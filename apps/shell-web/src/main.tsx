@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { SkyDeviceLayout } from '@sky-app/device-shell';
 import { createWebPlatform } from '@sky-app/platform-web';
 import { mockAppModule } from '@sky-app/module-mock-app';
+import '@sonth87/device-layout/style.css';
 
 const platform = createWebPlatform();
 

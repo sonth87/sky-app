@@ -1,5 +1,5 @@
 {
-  "extends": "@sky-app/tsconfig/base.json",
+  "extends": "@sky-app/tsconfig/react-library.json",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src"

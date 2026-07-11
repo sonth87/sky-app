@@ -12,6 +12,7 @@
     "@sky-app/device-shell": "workspace:*",
     "@sky-app/module-mock-app": "workspace:*",
     "@sky-app/platform-web": "workspace:*",
+    "@sonth87/device-layout": "file:../../.vendor/sonth87-device-layout-0.1.0.tgz",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

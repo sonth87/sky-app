@@ -1,123 +1,42 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ApiIntegration, AppConfig, Ceremony, Student } from '@sky-app/slide-shared';
+import type { ApiIntegration } from '@sky-app/slide-shared';
+import type {
+  ApiEnvironment,
+  SlideApi,
+  SlideMeta,
+  SyncResult,
+  SyncProgress,
+  DisplayInfo,
+  TtsConfig,
+  TtsEngines,
+  EngineInstallProgress,
+  TtsEnginePreflight,
+  TtsCapabilities,
+  PreGenStatus,
+} from '@sky-app/slide-shared';
 
-export type ApiEnvironment = 'prod' | 'test';
+// Re-export for the few call-sites elsewhere in electron/slide/* that still
+// `import type {...} from './preload'` — types now live in @sky-app/slide-shared
+// (modules/ceremony, a renderer package, cannot import 'electron' from here).
+export type {
+  ApiEnvironment,
+  SlideApi,
+  SlideMeta,
+  InvalidStudent,
+  ImportPreview,
+  SyncResult,
+  SyncProgress,
+  DisplayInfo,
+  TtsConfig,
+  TtsEngineInfo,
+  TtsEngines,
+  EngineInstallProgress,
+  TtsEnginePreflight,
+  TtsCapabilities,
+  PreGenStatus,
+} from '@sky-app/slide-shared';
 
-export interface SlideMeta {
-  config: AppConfig | null;
-  ceremony: Ceremony | null;
-  students: Student[];
-  syncedAt: string | null;
-  hasData: boolean;
-  apiEnvironment: ApiEnvironment;
-}
-
-export interface InvalidStudent {
-  index: number;
-  code: string;
-  reason: string;
-}
-
-export interface ImportPreview {
-  valid: number;
-  invalid: InvalidStudent[];
-  total: number;
-}
-
-export interface SyncResult {
-  ok: boolean;
-  updated: number;
-  added: number;
-  photosChanged: number;
-  offline: boolean;
-  message: string;
-  warning?: string;               // cảnh báo file nặng (vẫn import được)
-  pendingConfirm?: ImportPreview; // verify xong, chờ user xác nhận
-}
-
-export interface SyncProgress {
-  step: string;
-  pct: number;
-}
-
-export interface DisplayInfo {
-  id: number;
-  label: string;
-  bounds: { x: number; y: number; width: number; height: number };
-}
-
-/** Cấu hình TTS server-side (advanced infer params + device + engine) */
-export interface TtsConfig {
-  infer: {
-    temperature: number;
-    top_k: number;
-    top_p: number;
-    repetition_penalty: number;
-    max_new_frames: number | null;
-  };
-  device: { providers: string; threads: number };
-  engine: string;
-}
-
-/** Engine TTS đăng ký (multi-engine) */
-export interface TtsEngineInfo {
-  id: string;
-  label: string;
-  description: string;
-  implemented: boolean;
-  bundled: boolean;                                    // true = kèm installer, luôn sẵn sàng
-  install_status: 'installed' | 'partial' | 'missing'; // trạng thái model/runtime trên đĩa
-  requirements: {
-    min_ram_gb?: number; recommended_ram_gb?: number;
-    needs_gpu?: boolean; disk_headroom_factor?: number;
-  } | null;
-  capabilities: {
-    id: string; label: string; sample_rate: number;
-    supports_clone: boolean; supports_preset: boolean; supports_emotion: boolean;
-  } | null;
-}
-export interface TtsEngines {
-  engines: TtsEngineInfo[];
-  current: string;
-  current_capabilities: TtsEngineInfo['capabilities'] | null;
-}
-
-/** Tiến độ cài đặt engine mở rộng (event) */
-export interface EngineInstallProgress {
-  engineId: string;
-  phase: 'resolving' | 'downloading' | 'importing' | 'installing-runtime' | 'verifying' | 'done' | 'error' | 'paused';
-  filesTotal: number;
-  filesDone: number;
-  bytesReceived: number;
-  bytesTotal: number;
-  bytesPerSec: number;
-  currentFile: string;
-  error?: string;
-}
-
-/** Kết quả preflight trước khi tải engine mở rộng */
-export interface TtsEnginePreflight {
-  ok: boolean;
-  blocks: string[];
-  warnings: string[];
-  info: {
-    totalRamGb: number;
-    freeDiskGb: number | null;
-    requiredDiskGb: number;
-    engineTotalMb: number;
-  };
-}
-
-/** Năng lực thiết bị/provider onnxruntime (cho UI switch CPU/GPU) */
-export interface TtsCapabilities {
-  providers: Array<{ id: string; label: string; kind: string; available: boolean; works: boolean; supported?: boolean }>;
-  cpu_count: number;
-  current_providers: string[];
-  current_threads: number;
-  engine: string;
-}
-
-const api = {
+const api: SlideApi = {
   getMeta: (): Promise<SlideMeta> => ipcRenderer.invoke('data:meta'),
   syncData: (payload?: { url?: string; zipPath?: string }): Promise<SyncResult> =>
     ipcRenderer.invoke('data:sync', payload),
@@ -354,8 +273,6 @@ const api = {
     return () => ipcRenderer.removeListener('logs:changed', handler);
   },
 };
-
-export type SlideApi = typeof api;
 
 /**
  * Gọi từ electron/preload.ts (entry preload chính của app) — giữ bridge

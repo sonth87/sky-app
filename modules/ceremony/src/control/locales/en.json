@@ -1,0 +1,1177 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "error": "Error",
+    "loading": "Loading..."
+  },
+  "statusBar": {
+    "switchLanguage": "Switch language",
+    "env": {
+      "switchTooltip": "Switch API environment between PROD and TEST",
+      "label": "Environment: {{env}}",
+      "apiEnvironment": "API environment",
+      "current": "Current",
+      "description": "Description",
+      "descriptionProd": "Currently using the production API configuration.",
+      "descriptionTest": "Currently using the test API configuration.",
+      "impact": "Impact",
+      "impactDetail": "Switching environments will make the API Configuration section and all API calls use the corresponding endpoint/header/payload set.",
+      "switchEnvironment": "Switch environment",
+      "confirmSwitchTitle": "Confirm environment switch",
+      "confirmSwitchMessage": "Switch the API environment from {{from}} to {{to}}?\n\nAPI calls and the API Configuration screen will use the new environment's configuration.",
+      "switchTo": "Switch to {{env}}"
+    },
+    "fps": {
+      "lag": "Laggy",
+      "normal": "Normal",
+      "smooth": "Smooth",
+      "frameRate": "Frame rate",
+      "frameRateControl": "Frame Rate (Control)",
+      "currentFps": "Current FPS",
+      "currentFpsTooltip": "The number of frames rendered per second (Frames Per Second) by the interface.",
+      "level": "Level",
+      "levelTooltip": "The current smoothness level of the app (Smooth / Normal / Laggy).",
+      "confettiInterval": "Confetti interval",
+      "confettiIntervalValue": "~{{seconds}}s / burst",
+      "confettiIntervalTooltip": "The rest period between confetti bursts to reduce hardware load.",
+      "description": "Description",
+      "descriptionValue": "FPS of the Control window. Used to calculate the adaptive confetti interval — a slower machine automatically widens the gap between bursts to avoid particle buildup.",
+      "descriptionTooltip": "The monitoring purpose and use of the FPS metric."
+    },
+    "logs": {
+      "ok": "Logs: OK",
+      "errors": "Logs: {{count}} errors",
+      "sending": "Logs: Sending...",
+      "toggleTooltip": "Toggle the system and API log panel"
+    },
+    "pregen": {
+      "progress": "Pre-gen {{done}}/{{total}}…",
+      "paused": "Pre-gen paused {{done}}/{{total}}",
+      "progressFailed": "Pre-gen {{done}}/{{total}} ({{failed}} failed)",
+      "progressPlain": "Pre-gen {{done}}/{{total}}",
+      "tooltip": "TTS pre-generation status",
+      "title": "TTS Pre-generation"
+    },
+    "qr": {
+      "active": "QR active",
+      "waiting": "QR waiting",
+      "tooltip": "QR scanner status",
+      "title": "QR / Card scanner",
+      "status": "Status",
+      "statusActive": "✓ Active",
+      "statusWaiting": "○ Waiting (no recent scan)",
+      "statusTooltip": "The connection and response status of the QR/card scanner.",
+      "lastScan": "Last scan",
+      "lastScanTooltip": "The time the most recent successful scan was recorded.",
+      "student": "Student",
+      "studentTooltip": "Information about the last student recognized by the scanner.",
+      "none": "None yet",
+      "totalScanned": "Total scanned",
+      "totalScannedValue": "{{count}} scans",
+      "totalScannedTooltip": "The total number of scans recorded since startup.",
+      "description": "Description",
+      "descriptionValue": "Receives signals from the QR or ID card reader via the HID port. Considered active if there was a scan within the last 60 seconds.",
+      "descriptionTooltip": "Explains the automatic scanner detection and monitoring mechanism."
+    },
+    "system": {
+      "ramDash": "RAM —",
+      "title": "System resources",
+      "appRam": "App RAM",
+      "appRamTooltip": "The amount of RAM used by the Electron (App) process.",
+      "systemRam": "System RAM",
+      "systemRamTooltip": "The total amount of system RAM currently in use.",
+      "totalRam": "Total RAM",
+      "totalRamTooltip": "The total physical RAM installed on this device.",
+      "cpuUsage": "CPU Usage",
+      "cpuUsageTooltip": "The current CPU usage rate of the application.",
+      "cpuSys": "CPU (sys)",
+      "cpuSysTooltip": "The time the processor spent on operating-system-related tasks.",
+      "cpuUser": "CPU (user)",
+      "cpuUserTooltip": "The time the processor spent running instructions directly from the application.",
+      "description": "Description",
+      "descriptionValue": "App RAM: memory used by the Electron process. System RAM: total memory currently used by the system.",
+      "descriptionTooltip": "An overview explanation of the resource performance metrics."
+    },
+    "tts": {
+      "ready": "TTS ready",
+      "errorShort": "TTS error",
+      "starting": "TTS starting…",
+      "error": "Error",
+      "engineTooltip": "TTS Engine status (VieNeu)",
+      "restartTooltip": "Restart the TTS engine",
+      "restarting": "Restarting…",
+      "restart": "Restart",
+      "status": "Status",
+      "statusTooltip": "The readiness status of the text-to-speech (TTS) engine.",
+      "viewLogTooltip": "View the live log of the Python server",
+      "detail": "Detail",
+      "detailTooltip": "Detailed message about the current startup progress or error code.",
+      "engineDescTooltip": "VieNeu voice synthesis technology using ONNX format running on CPU.",
+      "voice": "Voice",
+      "voiceTooltip": "The identifier of the currently configured voice.",
+      "enabled": "TTS enabled",
+      "yes": "Yes",
+      "off": "Off",
+      "enabledTooltip": "Whether the slide's automatic audio playback feature is enabled.",
+      "loading": "Loading…",
+      "refresh": "Refresh",
+      "checking": "Checking…",
+      "notRunning": "Not running",
+      "processTooltip": "Whether the background Python Server process is running.",
+      "portTooltip": "The internal network port used to communicate with the Python Server.",
+      "noResponse": "Not responding",
+      "healthTooltip": "The result of the Python Server's health check endpoint (/health).",
+      "errorLabel": "Error",
+      "errorLabelTooltip": "Detailed error message that occurred when starting the Python process.",
+      "exitCodeTooltip": "The exit code returned when the Python process stopped.",
+      "hide": "Hide",
+      "view": "View",
+      "logStderrLines": "log/stderr ({{count}} lines)",
+      "noLog": "No log",
+      "activityLogEvents": "activity log ({{count}} events)",
+      "noEvents": "No events yet",
+      "loadMore": "Load more ({{count}} remaining)",
+      "viewDebugInfo": "View debug info"
+    },
+    "ws": {
+      "tooltip": "Socket connection status",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "title": "Socket connection",
+      "status": "Status",
+      "statusConnected": "✓ Connected",
+      "statusDisconnected": "✗ Disconnected",
+      "statusTooltip": "The current connection status of the Socket.IO channel between the control screen and the display screen.",
+      "protocol": "Protocol",
+      "protocolTooltip": "The real-time bidirectional communication protocol.",
+      "portTooltip": "The internal network port address of the WebSocket server.",
+      "description": "Description",
+      "descriptionValue": "The realtime channel between Control and Backdrop. Used to sync student status, playback mode, and TTS configuration.",
+      "descriptionTooltip": "The purpose of the Socket.IO data channel."
+    }
+  },
+  "apiConfig": {
+    "title": "Event API Integration Settings",
+    "subtitle": "Set up the endpoint and payload for each event in the app.",
+    "configuredCount": "Configured APIs ({{count}})",
+    "addNew": "Add new",
+    "emptyList": {
+      "line1": "No API configured yet.",
+      "line2": "Click \"Add new\" to get started."
+    },
+    "createNewTitle": "Create new API configuration",
+    "detailTitle": "API configuration details",
+    "saveConfig": "Save configuration",
+    "triggerEvent": "Trigger event",
+    "alreadyUsed": "(Already used)",
+    "apiUrl": "API URL",
+    "addHeader": "Add header",
+    "headerKeyPlaceholder": "Header key (e.g. Authorization)",
+    "headerValuePlaceholder": "Header value",
+    "noCustomHeaders": "No custom headers will be sent.",
+    "payloadBody": "Payload body (JSON template)",
+    "variableSuggestionsLabel": "Suggested variables to insert into Payload / URL:",
+    "clickToInsert": "Click to insert at the cursor position",
+    "insertHint": "Click into the <b1>API URL</b1> or <b2>Payload Body</b2> field, then click a variable above to insert it quickly.",
+    "emptyState": {
+      "title": "API integration configuration",
+      "description": "Select an API from the left column to edit it, or click <b>Add new</b> to link an action to your API."
+    },
+    "importConfig": "Import configuration",
+    "exportConfig": "Export configuration",
+    "resetToDefault": "Reset to default",
+    "alerts": {
+      "allActionsConfigured": "All event actions already have an API configured!",
+      "urlRequired": "Please enter an API URL!",
+      "invalidImportFormat": "Invalid configuration file! Check that the action/method values are valid.",
+      "duplicateActionInImport": "The configuration file has multiple APIs sharing the same event — each event can only have one API configured!",
+      "importNotArray": "The configuration file must be a JSON array!",
+      "cannotReadJsonFile": "Could not read the JSON file!"
+    },
+    "confirms": {
+      "deleteConfig": "Are you sure you want to delete this API configuration?"
+    },
+    "toasts": {
+      "saved": "API configuration saved!",
+      "deleted": "API configuration deleted!",
+      "importSuccess": "✓ API configuration imported successfully!",
+      "resetSuccess": "✓ Restored default API configuration ({{env}}) from .env"
+    },
+    "resetModal": {
+      "title": "Reset API to default",
+      "description": "You are about to restore all API configurations for the <b1>{{env}}</b1> environment to the defaults in the <b2>.env</b2> file. Any changes saved for this environment will be overwritten.",
+      "countdown": "The reset button will be enabled in <span>{{countdown}}</span> seconds",
+      "resetting": "Resetting...",
+      "resetDefault": "Reset to default"
+    },
+    "actions": {
+      "qrScan": "QR scan successful",
+      "playStudent": "Play student slide",
+      "welcomeScreen": "Show welcome screen",
+      "backdropToggle": "Toggle slide screen",
+      "submitLog": "Submit all logs to server"
+    },
+    "variables": {
+      "studentCode": "Student ID",
+      "fullName": "Full name",
+      "phoneNumber": "Phone number",
+      "majorName": "Major",
+      "classCode": "Class",
+      "awardLocationCode": "Venue code",
+      "event": "Event name",
+      "backdropOpen": "Slide screen open state",
+      "logs": "JSON log list"
+    },
+    "studentFields": {
+      "student_code": "Student ID",
+      "display_order": "Presentation order",
+      "full_name": "Full name",
+      "gender": "Gender",
+      "date_of_birth": "Date of birth",
+      "major_name": "Major",
+      "faculty_name": "Faculty",
+      "class_code": "Class",
+      "course_code": "Course/cohort",
+      "phone_number": "Phone number",
+      "identity_number": "National ID / ID number",
+      "email": "Email",
+      "card_code": "Student card code",
+      "gpa": "GPA",
+      "classification": "Classification (Excellent/Good/Fair...)",
+      "classification_type": "Classification type code",
+      "achievement_title": "Additional title",
+      "award_type": "Award type (MERIT/GRADUATION)",
+      "award_type_code": "Award type code",
+      "award_content": "Award content",
+      "presentation_template_type": "Presentation type (Award/Degree conferral)",
+      "quote": "Quote",
+      "graduation_batch_id": "Graduation batch ID",
+      "batch_name": "Batch name",
+      "degree_award_status": "Degree award status",
+      "status": "Operational status",
+      "staff_presenter": "Presenting staff"
+    },
+    "topLevelKeywords": {
+      "student": "Student information (type \".\" to see properties)",
+      "award_location_code": "Venue code",
+      "event": "Event name",
+      "backdrop_open": "Slide screen open state",
+      "logs": "JSON log list"
+    }
+  },
+  "ttsModal": {
+    "title": "Text-to-Speech (TTS) Settings",
+    "autoSaved": "Auto-saved",
+    "autoSaveHint": "Changes are saved automatically — no need to click \"OK\".",
+    "errors": {
+      "pregenStartFailed": "Could not start pre-generation"
+    },
+    "config": {
+      "sectionTitle": "CONFIGURATION",
+      "mainVoiceLabel": "Main voice / Fallback",
+      "multiVoiceActive": "Multiple voices — by condition set",
+      "multiVoiceHint": "Set specific configuration in the right column →",
+      "cloneVoiceFromAudio": "Create a voice from audio (clone)",
+      "speedLabel": "Speech speed",
+      "delayLabel": "TTS delay",
+      "delayHint": "* Delay: how long to wait after the slide appears before playing the voice.",
+      "templateLabel": "Speech sentence template",
+      "playModeLabel": "Audio playback mode",
+      "playModes": {
+        "pregenFallback": "Play from file (auto-falls back to realtime if missing)",
+        "realtime": "Realtime (synthesized live when presented on stage)",
+        "pregen": "File playback only (skip if not pre-generated)"
+      },
+      "recommended": "Recommended"
+    },
+    "pregen": {
+      "sectionTitle": "PRE-GENERATE AUDIO FILES",
+      "voicePoolLabel": "Voice pool",
+      "addVoice": "Add voice",
+      "defaultFallback": "Default (remaining)",
+      "distributionLabel": "Distribution for this batch:",
+      "staleWarning": "Configuration has changed — <b>{{count}} audio files</b> are still using the old settings/voice.",
+      "regenerateAll": "Regenerate all",
+      "createdCount": "Generated: {{done}}/{{total}} files",
+      "failedCount": "({{count}} failed)",
+      "paused": "Paused",
+      "generatingAudio": "Generating audio...",
+      "continueGenerate": "Continue generating",
+      "generateAll": "Generate all",
+      "resume": "Resume",
+      "pause": "Pause",
+      "cancel": "Cancel",
+      "perStudentVoiceLabel": "Voice assignment per student",
+      "regenerateSelected": "Regenerate {{count}} selected",
+      "noStudentData": "No student data yet. Please import first.",
+      "columnStudent": "Student",
+      "columnVoice": "Voice",
+      "columnStatus": "Status",
+      "statusNeedsRegenerate": "Needs regenerating",
+      "statusPending": "Pending",
+      "statusProcessing": "Processing...",
+      "statusDone": "Done",
+      "statusFailed": "Failed"
+    }
+  },
+  "advancedTtsConfig": {
+    "title": "Advanced configuration",
+    "subtitle": "voice generation parameters",
+    "loadingConfig": "Loading configuration…",
+    "presetLabel": "Preset:",
+    "presets": {
+      "safe": "Safe",
+      "default": "Default",
+      "experimental": "Experimental"
+    },
+    "params": {
+      "temperature": {
+        "label": "Randomness",
+        "tip": "How \"safe\" vs. \"natural\" the voice sounds. LOWER → steady, stable, fewer misreads (good for reading names). HIGHER → sounds more natural but more prone to stumbles or mispronunciation. Keep at 0.1 if unsure. (technical: temperature)"
+      },
+      "topK": {
+        "label": "Diversity (K)",
+        "tip": "How many candidate options the model picks from for each sound. LOW (5) = more certain, less variation. HIGH = more varied but more error-prone. Use 5 for reading names. (technical: top-k)"
+      },
+      "topP": {
+        "label": "Diversity (P)",
+        "tip": "Serves the same purpose as \"Diversity (K)\" but works differently. Rarely needs adjusting — keep at 0.95. Lower it for tighter, less varied speech. (technical: top-p / nucleus)"
+      },
+      "repetitionPenalty": {
+        "label": "Anti-repetition",
+        "tip": "Prevents repeated sounds/syllables (e.g. \"Nguyeeeen... nguyen nguyen\"). Increase if you hear repetition; but TOO HIGH (above 1.5) makes the voice sound distorted/rough. 1.3 is a good value. (technical: repetition penalty)"
+      }
+    },
+    "maxFrames": {
+      "label": "Maximum length (frames)",
+      "tip": "Limits the audio length per sentence, preventing endless rambling. Leave EMPTY = the system calculates it automatically from sentence length (recommended). Only set a number if long sentences get cut off. (technical: max_new_frames, ~12.5 frames/second)",
+      "placeholder": "Automatic",
+      "emptyMeansAuto": "empty = automatic"
+    },
+    "preview": "Preview",
+    "saved": "Saved ✓",
+    "footnote": "* Applies immediately to the next reading. Already pre-generated audio is unchanged until regenerated."
+  },
+  "voiceClone": {
+    "title": "Create a voice from audio (clone)",
+    "chooseWavFile": "Choose WAV file",
+    "noFileChosen": "No file chosen (WAV, 3–10 seconds, 48kHz)",
+    "voiceName": "Voice name",
+    "voiceNamePlaceholder": "e.g. Ms. Lan",
+    "gender": "Gender",
+    "female": "Female",
+    "male": "Male",
+    "region": "Region",
+    "regionNorth": "North",
+    "regionSouth": "South",
+    "creating": "Creating…",
+    "createVoice": "Create voice",
+    "recordingTip": "* Use 48kHz audio, 3–10 seconds long, clear voice with little background noise. Files that are too long/short will be rejected.",
+    "clonedVoicesCount": "Cloned voices ({{count}})",
+    "noClonedVoices": "No cloned voices yet.",
+    "tryListen": "Preview",
+    "deleteVoice": "Delete voice",
+    "errors": {
+      "fileAndLabelRequired": "Please choose a file and enter a voice name.",
+      "cloneFailed": "Cloning failed",
+      "deleteFailed": "Delete failed"
+    },
+    "confirms": {
+      "deleteVoice": "Delete voice \"{{label}}\"? This cannot be undone."
+    }
+  },
+  "voicePickerPopover": {
+    "loadingVoice": "Loading voice…",
+    "modelNotDownloaded": "VieNeu model not downloaded yet",
+    "modelNotDownloadedHint": "You can preview using the sample file. To use it for real, the model needs to be downloaded first.",
+    "downloadModel": "Download model",
+    "loadingVoiceList": "Loading voice list...",
+    "hfModelPage": "HuggingFace model page",
+    "footerHintNoModel": "▶ Listen to sample · Download the model to use for real",
+    "footerHintReady": "▶ Realtime preview · Click to select · ↗ Model page",
+    "stop": "Stop",
+    "errorRetry": "Error — retry",
+    "listenSample": "Listen to sample",
+    "tryRealtime": "Realtime preview",
+    "error": "Error",
+    "sample": "Sample",
+    "try": "Try",
+    "styles": {
+      "gentle": "Gentle",
+      "clear": "Clear",
+      "builtin": "Built-in"
+    }
+  },
+  "ttsToggle": {
+    "byConfig": "By configuration",
+    "enableTts": "Enable name reading (TTS)",
+    "voiceLabel": "Voice",
+    "multiVoiceTooltip": "The voice is assigned by configuration. Click to view/edit.",
+    "multiVoiceLabel": "By voice assignment configuration",
+    "open": "Open ›",
+    "speedLabel": "Speech speed — {{speed}}x",
+    "delayLabel": "TTS delay — {{delay}}s",
+    "startSentenceLabel": "Opening sentence",
+    "startSentencePlaceholder": "e.g. Congratulations to the student..."
+  },
+  "voiceConditionRules": {
+    "title": "Voice assignment rules",
+    "priorityHint": "Evaluated top to bottom in priority order ↓",
+    "if": "If",
+    "is": "is",
+    "fullNamePlaceholder": "Enter full name...",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "removeCondition": "Remove condition",
+    "addCondition": "Add condition",
+    "attrs": {
+      "gender": "Gender",
+      "classification": "Classification",
+      "major": "Major",
+      "faculty": "Faculty",
+      "classCode": "Class",
+      "course": "Course/cohort",
+      "fullName": "Full name"
+    }
+  },
+  "studentList": {
+    "columns": {
+      "avatar": "Photo",
+      "studentCode": "Student ID",
+      "fullName": "Full Name",
+      "majorName": "Major",
+      "classCode": "Class",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "searchPlaceholder": "Search by name / Student ID / Phone number…",
+    "filterTitle": "Filter student list",
+    "clear": "Clear",
+    "filterPanelTitle": "Student filters",
+    "resetFilter": "Reset filters",
+    "filters": {
+      "all": "All",
+      "major": "Major",
+      "gender": "Gender",
+      "faculty": "Faculty",
+      "course": "Course",
+      "classCode": "Class",
+      "status": "Status",
+      "awardType": "Award type",
+      "played": "Played",
+      "playedYes": "Played",
+      "playedNo": "Not played",
+      "scanned": "QR scanned",
+      "scannedYes": "Scanned",
+      "scannedNo": "Not scanned",
+      "receivedDegree": "Degree received",
+      "receivedYes": "Received",
+      "receivedNo": "Not received",
+      "hasAvatar": "Avatar photo",
+      "hasAvatarYes": "Has photo",
+      "hasAvatarNo": "No photo"
+    },
+    "count": "{{count}} students",
+    "countScanned": "{{count}} students scanned",
+    "activeButton": "Active",
+    "emptyScanned": "No students have been QR-scanned yet.",
+    "layoutMiddleTitle": "Center Layout (Award)",
+    "present": "Present",
+    "absent": "Absent",
+    "replay": "Replay",
+    "play": "Play",
+    "noPhoto": "No photo",
+    "copyTitle": "Copy",
+    "copiedLabel": "Copied {{label}}",
+    "copiedGeneric": "Copied to clipboard!"
+  },
+  "studentDetailPopover": {
+    "tableView": "Table view",
+    "cardView": "Card view",
+    "noPhoto": "No photo",
+    "orderNumber": "No.",
+    "studentCodePrefix": "ID",
+    "fieldLabels": {
+      "fullName": "full name",
+      "studentCode": "student ID",
+      "classCode": "Class",
+      "classificationGpa": "Classification / GPA",
+      "majorName": "Major",
+      "facultyName": "Faculty",
+      "dateOfBirth": "Date of birth",
+      "phoneNumber": "Phone number",
+      "achievementTitle": "Achievement title",
+      "awardContent": "Award content"
+    },
+    "tableHeaders": {
+      "key": "Field (Key)",
+      "value": "Value"
+    },
+    "base64ImageData": "[Base64 image data - {{size}} KB]",
+    "fieldOf": "field {{key}}",
+    "valueOf": "value of {{key}}"
+  },
+  "settingsModal": {
+    "title": "Settings",
+    "general": "General",
+    "appearance": "Appearance",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "themeMode": "Mode",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "themePalette": "Color palette",
+    "font": "Font",
+    "letterSpacing": "Letter Spacing",
+    "spacing": "Spacing",
+    "shadow": "Shadow",
+    "shadowNone": "None",
+    "shadowSoft": "Soft",
+    "shadowMedium": "Med",
+    "shadowBold": "Bold",
+    "backup": "Backup"
+  },
+  "backupSettings": {
+    "exportTab": "Export",
+    "importTab": "Import",
+    "exportHint": "Select the config groups to export as a JSON file. Does not include student/QR-scan data (use the Data menu for that).",
+    "importHint": "Select a JSON file exported previously. Only groups present and valid in the file will show up to choose from.",
+    "chooseFile": "Choose JSON file…",
+    "exportButton": "Export file",
+    "importButton": "Import selected groups",
+    "noGroupsFound": "The file does not contain any valid config group.",
+    "group": {
+      "apiConfig": "API integration config",
+      "customVariables": "Custom reading variables",
+      "layoutOverrides": "Layout config",
+      "tts": "TTS config",
+      "appearance": "Appearance (theme, font...)"
+    },
+    "toasts": {
+      "exportSuccess": "Exported {{count}} config group(s)",
+      "exportError": "Export failed: {{message}}",
+      "parseError": "Could not read file: {{message}}",
+      "importSuccess": "Imported {{count}} config group(s)",
+      "importError": "Import failed: {{message}}"
+    }
+  },
+  "debugMenu": {
+    "config": "Configuration",
+    "useSampleData": "Use sample data",
+    "tts": "Text-to-Speech (TTS)",
+    "manageVariables": "Manage variables",
+    "layoutConfig": "Layout configuration",
+    "apiConfig": "Integration API configuration",
+    "importZip": "Import data (ZIP)",
+    "exportZip": "Export data (ZIP)",
+    "debug": "Debug",
+    "apiTestInterface": "API test interface",
+    "devtoolsControl": "DevTools — Control",
+    "devtoolsBackdrop": "DevTools — Backdrop",
+    "deleteData": "Delete data",
+    "deleteStudentData": "Delete student data",
+    "deleteScanData": "Delete scan data",
+    "clearCache": "Clear cache",
+    "aboutApp": "About the app",
+    "largeFileConfirm": "Large file ({{size}}). Import may be slow. Continue anyway?",
+    "checkingData": "Checking data...",
+    "importConfirm": "Found {{valid}} valid students (total {{total}}). Overwrite current data?",
+    "importConfirmWithErrors": "Found {{valid}} valid students, {{invalid}} errors (total {{total}}). Overwrite current data?",
+    "importSuccess": "✓ Import successful!",
+    "importError": "Import error: {{message}}",
+    "genericError": "Error: {{message}}",
+    "exportSuccess": "✓ Data exported successfully!",
+    "exportError": "Export error: {{message}}",
+    "confirmResetTitle": "Confirm data deletion",
+    "confirmResetMessage": "Are you sure you want to delete all data? The app will restart with default data.",
+    "confirmDeleteStudentsTitle": "Delete student data",
+    "confirmDeleteStudentsMessage": "Are you sure you want to delete all student data? The app will restart with default data.",
+    "deleteStudentsSuccess": "✓ Student data deleted",
+    "confirmDeleteScansTitle": "Delete scan data",
+    "confirmDeleteScansMessage": "Are you sure you want to delete all scan data? Student data will be kept.",
+    "deleteScansSuccess": "✓ QR scan data deleted",
+    "confirmClearCacheTitle": "Clear cache",
+    "confirmClearCacheMessage": "Are you sure you want to clear the app cache? This will clear localStorage, sessionStorage, IndexedDB, and service worker cache.",
+    "clearCacheSuccess": "✓ Cache cleared"
+  },
+  "syncPanel": {
+    "title": "Data",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "refreshTitle": "Reload data from server",
+    "importZip": "Import ZIP",
+    "importing": "Importing…",
+    "importTitle": "Import a .zip bundle file from disk",
+    "exportZip": "Export ZIP",
+    "exporting": "Exporting…",
+    "exportTitle": "Export data as a .zip bundle file",
+    "cancel": "Cancel",
+    "overwriteAndImport": "Overwrite & import",
+    "confirmImportTitle": "Confirm import",
+    "foundValid": "Found",
+    "validStudents": "valid students",
+    "errors": "errors",
+    "outOfTotal": "out of {{total}} total records.",
+    "noCode": "(no code)",
+    "andMoreErrors": "…and {{count}} more errors",
+    "importOverwriteNote": "Import will overwrite current data (ceremony state is preserved). Invalid students will be skipped.",
+    "lastSync": "Last sync",
+    "unknown": "unknown",
+    "readingFile": "Reading file…",
+    "loadingData": "Loading data…",
+    "writingData": "Writing data…",
+    "preparingData": "Preparing data…",
+    "importCancelled": "Import cancelled.",
+    "largeFileConfirm": "Large file ({{size}}). Import may be slow and memory-intensive. Continue anyway?",
+    "errorPrefix": "Error: {{message}}",
+    "unknownError": "unknown"
+  },
+  "apiTestModal": {
+    "headerTitle": "API Test Interface",
+    "headerSubtitle": "Test the app's interoperability with the Dai Nam University service gateway.",
+    "requestSection": "Request",
+    "methodAndUrl": "Request method & URL endpoint",
+    "urlPlaceholder": "Enter API URL...",
+    "apiKeyPlaceholder": "x-api-key header...",
+    "loadRandomStudent": "Load Random Student",
+    "keyWordLabel": "key_word (Student ID / National ID)",
+    "keyWordPlaceholder": "e.g. SV001",
+    "locations": {
+      "square": "0 - Square",
+      "htlGd1": "1 - HTL - GD1",
+      "ht1Gd2": "2 - HT1- GD2",
+      "ht2Gd2": "3 - HT2-GD2"
+    },
+    "jsonRequestBody": "JSON Request Body",
+    "copyJsonTitle": "Copy JSON",
+    "responseSection": "Response",
+    "emptyResponseHint": "Click \"Send Request\" to send a test request.",
+    "contactingServer": "Contacting Dai Nam University service gateway...",
+    "responseHeaders": "Response Headers",
+    "responseBody": "Response Body",
+    "noResponseBody": "No response body",
+    "corsNote": "* Requests are made from the Electron Main Process to avoid being blocked by CORS.",
+    "cancel": "Cancel",
+    "sendRequest": "Send Request",
+    "sendSuccess": "Test API request sent successfully!",
+    "sendErrorStatus": "API returned error code: {{status}}",
+    "sendError": "Error calling the test API",
+    "loadedStudent": "Loaded student: {{name}}"
+  },
+  "engineManager": {
+    "title": "TTS Engine Manager",
+    "description": "VieNeu is the default engine (bundled). Other engines can be downloaded when needed — download before the ceremony, requires a stable network connection.",
+    "ceremonySafetyNote": "While a student is on stage, model downloads will <b>automatically pause</b> and engine switching/downloading will be disabled — freeing up resources for name reading. It resumes automatically afterward. No action needed.",
+    "inUse": "In use",
+    "bundled": "Bundled",
+    "requires": "Requires",
+    "recommended": "recommended",
+    "diskUsage": "Disk usage",
+    "switchToThis": "Switch to this engine",
+    "exportUsb": "Export to USB",
+    "deleteConfirm": "Delete model \"{{label}}\"? It will need to be re-downloaded if needed again.",
+    "deleteFailed": "Delete failed",
+    "delete": "Delete",
+    "pause": "Pause",
+    "resume": "Resume",
+    "downloadModel": "Download model",
+    "importFromUsb": "Import from USB",
+    "cancel": "Cancel",
+    "installStartFailed": "Could not start download",
+    "checkingEngine": "Checking engine…",
+    "engineLoadFailed": "Engine failed to load: {{error}}",
+    "unknownError": "error",
+    "switchingEngine": "Switching engine (restarting, ~30–60s)…",
+    "switchSuccess": "Engine switched ✓",
+    "switchFailed": "Switch failed: {{error}}",
+    "status": {
+      "ready": "Ready",
+      "partial": "Partially downloaded",
+      "notDownloaded": "Not downloaded"
+    },
+    "phase": {
+      "resolving": "Preparing",
+      "downloading": "Downloading",
+      "importing": "Importing",
+      "installingRuntime": "Installing runtime",
+      "verifying": "Verifying",
+      "paused": "Paused"
+    }
+  },
+  "deviceConfig": {
+    "title": "Processing device",
+    "subtitle": "(CPU / acceleration)",
+    "loading": "Loading…",
+    "ttsEngine": "TTS Engine",
+    "ttsEngineInfo": "The software that generates speech. VieNeu is the default (bundled). You can download other engines when needed — click 'Manage engine'. Switching engines requires a restart (~30–60 seconds).",
+    "inUse": "In use",
+    "manageEngine": "Manage engine",
+    "thisMachine": "This machine",
+    "threadsCount": "{{count}} threads",
+    "threadsAuto": "auto threads",
+    "cpuThreads": "CPU thread count",
+    "cpuThreadsInfo": "How many CPU cores are used to generate speech. 0 = automatic (uses all). Setting 2–4 usually runs smoother and reduces stutter on the presentation screen while generating speech. Requires an engine restart after changing.",
+    "auto": "auto",
+    "processor": "Processor",
+    "processorInfo": "Choose the hardware used to generate speech. CPU = central processing unit (every machine has one, stable). GPU = graphics card, processes AI in parallel so it's FASTER — but only works on machines with a discrete GPU (usually NVIDIA) and requires downloading an extra library.",
+    "gpuHelpToggle": "What is a GPU? Should I use one?",
+    "gpuHelp": {
+      "intro": "<b class=\"text-slate-700\">GPU (graphics card)</b> processes many calculations in parallel, so it's usually faster than CPU for AI. <b class=\"text-slate-700\">CPU</b> is the general-purpose processor every machine has.",
+      "benefits": "<b class=\"text-emerald-700\">GPU benefits:</b> faster speech generation (most noticeable on weaker CPUs), less CPU load so the presentation screen stays smoother while generating speech.",
+      "drawbacks": "<b class=\"text-amber-700\">Drawbacks:</b> only works on machines with a discrete GPU (usually NVIDIA); requires downloading an extra library (~a few hundred MB); more complex setup; may not be compatible with every engine.",
+      "whenNeeded": "<b class=\"text-slate-700\">When it's needed:</b> for sequential name-reading use cases (one sentence at a time), <b>CPU is usually fast enough</b>. GPU is worth using when the machine is weak, speech generation is slow, or you want to reduce CPU load. If no suitable GPU is available, the option is locked and CPU still works fine."
+    },
+    "cpuStable": "(stable, recommended)",
+    "noGpuOption": "This machine / engine has no GPU option — CPU only.",
+    "faster": "(faster)",
+    "incompatibleEngine": "(not compatible with this engine)",
+    "noHardware": "(this machine doesn't have this hardware)",
+    "needsLibrary": "(requires downloading a library)",
+    "installLibraryTitle": "Download the GPU acceleration library (~a few hundred MB) then enable it",
+    "installAndEnable": "Download & enable",
+    "applyAndRestart": "Apply & restart engine",
+    "restartNote": "* Changing the device requires restarting the engine (~30–60s). The list of processors changes depending on the current engine (each engine supports different hardware).",
+    "appliedAndRestarted": "Applied & restarted engine.",
+    "installing": "Installing {{pkg}}… (may take a few minutes)",
+    "installedRestartToCheck": "Installed {{pkg}}. Restart the engine to verify.",
+    "installFailed": "Installation failed"
+  },
+  "confettiModal": {
+    "title": "Confetti Settings",
+    "subtitle": "Configure the stage effect",
+    "enableEffect": "Enable effect",
+    "resetDefault": "Reset to default",
+    "section": {
+      "shootType": "Launch style",
+      "colors": "Colors",
+      "repeat": "Repeat",
+      "amountSpeed": "Particle amount & speed",
+      "ribbon": "Accompanying ribbon",
+      "shape": "Particle shape",
+      "size": "Particle size & ratio"
+    },
+    "advanced": {
+      "toggle": "Advanced tuning",
+      "toggleHint": "speed, ribbon, shape, particle size…"
+    },
+    "repeat": {
+      "auto": "Automatically repeat on a cycle",
+      "burstHint": "Each repeat fires lighter (no ribbon)"
+    },
+    "field": {
+      "amount": "Particle amount",
+      "speed": "Fall speed",
+      "ticks": "Lifetime"
+    },
+    "type": {
+      "standard": "Arch",
+      "sides": "Fire from both sides",
+      "rain": "Fall from above",
+      "cannon": "Cannon",
+      "centerUp": "Fountain",
+      "fireworks": "Fireworks burst"
+    },
+    "ribbon": {
+      "none": "None",
+      "wave": "Wave",
+      "classic": "Streamer roll",
+      "spiral": "Coiled spiral"
+    },
+    "color": {
+      "colorful": "Multicolor",
+      "gold": "Gold shimmer",
+      "silver": "Silver shimmer",
+      "pink": "Pink",
+      "green": "Green",
+      "blue": "Blue",
+      "red": "Red",
+      "purple": "Purple"
+    },
+    "shape": {
+      "star": "Star",
+      "mixed": "Mixed",
+      "circle": "Circle",
+      "square": "Square"
+    },
+    "amount": {
+      "veryLow": "Very low",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "veryHigh": "Very high"
+    },
+    "speed": {
+      "verySlow": "Very slow",
+      "slow": "Slow",
+      "normal": "Normal",
+      "fast": "Fast",
+      "veryFast": "Very fast"
+    },
+    "ticks": {
+      "short": "Short",
+      "normal": "Normal",
+      "long": "Long",
+      "veryLong": "Very long"
+    },
+    "wave": {
+      "count": "Strand count",
+      "countValue": "{{count}} strands",
+      "length": "Strand length",
+      "width": "Strand width",
+      "range": "Launch range",
+      "rangeValue": "Level {{level}}"
+    },
+    "classic": {
+      "count": "Strand count",
+      "countValue": "{{count}} strands",
+      "min": "Min length",
+      "max": "Max length"
+    },
+    "spiral": {
+      "count": "Intensity (strand count)",
+      "countValue": "{{count}} strands"
+    },
+    "size": {
+      "scale": "Overall scale",
+      "small": "Small particles",
+      "medium": "Medium particles",
+      "large": "Large particles"
+    }
+  },
+  "confettiToggle": {
+    "label": "Confetti",
+    "enable": "Enable confetti",
+    "intensity": "Intensity",
+    "fallSpeed": "Fall speed",
+    "repeat": "Repeat",
+    "burst": "Extra burst",
+    "burstHint": "lighter",
+    "advanced": "Advanced settings",
+    "amount": {
+      "veryLow": "Very low",
+      "low": "Low",
+      "medium": "Normal",
+      "high": "High",
+      "veryHigh": "Very high"
+    },
+    "speed": {
+      "verySlow": "Very slow",
+      "slow": "Slow",
+      "normal": "Normal",
+      "fast": "Fast",
+      "veryFast": "Very fast"
+    }
+  },
+  "layoutConfig": {
+    "title": "Layout Settings",
+    "selectLayout": "Select layout to configure",
+    "fieldsSectionTitle": "INFORMATION FIELDS",
+    "customContentHint": "Custom content (leave blank to use default)",
+    "customContentPlaceholder": "Enter display content...",
+    "textColor": "Text color (Hex)",
+    "fontSize": "Font size (%)",
+    "fontSizeDefault": "Default",
+    "preview": "Preview",
+    "reset": "Reset",
+    "saveConfig": "Save settings",
+    "previewNote": "Note: the preview screen may differ slightly from the actual display due to aspect ratio.",
+    "layoutOption": {
+      "layout1": "Left Layout (Default)",
+      "layout3": "Center Layout (Award)"
+    },
+    "field": {
+      "templateType": "Subtitle (Graduation ceremony...)",
+      "title": "Title (Bachelor's...)",
+      "fullName": "Full name",
+      "majorName": "Major",
+      "classification": "Classification",
+      "quote": "Quote"
+    }
+  },
+  "logsDrawer": {
+    "header": "System Logs & API Update Calls",
+    "confirmClear": "Are you sure you want to delete the entire log history? This will also delete the logs.json file on disk.",
+    "retry": "Retry",
+    "retryAllFailed": "Retry all failed ({{count}})",
+    "exportTitle": "Export .txt file",
+    "exportFile": "Export file",
+    "submitTitle": "Submit all logs to API",
+    "submitLogs": "Submit logs",
+    "clearTitle": "Delete logs on disk",
+    "clearLogs": "Clear logs",
+    "noMatch": "No matching log entries.",
+    "searchPlaceholder": "Search student, code, content...",
+    "stats": {
+      "total": "Total: {{count}}",
+      "apiOk": "API OK: {{count}}",
+      "apiFailed": "API Failed: {{count}}",
+      "apiPending": "Pending: {{count}}"
+    },
+    "filter": {
+      "all": "All",
+      "scan": "Scans ({{count}})",
+      "play": "Plays ({{count}})",
+      "clear": "Welcome",
+      "api": "API & Retry ({{count}})"
+    },
+    "badge": {
+      "scanQr": "SCAN QR",
+      "welcome": "WELCOME"
+    },
+    "apiStatus": {
+      "success": "Success",
+      "processing": "Processing...",
+      "failed": "Error"
+    },
+    "table": {
+      "time": "Time",
+      "action": "Action",
+      "student": "Student",
+      "details": "Event details",
+      "apiStatus": "API status"
+    },
+    "toast": {
+      "retryingSingle": "Retrying the API request...",
+      "retrySingleError": "Error triggering retry",
+      "retryingAll": "Retrying all failed API calls...",
+      "retryAllError": "Error triggering retry all",
+      "exportError": "Export error: {{message}}",
+      "exportConnectionError": "Connection error while exporting file",
+      "submitSuccess": "✓ All logs submitted to server!",
+      "submitError": "Error submitting logs! Please check your API configuration.",
+      "submitConnectionError": "Connection error while submitting logs",
+      "clearSuccess": "All logs have been cleared.",
+      "clearError": "Error clearing logs"
+    }
+  },
+  "templateEditor": {
+    "unknownVariable": "Variable does not exist",
+    "placeholder": "Type a template, use @ to insert a variable...",
+    "manageVariablesTitle": "Manage variables — create custom conditional variables (e.g. @title)",
+    "previewLabel": "Preview:",
+    "empty": "empty",
+    "ttsNotReady": "TTS engine not ready",
+    "generatingAudio": "Generating audio...",
+    "stopPlaying": "Stop playback",
+    "listenPreview": "Listen to preview",
+    "hint": {
+      "typeAt": "Type",
+      "toInsertVariable": "to insert a variable.",
+      "example": "Example:",
+      "addPunctBefore": "Add a",
+      "or": "or",
+      "forPause": "to add a pause.",
+      "useMultiDots": "Use multiple",
+      "forLongerPause": "for a longer pause."
+    }
+  },
+  "customVariables": {
+    "title": "Manage variables",
+    "subtitle": "Custom conditional variables — used in templates as @variable_name",
+    "autoSave": "Auto-saved",
+    "importTitle": "Import variables from JSON file",
+    "exportTitle": "Export all variables to JSON file",
+    "keyPlaceholder": "variable_name",
+    "labelPlaceholder": "Display label (e.g. Title)",
+    "studentFallback": "Student",
+    "empty": "empty",
+    "deleteVariable": "Delete variable",
+    "ifWord": "If",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "deleteRule": "Delete condition",
+    "addRule": "Add condition",
+    "defaultElse": "Default (otherwise) →",
+    "defaultPlaceholder": "e.g. Bachelor",
+    "resultPlaceholder": "Result (e.g. Engineer)",
+    "addVariable": "Add variable",
+    "footerNote": "Conditions are evaluated top to bottom — the first match wins. Changes are saved automatically.",
+    "emptyState": {
+      "before": "No variables yet. Click",
+      "after": "to create your first conditional variable."
+    },
+    "error": {
+      "invalidKey": "Variable name may only contain unaccented letters and underscores (a-z, A-Z, _).",
+      "duplicateKey": "Variable name conflicts with another variable.",
+      "reservedKey": "Variable name conflicts with an existing data field — the conditional variable will override that field."
+    },
+    "import": {
+      "button": "Import",
+      "noValidVariables": "The file contains no valid variables.",
+      "confirmReplace": "Import {{count}} variables.\n\nOK = Replace the entire current list.\nCancel = Add to the existing list.",
+      "readError": "Could not read the JSON file: {{message}}"
+    },
+    "export": {
+      "button": "Export"
+    },
+    "valuePlaceholder": {
+      "list": "it, information technology",
+      "default": "value"
+    },
+    "op": {
+      "equals": "equals",
+      "contains": "contains",
+      "in": "is in list",
+      "gt": "> (greater than)",
+      "lt": "< (less than)",
+      "gte": "≥ (greater or equal)",
+      "lte": "≤ (less or equal)"
+    }
+  },
+  "preGenPopover": {
+    "failedCount": "{{count}} failed",
+    "suspectTitle": "Files generated successfully but with suspected quality issues (noise, low volume, distortion...). Click to filter.",
+    "suspectCount": "{{count}} suspect",
+    "pause": "Pause",
+    "resume": "Resume",
+    "requeueSelected": "Regenerate {{count}} selected",
+    "searchPlaceholder": "Search name, student ID...",
+    "noResults": "No results",
+    "playTitle": "Play preview",
+    "requeueTitle": "Regenerate",
+    "suspectQualityTitle": "Suspected quality issue: {{flags}}",
+    "filter": {
+      "all": "All",
+      "done": "Done",
+      "suspect": "Suspect",
+      "failed": "Failed",
+      "pending": "Pending"
+    },
+    "table": {
+      "student": "Student",
+      "status": "Status",
+      "action": "Action"
+    },
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "done": "Done",
+      "failed": "Failed"
+    },
+    "quality": {
+      "noisy": "noisy/static",
+      "lowEnergy": "volume too low",
+      "noPauses": "no pauses between words (may sound slurred)",
+      "mostlySilent": "nearly silent",
+      "clipping": "distorted/clipped audio",
+      "tooShort": "too short for the content",
+      "tooLong": "too long (repeated/stretched)"
+    }
+  },
+  "controlApp": {
+    "title": "Control",
+    "studentNotFound": "No student found with code {{code}}",
+    "studentAdded": "Added {{name}}"
+  },
+  "about": {
+    "appName": "Diploma Award - Slide"
+  },
+  "autoPlayBar": {
+    "manualOnly": "AutoPlay is only available in manual mode",
+    "stop": "Stop",
+    "auto": "Auto"
+  },
+  "backdropToggle": {
+    "turnOff": "Turn off display screen",
+    "turnOn": "Turn on display screen",
+    "turnOffShort": "Turn off screen",
+    "turnOnShort": "Turn on screen",
+    "processing": "Processing…",
+    "exitFullscreen": "Exit fullscreen",
+    "fullscreen": "Fullscreen",
+    "displayScreen": "Display screen",
+    "on": "On",
+    "off": "Off"
+  },
+  "hallSelector": {
+    "label": "Hall:"
+  },
+  "idlePanel": {
+    "welcomeScreen": "Welcome screen",
+    "autoReturnTooltip": "Automatically returns to the welcome screen because no new student has been shown. Use the ⚙️ Options button on the toolbar to enable/disable or change the timing.",
+    "autoReturnIn": "Returning in {{seconds}}s",
+    "showWelcomeScreen": "Show welcome screen"
+  },
+  "modeSwitch": {
+    "label": "Mode:",
+    "auto": "Auto (scan to show)",
+    "manual": "Manual (wait for Play)"
+  },
+  "nowOnStage": {
+    "onStage": "Now on stage",
+    "scrollToStudent": "Scroll to this student in the list",
+    "idleScreen": "Screen is in idle mode.",
+    "prev": "Prev",
+    "next": "Next"
+  },
+  "optionsToggle": {
+    "label": "Options",
+    "display": "Display",
+    "showAllStudentsPanel": "Show all students panel",
+    "slideOperation": "Slide operation",
+    "slideDelay": "Slide transition delay",
+    "instant": "Instant",
+    "seconds": "{{seconds}} seconds",
+    "slideDelayHint": "Delay after a successful QR/card scan before the student's slide is automatically activated on the main screen.",
+    "autoIdleReturn": "Automatically return to idle screen when inactive",
+    "afterHowLong": "After how long (seconds)",
+    "idleTimeoutHint": "If no new student is shown within this time (in both auto/manual modes), automatically return to the welcome screen."
+  },
+  "previewPanel": {
+    "preview": "Preview",
+    "clickRowLine1": "Click on a row in the list",
+    "clickRowLine2": "to preview",
+    "currentlyShowing": "Currently showing",
+    "showOnScreen": "Show on screen"
+  },
+  "qrStatus": {
+    "lastScanAt": "Last scan: {{time}}",
+    "noScanYet": "No scans yet",
+    "active": "QR active",
+    "waiting": "QR waiting"
+  },
+  "rowContextMenu": {
+    "studentDetail": "Student details",
+    "playAudio": "Play audio",
+    "regenAudio": "Regenerate audio",
+    "markPresent": "Mark present",
+    "markAbsent": "Mark absent",
+    "goOnStage": "Go on stage"
+  },
+  "scanInbox": {
+    "noStudentScanned": "No student has been scanned yet.",
+    "studentMarkedAbsent": "Student marked as absent",
+    "justScanned": "Just scanned student:",
+    "reason": "Reason: {{reason}}",
+    "noPhoto": "No photo",
+    "showAnyway": "Show anyway (override)",
+    "play": "Play (show on screen)",
+    "skip": "Skip"
+  },
+  "studentPanels": {
+    "scannedCount": "Scanned: {{count}}",
+    "allStudents": "All students",
+    "scannedQr": "Scanned QR"
+  },
+  "displayPicker": {
+    "backdropScreen": "Backdrop screen",
+    "aspectRatio": "Projection aspect ratio:",
+    "moveToDisplay": "Move to display:",
+    "exitFullscreen": "Exit fullscreen",
+    "fullscreen": "Fullscreen"
+  },
+  "ui": {
+    "confirmModal": {
+      "deleting": "Deleting...",
+      "enableAfter": "The delete button will be enabled in",
+      "seconds": "seconds"
+    }
+  }
+}

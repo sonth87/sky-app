@@ -1,0 +1,1177 @@
+{
+  "common": {
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "close": "Đóng",
+    "confirm": "Xác nhận",
+    "delete": "Xóa",
+    "edit": "Sửa",
+    "add": "Thêm",
+    "error": "Lỗi",
+    "loading": "Đang tải..."
+  },
+  "statusBar": {
+    "switchLanguage": "Chuyển ngôn ngữ",
+    "env": {
+      "switchTooltip": "Chuyển môi trường API giữa PROD và TEST",
+      "label": "Môi trường: {{env}}",
+      "apiEnvironment": "Môi trường API",
+      "current": "Hiện tại",
+      "description": "Mô tả",
+      "descriptionProd": "Đang dùng cấu hình API môi trường production.",
+      "descriptionTest": "Đang dùng cấu hình API môi trường test.",
+      "impact": "Ảnh hưởng",
+      "impactDetail": "Đổi môi trường sẽ làm mục Cấu hình API và các lần gọi API dùng bộ endpoint/header/payload tương ứng.",
+      "switchEnvironment": "Chuyển môi trường",
+      "confirmSwitchTitle": "Xác nhận chuyển môi trường",
+      "confirmSwitchMessage": "Chuyển môi trường API từ {{from}} sang {{to}}?\n\nCác lần gọi API và màn hình Cấu hình API sẽ dùng bộ cấu hình của môi trường mới.",
+      "switchTo": "Chuyển sang {{env}}"
+    },
+    "fps": {
+      "lag": "Giật (lag)",
+      "normal": "Bình thường",
+      "smooth": "Mượt",
+      "frameRate": "Frame rate",
+      "frameRateControl": "Frame Rate (Control)",
+      "currentFps": "FPS hiện tại",
+      "currentFpsTooltip": "Số lượng khung hình được dựng trên giây (Frames Per Second) của giao diện.",
+      "level": "Mức độ",
+      "levelTooltip": "Mức độ mượt mà hiện tại của phần mềm (Mượt / Bình thường / Giật lag).",
+      "confettiInterval": "Confetti lặp",
+      "confettiIntervalValue": "~{{seconds}}s / lần",
+      "confettiIntervalTooltip": "Khoảng thời gian nghỉ giữa các đợt bắn pháo hoa để giảm tải phần cứng.",
+      "description": "Mô tả",
+      "descriptionValue": "FPS của cửa sổ Control. Dùng để tính interval confetti thích nghi — máy chậm tự giãn khoảng cách giữa các lần bắn để tránh tích lũy particle.",
+      "descriptionTooltip": "Mục đích giám sát và công dụng của chỉ số FPS."
+    },
+    "logs": {
+      "ok": "Logs: OK",
+      "errors": "Logs: {{count}} lỗi",
+      "sending": "Logs: Đang gửi...",
+      "toggleTooltip": "Bật/Tắt bảng Nhật ký hệ thống và API"
+    },
+    "pregen": {
+      "progress": "Pre-gen {{done}}/{{total}}…",
+      "paused": "Pre-gen tạm dừng {{done}}/{{total}}",
+      "progressFailed": "Pre-gen {{done}}/{{total}} ({{failed}} lỗi)",
+      "progressPlain": "Pre-gen {{done}}/{{total}}",
+      "tooltip": "Trạng thái tạo trước TTS",
+      "title": "Tạo trước TTS"
+    },
+    "qr": {
+      "active": "QR hoạt động",
+      "waiting": "QR chờ",
+      "tooltip": "Trạng thái máy quét QR",
+      "title": "Máy quét QR / Thẻ",
+      "status": "Trạng thái",
+      "statusActive": "✓ Đang hoạt động",
+      "statusWaiting": "○ Chờ (chưa có lần quét gần đây)",
+      "statusTooltip": "Trạng thái kết nối và phản hồi từ đầu đọc quét mã QR/Thẻ.",
+      "lastScan": "Lần quét gần nhất",
+      "lastScanTooltip": "Thời gian ghi nhận lượt quét thành công mới nhất.",
+      "student": "Sinh viên",
+      "studentTooltip": "Thông tin sinh viên cuối cùng được hệ thống quét nhận dạng.",
+      "none": "Chưa có",
+      "totalScanned": "Tổng đã quét",
+      "totalScannedValue": "{{count}} lượt",
+      "totalScannedTooltip": "Tổng số lượt quét đã ghi nhận từ khi khởi chạy.",
+      "description": "Mô tả",
+      "descriptionValue": "Nhận tín hiệu từ đầu đọc mã QR hoặc thẻ CCCD qua cổng HID. Coi là hoạt động nếu có lần quét trong 60 giây gần đây.",
+      "descriptionTooltip": "Giải thích cơ chế tự động theo dõi và nhận dạng máy quét."
+    },
+    "system": {
+      "ramDash": "RAM —",
+      "title": "Tài nguyên hệ thống",
+      "appRam": "App RAM",
+      "appRamTooltip": "Dung lượng bộ nhớ RAM mà tiến trình Electron (App) đang chiếm dụng.",
+      "systemRam": "System RAM",
+      "systemRamTooltip": "Dung lượng bộ nhớ RAM toàn hệ thống máy tính đang sử dụng.",
+      "totalRam": "Total RAM",
+      "totalRamTooltip": "Tổng dung lượng bộ nhớ RAM vật lý được trang bị trên thiết bị.",
+      "cpuUsage": "CPU Usage",
+      "cpuUsageTooltip": "Tỷ lệ sử dụng năng lực vi xử lý (CPU) hiện thời của ứng dụng.",
+      "cpuSys": "CPU (sys)",
+      "cpuSysTooltip": "Thời gian bộ xử lý thực hiện các tác vụ liên quan đến nhân hệ điều hành.",
+      "cpuUser": "CPU (user)",
+      "cpuUserTooltip": "Thời gian bộ xử lý chạy các dòng lệnh trực tiếp từ ứng dụng của người dùng.",
+      "description": "Mô tả",
+      "descriptionValue": "App RAM: bộ nhớ process Electron dùng. System RAM: tổng bộ nhớ mà hệ thống hiện đang sử dụng.",
+      "descriptionTooltip": "Giải thích tổng quan các chỉ số đo lường hiệu năng tài nguyên."
+    },
+    "tts": {
+      "ready": "TTS sẵn sàng",
+      "errorShort": "TTS lỗi",
+      "starting": "TTS khởi động…",
+      "error": "Lỗi",
+      "engineTooltip": "Trạng thái TTS Engine (VieNeu)",
+      "restartTooltip": "Khởi động lại TTS engine",
+      "restarting": "Đang khởi động…",
+      "restart": "Khởi động lại",
+      "status": "Trạng thái",
+      "statusTooltip": "Trạng thái sẵn sàng hoạt động của công cụ chuyển văn bản thành giọng nói (TTS).",
+      "viewLogTooltip": "Xem nhật ký chạy thực tế của server Python",
+      "detail": "Chi tiết",
+      "detailTooltip": "Thông báo chi tiết về tiến trình khởi động hoặc mã lỗi hiện tại.",
+      "engineDescTooltip": "Công nghệ tổng hợp giọng đọc VieNeu sử dụng định dạng ONNX chạy trên CPU.",
+      "voice": "Giọng đọc",
+      "voiceTooltip": "Mã định danh của giọng nói đang được thiết lập.",
+      "enabled": "TTS bật",
+      "yes": "Có",
+      "off": "Tắt",
+      "enabledTooltip": "Trạng thái kích hoạt tính năng phát âm thanh tự động của slide.",
+      "loading": "Đang tải…",
+      "refresh": "Làm mới",
+      "checking": "Đang kiểm tra…",
+      "notRunning": "Không chạy",
+      "processTooltip": "Tiến trình chạy nền Python Server có đang hoạt động hay không.",
+      "portTooltip": "Cổng mạng nội bộ được dùng để liên lạc với Python Server.",
+      "noResponse": "Không phản hồi",
+      "healthTooltip": "Kết quả kiểm tra sức khỏe đầu cuối (/health) của Python Server.",
+      "errorLabel": "Lỗi",
+      "errorLabelTooltip": "Chi tiết thông báo lỗi phát sinh khi khởi chạy tiến trình Python.",
+      "exitCodeTooltip": "Mã phản hồi trả về khi tiến trình Python dừng hoạt động.",
+      "hide": "Ẩn",
+      "view": "Xem",
+      "logStderrLines": "log/stderr ({{count}} dòng)",
+      "noLog": "Không có log",
+      "activityLogEvents": "activity log ({{count}} sự kiện)",
+      "noEvents": "Chưa có sự kiện nào",
+      "loadMore": "Load more ({{count}} còn lại)",
+      "viewDebugInfo": "Xem debug info"
+    },
+    "ws": {
+      "tooltip": "Trạng thái kết nối Socket",
+      "connected": "Đã kết nối",
+      "disconnected": "Mất kết nối",
+      "title": "Kết nối Socket",
+      "status": "Trạng thái",
+      "statusConnected": "✓ Đã kết nối",
+      "statusDisconnected": "✗ Mất kết nối",
+      "statusTooltip": "Trạng thái kết nối hiện tại của kênh Socket.IO giữa màn hình điều khiển và màn hình trình chiếu.",
+      "protocol": "Giao thức",
+      "protocolTooltip": "Giao thức truyền thông tin hai chiều thời gian thực.",
+      "portTooltip": "Địa chỉ cổng mạng nội bộ của WebSocket server.",
+      "description": "Mô tả",
+      "descriptionValue": "Kênh realtime giữa Control và Backdrop. Dùng để đồng bộ trạng thái sinh viên, chế độ phát và cấu hình TTS.",
+      "descriptionTooltip": "Mục đích sử dụng của kênh truyền tải dữ liệu Socket.IO."
+    }
+  },
+  "apiConfig": {
+    "title": "Cấu hình API Tích hợp Sự kiện",
+    "subtitle": "Thiết lập endpoint và payload cho từng sự kiện trong app.",
+    "configuredCount": "API đã cấu hình ({{count}})",
+    "addNew": "Thêm mới",
+    "emptyList": {
+      "line1": "Chưa có API nào được cấu hình.",
+      "line2": "Bấm \"Thêm mới\" để bắt đầu."
+    },
+    "createNewTitle": "Tạo cấu hình API mới",
+    "detailTitle": "Chi tiết cấu hình API",
+    "saveConfig": "Lưu cấu hình",
+    "triggerEvent": "Sự kiện kích hoạt",
+    "alreadyUsed": "(Đã sử dụng)",
+    "apiUrl": "API URL",
+    "addHeader": "Thêm Header",
+    "headerKeyPlaceholder": "Header Key (vd: Authorization)",
+    "headerValuePlaceholder": "Header Value",
+    "noCustomHeaders": "Không gửi thêm headers tùy chỉnh.",
+    "payloadBody": "Payload Body (JSON template)",
+    "variableSuggestionsLabel": "Gợi ý biến động chèn vào Payload / URL:",
+    "clickToInsert": "Click để chèn vào vị trí con trỏ chuột",
+    "insertHint": "Click vào ô <b1>API URL</b1> hoặc <b2>Payload Body</b2>, sau đó click vào biến bên trên để tự động chèn nhanh.",
+    "emptyState": {
+      "title": "Cấu hình API tích hợp",
+      "description": "Chọn một API bên cột trái để tùy chỉnh hoặc bấm <b>Thêm mới</b> để liên kết một hành động với API của bạn."
+    },
+    "importConfig": "Import cấu hình",
+    "exportConfig": "Export cấu hình",
+    "resetToDefault": "Reset về mặc định",
+    "alerts": {
+      "allActionsConfigured": "Tất cả các hành động sự kiện đều đã được cấu hình API!",
+      "urlRequired": "Vui lòng nhập URL API!",
+      "invalidImportFormat": "File cấu hình không đúng định dạng! Kiểm tra lại action/method có hợp lệ không.",
+      "duplicateActionInImport": "File cấu hình có nhiều API dùng chung một sự kiện — mỗi sự kiện chỉ được cấu hình một API!",
+      "importNotArray": "File cấu hình phải là một mảng JSON!",
+      "cannotReadJsonFile": "Không thể đọc file JSON!"
+    },
+    "confirms": {
+      "deleteConfig": "Bạn có chắc chắn muốn xóa cấu hình API này không?"
+    },
+    "toasts": {
+      "saved": "Đã lưu cấu hình API!",
+      "deleted": "Đã xóa cấu hình API!",
+      "importSuccess": "✓ Import cấu hình API thành công!",
+      "resetSuccess": "✓ Đã khôi phục cấu hình API mặc định ({{env}}) từ .env"
+    },
+    "resetModal": {
+      "title": "Reset API về mặc định",
+      "description": "Bạn sắp khôi phục toàn bộ cấu hình API của môi trường <b1>{{env}}</b1> về mặc định trong file <b2>.env</b2>. Các thay đổi đang lưu cho môi trường này sẽ bị ghi đè.",
+      "countdown": "Nút reset sẽ được bật sau <span>{{countdown}}</span> giây",
+      "resetting": "Đang reset...",
+      "resetDefault": "Reset mặc định"
+    },
+    "actions": {
+      "qrScan": "Quét QR thành công",
+      "playStudent": "Phát slide sinh viên",
+      "welcomeScreen": "Hiện màn hình chào mừng",
+      "backdropToggle": "Bật/tắt màn hình slide",
+      "submitLog": "Đẩy toàn bộ log lên server"
+    },
+    "variables": {
+      "studentCode": "Mã sinh viên",
+      "fullName": "Họ và tên",
+      "phoneNumber": "Số điện thoại",
+      "majorName": "Ngành học",
+      "classCode": "Lớp sinh viên",
+      "awardLocationCode": "Mã hội trường",
+      "event": "Tên sự kiện",
+      "backdropOpen": "Trạng thái mở slide",
+      "logs": "Danh sách nhật ký JSON"
+    },
+    "studentFields": {
+      "student_code": "Mã sinh viên",
+      "display_order": "Số thứ tự trao",
+      "full_name": "Họ và tên",
+      "gender": "Giới tính",
+      "date_of_birth": "Ngày sinh",
+      "major_name": "Ngành học",
+      "faculty_name": "Khoa",
+      "class_code": "Lớp sinh viên",
+      "course_code": "Khóa học",
+      "phone_number": "Số điện thoại",
+      "identity_number": "Số CCCD/ID",
+      "email": "Email",
+      "card_code": "Mã thẻ sinh viên",
+      "gpa": "Điểm GPA",
+      "classification": "Xếp loại (Xuất sắc/Giỏi/Khá...)",
+      "classification_type": "Mã loại xếp loại",
+      "achievement_title": "Danh hiệu phụ",
+      "award_type": "Loại giải thưởng (KHENTHUONG/TOTNGHIEP)",
+      "award_type_code": "Mã loại giải thưởng",
+      "award_content": "Nội dung khen thưởng",
+      "presentation_template_type": "Loại hình thức (Khen thưởng/Trao bằng)",
+      "quote": "Câu trích dẫn",
+      "graduation_batch_id": "ID đợt trao bằng",
+      "batch_name": "Tên đợt trao bằng",
+      "degree_award_status": "Trạng thái nhận bằng",
+      "status": "Trạng thái vận hành",
+      "staff_presenter": "Cán bộ trao bằng"
+    },
+    "topLevelKeywords": {
+      "student": "Thông tin sinh viên (gõ tiếp \".\" để xem thuộc tính)",
+      "award_location_code": "Mã hội trường",
+      "event": "Tên sự kiện",
+      "backdrop_open": "Trạng thái mở slide",
+      "logs": "Danh sách nhật ký JSON"
+    }
+  },
+  "ttsModal": {
+    "title": "Cấu hình Text-to-Speech (TTS)",
+    "autoSaved": "Tự động lưu",
+    "autoSaveHint": "Thay đổi được tự động lưu ngay lập tức — không cần bấm \"Đồng ý\".",
+    "errors": {
+      "pregenStartFailed": "Không thể bắt đầu pre-gen"
+    },
+    "config": {
+      "sectionTitle": "CẤU HÌNH",
+      "mainVoiceLabel": "Giọng đọc chính / Fallback",
+      "multiVoiceActive": "Nhiều giọng — theo bộ điều kiện",
+      "multiVoiceHint": "Đặt cấu hình cụ thể ở cột bên phải →",
+      "cloneVoiceFromAudio": "Tạo giọng từ audio (clone)",
+      "speedLabel": "Tốc độ đọc",
+      "delayLabel": "Delay TTS",
+      "delayHint": "* Delay: chờ bao lâu sau khi hiển thị slide mới phát giọng đọc.",
+      "templateLabel": "Template câu đọc",
+      "playModeLabel": "Chế độ phát phát âm thanh",
+      "playModes": {
+        "pregenFallback": "Phát từ file (tự động dùng realtime nếu thiếu)",
+        "realtime": "Realtime (tổng hợp trực tiếp khi lên sân khấu)",
+        "pregen": "Chỉ phát từ file (bỏ qua nếu chưa tạo trước)"
+      },
+      "recommended": "Khuyến nghị"
+    },
+    "pregen": {
+      "sectionTitle": "TẠO TRƯỚC FILE ÂM THANH",
+      "voicePoolLabel": "Nhóm giọng dùng",
+      "addVoice": "Thêm giọng",
+      "defaultFallback": "Mặc định (còn lại)",
+      "distributionLabel": "Phân bổ đợt này:",
+      "staleWarning": "Cấu hình đã thay đổi — <b>{{count}} file âm thanh</b> đang sử dụng cài đặt/giọng đọc cũ.",
+      "regenerateAll": "Tạo lại tất cả",
+      "createdCount": "Đã tạo: {{done}}/{{total}} file",
+      "failedCount": "({{count}} lỗi)",
+      "paused": "Tạm dừng",
+      "generatingAudio": "Đang tạo âm thanh...",
+      "continueGenerate": "Tiếp tục tạo",
+      "generateAll": "Tạo trước tất cả",
+      "resume": "Tiếp tục",
+      "pause": "Tạm dừng",
+      "cancel": "Hủy bỏ",
+      "perStudentVoiceLabel": "Phân bổ giọng đọc từng sinh viên",
+      "regenerateSelected": "Tạo lại {{count}} đã chọn",
+      "noStudentData": "Chưa có dữ liệu sinh viên. Vui lòng import trước.",
+      "columnStudent": "Sinh viên",
+      "columnVoice": "Giọng đọc",
+      "columnStatus": "Trạng thái",
+      "statusNeedsRegenerate": "Cần tạo lại",
+      "statusPending": "Chờ",
+      "statusProcessing": "Xử lý...",
+      "statusDone": "Xong",
+      "statusFailed": "Lỗi"
+    }
+  },
+  "advancedTtsConfig": {
+    "title": "Cấu hình chuyên sâu",
+    "subtitle": "tham số sinh giọng",
+    "loadingConfig": "Đang tải cấu hình…",
+    "presetLabel": "Preset:",
+    "presets": {
+      "safe": "An toàn",
+      "default": "Mặc định",
+      "experimental": "Thử nghiệm"
+    },
+    "params": {
+      "temperature": {
+        "label": "Độ ngẫu nhiên",
+        "tip": "Giọng đọc \"an toàn\" hay \"tự nhiên\". Kéo THẤP → đọc đều đều, ổn định, ít đọc sai (hợp đọc tên). Kéo CAO → nghe tự nhiên hơn nhưng dễ vấp, ú ớ, đọc sai. Cứ để 0.1 nếu không chắc. (kỹ thuật: temperature)"
+      },
+      "topK": {
+        "label": "Mức đa dạng (K)",
+        "tip": "Mỗi âm, máy được chọn trong bao nhiêu phương án. THẤP (5) = chắc chắn, ít bất ngờ. CAO = đa dạng nhưng dễ lỗi. Để 5 cho đọc tên. (kỹ thuật: top-k)"
+      },
+      "topP": {
+        "label": "Mức đa dạng (P)",
+        "tip": "Cùng mục đích với \"Mức đa dạng (K)\" nhưng theo cách khác. Hầu như không cần đụng — để 0.95. Giảm nếu muốn giọng đọc chặt chẽ, ít biến hoá hơn. (kỹ thuật: top-p / nucleus)"
+      },
+      "repetitionPenalty": {
+        "label": "Chống đọc lặp",
+        "tip": "Chống lặp lại âm/chữ (vd \"Nguyeeeen... nguyen nguyen\"). Tăng nếu nghe bị lặp; nhưng CAO quá (trên 1.5) làm giọng méo/rè. Để 1.3 là hợp lý. (kỹ thuật: repetition penalty)"
+      }
+    },
+    "maxFrames": {
+      "label": "Độ dài tối đa (frames)",
+      "tip": "Giới hạn độ dài audio cho mỗi câu, tránh máy đọc lê thê vô tận. Để TRỐNG = máy tự tính theo độ dài câu (nên dùng). Chỉ đặt số nếu thấy câu dài bị đọc cụt giữa chừng. (kỹ thuật: max_new_frames, ~12.5 frame/giây)",
+      "placeholder": "Tự động",
+      "emptyMeansAuto": "để trống = tự động"
+    },
+    "preview": "Nghe thử",
+    "saved": "Đã lưu ✓",
+    "footnote": "* Áp dụng ngay cho lần đọc kế tiếp. Giọng đã tạo trước (pregen) không đổi cho tới khi tạo lại."
+  },
+  "voiceClone": {
+    "title": "Tạo giọng từ audio (clone)",
+    "chooseWavFile": "Chọn file WAV",
+    "noFileChosen": "Chưa chọn file (WAV, 3–10 giây, 48kHz)",
+    "voiceName": "Tên giọng",
+    "voiceNamePlaceholder": "VD: Cô Lan",
+    "gender": "Giới tính",
+    "female": "Nữ",
+    "male": "Nam",
+    "region": "Vùng",
+    "regionNorth": "Bắc",
+    "regionSouth": "Nam",
+    "creating": "Đang tạo…",
+    "createVoice": "Tạo giọng",
+    "recordingTip": "* Nên dùng audio 48kHz, 3–10 giây, giọng rõ, ít tạp âm. File quá dài/ngắn sẽ bị từ chối.",
+    "clonedVoicesCount": "Giọng đã clone ({{count}})",
+    "noClonedVoices": "Chưa có giọng clone nào.",
+    "tryListen": "Nghe thử",
+    "deleteVoice": "Xoá giọng",
+    "errors": {
+      "fileAndLabelRequired": "Cần chọn file và nhập tên giọng.",
+      "cloneFailed": "Clone thất bại",
+      "deleteFailed": "Xoá thất bại"
+    },
+    "confirms": {
+      "deleteVoice": "Xoá giọng \"{{label}}\"? Không thể hoàn tác."
+    }
+  },
+  "voicePickerPopover": {
+    "loadingVoice": "Đang tải giọng đọc…",
+    "modelNotDownloaded": "Model VieNeu chưa được tải về",
+    "modelNotDownloadedHint": "Bạn có thể nghe thử bằng file mẫu. Để sử dụng thực tế, cần tải model về trước.",
+    "downloadModel": "Tải model",
+    "loadingVoiceList": "Đang tải danh sách giọng...",
+    "hfModelPage": "Trang model HuggingFace",
+    "footerHintNoModel": "▶ Nghe file mẫu · Tải model để sử dụng thực tế",
+    "footerHintReady": "▶ Nghe thử realtime · Click để chọn · ↗ Trang model",
+    "stop": "Dừng",
+    "errorRetry": "Lỗi — thử lại",
+    "listenSample": "Nghe file mẫu",
+    "tryRealtime": "Nghe thử realtime",
+    "error": "Lỗi",
+    "sample": "Mẫu",
+    "try": "Thử",
+    "styles": {
+      "gentle": "Dịu dàng",
+      "clear": "Rõ ràng",
+      "builtin": "Built-in"
+    }
+  },
+  "ttsToggle": {
+    "byConfig": "Theo cấu hình",
+    "enableTts": "Bật đọc tên (TTS)",
+    "voiceLabel": "Giọng đọc",
+    "multiVoiceTooltip": "Giọng đọc được phân theo cấu hình. Bấm để xem/chỉnh.",
+    "multiVoiceLabel": "Theo cấu hình phân giọng",
+    "open": "Mở ›",
+    "speedLabel": "Tốc độ đọc — {{speed}}x",
+    "delayLabel": "Delay TTS — {{delay}}s",
+    "startSentenceLabel": "Câu bắt đầu",
+    "startSentencePlaceholder": "VD: Xin chúc mừng sinh viên..."
+  },
+  "voiceConditionRules": {
+    "title": "Bộ điều kiện phân giọng",
+    "priorityHint": "Xét ưu tiên từ trên xuống dưới ↓",
+    "if": "Nếu",
+    "is": "là",
+    "fullNamePlaceholder": "Nhập họ tên...",
+    "moveUp": "Đẩy lên trước",
+    "moveDown": "Đẩy xuống sau",
+    "removeCondition": "Xóa điều kiện",
+    "addCondition": "Thêm điều kiện",
+    "attrs": {
+      "gender": "Giới tính",
+      "classification": "Xếp loại",
+      "major": "Ngành",
+      "faculty": "Khoa",
+      "classCode": "Lớp",
+      "course": "Khóa",
+      "fullName": "Họ tên"
+    }
+  },
+  "studentList": {
+    "columns": {
+      "avatar": "Ảnh",
+      "studentCode": "MSSV",
+      "fullName": "Họ tên",
+      "majorName": "Ngành",
+      "classCode": "Lớp",
+      "status": "Trạng thái",
+      "actions": "Hành động"
+    },
+    "searchPlaceholder": "Tìm theo tên / MSSV / Số điện thoại…",
+    "filterTitle": "Bộ lọc danh sách sinh viên",
+    "clear": "Clear",
+    "filterPanelTitle": "Bộ lọc sinh viên",
+    "resetFilter": "Reset bộ lọc",
+    "filters": {
+      "all": "Tất cả",
+      "major": "Ngành",
+      "gender": "Giới tính",
+      "faculty": "Khoa",
+      "course": "Khóa",
+      "classCode": "Lớp",
+      "status": "Trạng thái",
+      "awardType": "Award type",
+      "played": "Đã play",
+      "playedYes": "Đã play",
+      "playedNo": "Chưa play",
+      "scanned": "Đã quét QR",
+      "scannedYes": "Đã quét",
+      "scannedNo": "Chưa quét",
+      "receivedDegree": "Nhận bằng",
+      "receivedYes": "Đã nhận",
+      "receivedNo": "Chưa nhận",
+      "hasAvatar": "Ảnh avatar",
+      "hasAvatarYes": "Có ảnh",
+      "hasAvatarNo": "Không ảnh"
+    },
+    "count": "{{count}} sinh viên",
+    "countScanned": "{{count}} sinh viên đã quét",
+    "activeButton": "Đang active",
+    "emptyScanned": "Chưa có sinh viên nào được quét QR.",
+    "layoutMiddleTitle": "Layout Giữa (Khen thưởng)",
+    "present": "Có mặt",
+    "absent": "Vắng",
+    "replay": "Lại",
+    "play": "Play",
+    "noPhoto": "Không có ảnh",
+    "copyTitle": "Sao chép",
+    "copiedLabel": "Đã copy {{label}}",
+    "copiedGeneric": "Đã copy vào clipboard!"
+  },
+  "studentDetailPopover": {
+    "tableView": "Dạng bảng",
+    "cardView": "Dạng thẻ",
+    "noPhoto": "Không ảnh",
+    "orderNumber": "STT",
+    "studentCodePrefix": "MSSV",
+    "fieldLabels": {
+      "fullName": "họ tên",
+      "studentCode": "mã sinh viên",
+      "classCode": "Lớp học",
+      "classificationGpa": "Xếp loại / GPA",
+      "majorName": "Ngành học",
+      "facultyName": "Khoa",
+      "dateOfBirth": "Ngày sinh",
+      "phoneNumber": "Số điện thoại",
+      "achievementTitle": "Danh hiệu",
+      "awardContent": "Nội dung khen thưởng"
+    },
+    "tableHeaders": {
+      "key": "Trường (Key)",
+      "value": "Giá trị (Value)"
+    },
+    "base64ImageData": "[Dữ liệu ảnh Base64 - {{size}} KB]",
+    "fieldOf": "trường {{key}}",
+    "valueOf": "giá trị của {{key}}"
+  },
+  "settingsModal": {
+    "title": "Cài đặt",
+    "general": "Chung",
+    "appearance": "Giao diện",
+    "expand": "Mở rộng",
+    "collapse": "Thu gọn",
+    "themeMode": "Chế độ",
+    "themeLight": "Sáng",
+    "themeDark": "Tối",
+    "themeSystem": "Theo hệ thống",
+    "themePalette": "Bảng màu",
+    "font": "Phông chữ",
+    "letterSpacing": "Giãn cách chữ",
+    "spacing": "Khoảng cách",
+    "shadow": "Đổ bóng",
+    "shadowNone": "Không",
+    "shadowSoft": "Nhẹ",
+    "shadowMedium": "Vừa",
+    "shadowBold": "Đậm",
+    "backup": "Backup"
+  },
+  "backupSettings": {
+    "exportTab": "Export",
+    "importTab": "Import",
+    "exportHint": "Chọn các nhóm cấu hình muốn xuất ra file JSON. Không bao gồm dữ liệu sinh viên/quét QR (dùng menu Data cho việc đó).",
+    "importHint": "Chọn file JSON đã export trước đó. Chỉ những nhóm có mặt và hợp lệ trong file mới hiện ra để chọn import.",
+    "chooseFile": "Chọn file JSON…",
+    "exportButton": "Export file",
+    "importButton": "Import các nhóm đã chọn",
+    "noGroupsFound": "File không chứa nhóm cấu hình nào hợp lệ.",
+    "group": {
+      "apiConfig": "Cấu hình API tích hợp",
+      "customVariables": "Biến câu đọc tùy chỉnh",
+      "layoutOverrides": "Cấu hình Layout",
+      "tts": "Cấu hình TTS",
+      "appearance": "Giao diện (theme, font...)"
+    },
+    "toasts": {
+      "exportSuccess": "Đã export {{count}} nhóm cấu hình",
+      "exportError": "Lỗi khi export: {{message}}",
+      "parseError": "Không đọc được file: {{message}}",
+      "importSuccess": "Đã import {{count}} nhóm cấu hình",
+      "importError": "Lỗi khi import: {{message}}"
+    }
+  },
+  "debugMenu": {
+    "config": "Cấu hình",
+    "useSampleData": "Dùng dữ liệu mẫu",
+    "tts": "Text-to-Speech (TTS)",
+    "manageVariables": "Quản lý biến",
+    "layoutConfig": "Cấu hình Layout",
+    "apiConfig": "Cấu hình API tích hợp",
+    "importZip": "Import dữ liệu (ZIP)",
+    "exportZip": "Export dữ liệu (ZIP)",
+    "debug": "Debug",
+    "apiTestInterface": "Giao diện Thử nghiệm API",
+    "devtoolsControl": "DevTools — Control",
+    "devtoolsBackdrop": "DevTools — Backdrop",
+    "deleteData": "Xóa dữ liệu",
+    "deleteStudentData": "Xóa dữ liệu sinh viên",
+    "deleteScanData": "Xóa dữ liệu quét",
+    "clearCache": "Clear cache",
+    "aboutApp": "Về ứng dụng",
+    "largeFileConfirm": "File lớn ({{size}}). Import có thể chậm. Vẫn tiếp tục?",
+    "checkingData": "Đang kiểm tra dữ liệu...",
+    "importConfirm": "Tìm thấy {{valid}} SV hợp lệ (tổng {{total}}). Ghi đè dữ liệu hiện tại?",
+    "importConfirmWithErrors": "Tìm thấy {{valid}} SV hợp lệ, {{invalid}} lỗi (tổng {{total}}). Ghi đè dữ liệu hiện tại?",
+    "importSuccess": "✓ Import thành công!",
+    "importError": "Lỗi import: {{message}}",
+    "genericError": "Lỗi: {{message}}",
+    "exportSuccess": "✓ Xuất dữ liệu thành công!",
+    "exportError": "Lỗi xuất dữ liệu: {{message}}",
+    "confirmResetTitle": "Xác nhận xóa dữ liệu",
+    "confirmResetMessage": "Bạn chắc chắn muốn xóa toàn bộ dữ liệu? Ứng dụng sẽ khởi động lại với dữ liệu mặc định.",
+    "confirmDeleteStudentsTitle": "Xóa dữ liệu sinh viên",
+    "confirmDeleteStudentsMessage": "Bạn chắc chắn muốn xóa toàn bộ dữ liệu sinh viên? Ứng dụng sẽ khởi động lại với dữ liệu mặc định.",
+    "deleteStudentsSuccess": "✓ Dữ liệu sinh viên đã xóa",
+    "confirmDeleteScansTitle": "Xóa dữ liệu quét",
+    "confirmDeleteScansMessage": "Bạn chắc chắn muốn xóa toàn bộ dữ liệu quét? Dữ liệu sinh viên sẽ được giữ lại.",
+    "deleteScansSuccess": "✓ Dữ liệu quét QR đã xóa",
+    "confirmClearCacheTitle": "Clear cache",
+    "confirmClearCacheMessage": "Bạn chắc chắn muốn xóa cache của ứng dụng? Điều này sẽ xóa localStorage, sessionStorage, IndexedDB và service worker cache.",
+    "clearCacheSuccess": "✓ Cache đã xóa"
+  },
+  "syncPanel": {
+    "title": "Dữ liệu",
+    "refresh": "Làm mới",
+    "refreshing": "Đang làm mới…",
+    "refreshTitle": "Tải lại dữ liệu từ server",
+    "importZip": "Import ZIP",
+    "importing": "Đang import…",
+    "importTitle": "Import file bundle .zip từ máy",
+    "exportZip": "Export ZIP",
+    "exporting": "Đang xuất…",
+    "exportTitle": "Xuất dữ liệu ra file bundle .zip",
+    "cancel": "Hủy",
+    "overwriteAndImport": "Ghi đè & import",
+    "confirmImportTitle": "Xác nhận import",
+    "foundValid": "Tìm thấy",
+    "validStudents": "sinh viên hợp lệ",
+    "errors": "lỗi",
+    "outOfTotal": "trên tổng {{total}} bản ghi.",
+    "noCode": "(không mã)",
+    "andMoreErrors": "…và {{count}} lỗi khác",
+    "importOverwriteNote": "Import sẽ ghi đè dữ liệu hiện tại (giữ trạng thái buổi lễ đang chạy). SV lỗi sẽ bị bỏ qua.",
+    "lastSync": "Sync gần nhất",
+    "unknown": "chưa rõ",
+    "readingFile": "Đọc file…",
+    "loadingData": "Đang tải dữ liệu…",
+    "writingData": "Ghi dữ liệu…",
+    "preparingData": "Chuẩn bị dữ liệu…",
+    "importCancelled": "Đã hủy import.",
+    "largeFileConfirm": "File lớn ({{size}}). Quá trình import có thể chậm và tốn bộ nhớ. Vẫn tiếp tục?",
+    "errorPrefix": "Lỗi: {{message}}",
+    "unknownError": "không rõ"
+  },
+  "apiTestModal": {
+    "headerTitle": "Giao diện Thử nghiệm API",
+    "headerSubtitle": "Kiểm tra khả năng tương tác của ứng dụng với cổng dịch vụ Đại học Đại Nam.",
+    "requestSection": "Yêu cầu (Request)",
+    "methodAndUrl": "Mã yêu cầu & URL Endpoint",
+    "urlPlaceholder": "Nhập API URL...",
+    "apiKeyPlaceholder": "x-api-key header...",
+    "loadRandomStudent": "Nạp SV Ngẫu Nhiên",
+    "keyWordLabel": "key_word (Mã SV / CCCD)",
+    "keyWordPlaceholder": "Ví dụ: SV001",
+    "locations": {
+      "square": "0 - Quảng trường",
+      "htlGd1": "1 - HTL - GD1",
+      "ht1Gd2": "2 - HT1- GD2",
+      "ht2Gd2": "3 - HT2-GD2"
+    },
+    "jsonRequestBody": "JSON Request Body",
+    "copyJsonTitle": "Sao chép JSON",
+    "responseSection": "Phản hồi (Response)",
+    "emptyResponseHint": "Nhấp vào nút \"Gửi Yêu Cầu\" để gửi request thử nghiệm.",
+    "contactingServer": "Đang liên hệ với cổng dịch vụ Đại học Đại Nam...",
+    "responseHeaders": "Response Headers",
+    "responseBody": "Response Body",
+    "noResponseBody": "No response body",
+    "corsNote": "* Các yêu cầu được thực hiện từ Electron Main Process nhằm tránh bị chặn bởi CORS.",
+    "cancel": "Hủy",
+    "sendRequest": "Gửi Yêu Cầu",
+    "sendSuccess": "Gửi API thử nghiệm thành công!",
+    "sendErrorStatus": "API trả về mã lỗi: {{status}}",
+    "sendError": "Lỗi khi gọi API thử nghiệm",
+    "loadedStudent": "Đã nạp SV: {{name}}"
+  },
+  "engineManager": {
+    "title": "Quản lý engine TTS",
+    "description": "VieNeu là engine mặc định (tích hợp sẵn). Engine khác có thể tải thêm khi cần — nên tải trước buổi lễ, cần mạng ổn định.",
+    "ceremonySafetyNote": "Khi có sinh viên lên sân khấu, việc tải model sẽ <b>tự tạm dừng</b> và không cho đổi/tải engine — nhường tài nguyên cho đọc tên. Tự chạy lại khi hết. Không cần thao tác gì.",
+    "inUse": "Đang dùng",
+    "bundled": "Tích hợp sẵn",
+    "requires": "Cần",
+    "recommended": "khuyến nghị",
+    "diskUsage": "Chiếm đĩa",
+    "switchToThis": "Đổi sang engine này",
+    "exportUsb": "Export USB",
+    "deleteConfirm": "Xoá model \"{{label}}\"? Sẽ phải tải lại nếu cần.",
+    "deleteFailed": "Xoá thất bại",
+    "delete": "Xoá",
+    "pause": "Tạm dừng",
+    "resume": "Tiếp tục",
+    "downloadModel": "Tải model",
+    "importFromUsb": "Nhập từ USB",
+    "cancel": "Hủy",
+    "installStartFailed": "Không bắt đầu tải được",
+    "checkingEngine": "Đang kiểm tra engine…",
+    "engineLoadFailed": "Engine không load được: {{error}}",
+    "unknownError": "lỗi",
+    "switchingEngine": "Đang đổi engine (khởi động lại ~30–60s)…",
+    "switchSuccess": "Đã đổi engine ✓",
+    "switchFailed": "Đổi thất bại: {{error}}",
+    "status": {
+      "ready": "Đã sẵn sàng",
+      "partial": "Tải dở",
+      "notDownloaded": "Chưa tải"
+    },
+    "phase": {
+      "resolving": "Đang chuẩn bị",
+      "downloading": "Đang tải",
+      "importing": "Đang nhập",
+      "installingRuntime": "Đang cài thư viện",
+      "verifying": "Đang kiểm tra",
+      "paused": "Đã tạm dừng"
+    }
+  },
+  "deviceConfig": {
+    "title": "Thiết bị xử lý",
+    "subtitle": "(CPU / tăng tốc)",
+    "loading": "Đang tải…",
+    "ttsEngine": "Engine TTS",
+    "ttsEngineInfo": "Phần mềm tạo ra giọng đọc. VieNeu là mặc định (tích hợp sẵn). Có thể tải thêm engine khác khi cần — bấm 'Quản lý engine'. Đổi engine phải khởi động lại (~30–60 giây).",
+    "inUse": "Đang dùng",
+    "manageEngine": "Quản lý engine",
+    "thisMachine": "Máy này",
+    "threadsCount": "{{count}} luồng",
+    "threadsAuto": "luồng auto",
+    "cpuThreads": "Số luồng CPU",
+    "cpuThreadsInfo": "Máy dùng bao nhiêu nhân CPU để tạo giọng. 0 = tự động (dùng hết). Đặt 2–4 thường chạy mượt hơn và đỡ làm giật màn hình trình chiếu khi đang tạo giọng. Đổi xong phải khởi động lại engine.",
+    "auto": "auto",
+    "processor": "Bộ xử lý",
+    "processorInfo": "Chọn phần cứng tạo giọng đọc. CPU = bộ xử lý trung tâm (mọi máy đều có, ổn định). GPU = card đồ hoạ, xử lý AI song song nên NHANH hơn — nhưng chỉ máy có GPU rời (thường NVIDIA) mới dùng được và phải tải thêm thư viện.",
+    "gpuHelpToggle": "GPU là gì? Có nên dùng không?",
+    "gpuHelp": {
+      "intro": "<b class=\"text-slate-700\">GPU (card đồ hoạ)</b> xử lý nhiều phép tính song song, nên với AI thường nhanh hơn CPU. <b class=\"text-slate-700\">CPU</b> là bộ xử lý chung, máy nào cũng có.",
+      "benefits": "<b class=\"text-emerald-700\">Lợi ích GPU:</b> tạo giọng nhanh hơn (rõ nhất khi máy CPU yếu), đỡ chiếm CPU nên màn hình trình chiếu mượt hơn khi đang tạo giọng.",
+      "drawbacks": "<b class=\"text-amber-700\">Nhược điểm:</b> chỉ chạy trên máy có GPU rời (thường NVIDIA); phải tải thêm thư viện (~vài trăm MB); cài đặt phức tạp hơn; có thể không tương thích tuỳ engine.",
+      "whenNeeded": "<b class=\"text-slate-700\">Khi nào cần:</b> use case đọc tên tuần tự (từng câu) thì <b>CPU thường đã đủ nhanh</b>. GPU đáng dùng khi máy yếu, tạo giọng chậm, hoặc muốn giảm tải CPU. Không có GPU phù hợp → lựa chọn bị khoá, CPU vẫn chạy tốt."
+    },
+    "cpuStable": "(ổn định, khuyến nghị)",
+    "noGpuOption": "Máy này / engine này không có tuỳ chọn GPU — chỉ dùng CPU.",
+    "faster": "(nhanh hơn)",
+    "incompatibleEngine": "(không tương thích engine này)",
+    "noHardware": "(máy không có phần cứng này)",
+    "needsLibrary": "(cần tải thư viện)",
+    "installLibraryTitle": "Tải thư viện tăng tốc GPU (~vài trăm MB) rồi bật",
+    "installAndEnable": "Tải & bật",
+    "applyAndRestart": "Áp dụng & khởi động lại engine",
+    "restartNote": "* Đổi thiết bị cần khởi động lại engine (~30–60s). Danh sách bộ xử lý thay đổi theo engine đang dùng (mỗi engine hỗ trợ phần cứng khác nhau).",
+    "appliedAndRestarted": "Đã áp dụng & khởi động lại engine.",
+    "installing": "Đang cài {{pkg}}… (có thể mất vài phút)",
+    "installedRestartToCheck": "Đã cài {{pkg}}. Khởi động lại engine để kiểm tra.",
+    "installFailed": "Cài đặt thất bại"
+  },
+  "confettiModal": {
+    "title": "Cấu hình Confetti",
+    "subtitle": "Thiết lập hiệu ứng sân khấu",
+    "enableEffect": "Kích hoạt hiệu ứng",
+    "resetDefault": "Đặt lại mặc định",
+    "section": {
+      "shootType": "Kiểu bắn",
+      "colors": "Màu sắc",
+      "repeat": "Lặp lại",
+      "amountSpeed": "Số lượng & tốc độ hạt",
+      "ribbon": "Ribbon đi kèm",
+      "shape": "Hình dạng hạt",
+      "size": "Kích thước & Tỷ lệ hạt"
+    },
+    "advanced": {
+      "toggle": "Tinh chỉnh nâng cao",
+      "toggleHint": "tốc độ, ribbon, hình dạng, kích cỡ hạt…"
+    },
+    "repeat": {
+      "auto": "Tự động bắn lặp lại theo chu kỳ",
+      "burstHint": "Mỗi lần lặp bắn nhẹ hơn (không kèm ribbon)"
+    },
+    "field": {
+      "amount": "Số lượng hạt",
+      "speed": "Tốc độ rơi",
+      "ticks": "Thời gian tồn tại"
+    },
+    "type": {
+      "standard": "Cổng chào",
+      "sides": "Bắn 2 bên",
+      "rain": "Thả từ trên",
+      "cannon": "Đại bác",
+      "centerUp": "Đài phun",
+      "fireworks": "Pháo hoa nổ"
+    },
+    "ribbon": {
+      "none": "Không",
+      "wave": "Lượn sóng",
+      "classic": "Dải cuộn",
+      "spiral": "Xoắn lò xo"
+    },
+    "color": {
+      "colorful": "Đa màu",
+      "gold": "Ánh kim",
+      "silver": "Ánh bạc",
+      "pink": "Hồng",
+      "green": "Xanh lá",
+      "blue": "Xanh dương",
+      "red": "Đỏ",
+      "purple": "Tím"
+    },
+    "shape": {
+      "star": "Sao",
+      "mixed": "Hỗn hợp",
+      "circle": "Tròn",
+      "square": "Vuông"
+    },
+    "amount": {
+      "veryLow": "Rất ít",
+      "low": "Ít",
+      "medium": "Vừa",
+      "high": "Nhiều",
+      "veryHigh": "Rất nhiều"
+    },
+    "speed": {
+      "verySlow": "Rất chậm",
+      "slow": "Chậm",
+      "normal": "Vừa",
+      "fast": "Nhanh",
+      "veryFast": "Rất nhanh"
+    },
+    "ticks": {
+      "short": "Ngắn",
+      "normal": "Vừa",
+      "long": "Dài",
+      "veryLong": "Rất dài"
+    },
+    "wave": {
+      "count": "Số dải",
+      "countValue": "{{count}} dải",
+      "length": "Độ dài dải (Length)",
+      "width": "Bản rộng (Width)",
+      "range": "Bắn xa (Range)",
+      "rangeValue": "Mức {{level}}"
+    },
+    "classic": {
+      "count": "Số dải",
+      "countValue": "{{count}} dải",
+      "min": "Độ dài Min",
+      "max": "Độ dài Max"
+    },
+    "spiral": {
+      "count": "Cường độ (Số lượng dải)",
+      "countValue": "{{count}} dải"
+    },
+    "size": {
+      "scale": "Cỡ chung",
+      "small": "Hạt nhỏ",
+      "medium": "Hạt vừa",
+      "large": "Hạt to"
+    }
+  },
+  "confettiToggle": {
+    "label": "Confetti",
+    "enable": "Bật confetti",
+    "intensity": "Cường độ",
+    "fallSpeed": "Tốc độ rơi",
+    "repeat": "Lặp lại",
+    "burst": "Bắn bổ sung",
+    "burstHint": "nhẹ hơn",
+    "advanced": "Cấu hình nâng cao",
+    "amount": {
+      "veryLow": "Rất ít",
+      "low": "Ít",
+      "medium": "Bình thường",
+      "high": "Nhiều",
+      "veryHigh": "Rất nhiều"
+    },
+    "speed": {
+      "verySlow": "Rất chậm",
+      "slow": "Chậm",
+      "normal": "Bình thường",
+      "fast": "Nhanh",
+      "veryFast": "Rất nhanh"
+    }
+  },
+  "layoutConfig": {
+    "title": "Cấu hình Layout",
+    "selectLayout": "Chọn Layout để cấu hình",
+    "fieldsSectionTitle": "CÁC TRƯỜNG THÔNG TIN",
+    "customContentHint": "Nội dung tùy chỉnh (để trống sẽ dùng mặc định)",
+    "customContentPlaceholder": "Nhập nội dung hiển thị...",
+    "textColor": "Màu chữ (Hex)",
+    "fontSize": "Cỡ chữ (%)",
+    "fontSizeDefault": "Mặc định",
+    "preview": "Xem trước (Preview)",
+    "reset": "Reset",
+    "saveConfig": "Lưu cấu hình",
+    "previewNote": "Lưu ý: Màn hình xem trước có thể khác biệt đôi chút so với hiển thị thực tế do tỷ lệ khung hình.",
+    "layoutOption": {
+      "layout1": "Layout Trái (Mặc định)",
+      "layout3": "Layout Giữa (Khen thưởng)"
+    },
+    "field": {
+      "templateType": "Subtitle (Lễ trao bằng...)",
+      "title": "Title (Cử nhân...)",
+      "fullName": "Họ tên",
+      "majorName": "Ngành học",
+      "classification": "Xếp loại",
+      "quote": "Câu nói (Quote)"
+    }
+  },
+  "logsDrawer": {
+    "header": "Nhật ký Hệ thống & Gọi API Cập nhật",
+    "confirmClear": "Bạn có chắc chắn muốn xóa toàn bộ lịch sử nhật ký? Hành động này cũng sẽ xóa file logs.json trên đĩa.",
+    "retry": "Thử lại",
+    "retryAllFailed": "Thử lại toàn bộ lỗi ({{count}})",
+    "exportTitle": "Xuất file .txt",
+    "exportFile": "Xuất file",
+    "submitTitle": "Gửi toàn bộ nhật ký lên API",
+    "submitLogs": "Đẩy log",
+    "clearTitle": "Xóa nhật ký trên đĩa",
+    "clearLogs": "Xóa nhật ký",
+    "noMatch": "Không có nhật ký nào trùng khớp.",
+    "searchPlaceholder": "Tìm kiếm sinh viên, mã, nội dung...",
+    "stats": {
+      "total": "Tổng: {{count}}",
+      "apiOk": "API OK: {{count}}",
+      "apiFailed": "API Lỗi: {{count}}",
+      "apiPending": "Chờ gửi: {{count}}"
+    },
+    "filter": {
+      "all": "Tất cả",
+      "scan": "Lượt quét ({{count}})",
+      "play": "Lượt Play ({{count}})",
+      "clear": "Chào mừng",
+      "api": "API & Retry ({{count}})"
+    },
+    "badge": {
+      "scanQr": "QUÉT QR",
+      "welcome": "CHÀO MỪNG"
+    },
+    "apiStatus": {
+      "success": "Thành công",
+      "processing": "Đang xử lý...",
+      "failed": "Lỗi"
+    },
+    "table": {
+      "time": "Thời gian",
+      "action": "Hành động",
+      "student": "Sinh viên",
+      "details": "Chi tiết sự kiện",
+      "apiStatus": "Trạng thái API"
+    },
+    "toast": {
+      "retryingSingle": "Đang tiến hành thử lại yêu cầu API...",
+      "retrySingleError": "Lỗi khi kích hoạt thử lại",
+      "retryingAll": "Đang tiến hành thử lại toàn bộ các API lỗi...",
+      "retryAllError": "Lỗi khi kích hoạt thử lại toàn bộ",
+      "exportError": "Lỗi xuất file: {{message}}",
+      "exportConnectionError": "Lỗi kết nối khi xuất file",
+      "submitSuccess": "✓ Đã đẩy toàn bộ nhật ký lên server!",
+      "submitError": "Lỗi gửi nhật ký! Vui lòng kiểm tra lại cấu hình API.",
+      "submitConnectionError": "Lỗi kết nối khi gửi nhật ký",
+      "clearSuccess": "Đã xóa toàn bộ nhật ký.",
+      "clearError": "Lỗi khi xóa nhật ký"
+    }
+  },
+  "templateEditor": {
+    "unknownVariable": "Biến không tồn tại",
+    "placeholder": "Nhập template, gõ @ để chèn biến...",
+    "manageVariablesTitle": "Quản lý biến — tạo biến điều kiện tùy chỉnh (vd @danh_xung)",
+    "previewLabel": "Preview:",
+    "empty": "trống",
+    "ttsNotReady": "Engine TTS chưa sẵn sàng",
+    "generatingAudio": "Đang tạo âm thanh...",
+    "stopPlaying": "Dừng phát",
+    "listenPreview": "Nghe thử câu preview",
+    "hint": {
+      "typeAt": "Gõ",
+      "toInsertVariable": "để chèn biến.",
+      "example": "Ví dụ:",
+      "addPunctBefore": "Thêm dấu",
+      "or": "hoặc",
+      "forPause": "để ngắt nghỉ câu.",
+      "useMultiDots": "Dùng nhiều dấu",
+      "forLongerPause": "để nghỉ lâu hơn."
+    }
+  },
+  "customVariables": {
+    "title": "Quản lý biến",
+    "subtitle": "Biến điều kiện tùy chỉnh — dùng trong template dạng @tên_biến",
+    "autoSave": "Tự động lưu",
+    "importTitle": "Import biến từ file JSON",
+    "exportTitle": "Export toàn bộ biến ra file JSON",
+    "keyPlaceholder": "tên_biến",
+    "labelPlaceholder": "Nhãn hiển thị (vd Danh xưng)",
+    "studentFallback": "SV",
+    "empty": "trống",
+    "deleteVariable": "Xóa biến",
+    "ifWord": "Nếu",
+    "moveUp": "Đẩy lên",
+    "moveDown": "Đẩy xuống",
+    "deleteRule": "Xóa điều kiện",
+    "addRule": "Thêm điều kiện",
+    "defaultElse": "Mặc định (còn lại) →",
+    "defaultPlaceholder": "vd Cử nhân",
+    "resultPlaceholder": "Kết quả (vd Kỹ sư)",
+    "addVariable": "Thêm biến",
+    "footerNote": "Điều kiện xét từ trên xuống — điều kiện khớp đầu tiên thắng. Thay đổi được lưu tự động.",
+    "emptyState": {
+      "before": "Chưa có biến nào. Bấm",
+      "after": "để tạo biến điều kiện đầu tiên."
+    },
+    "error": {
+      "invalidKey": "Tên biến chỉ gồm chữ cái không dấu và dấu gạch dưới (a-z, A-Z, _).",
+      "duplicateKey": "Tên biến bị trùng với biến khác.",
+      "reservedKey": "Tên biến trùng với trường dữ liệu có sẵn — biến điều kiện sẽ ghi đè trường đó."
+    },
+    "import": {
+      "button": "Import",
+      "noValidVariables": "File không chứa biến hợp lệ.",
+      "confirmReplace": "Import {{count}} biến.\n\nOK = Thay thế toàn bộ danh sách hiện tại.\nCancel = Thêm vào danh sách hiện có.",
+      "readError": "Không đọc được file JSON: {{message}}"
+    },
+    "export": {
+      "button": "Export"
+    },
+    "valuePlaceholder": {
+      "list": "cntt, công nghệ thông tin",
+      "default": "giá trị"
+    },
+    "op": {
+      "equals": "bằng",
+      "contains": "chứa",
+      "in": "thuộc danh sách",
+      "gt": "> (lớn hơn)",
+      "lt": "< (nhỏ hơn)",
+      "gte": "≥ (lớn hơn hoặc bằng)",
+      "lte": "≤ (nhỏ hơn hoặc bằng)"
+    }
+  },
+  "preGenPopover": {
+    "failedCount": "{{count}} lỗi",
+    "suspectTitle": "Các file gen xong nhưng nghi ngờ chất lượng (rè, âm nhỏ, méo...). Nhấn để lọc.",
+    "suspectCount": "{{count}} khả nghi",
+    "pause": "Tạm dừng",
+    "resume": "Tiếp tục",
+    "requeueSelected": "Tạo lại {{count}} đã chọn",
+    "searchPlaceholder": "Tìm tên, mã SV...",
+    "noResults": "Không có kết quả",
+    "playTitle": "Phát thử",
+    "requeueTitle": "Tạo lại",
+    "suspectQualityTitle": "Nghi ngờ chất lượng: {{flags}}",
+    "filter": {
+      "all": "Tất cả",
+      "done": "Xong",
+      "suspect": "Khả nghi",
+      "failed": "Lỗi",
+      "pending": "Chờ"
+    },
+    "table": {
+      "student": "Sinh viên",
+      "status": "Trạng thái",
+      "action": "Thao tác"
+    },
+    "status": {
+      "pending": "Chờ",
+      "processing": "Đang xử lý",
+      "done": "Xong",
+      "failed": "Lỗi"
+    },
+    "quality": {
+      "noisy": "rè/nhiễu",
+      "lowEnergy": "âm quá nhỏ",
+      "noPauses": "nói liền không ngắt (dễ ú ớ)",
+      "mostlySilent": "gần như im lặng",
+      "clipping": "méo/vỡ tiếng",
+      "tooShort": "quá ngắn so với nội dung",
+      "tooLong": "quá dài (lặp/kéo dài)"
+    }
+  },
+  "controlApp": {
+    "title": "Control",
+    "studentNotFound": "Không tìm thấy sinh viên với mã {{code}}",
+    "studentAdded": "Đã thêm {{name}}"
+  },
+  "about": {
+    "appName": "Trao bằng - Slide"
+  },
+  "autoPlayBar": {
+    "manualOnly": "AutoPlay chỉ dùng ở chế độ thủ công (manual)",
+    "stop": "Dừng",
+    "auto": "Tự động"
+  },
+  "backdropToggle": {
+    "turnOff": "Tắt màn hình hiển thị",
+    "turnOn": "Bật màn hình hiển thị",
+    "turnOffShort": "Tắt màn hình",
+    "turnOnShort": "Bật màn hình",
+    "processing": "Đang xử lý…",
+    "exitFullscreen": "Thoát toàn màn hình",
+    "fullscreen": "Toàn màn hình",
+    "displayScreen": "Màn hình hiển thị",
+    "on": "Đang bật",
+    "off": "Đã tắt"
+  },
+  "hallSelector": {
+    "label": "Hội trường:"
+  },
+  "idlePanel": {
+    "welcomeScreen": "Màn hình chào mừng",
+    "autoReturnTooltip": "Tự động quay về màn hình chào mừng vì không có sinh viên mới nào được hiển thị. Vào nút ⚙️ Tùy chọn trên toolbar để bật/tắt hoặc đổi thời gian.",
+    "autoReturnIn": "Tự về sau {{seconds}}s",
+    "showWelcomeScreen": "Hiển thị màn hình chào mừng"
+  },
+  "modeSwitch": {
+    "label": "Chế độ:",
+    "auto": "Auto (quét là lên)",
+    "manual": "Manual (chờ Play)"
+  },
+  "nowOnStage": {
+    "onStage": "Đang trên sân khấu",
+    "scrollToStudent": "Cuộn đến sinh viên này trong danh sách",
+    "idleScreen": "Màn hình đang ở chế độ chờ (Idle).",
+    "prev": "Trước",
+    "next": "Sau"
+  },
+  "optionsToggle": {
+    "label": "Tùy chọn",
+    "display": "Hiển thị",
+    "showAllStudentsPanel": "Hiện bảng tất cả sinh viên",
+    "slideOperation": "Vận hành Slide",
+    "slideDelay": "Delay chuyển slide",
+    "instant": "Tức thì",
+    "seconds": "{{seconds}} giây",
+    "slideDelayHint": "Độ trễ sau khi quét QR/Thẻ thành công trước khi tự động kích hoạt slide của sinh viên đó lên màn hình lớn.",
+    "autoIdleReturn": "Tự động về màn chờ khi không hoạt động",
+    "afterHowLong": "Sau bao lâu (giây)",
+    "idleTimeoutHint": "Nếu không có sinh viên mới nào được hiển thị trong khoảng thời gian này (cả 2 chế độ auto/manual), tự động quay về màn hình chào mừng."
+  },
+  "previewPanel": {
+    "preview": "Xem trước",
+    "clickRowLine1": "Bấm vào một dòng trong danh sách",
+    "clickRowLine2": "để xem trước",
+    "currentlyShowing": "Đang hiển thị",
+    "showOnScreen": "Đưa lên màn hình"
+  },
+  "qrStatus": {
+    "lastScanAt": "Lần quét gần nhất: {{time}}",
+    "noScanYet": "Chưa có lần quét nào",
+    "active": "QR đang hoạt động",
+    "waiting": "QR chờ"
+  },
+  "rowContextMenu": {
+    "studentDetail": "Chi tiết sinh viên",
+    "playAudio": "Phát audio",
+    "regenAudio": "Tạo lại audio",
+    "markPresent": "Đánh dấu có mặt",
+    "markAbsent": "Vắng mặt",
+    "goOnStage": "Lên sân khấu"
+  },
+  "scanInbox": {
+    "noStudentScanned": "Chưa có sinh viên nào được quét.",
+    "studentMarkedAbsent": "Sinh viên đã đánh dấu vắng",
+    "justScanned": "Vừa quét sinh viên:",
+    "reason": "Lý do: {{reason}}",
+    "noPhoto": "No photo",
+    "showAnyway": "Vẫn hiển thị (override)",
+    "play": "Play (lên màn hình)",
+    "skip": "Bỏ qua"
+  },
+  "studentPanels": {
+    "scannedCount": "Đã quét: {{count}}",
+    "allStudents": "Tất cả sinh viên",
+    "scannedQr": "Đã quét QR"
+  },
+  "displayPicker": {
+    "backdropScreen": "Màn hình Backdrop",
+    "aspectRatio": "Tỷ lệ màn chiếu:",
+    "moveToDisplay": "Kéo sang màn:",
+    "exitFullscreen": "Thoát toàn màn hình",
+    "fullscreen": "Toàn màn hình"
+  },
+  "ui": {
+    "confirmModal": {
+      "deleting": "Đang xóa...",
+      "enableAfter": "Nút xóa sẽ được bật sau",
+      "seconds": "giây"
+    }
+  }
+}

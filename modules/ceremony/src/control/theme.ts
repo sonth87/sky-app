@@ -1,0 +1,169 @@
+import type { AppFont, ShadowLevel, ThemeMode, ThemePalette } from './store';
+
+const STORAGE_KEY = 'ceremony-control-storage';
+
+const VALID_PALETTES: ThemePalette[] = [
+  'green', 'violet-bloom', 'yellow', 'tangerine', 'summer', 'starry-night',
+  'blue', 'red', 'orange', 'rose',
+  'modern-minimal', 'clean-slate', 'amber-minimal', 'graphite', 'mono',
+  'cosmic-night', 'midnight-bloom', 'caffeine',
+  'bubblegum', 'catppuccin',
+  'ocean-breeze',
+];
+const VALID_FONTS: AppFont[] = [
+  'system-ui', 'Inter', 'Montserrat', 'Roboto', 'Be Vietnam Pro', 'SF Pro Vietnamese',
+  'Playfair Display', 'EB Garamond', 'Lora', 'Crimson Pro', 'Source Serif Pro',
+];
+const VALID_SHADOW_LEVELS: ShadowLevel[] = ['none', 'soft', 'medium', 'bold'];
+
+// Mỗi font "thân thiện" map sang font-family CSS thật (system-ui giữ nguyên stack mặc định của app).
+export const FONT_STACK: Record<AppFont, string> = {
+  'system-ui': "system-ui, 'Segoe UI', Roboto, sans-serif",
+  Inter: "'Inter', system-ui, sans-serif",
+  Montserrat: "'Montserrat', system-ui, sans-serif",
+  Roboto: "'Roboto', system-ui, sans-serif",
+  'Be Vietnam Pro': "'Be Vietnam Pro', system-ui, sans-serif",
+  'SF Pro Vietnamese': "'SF Pro Vietnamese', system-ui, sans-serif",
+  'Playfair Display': "'Playfair Display', Georgia, serif",
+  'EB Garamond': "'EB Garamond', Georgia, serif",
+  Lora: "'Lora', Georgia, serif",
+  'Crimson Pro': "'Crimson Pro', Georgia, serif",
+  'Source Serif Pro': "'Source Serif Pro', Georgia, serif",
+};
+
+// 3 mức đậm bóng đổ — Soft nhạt hơn, Bold đậm/rõ hơn baseline "medium" hiện có trong theme.
+const SHADOW_PRESETS: Record<Exclude<ShadowLevel, 'none'>, Record<string, string>> = {
+  soft: {
+    '--shadow-2xs': '0px 2px 4px -1px hsl(0 0% 0% / 0.03)',
+    '--shadow-xs': '0px 2px 4px -1px hsl(0 0% 0% / 0.03)',
+    '--shadow-sm': '0px 2px 4px -1px hsl(0 0% 0% / 0.05), 0px 1px 1px -2px hsl(0 0% 0% / 0.05)',
+    '--shadow': '0px 2px 4px -1px hsl(0 0% 0% / 0.05), 0px 1px 1px -2px hsl(0 0% 0% / 0.05)',
+    '--shadow-md': '0px 2px 4px -1px hsl(0 0% 0% / 0.05), 0px 1px 2px -2px hsl(0 0% 0% / 0.05)',
+    '--shadow-lg': '0px 2px 4px -1px hsl(0 0% 0% / 0.05), 0px 2px 3px -2px hsl(0 0% 0% / 0.05)',
+    '--shadow-xl': '0px 2px 4px -1px hsl(0 0% 0% / 0.05), 0px 4px 5px -2px hsl(0 0% 0% / 0.05)',
+    '--shadow-2xl': '0px 2px 4px -1px hsl(0 0% 0% / 0.12)',
+  },
+  medium: {
+    '--shadow-2xs': '0px 4px 8px -1px hsl(0 0% 0% / 0.05)',
+    '--shadow-xs': '0px 4px 8px -1px hsl(0 0% 0% / 0.05)',
+    '--shadow-sm': '0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 1px 2px -2px hsl(0 0% 0% / 0.10)',
+    '--shadow': '0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 1px 2px -2px hsl(0 0% 0% / 0.10)',
+    '--shadow-md': '0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 2px 4px -2px hsl(0 0% 0% / 0.10)',
+    '--shadow-lg': '0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 4px 6px -2px hsl(0 0% 0% / 0.10)',
+    '--shadow-xl': '0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 8px 10px -2px hsl(0 0% 0% / 0.10)',
+    '--shadow-2xl': '0px 4px 8px -1px hsl(0 0% 0% / 0.25)',
+  },
+  bold: {
+    '--shadow-2xs': '0px 6px 12px -1px hsl(0 0% 0% / 0.10)',
+    '--shadow-xs': '0px 6px 12px -1px hsl(0 0% 0% / 0.10)',
+    '--shadow-sm': '0px 6px 12px -1px hsl(0 0% 0% / 0.18), 0px 2px 4px -2px hsl(0 0% 0% / 0.18)',
+    '--shadow': '0px 6px 12px -1px hsl(0 0% 0% / 0.18), 0px 2px 4px -2px hsl(0 0% 0% / 0.18)',
+    '--shadow-md': '0px 6px 12px -1px hsl(0 0% 0% / 0.18), 0px 4px 8px -2px hsl(0 0% 0% / 0.18)',
+    '--shadow-lg': '0px 6px 12px -1px hsl(0 0% 0% / 0.18), 0px 8px 12px -2px hsl(0 0% 0% / 0.18)',
+    '--shadow-xl': '0px 6px 12px -1px hsl(0 0% 0% / 0.18), 0px 14px 18px -2px hsl(0 0% 0% / 0.18)',
+    '--shadow-2xl': '0px 6px 12px -1px hsl(0 0% 0% / 0.40)',
+  },
+};
+const NONE_SHADOW: Record<string, string> = Object.fromEntries(
+  Object.keys(SHADOW_PRESETS.medium).map((k) => [k, 'none'])
+);
+
+function readPersistedTheme(): {
+  mode: ThemeMode; palette: ThemePalette;
+  font: AppFont; letterSpacing: number; spacing: number; shadowLevel: ShadowLevel;
+} {
+  const fallback = {
+    mode: 'system' as ThemeMode, palette: 'green' as ThemePalette,
+    font: 'Inter' as AppFont, letterSpacing: 0, spacing: 0.25, shadowLevel: 'medium' as ShadowLevel,
+  };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    const mode = parsed?.state?.themeMode;
+    const palette = parsed?.state?.themePalette;
+    const font = parsed?.state?.appFont;
+    const letterSpacing = parsed?.state?.letterSpacing;
+    const spacing = parsed?.state?.appSpacing;
+    const shadowLevel = parsed?.state?.shadowLevel;
+    return {
+      mode: mode === 'light' || mode === 'dark' || mode === 'system' ? mode : fallback.mode,
+      palette: VALID_PALETTES.includes(palette) ? palette : fallback.palette,
+      font: VALID_FONTS.includes(font) ? font : fallback.font,
+      letterSpacing: typeof letterSpacing === 'number' ? letterSpacing : fallback.letterSpacing,
+      spacing: typeof spacing === 'number' ? spacing : fallback.spacing,
+      shadowLevel: VALID_SHADOW_LEVELS.includes(shadowLevel) ? shadowLevel : fallback.shadowLevel,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function resolveThemeMode(mode: ThemeMode): 'light' | 'dark' {
+  if (mode === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return mode;
+}
+
+let currentMode: ThemeMode = 'system';
+let currentPalette: ThemePalette = 'green';
+let currentFont: AppFont = 'Inter';
+let currentLetterSpacing = 0;
+let currentSpacing = 0.25;
+let currentShadowLevel: ShadowLevel = 'medium';
+
+/** Áp dụng theme hiện tại (class `dark` + attribute `data-theme`) lên <html>. */
+export function applyTheme(mode?: ThemeMode, palette?: ThemePalette) {
+  if (mode !== undefined) currentMode = mode;
+  if (palette !== undefined) currentPalette = palette;
+
+  const root = document.documentElement;
+  root.classList.toggle('dark', resolveThemeMode(currentMode) === 'dark');
+  root.setAttribute('data-theme', currentPalette);
+}
+
+interface AppearancePatch {
+  appFont?: AppFont;
+  letterSpacing?: number;
+  appSpacing?: number;
+  shadowLevel?: ShadowLevel;
+}
+
+/** Áp dụng font/letter-spacing/spacing/shadow hiện tại lên <html> qua CSS variable inline. */
+export function applyAppearance(patch: AppearancePatch = {}) {
+  if (patch.appFont !== undefined) currentFont = patch.appFont;
+  if (patch.letterSpacing !== undefined) currentLetterSpacing = patch.letterSpacing;
+  if (patch.appSpacing !== undefined) currentSpacing = patch.appSpacing;
+  if (patch.shadowLevel !== undefined) currentShadowLevel = patch.shadowLevel;
+
+  const root = document.documentElement;
+  root.style.setProperty('--font-sans', FONT_STACK[currentFont]);
+  root.style.setProperty('--tracking-normal', `${currentLetterSpacing}em`);
+  root.style.setProperty('--spacing', `${currentSpacing}rem`);
+
+  const shadowVars = currentShadowLevel === 'none' ? NONE_SHADOW : SHADOW_PRESETS[currentShadowLevel];
+  for (const [key, value] of Object.entries(shadowVars)) {
+    root.style.setProperty(key, value);
+  }
+}
+
+// Set ngay khi module load (trước React mount) để tránh FOUC — cùng pattern với i18n.ts.
+const persisted = readPersistedTheme();
+currentMode = persisted.mode;
+currentPalette = persisted.palette;
+currentFont = persisted.font;
+currentLetterSpacing = persisted.letterSpacing;
+currentSpacing = persisted.spacing;
+currentShadowLevel = persisted.shadowLevel;
+if (typeof document !== 'undefined') {
+  applyTheme();
+  applyAppearance();
+}
+
+// Khi mode = 'system', tự cập nhật lại nếu OS đổi theme trong lúc app đang chạy.
+if (typeof window !== 'undefined') {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (currentMode === 'system') applyTheme();
+  });
+}
