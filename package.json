@@ -1,0 +1,24 @@
+{
+  "name": "sky-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Nền tảng multi-app đa môi trường (Web + Electron, Online + Offline)",
+  "packageManager": "pnpm@10.21.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "changeset": "changeset"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.7",
+    "turbo": "^2.5.4",
+    "typescript": "^5.9.3"
+  }
+}
