@@ -20,8 +20,8 @@ App nhúng PUBLIC key → verify chữ ký OFFLINE → tin payload → gate theo
 ## Entitlement là gì
 
 Một chuỗi định danh quyền, quy ước phân cấp:
-- `app.<id>` — quyền mở nguyên 1 app (vd `app.trao-bang`).
-- `feature.<app>.<name>` — quyền 1 tính năng con (vd `feature.trao-bang.voice-clone`).
+- `app.<id>` — quyền mở nguyên 1 app (vd `app.ceremony`).
+- `feature.<app>.<name>` — quyền 1 tính năng con (vd `feature.ceremony.voice-clone`).
 
 ## Gate ở 2 tầng
 
@@ -42,7 +42,7 @@ function canOpen(app: AppModule, lic: License): boolean {
 
 ```tsx
 function MyApp({ platform }: AppContentProps) {
-  const canClone = platform.entitlements.has('feature.trao-bang.voice-clone');
+  const canClone = platform.entitlements.has('feature.ceremony.voice-clone');
   return <>{canClone ? <VoiceCloneButton/> : <UpgradeHint/>}</>;
 }
 ```

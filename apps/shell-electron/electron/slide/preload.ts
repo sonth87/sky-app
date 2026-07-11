@@ -360,8 +360,8 @@ export type SlideApi = typeof api;
 /**
  * Gọi từ electron/preload.ts (entry preload chính của app) — giữ bridge
  * `window.slide` tách biệt với `window.sky` (kernel), theo chiến lược port
- * ở docs/guides/ports-and-adapters.md §"Trường hợp đặc biệt: Trao Bằng
- * window.slide": giữ nguyên bridge cũ để 117 call-site trong modules/trao-bang
+ * ở docs/guides/ports-and-adapters.md §"Trường hợp đặc biệt: Ceremony
+ * window.slide": giữ nguyên bridge cũ để 117 call-site trong modules/ceremony
  * (GĐ5) chạy không đổi, bọc dần thành TtsPort/DataPort sau.
  */
 export function registerSlideBridge(): void {

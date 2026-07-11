@@ -23,14 +23,14 @@ describe('EntitlementGate', () => {
 
   it('app có entitlement nhưng license thiếu → bị khóa kèm lý do', () => {
     const gate = createEntitlementGate(createEntitlementSet(['app.other']));
-    const app = fakeApp('app.trao-bang');
+    const app = fakeApp('app.ceremony');
     expect(gate.canOpen(app)).toBe(false);
-    expect(gate.reason(app)).toContain('app.trao-bang');
+    expect(gate.reason(app)).toContain('app.ceremony');
   });
 
   it('app có entitlement và license đủ → mở được', () => {
-    const gate = createEntitlementGate(createEntitlementSet(['app.trao-bang']));
-    const app = fakeApp('app.trao-bang');
+    const gate = createEntitlementGate(createEntitlementSet(['app.ceremony']));
+    const app = fakeApp('app.ceremony');
     expect(gate.canOpen(app)).toBe(true);
     expect(gate.reason(app)).toBeNull();
   });

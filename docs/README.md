@@ -24,7 +24,7 @@ docs/
 │   └── contract-reference.md  AppModule, PlatformContext, ServiceRegistry, EventBus, Ports
 │
 ├── apps/                  ← 📦 TỪNG APP CON (mô tả nghiệp vụ mỗi app)
-│   └── (trao-bang.md, tts-studio.md ... — thêm khi có app)
+│   └── (ceremony.md, tts-studio.md ... — thêm khi có app)
 │
 ├── services/             ← ⚙️ TỪNG SERVICE (TTS, ... — service dùng chung)
 │   └── (tts-service.md ... — thêm khi có service)

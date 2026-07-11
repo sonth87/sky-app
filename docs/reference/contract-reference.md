@@ -10,7 +10,7 @@ Contract mỗi app con phải implement.
 
 ```ts
 interface AppModule {
-  id: string;                    // slug duy nhất: 'trao-bang', 'tts-studio'
+  id: string;                    // slug duy nhất: 'ceremony', 'tts-studio'
   name: string;                  // tên hiển thị ở dock/title
   icon: string;                  // 'lucide:IconName' | '/path/icon.svg'
   category?: string;             // nhóm ở launcher: 'ceremony'|'tools'|...
@@ -102,7 +102,7 @@ interface EventBus {
 }
 ```
 
-Quy ước tên: `{appId}:{action}` (vd `trao-bang:student-shown`) | `platform:{action}` (vd `platform:license-changed`).
+Quy ước tên: `{appId}:{action}` (vd `ceremony:student-shown`) | `platform:{action}` (vd `platform:license-changed`).
 
 ## EntitlementSet & EntitlementGate
 

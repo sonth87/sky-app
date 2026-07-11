@@ -430,7 +430,7 @@ class ApiLogger {
     const win = getControlWindow();
     const { canceled, filePath } = await dialog.showSaveDialog(win ?? undefined!, {
       title: 'Xuất Nhật Ký (.txt)',
-      defaultPath: `nhat-ky-trao-bang-${new Date().toISOString().slice(0, 10)}.txt`,
+      defaultPath: `nhat-ky-ceremony-${new Date().toISOString().slice(0, 10)}.txt`,
       filters: [{ name: 'Text Files', extensions: ['txt'] }],
     });
 

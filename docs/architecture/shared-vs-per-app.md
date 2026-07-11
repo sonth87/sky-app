@@ -19,7 +19,7 @@
             ▲
 ┌───────────┴──────────────────────────────────┐
 │ modules/ (per-app)                            │  ← nghiệp vụ cụ thể 1 app
-│  trao-bang, tts-studio, ...                   │
+│  ceremony, tts-studio, ...                    │
 └───────────────────────────────────────────────┘
 ```
 
@@ -32,10 +32,10 @@
 | shadcn primitives, design tokens | `ui` (shared) | đồng nhất UI toàn nền tảng |
 | Cấu hình service (device/engine/clone giọng TTS) | shared (thuộc service, mọi app dùng) | config service share được |
 | License verify, EntitlementGate | `licensing` / `kernel` (shared) | gating chung |
-| **Template câu đọc theo field sinh viên** | `modules/trao-bang` | nghiệp vụ Trao Bằng |
-| **Điều kiện phân giọng theo thuộc tính SV** | `modules/trao-bang` | nghiệp vụ |
-| **Pregen theo danh sách SV/batch** | `modules/trao-bang` | gắn dữ liệu 1 app |
-| **State on-stage / pending (backdrop)** | `modules/trao-bang` | "trao bằng" đậm, đừng ép thành khung chung |
+| **Template câu đọc theo field sinh viên** | `modules/ceremony` | nghiệp vụ Ceremony |
+| **Điều kiện phân giọng theo thuộc tính SV** | `modules/ceremony` | nghiệp vụ |
+| **Pregen theo danh sách SV/batch** | `modules/ceremony` | gắn dữ liệu 1 app |
+| **State on-stage / pending (backdrop)** | `modules/ceremony` | nghiệp vụ riêng đậm đặc của Ceremony, đừng ép thành khung chung |
 | UI nhập text tự do → xuất audio | `modules/tts-studio` | dùng service TTS chung, nhưng là app riêng |
 
 ## Quy tắc quyết định (checklist)
@@ -52,7 +52,7 @@
 
 ## Cảnh báo: đừng tổng quát hóa sớm
 
-- **`socket-server` + state on-stage/pending của Trao Bằng** là "trao bằng" đậm — giữ trong `modules/trao-bang`, đừng ép thành khung chung ngay.
+- **`socket-server` + state on-stage/pending của Ceremony** là nghiệp vụ riêng đậm đặc — giữ trong `modules/ceremony`, đừng ép thành khung chung ngay.
 - **Pregen queue** bị trộn: phần "hàng đợi sinh audio" có thể shared, phần "theo SV/batch/template" là module. Tách cẩn thận khi thực sự có app thứ 2 cần.
 - Nguyên tắc: **chỉ kéo lên shared khi có app thứ 2 thật sự dùng**, không phỏng đoán.
 

@@ -74,14 +74,14 @@ Mỗi platform gom adapter vào `PlatformContext` khi khởi tạo shell tương
 - Nếu 1 môi trường không làm được port → adapter trả `null`/không đăng ký → capability = `false` → app kiểm `capabilities.has()` và degrade. **Không throw giữa chừng.**
 - Port async (`Promise`) kể cả khi Electron làm được đồng bộ — để 2 môi trường cùng shape.
 
-## Trường hợp đặc biệt: Trao Bằng `window.slide`
+## Trường hợp đặc biệt: Ceremony `window.slide`
 
-Trao Bằng hiện có 1 bridge `window.slide` với 78 IPC channel. Chiến lược migrate (GĐ4-5):
+Ceremony (trước đây gọi là Trao Bằng, port từ dự án `apps/slide`) hiện có 1 bridge `window.slide` với 78 IPC channel. Chiến lược migrate (GĐ4-5):
 1. **Giữ nguyên** `window.slide` trong preload sky-app → 117 call-site chạy không đổi ngay.
 2. **Bọc dần** thành `TtsPort`/`DataPort`/`DisplayPort` — thay call-site theo nhóm, không codemod 1 lần.
 3. 7 event-listener (`onPregenProgress`...) map sang callback/observable trong port.
 
-Xem [dev/history.md](../dev/history.md) để biết chi tiết bridge Slide.
+Xem [dev/history.md](../dev/history.md) để biết chi tiết bridge Ceremony.
 
 ## Anti-pattern (tuyệt đối tránh)
 

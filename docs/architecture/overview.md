@@ -10,14 +10,14 @@
 
 ## 1. Tầm nhìn
 
-Sky-App là một **nền tảng multi-app** (không phải 1 app), dùng [`device-layout`](https://github.com/sonth87/device-layout) làm lớp visualize (cửa sổ/dock/menubar kiểu desktop OS). Trao Bằng (Slide) + TTS chỉ là **2 app đầu tiên** trong nhiều app/service tích hợp dần.
+Sky-App là một **nền tảng multi-app** (không phải 1 app), dùng [`device-layout`](https://github.com/sonth87/device-layout) làm lớp visualize (cửa sổ/dock/menubar kiểu desktop OS). Ceremony (trước đây gọi là Trao Bằng, port từ dự án `apps/slide`) + TTS chỉ là **2 app đầu tiên** trong nhiều app/service tích hợp dần.
 
 **Yêu cầu nền tảng:**
 1. **Chạy cả Web lẫn Electron** — isomorphic-first: 1 codebase, 2 runtime adapter. Đánh đổi: một số tính năng chỉ có ở 1 môi trường, hoặc triển khai 2 lần (vd TTS: Electron = client gọi local service; Web = gọi backend service). Chi tiết: [web-vs-electron.md](./web-vs-electron.md).
 2. **Online + Offline** — offline-first, không bắt buộc mạng để chạy app đã cấp quyền.
 3. **License/activation theo tính năng** — entitlement gating từng app/feature, verify offline-capable (ký số + refresh online). Chi tiết: [guides/licensing-entitlement.md](../guides/licensing-entitlement.md).
 4. **Dễ mở rộng & tích hợp giữa app con** — thêm app không sửa core; app giao tiếp qua contract. **Ưu tiên số 1.**
-5. Trao Bằng vẫn hỗ trợ đầy đủ **Control + Backdrop** như hiện tại.
+5. Ceremony vẫn hỗ trợ đầy đủ **Control + Backdrop** như hiện tại.
 
 ---
 
@@ -55,8 +55,8 @@ sky-app/  (pnpm workspace + Turborepo)
 │   └── build-config/     ← Vite/electron-vite/tsup config factory (build kernel)
 │
 ├── modules/              ← APP con (mỗi app = 1 package implement AppModule)
-│   ├── trao-bang/        ← Slide Control UI
-│   ├── trao-bang-backdrop/← Backdrop renderer (BrowserWindow/tab riêng)
+│   ├── ceremony/         ← Control UI (trước đây gọi là Trao Bằng, port từ apps/slide)
+│   ├── ceremony-backdrop/← Backdrop renderer (BrowserWindow/tab riêng)
 │   └── tts-studio/       ← UI cấu hình TTS
 ```
 
@@ -94,8 +94,8 @@ License ký **Ed25519** chứa `{ entitlements[], expiry, deviceBinding? }`, ver
 | **1** | Kernel + contract: monorepo, `packages/kernel` (interface + impl tối thiểu), `service-contracts` | unit test contract + 1 mock app |
 | **2** | device-layout thành lib + `packages/device-shell` nối kernel registry | web render desktop + mock app dùng platform context |
 | **3** | `platform-electron` + `platform-web` + 2 shell mỏng render cùng renderer | 1 mock app chạy cả electron dev lẫn web dev |
-| **4** | Port backend Trao Bằng (socket/http/python/ipc) sau các port | main khởi động đủ service |
-| **5** | Trao Bằng thành module (React 18→19), Backdrop kiosk riêng, xử lý style isolation | end-to-end vs `apps/slide` gốc: quét mã → backdrop → TTS |
+| **4** | Port backend Ceremony (socket/http/python/ipc) sau các port | main khởi động đủ service |
+| **5** | Ceremony thành module (React 18→19), Backdrop kiosk riêng, xử lý style isolation | end-to-end vs `apps/slide` gốc: quét mã → backdrop → TTS |
 | **6** | TTS Studio tách + Licensing thật (Ed25519 + EntitlementGate) | app khóa khi thiếu entitlement |
 | **7** | Web parity: adapter web thật cho port khả thi; app không hỗ trợ web degrade | mở desktop trên browser, chạy app web-compatible |
 

@@ -6,7 +6,7 @@
 
 ---
 
-## 2026-07-11 — Giai đoạn 4: Port backend Trao Bằng thật vào sky-app, chạy thật (WS/HTTP/Python/window.slide)
+## 2026-07-11 — Giai đoạn 4: Port backend Ceremony thật vào sky-app, chạy thật (WS/HTTP/Python/window.slide)
 
 **Quyết định:** Port nguyên vẹn 19 file TypeScript (~6.500 dòng: `socket-server.ts`, `http-server.ts`, `python-server.ts`, `ipc.ts` 78 handler, `pregen-queue.ts`, `api-logger.ts`, `engine-installer.ts`, `download-task.ts`, `menu.ts`, `vieneu-tts.ts`, `windows.ts`, `session-store.ts`, `preload.ts`, `data/{paths,store,sync}.ts`, `lib/{customVariables,renderTemplate}.ts`) từ `apps/slide/electron/` (repo `trao-bang-tot-nghiep-2026`) vào `apps/shell-electron/electron/slide/`, cộng `apps/tts-service` (Python, chỉ `server/` — không copy `venv/`/`build/`/`dist/`, 1MB thay vì 600MB). Theo đúng nguyên tắc ports-and-adapters.md: **giữ nguyên bridge `window.slide`** song song `window.sky` (kernel), KHÔNG codemod 117 call-site ngay — bọc dần thành port ở GĐ5+.
 
@@ -27,7 +27,7 @@
 - `window.sky.invoke('kernel:tts:listVoices')` (kernel port GĐ3) vẫn hoạt động bình thường, không bị ảnh hưởng bởi việc thêm backend Slide — 2 bridge độc lập cùng tồn tại.
 - **Toàn workspace: 21/21 turbo task xanh, 33/33 test pass.**
 
-**Còn thiếu ở GĐ4 (để GĐ5):** chưa mở `createControlWindow()`/`createBackdropWindow()` (Slide UI thật) — renderer chính vẫn là `SkyDeviceLayout`+`mockAppModule` từ GĐ3. `ControlApp.tsx` (React 18, UI thật của Trao Bằng) chưa port, chưa trở thành 1 `AppModule`. Chưa test import/sync data thật (ZIP), chưa test TTS synthesize thật (cần setup Python venv), chưa xử lý style isolation Tailwind v4 (device-layout `@theme` vs Slide `@theme` — chỉ phát sinh khi Slide UI thật được nhúng).
+**Còn thiếu ở GĐ4 (để GĐ5):** chưa mở `createControlWindow()`/`createBackdropWindow()` (Slide UI thật) — renderer chính vẫn là `SkyDeviceLayout`+`mockAppModule` từ GĐ3. `ControlApp.tsx` (React 18, UI thật của Ceremony) chưa port, chưa trở thành 1 `AppModule`. Chưa test import/sync data thật (ZIP), chưa test TTS synthesize thật (cần setup Python venv), chưa xử lý style isolation Tailwind v4 (device-layout `@theme` vs Slide `@theme` — chỉ phát sinh khi Slide UI thật được nhúng).
 
 ---
 
@@ -110,9 +110,9 @@
 
 ## 2026-07-11 — Khởi tạo repo + chốt kiến trúc nền tảng
 
-**Quyết định:** Dựng Sky-App làm nền tảng multi-app đa môi trường (web+electron, online+offline) có licensing, thay vì chỉ port Trao Bằng vào device-layout.
+**Quyết định:** Dựng Sky-App làm nền tảng multi-app đa môi trường (web+electron, online+offline) có licensing, thay vì chỉ port Ceremony (khi đó còn gọi là Trao Bằng) vào device-layout.
 
-**Lý do:** Người dùng định hình tầm nhìn lớn hơn — device-layout + Trao Bằng + TTS chỉ là phần đầu; cần nền tảng mở rộng được, tích hợp nhiều app/service, hỗ trợ cả web lẫn electron, có license theo tính năng.
+**Lý do:** Người dùng định hình tầm nhìn lớn hơn — device-layout + Ceremony + TTS chỉ là phần đầu; cần nền tảng mở rộng được, tích hợp nhiều app/service, hỗ trợ cả web lẫn electron, có license theo tính năng.
 
 **Các quyết định con:**
 - **Ports & Adapters ở tâm** — vì học từ khảo sát `sdk-hub` + `mfe-shell-app`: cả 2 đều thiếu lớp tách môi trường và lifecycle contract tường minh. Sky-App đặt 2 thứ đó làm trung tâm để chạy được web+electron từ 1 codebase.
@@ -123,8 +123,8 @@
 - **Monorepo pnpm+Turbo, React 19/shadcn/Tailwind v4/TanStack** — công nghệ mới, phổ biến, đồng bộ device-layout.
 
 **Facts kỹ thuật quan trọng (dùng khi code):**
-- Trao Bằng bridge tên **`window.slide`** (không phải electronAPI), 117 call-site/30 file, 78 IPC channel + 7 event-listener trả unsubscribe. 2 renderer: Control (trong shell) + Backdrop (kiosk riêng, state Socket.IO). Main giữ WS8765+HTTP8080+Python TTS.
-- Trao Bằng React 18 → cần nâng 19. Cả Slide + device-layout đều Tailwind v4 `@theme` global → rủi ro style leakage.
+- Ceremony (trước đây gọi là Trao Bằng) bridge tên **`window.slide`** (không phải electronAPI), 117 call-site/30 file, 78 IPC channel + 7 event-listener trả unsubscribe. 2 renderer: Control (trong shell) + Backdrop (kiosk riêng, state Socket.IO). Main giữ WS8765+HTTP8080+Python TTS.
+- Ceremony React 18 → cần nâng 19. Cả Slide + device-layout đều Tailwind v4 `@theme` global → rủi ro style leakage.
 - Điểm nối device-layout nhận app ngoài: `AppRegistry.tsx` (AppContent/AppViewportProvider), `ThemeProvider.tsx` (bỏ hardcode registerApps), `types/app.ts` (thêm `render?`).
 
 **Trạng thái:** chốt tài liệu kiến trúc + khởi tạo repo docs. CHƯA viết code. Lộ trình 7 GĐ ở [architecture/overview.md](../architecture/overview.md) §5.

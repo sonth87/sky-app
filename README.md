@@ -1,6 +1,6 @@
 # Sky-App
 
-> **Nền tảng multi-app đa môi trường** — một "desktop OS" chạy được cả **Web** lẫn **Electron**, **online + offline**, nơi mỗi ứng dụng (Trao Bằng, TTS Studio, ...) là một **app con** cắm vào theo một contract chung. Giao diện dùng [`device-layout`](https://github.com/sonth87/device-layout) để visualize cửa sổ/dock/menubar kiểu desktop.
+> **Nền tảng multi-app đa môi trường** — một "desktop OS" chạy được cả **Web** lẫn **Electron**, **online + offline**, nơi mỗi ứng dụng (Ceremony, TTS Studio, ...) là một **app con** cắm vào theo một contract chung. Giao diện dùng [`device-layout`](https://github.com/sonth87/device-layout) để visualize cửa sổ/dock/menubar kiểu desktop.
 
 **Trạng thái:** 🟡 Thiết kế kiến trúc — **chưa triển khai code**. Toàn bộ hiện có là tài liệu định hướng trong [`docs/`](./docs/).
 
@@ -22,11 +22,11 @@
 
 **LÀ:** một shell/nền tảng chứa nhiều app + service dùng chung, tách môi trường bằng **ports & adapters** (1 codebase → 2 runtime Web/Electron), có **license/entitlement** gating theo app/feature.
 
-**KHÔNG LÀ:** một ứng dụng đơn. Trao Bằng (Slide) chỉ là **app con đầu tiên** được migrate sang, không phải toàn bộ dự án.
+**KHÔNG LÀ:** một ứng dụng đơn. Ceremony (module tổ chức sự kiện, port từ dự án Slide gốc) chỉ là **app con đầu tiên** được migrate sang, không phải toàn bộ dự án.
 
 ## Nguồn gốc
 
-Sky-App là bước tiến hóa của định hướng multi-app từ dự án `trao-bang-tot-nghiep-2026` (xem `docs/multi-verse.md` bên repo đó). Trao Bằng + TTS được migrate sang đây làm các app con đầu tiên.
+Sky-App là bước tiến hóa của định hướng multi-app từ dự án `trao-bang-tot-nghiep-2026` (xem `docs/multi-verse.md` bên repo đó). App Ceremony (nghiệp vụ tổ chức sự kiện/lễ — không gắn tên cụ thể "trao bằng" nữa, vì nền tảng dùng chung cho nhiều loại tổ chức) + TTS được migrate sang đây làm các app con đầu tiên.
 
 ## Tech stack
 
@@ -38,6 +38,6 @@ React 19 · TypeScript · Tailwind v4 · shadcn/ui · TanStack Query · Zustand 
 apps/       shell-electron, shell-web, tts-service
 packages/   kernel, platform-electron, platform-web, device-shell, ui,
             service-contracts, licensing, build-config
-modules/    trao-bang, trao-bang-backdrop, tts-studio   (các app con)
+modules/    ceremony, ceremony-backdrop, tts-studio   (các app con)
 docs/       tài liệu (xem docs/README.md)
 ```
