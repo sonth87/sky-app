@@ -9,19 +9,19 @@ import '../bridge-types.js';
 export function createElectronDisplayPort(): DisplayPort {
   return {
     async listDisplays() {
-      return (await window.sky.invoke('display:list')) as Awaited<ReturnType<DisplayPort['listDisplays']>>;
+      return (await window.sky.invoke('kernel:display:list')) as Awaited<ReturnType<DisplayPort['listDisplays']>>;
     },
     async open(displayId) {
-      await window.sky.invoke('display:open', displayId);
+      await window.sky.invoke('kernel:display:open', displayId);
     },
     async close() {
-      await window.sky.invoke('display:close');
+      await window.sky.invoke('kernel:display:close');
     },
     async isOpen() {
-      return (await window.sky.invoke('display:isOpen')) as boolean;
+      return (await window.sky.invoke('kernel:display:isOpen')) as boolean;
     },
     async setFullscreen(fullscreen) {
-      await window.sky.invoke('display:setFullscreen', fullscreen);
+      await window.sky.invoke('kernel:display:setFullscreen', fullscreen);
     },
   };
 }

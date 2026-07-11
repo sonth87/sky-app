@@ -16,3 +16,10 @@ dist-lib/
 # License private keys — KHÔNG BAO GIỜ commit
 *.private.pem
 license-signing-key*
+
+# apps/tts-service (Python) — venv/build tự tạo lại, không commit binary nặng
+apps/tts-service/venv/
+apps/tts-service/build/
+apps/tts-service/dist/
+__pycache__/
+*.pyc

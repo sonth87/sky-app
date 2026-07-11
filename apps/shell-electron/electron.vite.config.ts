@@ -7,7 +7,9 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // @sky-app/slide-shared is bundled inline (ESM workspace source, not a
+    // published package) — same as @trao-bang/shared in the source repo.
+    plugins: [externalizeDepsPlugin({ exclude: ['@sky-app/slide-shared'] })],
     build: {
       outDir: 'dist-electron/main',
       rollupOptions: {
@@ -16,7 +18,7 @@ export default defineConfig({
     },
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['@sky-app/slide-shared'] })],
     build: {
       outDir: 'dist-electron/preload',
       rollupOptions: {

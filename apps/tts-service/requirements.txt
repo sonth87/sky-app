@@ -1,0 +1,6 @@
+vieneu==3.0.9
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.34,<0.35
+soxr>=0.3,<0.4
+numpy>=1.26,<2
+python-multipart>=0.0.20

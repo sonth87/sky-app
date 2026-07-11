@@ -6,6 +6,31 @@
 
 ---
 
+## 2026-07-11 — Giai đoạn 4: Port backend Trao Bằng thật vào sky-app, chạy thật (WS/HTTP/Python/window.slide)
+
+**Quyết định:** Port nguyên vẹn 19 file TypeScript (~6.500 dòng: `socket-server.ts`, `http-server.ts`, `python-server.ts`, `ipc.ts` 78 handler, `pregen-queue.ts`, `api-logger.ts`, `engine-installer.ts`, `download-task.ts`, `menu.ts`, `vieneu-tts.ts`, `windows.ts`, `session-store.ts`, `preload.ts`, `data/{paths,store,sync}.ts`, `lib/{customVariables,renderTemplate}.ts`) từ `apps/slide/electron/` (repo `trao-bang-tot-nghiep-2026`) vào `apps/shell-electron/electron/slide/`, cộng `apps/tts-service` (Python, chỉ `server/` — không copy `venv/`/`build/`/`dist/`, 1MB thay vì 600MB). Theo đúng nguyên tắc ports-and-adapters.md: **giữ nguyên bridge `window.slide`** song song `window.sky` (kernel), KHÔNG codemod 117 call-site ngay — bọc dần thành port ở GĐ5+.
+
+**Port `@trao-bang/shared/node` thành `packages/slide-shared`** (quyết định đã hỏi trước khi làm): copy nguyên `types.ts`/`socket-events.ts`/`status.ts`/`format.ts`/`constants.ts` (576 dòng) — chỉ phần `/node` (không dùng React), độc lập hoàn toàn với repo gốc từ đây.
+
+**Vấn đề gặp & fix:**
+1. **Thiếu `electron/lib/` và `windows.ts` ở lần copy đầu** — khảo sát ban đầu bỏ sót, phát hiện khi `menu.ts`/`api-logger.ts` import `./windows` không tồn tại. Bài học: khảo sát bằng agent Explore vẫn có thể sót — luôn double-check import chain thực tế khi port, không chỉ tin danh sách file đã liệt kê.
+2. **`noUncheckedIndexedAccess` (flag riêng của `@sky-app/tsconfig`, KHÔNG có trong tsconfig gốc của Slide) gây 27 lỗi type** ở code port — không phải bug logic thật, code gốc chạy đúng production với tsconfig ít nghiêm ngặt hơn. Đã hỏi người dùng, chọn **nới lỏng tsconfig cho `apps/shell-electron`** (tắt `noUncheckedIndexedAccess` toàn app, không sửa logic đã chạy thật) thay vì sửa 27 chỗ bằng `!`/guard — giữ code port nguyên vẹn 100%. `format.ts` trong `slide-shared` (package share, không phải app) vẫn sửa 1 chỗ bằng `!` có comment vì package đó cố tình giữ strict cao hơn.
+3. **`ModuleNotFoundError: numpy`** khi Python server spawn — **không phải bug**, môi trường Python (`venv/`) cố tình không copy theo kế hoạch (407MB, tự setup khi cần chạy TTS thật). Bootstrap Slide backend vẫn thành công (không throw) vì `startPythonServer` là non-blocking, không chặn các service khác.
+4. **Xung đột IPC channel: `Attempted to register a second handler for 'display:list'`** — cả `electron/ipc.ts` (kernel port, GĐ3) và `electron/slide/ipc.ts` (window.slide, GĐ4) đều dùng bare `'display:list'`/`'tts:speak'` cho 2 mục đích hoàn toàn khác nhau, cùng đăng ký vào 1 `ipcMain` global namespace. Fix: đổi channel của kernel port thành prefix `kernel:tts:*`/`kernel:display:*` (sửa `packages/platform-electron/src/adapters/{tts,display}.ts` + `apps/shell-electron/electron/ipc.ts` + test tương ứng), giữ nguyên `window.slide`'s bare `tts:*`/`display:*` (không đổi API 78-handler đã có).
+5. **Test verify script tạm (Playwright, không phải test suite chính thức) gọi tên channel cũ** sau khi đổi namespace — chỉnh script, không phải bug code.
+
+**Kết quả verify RUNTIME THẬT** (Playwright `connectOverCDP`, `electron-vite dev` thật):
+- `[SocketServer] Listening on port 8765` — Socket.IO thật, xác nhận qua `curl http://localhost:8765/socket.io/...` → 200.
+- `curl http://localhost:8080/health` → `{"ok":true}` — Express HTTP server thật.
+- `[Python Server] Khởi chạy port=8093: python3 .../apps/tts-service/server/main.py` — `findMonoRoot()` (dò `pnpm-workspace.yaml`) tự tìm đúng `apps/tts-service/server` từ vị trí mới, logic port đúng nguyên vẹn không cần sửa.
+- `window.slide.getMeta()` (bridge 78-handler thật) round-trip đúng qua IPC thật, trả `{"config":null,"ceremony":null,"students":[],...}` (rỗng vì chưa import data — đúng trạng thái ban đầu).
+- `window.sky.invoke('kernel:tts:listVoices')` (kernel port GĐ3) vẫn hoạt động bình thường, không bị ảnh hưởng bởi việc thêm backend Slide — 2 bridge độc lập cùng tồn tại.
+- **Toàn workspace: 21/21 turbo task xanh, 33/33 test pass.**
+
+**Còn thiếu ở GĐ4 (để GĐ5):** chưa mở `createControlWindow()`/`createBackdropWindow()` (Slide UI thật) — renderer chính vẫn là `SkyDeviceLayout`+`mockAppModule` từ GĐ3. `ControlApp.tsx` (React 18, UI thật của Trao Bằng) chưa port, chưa trở thành 1 `AppModule`. Chưa test import/sync data thật (ZIP), chưa test TTS synthesize thật (cần setup Python venv), chưa xử lý style isolation Tailwind v4 (device-layout `@theme` vs Slide `@theme` — chỉ phát sinh khi Slide UI thật được nhúng).
+
+---
+
 ## 2026-07-11 — Giai đoạn 3: platform-electron + platform-web + 2 shell mỏng, chạy thật cả Electron lẫn browser
 
 **Quyết định:** Dựng `packages/platform-web`, `packages/platform-electron`, `apps/shell-web`, `apps/shell-electron` — mỗi platform implement `TtsPort` (+ `DisplayPort` cho Electron) và build `PlatformContext` với capability đúng thực tế môi trường. Mục tiêu GĐ3 theo overview.md §5: **cùng 1 `mock-app` chạy thật cả Electron lẫn Web**, không còn chỉ jsdom mock như GĐ1-2.

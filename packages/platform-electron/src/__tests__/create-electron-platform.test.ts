@@ -36,7 +36,7 @@ describe('createElectronPlatform', () => {
     const tts = platform.services.get<{ speak: (t: string, o?: unknown) => Promise<void> }>('tts')!;
     await tts.speak('hello', { voiceId: 'v1' });
 
-    expect(window.sky.invoke).toHaveBeenCalledWith('tts:speak', 'hello', { voiceId: 'v1' });
+    expect(window.sky.invoke).toHaveBeenCalledWith('kernel:tts:speak', 'hello', { voiceId: 'v1' });
   });
 
   it('DisplayPort.setFullscreen gọi window.sky.invoke đúng channel', async () => {
@@ -44,6 +44,6 @@ describe('createElectronPlatform', () => {
     const display = platform.services.get<{ setFullscreen: (v: boolean) => Promise<void> }>('display')!;
     await display.setFullscreen(true);
 
-    expect(window.sky.invoke).toHaveBeenCalledWith('display:setFullscreen', true);
+    expect(window.sky.invoke).toHaveBeenCalledWith('kernel:display:setFullscreen', true);
   });
 });

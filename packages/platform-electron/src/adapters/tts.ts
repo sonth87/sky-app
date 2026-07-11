@@ -10,10 +10,10 @@ import '../bridge-types.js';
 export function createElectronTtsPort(): TtsPort {
   return {
     async speak(text, opts) {
-      await window.sky.invoke('tts:speak', text, opts);
+      await window.sky.invoke('kernel:tts:speak', text, opts);
     },
     async listVoices() {
-      return (await window.sky.invoke('tts:listVoices')) as Awaited<ReturnType<TtsPort['listVoices']>>;
+      return (await window.sky.invoke('kernel:tts:listVoices')) as Awaited<ReturnType<TtsPort['listVoices']>>;
     },
   };
 }
