@@ -1,0 +1,7 @@
+{
+  "extends": "@sky-app/tsconfig/react-library.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src"]
+}

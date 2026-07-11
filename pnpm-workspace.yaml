@@ -2,3 +2,7 @@ packages:
   - apps/*
   - packages/*
   - modules/*
+
+onlyBuiltDependencies:
+  - electron
+  - esbuild
