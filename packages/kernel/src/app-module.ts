@@ -31,6 +31,13 @@ export interface AppContentProps {
   appId: string;
   windowId: string;
   platform: PlatformContext;
+  /**
+   * True khi app này đang là app active/focus trong shell (R2: chỉ 1 app
+   * active tại 1 thời điểm — xem docs/architecture/overview.md). Dùng để
+   * gate global side-effect mà app không nên chạy khi không active — ví dụ
+   * global keyboard listener (card reader) hay native OS menu handler.
+   */
+  isActive: boolean;
 }
 
 export interface AppModule {

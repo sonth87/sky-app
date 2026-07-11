@@ -7,7 +7,7 @@ import type { TtsPort } from '@sky-app/service-contracts';
  * chỉ chạm môi trường qua `platform.services`/`platform.capabilities`,
  * KHÔNG bao giờ gọi window.x / ipcRenderer / fetch trực tiếp.
  */
-export function MockApp({ appId, platform }: AppContentProps) {
+export function MockApp({ appId, platform, isActive }: AppContentProps) {
   const tts = platform.services.get<TtsPort>('tts');
   const hasSecondaryDisplay = platform.capabilities.has('secondary-display');
 
@@ -20,5 +20,6 @@ export function MockApp({ appId, platform }: AppContentProps) {
       { 'data-testid': 'secondary-display' },
       hasSecondaryDisplay ? 'secondary-display:yes' : 'secondary-display:no',
     ),
+    createElement('span', { 'data-testid': 'is-active' }, isActive ? 'is-active:yes' : 'is-active:no'),
   );
 }

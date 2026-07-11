@@ -186,6 +186,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.17)
+      immer:
+        specifier: ^11.1.11
+        version: 11.1.11
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1
@@ -201,6 +204,9 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@26.1.1)(jsdom@29.1.1)(lightningcss@1.32.0)(terser@5.49.0)
+      zustand:
+        specifier: ^5.0.14
+        version: 5.0.14(@types/react@19.2.17)(immer@11.1.11)(react@19.2.7)
 
   packages/kernel:
     devDependencies:
@@ -2230,7 +2236,7 @@ packages:
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
   '@sonth87/device-layout@file:.vendor/sonth87-device-layout-0.1.0.tgz':
-    resolution: {integrity: sha512-IQfZ9+llFDy2aMkul8Me5WJvGlFz5ZSpj6f7Vys64OTiIMt8zqrOFtdtWsM4h4v3dqS/7DVa66OPpvif8Gg4Ew==, tarball: file:.vendor/sonth87-device-layout-0.1.0.tgz}
+    resolution: {integrity: sha512-MvSWS2iRHtEZfvkGisq2iyt/rvVlGkPR+Gp/z1nAugxez4f5hgBly7G9xJAEWVb8Yxj+Jtpi6EQ3Ws1YF5mlwQ==, tarball: file:.vendor/sonth87-device-layout-0.1.0.tgz}
     version: 0.1.0
 
   '@standard-schema/spec@1.0.0':

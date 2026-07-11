@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { useStore } from '@sonth87/device-layout';
 import { createMockPlatformContext } from '@sky-app/kernel';
 import { mockAppModule } from '@sky-app/module-mock-app';
 import { toDeviceAppConfig } from '../to-device-app-config.js';
@@ -29,6 +30,21 @@ describe('toDeviceAppConfig', () => {
     const root = screen.getByText('secondary-display:yes').closest('[data-app-id]');
     expect(root).toHaveAttribute('data-env', 'electron');
     expect(screen.getByTestId('tts-available').textContent).toBe('tts:unavailable'); // chưa register service
+  });
+
+  it('isActive phản ánh đúng device-layout activeAppId', () => {
+    const platform = createMockPlatformContext();
+    const config = toDeviceAppConfig(mockAppModule, platform);
+    const Bridged = config.render!;
+
+    useStore.setState({ activeAppId: 'mock-app' });
+    const { unmount } = render(<Bridged appId="mock-app" windowId="w1" />);
+    expect(screen.getByText('is-active:yes')).toBeInTheDocument();
+    unmount();
+
+    useStore.setState({ activeAppId: 'other-app' });
+    render(<Bridged appId="mock-app" windowId="w2" />);
+    expect(screen.getByText('is-active:no')).toBeInTheDocument();
   });
 });
 
