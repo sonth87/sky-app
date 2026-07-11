@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-electron/
+dist-lib/
+.turbo/
+*.log
+.DS_Store
+.env
+.env.local
+*.local
+
+# License private keys — KHÔNG BAO GIỜ commit
+*.private.pem
+license-signing-key*
