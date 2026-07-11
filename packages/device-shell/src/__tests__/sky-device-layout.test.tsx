@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { useStore } from '@sonth87/device-layout';
-import { createMockPlatformContext } from '@sky-app/kernel';
+import { createMockPlatformContext, createPlatformContext, type AppModule } from '@sky-app/kernel';
 import { mockAppModule } from '@sky-app/module-mock-app';
 import { toDeviceAppConfig } from '../to-device-app-config.js';
 import { SkyDeviceLayout } from '../SkyDeviceLayout.js';
@@ -45,6 +45,38 @@ describe('toDeviceAppConfig', () => {
     useStore.setState({ activeAppId: 'other-app' });
     render(<Bridged appId="mock-app" windowId="w2" />);
     expect(screen.getByText('is-active:no')).toBeInTheDocument();
+  });
+});
+
+describe('toDeviceAppConfig — entitlement gate', () => {
+  const paidApp: AppModule = {
+    ...mockAppModule,
+    id: 'paid-app',
+    entitlement: 'app.paid-app',
+  };
+
+  it('disabled=false khi app không khai entitlement', () => {
+    const platform = createPlatformContext({ env: 'web', entitlements: [] });
+    const config = toDeviceAppConfig(mockAppModule, platform);
+    expect(config.disabled).toBe(false);
+  });
+
+  it('disabled=true khi app khai entitlement nhưng platform không có', () => {
+    const platform = createPlatformContext({ env: 'web', entitlements: [] });
+    const config = toDeviceAppConfig(paidApp, platform);
+    expect(config.disabled).toBe(true);
+  });
+
+  it('disabled=false khi platform có đúng entitlement app yêu cầu', () => {
+    const platform = createPlatformContext({ env: 'web', entitlements: ['app.paid-app'] });
+    const config = toDeviceAppConfig(paidApp, platform);
+    expect(config.disabled).toBe(false);
+  });
+
+  it('disabled=false khi platform entitlements là "all" (mock/dev)', () => {
+    const platform = createMockPlatformContext();
+    const config = toDeviceAppConfig(paidApp, platform);
+    expect(config.disabled).toBe(false);
   });
 });
 

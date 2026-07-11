@@ -1,4 +1,6 @@
-import { ipcMain, type BrowserWindow } from 'electron';
+import { ipcMain, app, type BrowserWindow } from 'electron';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 /**
  * IPC router — the main-process counterpart to platform-electron's preload
@@ -37,5 +39,24 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('kernel:display:setFullscreen', async (_event, fullscreen: boolean) => {
     getMainWindow()?.setFullScreen(fullscreen);
+  });
+
+  // Licensing (docs/guides/licensing-entitlement.md) — renderer không có fs
+  // trực tiếp (contextIsolation), main lưu license key thô trong userData.
+  // packages/licensing verify chữ ký; ở đây chỉ đọc/ghi chuỗi, không parse.
+  const licenseFilePath = () => join(app.getPath('userData'), 'license.key');
+
+  ipcMain.handle('kernel:license:read', async () => {
+    try {
+      return await readFile(licenseFilePath(), 'utf-8');
+    } catch {
+      return null;
+    }
+  });
+
+  ipcMain.handle('kernel:license:write', async (_event, licenseKey: string) => {
+    const path = licenseFilePath();
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, licenseKey, 'utf-8');
   });
 }

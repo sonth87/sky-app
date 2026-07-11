@@ -27,6 +27,10 @@ export const ceremonyModule: AppModule = {
   requiredCapabilities: ['network', 'tts', 'secondary-display'],
   requiredServices: [],
 
+  // Gate theo license (docs/guides/licensing-entitlement.md) — thiếu quyền
+  // này thì app hiện mờ/khóa ở dock (packages/device-shell's toDeviceAppConfig).
+  entitlement: 'app.ceremony',
+
   render: CeremonyApp,
 };
 

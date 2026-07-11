@@ -120,7 +120,7 @@ importers:
         version: link:../../packages/platform-web
       '@sonth87/device-layout':
         specifier: file:../../.vendor/sonth87-device-layout-0.1.0.tgz
-        version: file:.vendor/sonth87-device-layout-0.1.0.tgz(@babel/core@7.29.7)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))
+        version: file:.vendor/sonth87-device-layout-0.1.0.tgz(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))
       react:
         specifier: ^19.2.7
         version: 19.2.7
@@ -320,11 +320,33 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@26.1.1)(jiti@2.7.0)(jsdom@29.1.1)(lightningcss@1.32.0)(terser@5.49.0)
 
+  packages/licensing:
+    dependencies:
+      '@noble/ed25519':
+        specifier: ^3.1.0
+        version: 3.1.0
+      '@sky-app/service-contracts':
+        specifier: workspace:*
+        version: link:../service-contracts
+    devDependencies:
+      '@sky-app/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@26.1.1)(jiti@2.7.0)(jsdom@29.1.1)(lightningcss@1.32.0)(terser@5.49.0)
+
   packages/platform-electron:
     dependencies:
       '@sky-app/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@sky-app/licensing':
+        specifier: workspace:*
+        version: link:../licensing
       '@sky-app/service-contracts':
         specifier: workspace:*
         version: link:../service-contracts
@@ -1613,6 +1635,9 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
+
+  '@noble/ed25519@3.1.0':
+    resolution: {integrity: sha512-pfcObRY3CtvwfaG9Mt5XqZdKmAQppl37tHUeuBhDUbiwJBCVY4/A4lbMvb1xKhMDx96AqAqZpMWuBX1HulhX4g==}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -6322,20 +6347,6 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))':
-    dependencies:
-      fast-glob: 3.3.2
-      next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      semver: 7.6.3
-      webpack: 5.108.4(esbuild@0.28.1)
-      workbox-build: 7.1.1(@types/babel__core@7.20.5)
-      workbox-core: 7.1.0
-      workbox-webpack-plugin: 7.1.0(@types/babel__core@7.20.5)(webpack@5.108.4(esbuild@0.28.1))
-      workbox-window: 7.1.0
-    transitivePeerDependencies:
-      - '@types/babel__core'
-      - supports-color
-
   '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))':
     dependencies:
       fast-glob: 3.3.2
@@ -6345,6 +6356,20 @@ snapshots:
       workbox-build: 7.1.1(@types/babel__core@7.20.5)
       workbox-core: 7.1.0
       workbox-webpack-plugin: 7.1.0(@types/babel__core@7.20.5)(webpack@5.108.4(lightningcss@1.32.0))
+      workbox-window: 7.1.0
+    transitivePeerDependencies:
+      - '@types/babel__core'
+      - supports-color
+
+  '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))':
+    dependencies:
+      fast-glob: 3.3.2
+      next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      semver: 7.6.3
+      webpack: 5.108.4(esbuild@0.28.1)
+      workbox-build: 7.1.1(@types/babel__core@7.20.5)
+      workbox-core: 7.1.0
+      workbox-webpack-plugin: 7.1.0(@types/babel__core@7.20.5)(webpack@5.108.4(esbuild@0.28.1))
       workbox-window: 7.1.0
     transitivePeerDependencies:
       - '@types/babel__core'
@@ -6737,6 +6762,8 @@ snapshots:
 
   '@next/swc-win32-x64-msvc@16.2.6':
     optional: true
+
+  '@noble/ed25519@3.1.0': {}
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -7678,55 +7705,6 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@sonth87/device-layout@file:.vendor/sonth87-device-layout-0.1.0.tgz(@babel/core@7.29.7)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))':
-    dependencies:
-      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))
-      '@radix-ui/react-context-menu': 2.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-dialog': 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-dropdown-menu': 2.1.20(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-popover': 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-scroll-area': 1.2.14(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-select': 2.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-separator': 1.1.11(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-slider': 1.4.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-switch': 1.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-tabs': 1.1.17(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-toast': 1.2.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-tooltip': 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/react-query': 5.101.2(react@19.2.7)
-      '@tanstack/react-query-devtools': 5.101.2(@tanstack/react-query@5.101.2(react@19.2.7))(react@19.2.7)
-      class-variance-authority: 0.7.1
-      clsx: 2.1.1
-      immer: 11.1.11
-      lucide-react: 1.24.0(react@19.2.7)
-      motion: 12.42.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      nanoid: 5.1.16
-      next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      nuqs: 2.9.0(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
-      tailwind-merge: 3.6.0
-      zod: 4.4.3
-      zustand: 5.0.14(@types/react@19.2.17)(immer@11.1.11)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
-    transitivePeerDependencies:
-      - '@babel/core'
-      - '@emotion/is-prop-valid'
-      - '@opentelemetry/api'
-      - '@playwright/test'
-      - '@remix-run/react'
-      - '@tanstack/react-router'
-      - '@types/babel__core'
-      - '@types/react'
-      - '@types/react-dom'
-      - babel-plugin-macros
-      - babel-plugin-react-compiler
-      - react-router
-      - react-router-dom
-      - sass
-      - supports-color
-      - use-sync-external-store
-      - webpack
-
   '@sonth87/device-layout@file:.vendor/sonth87-device-layout-0.1.0.tgz(@babel/core@7.29.7)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))':
     dependencies:
       '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
@@ -7751,7 +7729,56 @@ snapshots:
       motion: 12.42.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       nanoid: 5.1.16
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      nuqs: 2.9.0(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      nuqs: 2.9.0(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      tailwind-merge: 3.6.0
+      zod: 4.4.3
+      zustand: 5.0.14(@types/react@19.2.17)(immer@11.1.11)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
+    transitivePeerDependencies:
+      - '@babel/core'
+      - '@emotion/is-prop-valid'
+      - '@opentelemetry/api'
+      - '@playwright/test'
+      - '@remix-run/react'
+      - '@tanstack/react-router'
+      - '@types/babel__core'
+      - '@types/react'
+      - '@types/react-dom'
+      - babel-plugin-macros
+      - babel-plugin-react-compiler
+      - react-router
+      - react-router-dom
+      - sass
+      - supports-color
+      - use-sync-external-store
+      - webpack
+
+  '@sonth87/device-layout@file:.vendor/sonth87-device-layout-0.1.0.tgz(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))':
+    dependencies:
+      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))
+      '@radix-ui/react-context-menu': 2.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-dialog': 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-dropdown-menu': 2.1.20(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-popover': 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-scroll-area': 1.2.14(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-select': 2.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-separator': 1.1.11(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-slider': 1.4.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-switch': 1.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-tabs': 1.1.17(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-toast': 1.2.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-tooltip': 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@tanstack/react-query': 5.101.2(react@19.2.7)
+      '@tanstack/react-query-devtools': 5.101.2(@tanstack/react-query@5.101.2(react@19.2.7))(react@19.2.7)
+      class-variance-authority: 0.7.1
+      clsx: 2.1.1
+      immer: 11.1.11
+      lucide-react: 1.24.0(react@19.2.7)
+      motion: 12.42.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      nanoid: 5.1.16
+      next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      nuqs: 2.9.0(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       tailwind-merge: 3.6.0
@@ -9616,7 +9643,7 @@ snapshots:
 
   normalize-path@3.0.0: {}
 
-  nuqs@2.9.0(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7):
+  nuqs@2.9.0(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7):
     dependencies:
       '@standard-schema/spec': 1.0.0
       react: 19.2.7

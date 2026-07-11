@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 import type { AppModule, PlatformContext } from '@sky-app/kernel';
+import { createEntitlementGate } from '@sky-app/kernel';
 import type { AppConfig, AppContentProps as DeviceAppContentProps } from '@sonth87/device-layout';
 import { useStore } from '@sonth87/device-layout';
 // Side-effect type-only imports — device-layout's useStore type
@@ -30,11 +31,19 @@ export function toDeviceAppConfig(app: AppModule, platform: PlatformContext): Ap
   }
   Bridged.displayName = `DeviceShellBridge(${app.id})`;
 
+  // Tầng 1 gate (docs/guides/licensing-entitlement.md) — app thiếu entitlement
+  // bị ẨN KHỎI DOCK (device-layout's IconGrid lọc bỏ hẳn AppConfig.disabled,
+  // không hiện mờ như AppIcon.tsx's opacity-40 gợi ý — hành vi thật đã verify,
+  // guide có thể chưa cập nhật đúng). App không khai app.entitlement luôn mở
+  // được (createEntitlementGate.canOpen trả true khi entitlement undefined).
+  const gate = createEntitlementGate(platform.entitlements);
+
   return {
     id: app.id,
     name: app.name,
     icon: app.icon,
     category: app.category,
+    disabled: !gate.canOpen(app),
     defaultSize: app.window?.defaultSize,
     minSize: app.window?.minSize,
     hasMenuBar: app.window?.hasMenuBar,

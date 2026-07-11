@@ -1,5 +1,5 @@
 {
-  "name": "@sky-app/platform-electron",
+  "name": "@sky-app/licensing",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,14 +17,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@sky-app/kernel": "workspace:*",
-    "@sky-app/licensing": "workspace:*",
+    "@noble/ed25519": "^3.1.0",
     "@sky-app/service-contracts": "workspace:*"
   },
   "devDependencies": {
     "@sky-app/tsconfig": "workspace:*",
-    "@types/node": "^20.19.20",
-    "electron": "^43.1.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }

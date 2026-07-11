@@ -29,7 +29,10 @@ Một chuỗi định danh quyền, quy ước phân cấp:
 
 `AppModule.entitlement` khai quyền cần. `EntitlementGate` kiểm trước khi mở:
 - Có → mở bình thường.
-- Thiếu → app hiện **mờ + khóa** ở dock, click báo lý do (học gating của mfe-shell).
+- Thiếu → app **ẩn khỏi dock** (`AppConfig.disabled` → device-layout's `IconGrid`
+  lọc bỏ hẳn khỏi danh sách icon, xác nhận qua runtime — KHÔNG hiện mờ/khóa như
+  bản nháp thiết kế ban đầu định hướng theo mfe-shell's gating; đó cần sửa
+  device-layout's `IconGrid.tsx` để đổi, ngoài phạm vi GĐ6).
 
 ```ts
 // kernel — pseudo
