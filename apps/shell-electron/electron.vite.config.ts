@@ -37,7 +37,13 @@ export default defineConfig({
     build: {
       outDir: 'dist',
       rollupOptions: {
-        input: resolve(__dirname, 'index.html'),
+        // Multi-page: index.html = mainWindow (device-layout + Ceremony
+        // Control), backdrop.html = backdropWindow riêng (kiosk, màn phụ —
+        // xem electron/slide/windows.ts's createBackdropWindow).
+        input: {
+          index: resolve(__dirname, 'index.html'),
+          backdrop: resolve(__dirname, 'backdrop.html'),
+        },
       },
     },
   },

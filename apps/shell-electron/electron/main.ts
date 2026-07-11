@@ -10,6 +10,7 @@ import { startHttpServer, stopHttpServer } from './slide/http-server.js';
 import { startPythonServer, stopPythonServer } from './slide/python-server.js';
 import { apiLogger } from './slide/api-logger.js';
 import { registerIpcHandlers as registerSlideIpcHandlers } from './slide/ipc.js';
+import { setMainWindow } from './slide/windows.js';
 
 // Built as CJS (package.json has no "type": "module") — __dirname is native here.
 let mainWindow: BrowserWindow | null = null;
@@ -52,10 +53,9 @@ function ensureDefaultAssets() {
  * Bootstrap backend Slide — port từ apps/slide/electron/main.ts's bootstrap(),
  * cùng thứ tự: assets → data → session → WS → HTTP → Python → IPC handlers.
  *
- * GĐ4 scope: khởi động service thật (WS 8765, HTTP 8080, Python TTS),
- * KHÔNG mở Control/Backdrop window (createControlWindow) — đó là GĐ5 khi
- * ControlApp.tsx thật trở thành 1 AppModule trong device-layout. Renderer
- * chính hiện tại vẫn là SkyDeviceLayout + mockAppModule (từ GĐ3).
+ * Control render trong mainWindow (device-layout + ceremonyModule, từ GĐ5).
+ * Backdrop vẫn là BrowserWindow riêng ngoài device-layout (kiosk, màn phụ) —
+ * mở qua windows.ts's openBackdropWindow(), gọi từ IPC 'backdrop:toggle'.
  */
 async function bootstrapSlideBackend() {
   apiLogger.init();
@@ -102,6 +102,12 @@ function createMainWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Ceremony's Control UI render TRONG mainWindow (qua device-layout, không
+  // phải BrowserWindow riêng — xem docs/dev/history.md GĐ5) nên các event
+  // backend→Control (backdrop:state, tts:*-progress, menu:action, ...) phải
+  // gửi tới đây thay vì 1 "control window" tách biệt.
+  setMainWindow(mainWindow);
 }
 
 // Đăng ký custom protocol để renderer load ảnh từ ceremony-data (port từ apps/slide).

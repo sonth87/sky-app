@@ -33,3 +33,8 @@ export const ceremonyModule: AppModule = {
 export { CeremonyApp } from './CeremonyApp.js';
 export { ControlApp } from './control/ControlApp.js';
 export type { ControlAppProps } from './control/ControlApp.js';
+
+// Backdrop — BrowserWindow kiosk riêng ngoài device-layout (màn phụ), KHÔNG
+// phải AppModule trong shell. Host tự mount qua entry riêng — xem
+// apps/shell-electron/backdrop.html + src/backdrop-main.tsx.
+export { BackdropApp } from './backdrop/BackdropApp.js';

@@ -13,7 +13,7 @@ import type { PreGenStatus, ManifestEntry } from './pregen-queue';
 import {
   closeBackdropWindow,
   getBackdropWindow,
-  getControlWindow,
+  getMainWindow,
   isBackdropOpen,
   listDisplays,
   moveBackdropToDisplay,
@@ -29,7 +29,7 @@ import { setAppMenu, refreshAppMenu, type MenuLanguage } from './menu';
 export function notifyBackdropState() {
   const open = isBackdropOpen();
   const fullscreen = open ? (getBackdropWindow()?.isKiosk() || getBackdropWindow()?.isFullScreen() || false) : false;
-  getControlWindow()?.webContents.send('backdrop:state', { open, fullscreen });
+  getMainWindow()?.webContents.send('backdrop:state', { open, fullscreen });
 }
 
 function runPiper(text: string, modelName?: string, speed?: number): Promise<{ ok: boolean; buffer?: Buffer; error?: string }> {
@@ -147,7 +147,7 @@ export function registerIpcHandlers() {
 
   // Mở dialog chọn file ZIP để import
   ipcMain.handle('data:openFile', async () => {
-    const win = getControlWindow();
+    const win = getMainWindow();
     const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined!, {
       title: 'Chọn file bundle (.zip)',
       filters: [{ name: 'Bundle ZIP', extensions: ['zip'] }],
@@ -167,7 +167,7 @@ export function registerIpcHandlers() {
     if (isIoBusy()) {
       return { ok: false, message: 'Đang có thao tác dữ liệu khác chạy — vui lòng đợi hoàn tất.' };
     }
-    const win = getControlWindow();
+    const win = getMainWindow();
     const { canceled, filePath } = await dialog.showSaveDialog(win ?? undefined!, {
       title: 'Xuất file dữ liệu (.zip)',
       defaultPath: `ceremony-bundle-${new Date().toISOString().slice(0, 10)}.zip`,
@@ -365,7 +365,7 @@ export function registerIpcHandlers() {
 
   // Mở DevTools của Control window
   ipcMain.handle('debug:openDevTools', () => {
-    getControlWindow()?.webContents.openDevTools();
+    getMainWindow()?.webContents.openDevTools();
   });
 
   // Mở DevTools của Backdrop window
@@ -495,7 +495,7 @@ export function registerIpcHandlers() {
   // Clear cache (localStorage, sessionStorage, IndexedDB, service worker cache)
   ipcMain.handle('data:clearCache', async () => {
     try {
-      const win = getControlWindow();
+      const win = getMainWindow();
       if (win) {
         await win.webContents.session.clearCache();
         await win.webContents.session.clearStorageData({
@@ -701,7 +701,7 @@ export function registerIpcHandlers() {
     } else {
       const result = await runPiper('xin chào', model, config?.tts_speed);
       if (!result.ok) {
-        getControlWindow()?.webContents.send('python:status', { status: 'error', detail: `Warmup Piper thất bại: ${result.error ?? 'unknown error'}` });
+        getMainWindow()?.webContents.send('python:status', { status: 'error', detail: `Warmup Piper thất bại: ${result.error ?? 'unknown error'}` });
       }
     }
     return { ok: true };
@@ -849,7 +849,7 @@ export function registerIpcHandlers() {
     if (!repo) return { ok: false, error: 'Engine không có nguồn model HF' };
     const pipPkgs = await getEngineRuntimePackages(engineId);
     const inst = getInstaller(engineId, (p) => {
-      getControlWindow()?.webContents.send('tts:engine-install-progress', p);
+      getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
     // Runtime: bản dev dùng venv python (pip --target). Packaged (không venv) → null
     // → installRuntime báo cần embeddable (đã ghi nợ). Cài runtime sau khi tải model.
@@ -870,7 +870,7 @@ export function registerIpcHandlers() {
     const repo = await getEngineModelRepo(engineId);
     if (!repo) return { ok: false, error: 'Engine không có nguồn model HF' };
     const inst = getInstaller(engineId, (p) => {
-      getControlWindow()?.webContents.send('tts:engine-install-progress', p);
+      getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
     inst.downloadFromHf(repo);  // resume từ install-state.json
     return { ok: true };
@@ -885,14 +885,14 @@ export function registerIpcHandlers() {
   // Import model từ thư mục/USB (không cần mạng).
   ipcMain.handle('tts:engine-import-local', async (_e, { engineId }: { engineId: string }) => {
     const { getInstaller } = await import('./engine-installer');
-    const win = getControlWindow();
+    const win = getMainWindow();
     const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined!, {
       title: 'Chọn thư mục chứa model đã tải sẵn',
       properties: ['openDirectory'],
     });
     if (canceled || filePaths.length === 0) return { ok: false };
     const inst = getInstaller(engineId, (p) => {
-      getControlWindow()?.webContents.send('tts:engine-install-progress', p);
+      getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
     inst.importFromLocal(filePaths[0]);
     return { ok: true };
@@ -901,7 +901,7 @@ export function registerIpcHandlers() {
   // Export model đã tải ra USB (chép sang máy khác).
   ipcMain.handle('tts:engine-export-local', async (_e, { engineId }: { engineId: string }) => {
     const { getInstaller } = await import('./engine-installer');
-    const win = getControlWindow();
+    const win = getMainWindow();
     const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined!, {
       title: 'Chọn thư mục để export model (chép sang USB)',
       properties: ['openDirectory', 'createDirectory'],
@@ -953,7 +953,7 @@ export function registerIpcHandlers() {
     const pythonBin = existsSync(runtimePy) ? runtimePy : getPythonPath();
 
     const inst = getInstaller(engineId, (p) => {
-      getControlWindow()?.webContents.send('tts:engine-install-progress', p);
+      getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
     const { vieneuDir } = await import('./data/paths');
     return await inst.verify(pythonBin, serverDir, sitePackages, {
@@ -1095,7 +1095,7 @@ export function registerIpcHandlers() {
   // ── Clone voice ──────────────────────────────────────────────────────────────
   // Mở dialog chọn file audio (WAV) để clone giọng
   ipcMain.handle('tts:pick-audio-file', async () => {
-    const win = getControlWindow();
+    const win = getMainWindow();
     const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined!, {
       title: 'Chọn file audio để clone giọng',
       properties: ['openFile'],
@@ -1223,7 +1223,7 @@ export function registerIpcHandlers() {
     // Tạo queue mới nếu batchId đổi hoặc config đổi (giọng/tốc độ/template)
     if (!pregenQueue || pregenQueue.getBatchId() !== batchId || pregenQueue.configChanged(payload.config)) {
       pregenQueue = new PreGenQueue(batchId, students, payload.config, (status: PreGenStatus) => {
-        getControlWindow()?.webContents.send('tts:pregen-progress', status);
+        getMainWindow()?.webContents.send('tts:pregen-progress', status);
       });
     }
 
@@ -1254,7 +1254,7 @@ export function registerIpcHandlers() {
       const batchId = getPregenBatchId();
       const config = getTtsPregenConfig();
       pregenQueue = new PreGenQueue(batchId, students, config, (status: PreGenStatus) => {
-        getControlWindow()?.webContents.send('tts:pregen-progress', status);
+        getMainWindow()?.webContents.send('tts:pregen-progress', status);
       });
     }
     return pregenQueue.getStatus();

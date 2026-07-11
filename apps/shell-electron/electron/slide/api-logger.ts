@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ApiIntegration, Student } from '@sky-app/slide-shared';
 import { getAwardLocationCode, getApiIntegrations } from './socket-server';
-import { getControlWindow, isBackdropOpen } from './windows';
+import { getMainWindow, isBackdropOpen } from './windows';
 
 // Request đã build thực tế (URL/headers/body đã interpolate) — lưu lại để UI có thể dựng
 // lệnh curl y hệt request đã gửi, khác với `payload` (input thô, dùng để build lại lúc retry).
@@ -144,7 +144,7 @@ class ApiLogger {
   }
 
   private notifyClients() {
-    const win = getControlWindow();
+    const win = getMainWindow();
     if (win && !win.isDestroyed()) {
       win.webContents.send('logs:changed', this.logs);
     }
@@ -427,7 +427,7 @@ class ApiLogger {
   }
 
   async exportLogsToTxt(): Promise<{ ok: boolean; message: string }> {
-    const win = getControlWindow();
+    const win = getMainWindow();
     const { canceled, filePath } = await dialog.showSaveDialog(win ?? undefined!, {
       title: 'Xuất Nhật Ký (.txt)',
       defaultPath: `nhat-ky-ceremony-${new Date().toISOString().slice(0, 10)}.txt`,

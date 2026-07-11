@@ -1,11 +1,21 @@
 import { join } from 'node:path';
-import { BrowserWindow, screen, dialog } from 'electron';
+import { BrowserWindow, screen } from 'electron';
 
 const isDev = !!process.env['ELECTRON_RENDERER_URL'];
 const preloadPath = join(__dirname, '../preload/preload.js');
 
-let controlWindow: BrowserWindow | null = null;
 let backdropWindow: BrowserWindow | null = null;
+
+// Cửa sổ chính (device-layout + Ceremony Control render trong đó, xem
+// apps/shell-electron/electron/main.ts's createMainWindow) — main đăng ký
+// qua setMainWindow() sau khi tạo, dùng để báo trạng thái Backdrop cho Control.
+let mainWindow: BrowserWindow | null = null;
+export function setMainWindow(win: BrowserWindow) {
+  mainWindow = win;
+}
+export function getMainWindow() {
+  return mainWindow;
+}
 
 // Callback gọi khi trạng thái Backdrop thay đổi (mở/đóng) — main đăng ký để báo Control.
 let onBackdropStateChange: (() => void) | null = null;
@@ -13,52 +23,12 @@ export function setBackdropStateListener(fn: () => void) {
   onBackdropStateChange = fn;
 }
 
-function loadRenderer(win: BrowserWindow, htmlName: 'control' | 'backdrop') {
+function loadRenderer(win: BrowserWindow, htmlName: 'backdrop') {
   if (isDev) {
     win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/${htmlName}.html`);
   } else {
     win.loadFile(join(__dirname, `../../dist/${htmlName}.html`));
   }
-}
-
-export function createControlWindow(): BrowserWindow {
-  controlWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    title: 'Control — Trao bằng',
-    webPreferences: {
-      preload: preloadPath,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-  loadRenderer(controlWindow, 'control');
-
-  // Confirm trước khi đóng window
-  controlWindow.on('close', (event) => {
-    event.preventDefault();
-    dialog
-      .showMessageBox(controlWindow!, {
-        type: 'question',
-        title: 'Xác nhận tắt ứng dụng',
-        message: 'Bạn có chắc chắn muốn tắt ứng dụng?',
-        buttons: ['Hủy', 'Tắt'],
-        defaultId: 0,
-        cancelId: 0,
-      })
-      .then((result) => {
-        if (result.response === 1) {
-          closeBackdropWindow();
-          controlWindow?.destroy();
-        }
-      });
-  });
-
-  controlWindow.on('closed', () => {
-    closeBackdropWindow();
-    controlWindow = null;
-  });
-  return controlWindow;
 }
 
 /**
@@ -234,9 +204,6 @@ export function isBackdropOpen(): boolean {
   return backdropWindow != null;
 }
 
-export function getControlWindow() {
-  return controlWindow;
-}
 export function getBackdropWindow() {
   return backdropWindow;
 }

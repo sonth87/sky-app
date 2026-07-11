@@ -1,5 +1,5 @@
 import { Menu, app, type MenuItemConstructorOptions } from 'electron';
-import { getControlWindow, getBackdropWindow } from './windows';
+import { getMainWindow, getBackdropWindow } from './windows';
 import { getUseSampleData } from './socket-server';
 
 export type MenuLanguage = 'vi' | 'en';
@@ -61,7 +61,7 @@ const LABELS: Record<MenuLanguage, Record<string, string>> = {
 };
 
 function sendMenuAction(id: MenuActionId) {
-  getControlWindow()?.webContents.send('menu:action', id);
+  getMainWindow()?.webContents.send('menu:action', id);
 }
 
 export function buildAppMenu(language: MenuLanguage) {
@@ -105,7 +105,7 @@ export function buildAppMenu(language: MenuLanguage) {
           click: () => sendMenuAction('develop:sampleData'),
         },
         { type: 'separator' },
-        { label: l.devtoolsControl, click: () => getControlWindow()?.webContents.openDevTools() },
+        { label: l.devtoolsControl, click: () => getMainWindow()?.webContents.openDevTools() },
         { label: l.devtoolsBackdrop, click: () => getBackdropWindow()?.webContents.openDevTools() },
         { label: l.apiTest, click: () => sendMenuAction('develop:apiTest') },
         { type: 'separator' },
