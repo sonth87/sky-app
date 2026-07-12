@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Toaster } from 'sonner';
+import { useStore as useDeviceLayoutStore } from '@sonth87/device-layout';
 import { useControlStore } from './store';
 import { useSocket } from './hooks/useSocket';
 import { useGlobalCardReader } from './hooks/useGlobalCardReader';
@@ -9,6 +10,9 @@ import { showErrorToast } from './lib/toast';
 import { setupDebugInspect } from './lib/debugInspect';
 import { SocketContext } from './SocketContext';
 import { ScrollProvider } from './ScrollContext';
+import { PortalContainerContext } from './PortalContainerContext';
+import { buildCeremonyThemeStyle } from './theme';
+import { cn } from './lib/cn';
 import { ScanInbox } from './components/ScanInbox';
 import { NowOnStage } from './components/NowOnStage';
 import { PreviewPanel } from './components/PreviewPanel';
@@ -51,11 +55,31 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
     ceremony, setMeta, students, setPythonStatus, logsDrawerOpen,
     language, aboutModalOpen, setAboutModalOpen, openSettingsModal,
     resetConfirmOpen, setResetConfirmOpen, deleteModalOpen, setDeleteModalOpen,
+    themeMode, themePalette, appFont, letterSpacing, appSpacing, shadowLevel,
   } = useControlStore();
   const socketRef = useSocket();
   const { togglePlay, replayCode, countdown, progress, smoothProgress } = useAutoPlay();
   const [resetting, setResetting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const ceremonyRootRef = useRef<HTMLDivElement>(null);
+
+  // mode === 'system' kế thừa theme từ shell (device-layout) thay vì OS trực
+  // tiếp — đúng trong ngữ cảnh app con chạy trong desktop-shell ảo. Không dùng
+  // useTheme() vì device-layout không export hook đó — chỉ export useStore.
+  const shellResolvedColorScheme = useDeviceLayoutStore((s) => s.resolvedColorScheme);
+  const themeStyle = useMemo(
+    () =>
+      buildCeremonyThemeStyle({
+        mode: themeMode,
+        palette: themePalette,
+        font: appFont,
+        letterSpacing,
+        appSpacing,
+        shadowLevel,
+        shellResolvedColorScheme,
+      }),
+    [themeMode, themePalette, appFont, letterSpacing, appSpacing, shadowLevel, shellResolvedColorScheme],
+  );
 
   // Quẹt thẻ (đầu đọc HID): tìm SV theo MSSV, CCCD hoặc số điện thoại
   const handleCardScan = useCallback(
@@ -269,13 +293,27 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
   });
 
   return (
+    <PortalContainerContext.Provider value={ceremonyRootRef}>
     <TooltipProvider>
     <ScrollProvider>
     <SocketContext.Provider value={socketRef}>
-      <Toaster position="top-center" richColors closeButton />
-      <div className="flex h-screen flex-col bg-slate-100">
+      <div
+        ref={ceremonyRootRef}
+        // h-full (not h-screen/100vh): unlike the original standalone Electron
+        // app this was ported from (where 100vh correctly matched the whole
+        // window), Ceremony now renders inside device-layout's window-body
+        // container — a flex-1 child sized to the window's actual body height,
+        // which is smaller than the viewport (title bar, menu bar). h-screen
+        // made this div taller than its container, forcing window-body's
+        // overflow-auto to scroll the WHOLE app instead of Ceremony managing
+        // its own internal scroll areas.
+        className={cn('ceremony-root flex h-full flex-col bg-background', themeStyle.className)}
+        data-theme={themeStyle.dataTheme}
+        style={themeStyle.style}
+      >
+        <Toaster position="top-center" richColors closeButton />
         {/* Header */}
-        <header className="flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-3">
+        <header className="flex items-center gap-4 border-b border-border bg-card px-5 py-3">
           <h1 className="text-base font-bold">{ceremony?.name ?? t('controlApp.title')}</h1>
           <ModeSwitch />
           <HallSelector />
@@ -309,89 +347,90 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
         </div>
         {logsDrawerOpen && <LogsDrawer />}
         <StatusBar />
+        <AboutModal open={aboutModalOpen} onClose={() => setAboutModalOpen(false)} />
+        <SettingsModal />
+        <ConfirmModal
+          open={resetConfirmOpen}
+          title={t('debugMenu.confirmResetTitle')}
+          message={t('debugMenu.confirmResetMessage')}
+          loading={resetting}
+          onCancel={() => setResetConfirmOpen(false)}
+          onConfirm={async () => {
+            setResetting(true);
+            const result = await window.slide.resetData();
+            setResetting(false);
+            if (result.ok) {
+              alert(result.message);
+              window.location.reload();
+            } else {
+              alert(t('debugMenu.genericError', { message: result.message }));
+            }
+            setResetConfirmOpen(false);
+          }}
+        />
+        <ConfirmModal
+          open={deleteModalOpen === 'students'}
+          title={t('debugMenu.confirmDeleteStudentsTitle')}
+          message={t('debugMenu.confirmDeleteStudentsMessage')}
+          loading={deleting}
+          countdownSeconds={10}
+          onCancel={() => setDeleteModalOpen(false)}
+          onConfirm={async () => {
+            setDeleting(true);
+            const result = await window.slide.resetStudents();
+            setDeleting(false);
+            if (result.ok) {
+              showSuccessToast(t('debugMenu.deleteStudentsSuccess'));
+              window.location.reload();
+            } else {
+              alert(t('debugMenu.genericError', { message: result.message }));
+            }
+            setDeleteModalOpen(false);
+          }}
+        />
+        <ConfirmModal
+          open={deleteModalOpen === 'scans'}
+          title={t('debugMenu.confirmDeleteScansTitle')}
+          message={t('debugMenu.confirmDeleteScansMessage')}
+          loading={deleting}
+          countdownSeconds={10}
+          onCancel={() => setDeleteModalOpen(false)}
+          onConfirm={async () => {
+            setDeleting(true);
+            const result = await window.slide.clearScans();
+            setDeleting(false);
+            if (result.ok) {
+              showSuccessToast(t('debugMenu.deleteScansSuccess'));
+              window.location.reload();
+            } else {
+              alert(t('debugMenu.genericError', { message: result.message }));
+            }
+            setDeleteModalOpen(false);
+          }}
+        />
+        <ConfirmModal
+          open={deleteModalOpen === 'cache'}
+          title={t('debugMenu.confirmClearCacheTitle')}
+          message={t('debugMenu.confirmClearCacheMessage')}
+          loading={deleting}
+          countdownSeconds={10}
+          onCancel={() => setDeleteModalOpen(false)}
+          onConfirm={async () => {
+            setDeleting(true);
+            const result = await window.slide.clearCache();
+            setDeleting(false);
+            if (result.ok) {
+              showSuccessToast(t('debugMenu.clearCacheSuccess'));
+            } else {
+              alert(t('debugMenu.genericError', { message: result.message }));
+            }
+            setDeleteModalOpen(false);
+          }}
+        />
       </div>
-      <AboutModal open={aboutModalOpen} onClose={() => setAboutModalOpen(false)} />
-      <SettingsModal />
-      <ConfirmModal
-        open={resetConfirmOpen}
-        title={t('debugMenu.confirmResetTitle')}
-        message={t('debugMenu.confirmResetMessage')}
-        loading={resetting}
-        onCancel={() => setResetConfirmOpen(false)}
-        onConfirm={async () => {
-          setResetting(true);
-          const result = await window.slide.resetData();
-          setResetting(false);
-          if (result.ok) {
-            alert(result.message);
-            window.location.reload();
-          } else {
-            alert(t('debugMenu.genericError', { message: result.message }));
-          }
-          setResetConfirmOpen(false);
-        }}
-      />
-      <ConfirmModal
-        open={deleteModalOpen === 'students'}
-        title={t('debugMenu.confirmDeleteStudentsTitle')}
-        message={t('debugMenu.confirmDeleteStudentsMessage')}
-        loading={deleting}
-        countdownSeconds={10}
-        onCancel={() => setDeleteModalOpen(false)}
-        onConfirm={async () => {
-          setDeleting(true);
-          const result = await window.slide.resetStudents();
-          setDeleting(false);
-          if (result.ok) {
-            showSuccessToast(t('debugMenu.deleteStudentsSuccess'));
-            window.location.reload();
-          } else {
-            alert(t('debugMenu.genericError', { message: result.message }));
-          }
-          setDeleteModalOpen(false);
-        }}
-      />
-      <ConfirmModal
-        open={deleteModalOpen === 'scans'}
-        title={t('debugMenu.confirmDeleteScansTitle')}
-        message={t('debugMenu.confirmDeleteScansMessage')}
-        loading={deleting}
-        countdownSeconds={10}
-        onCancel={() => setDeleteModalOpen(false)}
-        onConfirm={async () => {
-          setDeleting(true);
-          const result = await window.slide.clearScans();
-          setDeleting(false);
-          if (result.ok) {
-            showSuccessToast(t('debugMenu.deleteScansSuccess'));
-            window.location.reload();
-          } else {
-            alert(t('debugMenu.genericError', { message: result.message }));
-          }
-          setDeleteModalOpen(false);
-        }}
-      />
-      <ConfirmModal
-        open={deleteModalOpen === 'cache'}
-        title={t('debugMenu.confirmClearCacheTitle')}
-        message={t('debugMenu.confirmClearCacheMessage')}
-        loading={deleting}
-        countdownSeconds={10}
-        onCancel={() => setDeleteModalOpen(false)}
-        onConfirm={async () => {
-          setDeleting(true);
-          const result = await window.slide.clearCache();
-          setDeleting(false);
-          if (result.ok) {
-            showSuccessToast(t('debugMenu.clearCacheSuccess'));
-          } else {
-            alert(t('debugMenu.genericError', { message: result.message }));
-          }
-          setDeleteModalOpen(false);
-        }}
-      />
     </SocketContext.Provider>
     </ScrollProvider>
     </TooltipProvider>
+    </PortalContainerContext.Provider>
   );
 }

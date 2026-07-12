@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { BackdropAspectRatio, Ceremony, OperatingMode, Student } from '@sky-app/slide-shared';
 import i18n from './i18n';
-import { applyTheme, applyAppearance } from './theme';
 import { STORAGE_KEY, OLD_STORAGE_KEY } from './storage-key';
 
 export type ApiEnvironment = 'prod' | 'test';
@@ -384,30 +383,12 @@ export const useControlStore = create<ControlState>()(
     i18n.changeLanguage(language);
     set({ language });
   },
-  setThemeMode: (themeMode) => {
-    applyTheme(themeMode, undefined);
-    set({ themeMode });
-  },
-  setThemePalette: (themePalette) => {
-    applyTheme(undefined, themePalette);
-    set({ themePalette });
-  },
-  setAppFont: (appFont) => {
-    applyAppearance({ appFont });
-    set({ appFont });
-  },
-  setLetterSpacing: (letterSpacing) => {
-    applyAppearance({ letterSpacing });
-    set({ letterSpacing });
-  },
-  setAppSpacing: (appSpacing) => {
-    applyAppearance({ appSpacing });
-    set({ appSpacing });
-  },
-  setShadowLevel: (shadowLevel) => {
-    applyAppearance({ shadowLevel });
-    set({ shadowLevel });
-  },
+  setThemeMode: (themeMode) => set({ themeMode }),
+  setThemePalette: (themePalette) => set({ themePalette }),
+  setAppFont: (appFont) => set({ appFont }),
+  setLetterSpacing: (letterSpacing) => set({ letterSpacing }),
+  setAppSpacing: (appSpacing) => set({ appSpacing }),
+  setShadowLevel: (shadowLevel) => set({ shadowLevel }),
   setConnected: (connected) => set({ connected }),
   setMode: (mode) => set({ mode }),
   setOnStage: (onStage) => set({ onStage }),

@@ -1,16 +1,16 @@
 import type { AppModule } from '@sky-app/kernel';
 import { CeremonyApp } from './CeremonyApp.js';
 
-// Side-effect imports — port từ control/main.tsx gốc. i18n.ts khởi tạo
-// i18next, theme.ts áp theme đã lưu lên <html> ngay khi module load (tránh
-// FOUC), cả 2 chạy 1 lần khi module này được import lần đầu.
+// Side-effect import — port từ control/main.tsx gốc. i18n.ts khởi tạo i18next
+// ngay khi module này được import lần đầu. theme.ts KHÔNG còn side-effect (đã
+// refactor để tránh rò rỉ theme ra <html> toàn shell — xem ControlApp.tsx, áp
+// theme qua React render thay vì DOM API thủ công lúc module load).
 //
 // styles.css KHÔNG import ở đây — CSS side-effect import trong 1 package đã
 // build (dist/) không resolve được qua bundler của app host (Vite không copy
 // .css theo .js khi build lib). Host tự `import '@sky-app/module-ceremony/styles.css'`
 // (package.json's "./styles.css" export) ở entry app — xem apps/shell-electron/src/main.tsx.
 import './control/i18n.js';
-import './control/theme.js';
 
 export const ceremonyModule: AppModule = {
   id: 'ceremony',

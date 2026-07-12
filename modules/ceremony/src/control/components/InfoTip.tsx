@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { HelpCircle } from 'lucide-react';
+import { usePortalContainer } from '../PortalContainerContext';
 
 /**
  * Tooltip hover render qua PORTAL (document.body) để KHÔNG bị cắt bởi các container
@@ -11,6 +12,7 @@ export function InfoTip({ text, children }: { text: string; children?: ReactNode
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anchorRef = useRef<HTMLSpanElement | null>(null);
+  const container = usePortalContainer();
 
   const open = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -54,7 +56,7 @@ export function InfoTip({ text, children }: { text: string; children?: ReactNode
           >
             {text}
           </span>,
-          document.body,
+          container ?? document.body,
         )}
     </>
   );

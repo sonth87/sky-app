@@ -132,7 +132,20 @@
 @import "tailwindcss";
 @source "./**/*.{ts,tsx}";
 
-@custom-variant dark (&:is(.dark *));
+/*
+ * Explicit @layer order — REQUIRED because this bundle shares a page with
+ * @sonth87/device-layout's independently-built Tailwind v4 CSS (both loaded
+ * in apps/shell-electron/src/main.tsx). Without pinning this identically in
+ * both entry points, CSS Cascade Layers order depends on whichever bundle's
+ * compiled output happens to forward-declare a layer name first — which can
+ * differ between two separately-built bundles even on the same Tailwind
+ * version, silently breaking @theme custom properties (e.g. --spacing
+ * computing as empty) in whichever bundle loses. See device-layout's
+ * src/app/globals.css for the matching declaration and full writeup.
+ */
+@layer theme, base, components, utilities;
+
+@custom-variant dark (&:is(.ceremony-root.dark *));
 
 @theme {
   --text-3xs: 9px;
@@ -157,7 +170,7 @@
   }
 }
 
-:root {
+.ceremony-root {
   font-family: var(--font-sans);
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
@@ -224,7 +237,7 @@
   --info-foreground: oklch(0.98 0.02 255);
 }
 
-.dark {
+.ceremony-root.dark {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
@@ -280,70 +293,90 @@
   --info-foreground: oklch(0.18 0.04 255);
 }
 
-@theme inline {
-  --tracking-normal: var(--tracking-normal);
-  --shadow-2xl: var(--shadow-2xl);
-  --shadow-xl: var(--shadow-xl);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-md: var(--shadow-md);
-  --shadow: var(--shadow);
-  --shadow-sm: var(--shadow-sm);
-  --shadow-xs: var(--shadow-xs);
-  --shadow-2xs: var(--shadow-2xs);
-  --spacing: var(--spacing);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
-  --tracking-tight: calc(var(--tracking-normal) - 0.025em);
-  --tracking-wide: calc(var(--tracking-normal) + 0.025em);
-  --tracking-wider: calc(var(--tracking-normal) + 0.05em);
-  --tracking-widest: calc(var(--tracking-normal) + 0.1em);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+/*
+ * Any `@theme`/`@theme inline` block — regardless of `inline` — makes
+ * Tailwind v4 emit a GLOBAL, unscoped `:root, :host { --token: ...; }`
+ * declaration merging EVERY `@theme` block in this file (this one plus
+ * Tailwind's own built-in core theme) into one rule. `inline` only changes
+ * whether generated utility classes bake the value at build time or
+ * reference `var(--token)` at runtime — neither stops the global
+ * declaration from being emitted (`@theme` has no scoping mechanism).
+ *
+ * Every line below reads e.g. `var(--background)` — a variable that, after
+ * the theme-isolation fix, only exists inside `.ceremony-root`/etc, NOT at
+ * this rule's own global `:root, :host` scope. Two different failure modes
+ * came from this, both fixed by adding an explicit fallback:
+ *
+ * 1. `--spacing: var(--spacing);` (same name on both sides) — a genuine
+ *    cyclic reference. Per spec this makes the property computed-value-time
+ *    invalid, which does NOT fall back to `var()`'s 2nd argument (verified
+ *    empirically). Fix: removed entirely — Tailwind only needs to SEE
+ *    `var(--spacing)` referenced somewhere in this file to generate correct
+ *    utility classes; it doesn't require `@theme` to redeclare the token.
+ * 2. `--color-background: var(--background);` (DIFFERENT names) — not
+ *    cyclic, but `--background` is still undefined at this rule's global
+ *    scope, so it resolves empty and Tailwind's utility generator treats
+ *    the resulting token as invalid, silently DROPPING classes like
+ *    `.bg-background` from the compiled output entirely (not just their
+ *    color — the whole class rule vanishes). This one CAN use `var()`'s
+ *    fallback (verified empirically: non-self-referencing `var(--x, 5px)`
+ *    resolves to the fallback when `--x` is undefined) — see the 2026-07-13
+ *    "Ceremony window has no style at all" regression this fixed. Fallback
+ *    values below match `.ceremony-root`'s default (green/light) palette —
+ *    keep in sync if that ever changes; they only matter as a last resort
+ *    for Tailwind's build-time class generation, since any real render
+ *    always has `.ceremony-root` (or a `[data-theme]`/`.dark` variant of it)
+ *    providing the actual value.
+ */
+@theme {
+  --color-destructive-foreground: var(--destructive-foreground, oklch(1 0 0));
+  --color-sidebar-ring: var(--sidebar-ring, oklch(0.723 0.219 149.579));
+  --color-sidebar-border: var(--sidebar-border, oklch(0.92 0.004 286.32));
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground, oklch(0.21 0.006 285.885));
+  --color-sidebar-accent: var(--sidebar-accent, oklch(0.967 0.001 286.375));
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground, oklch(0.982 0.018 155.826));
+  --color-sidebar-primary: var(--sidebar-primary, oklch(0.723 0.219 149.579));
+  --color-sidebar-foreground: var(--sidebar-foreground, oklch(0.141 0.005 285.823));
+  --color-sidebar: var(--sidebar, oklch(0.985 0 0));
+  --color-chart-5: var(--chart-5, oklch(0.769 0.188 70.08));
+  --color-chart-4: var(--chart-4, oklch(0.828 0.189 84.429));
+  --color-chart-3: var(--chart-3, oklch(0.398 0.07 227.392));
+  --color-chart-2: var(--chart-2, oklch(0.6 0.118 184.704));
+  --color-chart-1: var(--chart-1, oklch(0.646 0.222 41.116));
+  --color-ring: var(--ring, oklch(0.723 0.219 149.579));
+  --color-input: var(--input, oklch(0.92 0.004 286.32));
+  --color-border: var(--border, oklch(0.92 0.004 286.32));
+  --color-destructive: var(--destructive, oklch(0.577 0.245 27.325));
+  --color-accent-foreground: var(--accent-foreground, oklch(0.21 0.006 285.885));
+  --color-accent: var(--accent, oklch(0.967 0.001 286.375));
+  --color-muted-foreground: var(--muted-foreground, oklch(0.552 0.016 285.938));
+  --color-muted: var(--muted, oklch(0.967 0.001 286.375));
+  --color-secondary-foreground: var(--secondary-foreground, oklch(0.21 0.006 285.885));
+  --color-secondary: var(--secondary, oklch(0.967 0.001 286.375));
+  --color-primary-foreground: var(--primary-foreground, oklch(0.982 0.018 155.826));
+  --color-primary: var(--primary, oklch(0.723 0.219 149.579));
+  --color-popover-foreground: var(--popover-foreground, oklch(0.141 0.005 285.823));
+  --color-popover: var(--popover, oklch(1 0 0));
+  --color-card-foreground: var(--card-foreground, oklch(0.141 0.005 285.823));
+  --color-card: var(--card, oklch(1 0 0));
+  --color-foreground: var(--foreground, oklch(0.141 0.005 285.823));
+  --color-background: var(--background, oklch(1 0 0));
+  --color-success: var(--success, oklch(0.72 0.17 145));
+  --color-success-foreground: var(--success-foreground, oklch(0.98 0.02 145));
+  --color-warning: var(--warning, oklch(0.79 0.17 75));
+  --color-warning-foreground: var(--warning-foreground, oklch(0.28 0.06 75));
+  --color-info: var(--info, oklch(0.62 0.19 255));
+  --color-info-foreground: var(--info-foreground, oklch(0.98 0.02 255));
+  --radius-sm: calc(var(--radius, 0.65rem) * 0.6);
+  --radius-md: calc(var(--radius, 0.65rem) * 0.8);
+  --radius-lg: var(--radius, 0.65rem);
+  --radius-xl: calc(var(--radius, 0.65rem) * 1.4);
+  --radius-2xl: calc(var(--radius, 0.65rem) * 1.8);
+  --radius-3xl: calc(var(--radius, 0.65rem) * 2.2);
+  --radius-4xl: calc(var(--radius, 0.65rem) * 2.6);
 }
 
-[data-theme="green"] {
+.ceremony-root[data-theme="green"] {
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -401,7 +434,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="green"].dark {
+.ceremony-root[data-theme="green"].dark {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
@@ -449,7 +482,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="violet-bloom"] {
+.ceremony-root[data-theme="violet-bloom"] {
   --background: oklch(0.9940 0 0);
   --foreground: oklch(0 0 0);
   --card: oklch(0.9940 0 0);
@@ -507,7 +540,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="violet-bloom"].dark {
+.ceremony-root[data-theme="violet-bloom"].dark {
   --background: oklch(0.2223 0.0060 271.1393);
   --foreground: oklch(0.9551 0 0);
   --card: oklch(0.2568 0.0076 274.6528);
@@ -555,7 +588,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="yellow"] {
+.ceremony-root[data-theme="yellow"] {
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -613,7 +646,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="yellow"].dark {
+.ceremony-root[data-theme="yellow"].dark {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
@@ -661,7 +694,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="tangerine"] {
+.ceremony-root[data-theme="tangerine"] {
   --background: oklch(0.9383 0.0042 236.4993);
   --foreground: oklch(0.3211 0 0);
   --card: oklch(1.0000 0 0);
@@ -719,7 +752,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="tangerine"].dark {
+.ceremony-root[data-theme="tangerine"].dark {
   --background: oklch(0.2598 0.0306 262.6666);
   --foreground: oklch(0.9219 0 0);
   --card: oklch(0.3106 0.0301 268.6365);
@@ -767,7 +800,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="summer"] {
+.ceremony-root[data-theme="summer"] {
   --background: oklch(0.98 0.01 78.24);
   --foreground: oklch(0.38 0.02 64.34);
   --card: oklch(0.97 0.02 74.09);
@@ -824,7 +857,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="summer"].dark {
+.ceremony-root[data-theme="summer"].dark {
   --background: oklch(0.26 0.02 60.79);
   --foreground: oklch(0.87 0.08 65.91);
   --card: oklch(0.31 0.03 57.05);
@@ -871,7 +904,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="starry-night"] {
+.ceremony-root[data-theme="starry-night"] {
   --background: oklch(0.9755 0.0045 258.3245);
   --foreground: oklch(0.2558 0.0433 268.0662);
   --card: oklch(0.9341 0.0132 251.5628);
@@ -929,7 +962,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="starry-night"].dark {
+.ceremony-root[data-theme="starry-night"].dark {
   --background: oklch(0.2204 0.0198 275.8439);
   --foreground: oklch(0.9366 0.0129 266.6974);
   --card: oklch(0.2703 0.0407 281.3036);
@@ -977,7 +1010,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="blue"] {
+.ceremony-root[data-theme="blue"] {
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -1031,7 +1064,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="blue"].dark {
+.ceremony-root[data-theme="blue"].dark {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
@@ -1079,7 +1112,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="red"] {
+.ceremony-root[data-theme="red"] {
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -1133,7 +1166,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="red"].dark {
+.ceremony-root[data-theme="red"].dark {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
@@ -1181,7 +1214,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="orange"] {
+.ceremony-root[data-theme="orange"] {
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -1235,7 +1268,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="orange"].dark {
+.ceremony-root[data-theme="orange"].dark {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
@@ -1283,7 +1316,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="rose"] {
+.ceremony-root[data-theme="rose"] {
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -1337,7 +1370,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="rose"].dark {
+.ceremony-root[data-theme="rose"].dark {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
@@ -1385,7 +1418,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="modern-minimal"] {
+.ceremony-root[data-theme="modern-minimal"] {
   --background: oklch(1.00 0 0);
   --foreground: oklch(0.32 0 0);
   --card: oklch(1.00 0 0);
@@ -1437,7 +1470,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="modern-minimal"].dark {
+.ceremony-root[data-theme="modern-minimal"].dark {
   --background: oklch(0.20 0 0);
   --foreground: oklch(0.92 0 0);
   --card: oklch(0.27 0 0);
@@ -1483,7 +1516,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="clean-slate"] {
+.ceremony-root[data-theme="clean-slate"] {
   --background: oklch(0.98 0.00 247.86);
   --foreground: oklch(0.28 0.04 260.03);
   --card: oklch(1.00 0 0);
@@ -1536,7 +1569,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="clean-slate"].dark {
+.ceremony-root[data-theme="clean-slate"].dark {
   --background: oklch(0.21 0.04 265.75);
   --foreground: oklch(0.93 0.01 255.51);
   --card: oklch(0.28 0.04 260.03);
@@ -1583,7 +1616,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="amber-minimal"] {
+.ceremony-root[data-theme="amber-minimal"] {
   --background: oklch(1.0000 0 0);
   --foreground: oklch(0.2686 0 0);
   --card: oklch(1.0000 0 0);
@@ -1637,7 +1670,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="amber-minimal"].dark {
+.ceremony-root[data-theme="amber-minimal"].dark {
   --background: oklch(0.2046 0 0);
   --foreground: oklch(0.9219 0 0);
   --card: oklch(0.2686 0 0);
@@ -1685,7 +1718,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="graphite"] {
+.ceremony-root[data-theme="graphite"] {
   --background: oklch(0.9551 0 0);
   --foreground: oklch(0.3211 0 0);
   --card: oklch(0.9702 0 0);
@@ -1739,7 +1772,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="graphite"].dark {
+.ceremony-root[data-theme="graphite"].dark {
   --background: oklch(0.2178 0 0);
   --foreground: oklch(0.8853 0 0);
   --card: oklch(0.2435 0 0);
@@ -1787,7 +1820,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="mono"] {
+.ceremony-root[data-theme="mono"] {
   --background: oklch(1.0000 0 0);
   --foreground: oklch(0.1448 0 0);
   --card: oklch(1.0000 0 0);
@@ -1841,7 +1874,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="mono"].dark {
+.ceremony-root[data-theme="mono"].dark {
   --background: oklch(0.1448 0 0);
   --foreground: oklch(0.9851 0 0);
   --card: oklch(0.2134 0 0);
@@ -1889,7 +1922,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="cosmic-night"] {
+.ceremony-root[data-theme="cosmic-night"] {
   --background: oklch(0.9730 0.0133 286.1503);
   --foreground: oklch(0.3015 0.0572 282.4176);
   --card: oklch(1.0000 0 0);
@@ -1943,7 +1976,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="cosmic-night"].dark {
+.ceremony-root[data-theme="cosmic-night"].dark {
   --background: oklch(0.1743 0.0227 283.7998);
   --foreground: oklch(0.9185 0.0257 285.8834);
   --card: oklch(0.2284 0.0384 282.9324);
@@ -1991,7 +2024,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="midnight-bloom"] {
+.ceremony-root[data-theme="midnight-bloom"] {
   --background: oklch(0.98 0 0);
   --foreground: oklch(0.32 0 0);
   --card: oklch(1.00 0 0);
@@ -2044,7 +2077,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="midnight-bloom"].dark {
+.ceremony-root[data-theme="midnight-bloom"].dark {
   --background: oklch(0.23 0.01 264.29);
   --foreground: oklch(0.92 0 0);
   --card: oklch(0.32 0.01 223.67);
@@ -2091,7 +2124,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="caffeine"] {
+.ceremony-root[data-theme="caffeine"] {
   --background: oklch(0.9821 0 0);
   --foreground: oklch(0.2435 0 0);
   --card: oklch(0.9911 0 0);
@@ -2145,7 +2178,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="caffeine"].dark {
+.ceremony-root[data-theme="caffeine"].dark {
   --background: oklch(0.1776 0 0);
   --foreground: oklch(0.9491 0 0);
   --card: oklch(0.2134 0 0);
@@ -2193,7 +2226,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="bubblegum"] {
+.ceremony-root[data-theme="bubblegum"] {
   --background: oklch(0.9399 0.0203 345.6985);
   --foreground: oklch(0.4712 0 0);
   --card: oklch(0.9498 0.0500 86.8891);
@@ -2247,7 +2280,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="bubblegum"].dark {
+.ceremony-root[data-theme="bubblegum"].dark {
   --background: oklch(0.2497 0.0305 234.1628);
   --foreground: oklch(0.9306 0.0197 349.0785);
   --card: oklch(0.2902 0.0299 233.5352);
@@ -2295,7 +2328,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="catppuccin"] {
+.ceremony-root[data-theme="catppuccin"] {
   --background: oklch(0.9578 0.0058 264.5321);
   --foreground: oklch(0.4355 0.0430 279.3250);
   --card: oklch(1.0000 0 0);
@@ -2349,7 +2382,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="catppuccin"].dark {
+.ceremony-root[data-theme="catppuccin"].dark {
   --background: oklch(0.2155 0.0254 284.0647);
   --foreground: oklch(0.8787 0.0426 272.2767);
   --card: oklch(0.2429 0.0304 283.9110);
@@ -2397,7 +2430,7 @@
   --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
 }
 
-[data-theme="ocean-breeze"] {
+.ceremony-root[data-theme="ocean-breeze"] {
   --background: oklch(0.9751 0.0127 244.2507);
   --foreground: oklch(0.3729 0.0306 259.7328);
   --card: oklch(1.0000 0 0);
@@ -2451,7 +2484,7 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-[data-theme="ocean-breeze"].dark {
+.ceremony-root[data-theme="ocean-breeze"].dark {
   --background: oklch(0.2077 0.0398 265.7549);
   --foreground: oklch(0.8717 0.0093 258.3382);
   --card: oklch(0.2795 0.0368 260.0310);

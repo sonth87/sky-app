@@ -1220,8 +1220,16 @@ export function registerIpcHandlers() {
     }
     const batchId = getPregenBatchId();
 
-    // Tạo queue mới nếu batchId đổi hoặc config đổi (giọng/tốc độ/template)
-    if (!pregenQueue || pregenQueue.getBatchId() !== batchId || pregenQueue.configChanged(payload.config)) {
+    // Tạo queue mới nếu batchId đổi, config đổi (giọng/tốc độ/template), hoặc số
+    // lượng SV đổi (re-import cùng batch_id — ví dụ sửa/nạp lại dữ liệu mà
+    // graduation_batch_id giữ nguyên) — nếu không, queue cũ (đang giữ danh sách SV
+    // cũ trong bộ nhớ) tiếp tục báo total theo số cũ dù dữ liệu đã đổi.
+    if (
+      !pregenQueue ||
+      pregenQueue.getBatchId() !== batchId ||
+      pregenQueue.configChanged(payload.config) ||
+      pregenQueue.getStatus().total !== students.length
+    ) {
       pregenQueue = new PreGenQueue(batchId, students, payload.config, (status: PreGenStatus) => {
         getMainWindow()?.webContents.send('tts:pregen-progress', status);
       });
@@ -1248,9 +1256,9 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle('tts:pregen-status', () => {
-    if (!pregenQueue) {
-      const students = ceremonyStore.getStudents();
-      if (!students || students.length === 0) return null;
+    const students = ceremonyStore.getStudents();
+    if (!pregenQueue || (students && students.length > 0 && pregenQueue.getStatus().total !== students.length)) {
+      if (!students || students.length === 0) return pregenQueue?.getStatus() ?? null;
       const batchId = getPregenBatchId();
       const config = getTtsPregenConfig();
       pregenQueue = new PreGenQueue(batchId, students, config, (status: PreGenStatus) => {

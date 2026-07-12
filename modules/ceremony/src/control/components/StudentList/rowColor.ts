@@ -19,6 +19,6 @@ export function getRowColorClass(ctx: RowColorContext, { bold = false }: { bold?
   if (pregenStatus === 'processing') return 'bg-blue-50';
   if (pregenStatus === 'done') return 'bg-green-50';
   if (pregenStatus === 'failed') return 'bg-red-50';
-  if (hasPlayed) return 'bg-slate-50 opacity-50';
-  return 'hover:bg-slate-50';
+  if (hasPlayed) return 'bg-muted opacity-50';
+  return 'hover:bg-muted';
 }

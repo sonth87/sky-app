@@ -67,7 +67,8 @@ const NONE_SHADOW: Record<string, string> = Object.fromEntries(
   Object.keys(SHADOW_PRESETS.medium).map((k) => [k, 'none'])
 );
 
-function readPersistedTheme(): {
+/** Đọc cấu hình appearance/theme đã lưu (localStorage) — không set gì lên DOM, chỉ đọc. */
+export function readPersistedTheme(): {
   mode: ThemeMode; palette: ThemePalette;
   font: AppFont; letterSpacing: number; spacing: number; shadowLevel: ShadowLevel;
 } {
@@ -93,71 +94,50 @@ function readPersistedTheme(): {
   };
 }
 
-function resolveThemeMode(mode: ThemeMode): 'light' | 'dark' {
-  if (mode === 'system') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-  return mode;
+export interface CeremonyThemeInput {
+  mode: ThemeMode;
+  palette: ThemePalette;
+  font: AppFont;
+  letterSpacing: number;
+  appSpacing: number;
+  shadowLevel: ShadowLevel;
+  /** Theme hiện tại của shell (device-layout) — dùng khi mode === 'system' (kế thừa). */
+  shellResolvedColorScheme: 'light' | 'dark';
 }
 
-let currentMode: ThemeMode = 'system';
-let currentPalette: ThemePalette = 'green';
-let currentFont: AppFont = 'Inter';
-let currentLetterSpacing = 0;
-let currentSpacing = 0.25;
-let currentShadowLevel: ShadowLevel = 'medium';
-
-/** Áp dụng theme hiện tại (class `dark` + attribute `data-theme`) lên <html>. */
-export function applyTheme(mode?: ThemeMode, palette?: ThemePalette) {
-  if (mode !== undefined) currentMode = mode;
-  if (palette !== undefined) currentPalette = palette;
-
-  const root = document.documentElement;
-  root.classList.toggle('dark', resolveThemeMode(currentMode) === 'dark');
-  root.setAttribute('data-theme', currentPalette);
+export interface CeremonyThemeStyle {
+  /** 'dark' nếu resolved dark, else '' — thêm vào className root div. */
+  className: string;
+  /** Giá trị data-theme attribute — palette đang áp dụng. */
+  dataTheme: ThemePalette;
+  /** CSS variable inline (font/tracking/spacing/shadow) — set qua React style prop. */
+  style: Record<string, string>;
 }
 
-interface AppearancePatch {
-  appFont?: AppFont;
-  letterSpacing?: number;
-  appSpacing?: number;
-  shadowLevel?: ShadowLevel;
-}
+/**
+ * Tính class/attribute/style cần áp cho root div `.ceremony-root` — pure function,
+ * KHÔNG đụng DOM. Thay thế applyTheme()/applyAppearance() cũ (từng set thẳng lên
+ * document.documentElement, gây rò rỉ theme ra toàn shell — xem GĐ7.5+ fix theme
+ * isolation). Gọi trong ControlApp's render body (useMemo), không phải side-effect.
+ *
+ * mode === 'system' nghĩa là "kế thừa theme từ shell" (đọc qua shellResolvedColorScheme,
+ * lấy từ @sonth87/device-layout's useStore) — KHÔNG còn đọc trực tiếp OS's
+ * prefers-color-scheme, vì trong ngữ cảnh app con chạy trong desktop-shell ảo, "theo
+ * hệ thống" nên hiểu là theo shell chứ không phải theo OS thật.
+ */
+export function buildCeremonyThemeStyle(input: CeremonyThemeInput): CeremonyThemeStyle {
+  const resolvedMode = input.mode === 'system' ? input.shellResolvedColorScheme : input.mode;
 
-/** Áp dụng font/letter-spacing/spacing/shadow hiện tại lên <html> qua CSS variable inline. */
-export function applyAppearance(patch: AppearancePatch = {}) {
-  if (patch.appFont !== undefined) currentFont = patch.appFont;
-  if (patch.letterSpacing !== undefined) currentLetterSpacing = patch.letterSpacing;
-  if (patch.appSpacing !== undefined) currentSpacing = patch.appSpacing;
-  if (patch.shadowLevel !== undefined) currentShadowLevel = patch.shadowLevel;
+  const shadowVars = input.shadowLevel === 'none' ? NONE_SHADOW : SHADOW_PRESETS[input.shadowLevel];
 
-  const root = document.documentElement;
-  root.style.setProperty('--font-sans', FONT_STACK[currentFont]);
-  root.style.setProperty('--tracking-normal', `${currentLetterSpacing}em`);
-  root.style.setProperty('--spacing', `${currentSpacing}rem`);
-
-  const shadowVars = currentShadowLevel === 'none' ? NONE_SHADOW : SHADOW_PRESETS[currentShadowLevel];
-  for (const [key, value] of Object.entries(shadowVars)) {
-    root.style.setProperty(key, value);
-  }
-}
-
-// Set ngay khi module load (trước React mount) để tránh FOUC — cùng pattern với i18n.ts.
-const persisted = readPersistedTheme();
-currentMode = persisted.mode;
-currentPalette = persisted.palette;
-currentFont = persisted.font;
-currentLetterSpacing = persisted.letterSpacing;
-currentSpacing = persisted.spacing;
-currentShadowLevel = persisted.shadowLevel;
-if (typeof document !== 'undefined') {
-  applyTheme();
-  applyAppearance();
-}
-
-// Khi mode = 'system', tự cập nhật lại nếu OS đổi theme trong lúc app đang chạy.
-if (typeof window !== 'undefined') {
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (currentMode === 'system') applyTheme();
-  });
+  return {
+    className: resolvedMode === 'dark' ? 'dark' : '',
+    dataTheme: input.palette,
+    style: {
+      '--font-sans': FONT_STACK[input.font],
+      '--tracking-normal': `${input.letterSpacing}em`,
+      '--spacing': `${input.appSpacing}rem`,
+      ...shadowVars,
+    },
+  };
 }

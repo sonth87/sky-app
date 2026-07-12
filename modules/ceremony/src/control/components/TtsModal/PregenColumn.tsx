@@ -387,7 +387,7 @@ export function PregenColumn({
                       <th className="py-2 pr-4 text-right">{t('ttsModal.pregen.columnStatus')}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
+                  <tbody className="divide-y divide-border">
                     {students.map((sv) => {
                       const code = sv.student_code;
                       const isChecked = selectedCodes.has(code);
