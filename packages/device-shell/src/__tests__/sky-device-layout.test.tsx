@@ -88,4 +88,41 @@ describe('SkyDeviceLayout', () => {
     // device-layout mount desktop chrome (wallpaper/icon grid) — không rỗng.
     expect(container.firstChild).not.toBeNull();
   });
+
+  it('builtInApps mặc định (không truyền) đăng ký cả demo app lẫn app truyền vào', () => {
+    const platform = createMockPlatformContext();
+    render(<SkyDeviceLayout apps={[mockAppModule]} platform={platform} />);
+
+    const registered = useStore.getState().apps;
+    expect(registered['finder']).toBeDefined();
+    expect(registered['notes']).toBeDefined();
+    expect(registered['mock-app']).toBeDefined();
+  });
+
+  it('builtInApps={false} ẩn toàn bộ demo app, chỉ còn app truyền vào', () => {
+    const platform = createMockPlatformContext();
+    render(<SkyDeviceLayout apps={[mockAppModule]} platform={platform} builtInApps={false} />);
+
+    const registered = useStore.getState().apps;
+    expect(registered['finder']).toBeUndefined();
+    expect(registered['notes']).toBeUndefined();
+    expect(registered['mock-app']).toBeDefined();
+  });
+
+  it('builtInApps={{exclude:[...]}} ẩn đúng những app được liệt kê, giữ lại phần còn lại', () => {
+    const platform = createMockPlatformContext();
+    render(
+      <SkyDeviceLayout
+        apps={[mockAppModule]}
+        platform={platform}
+        builtInApps={{ exclude: ['finder', 'terminal'] }}
+      />,
+    );
+
+    const registered = useStore.getState().apps;
+    expect(registered['finder']).toBeUndefined();
+    expect(registered['terminal']).toBeUndefined();
+    expect(registered['notes']).toBeDefined();
+    expect(registered['mock-app']).toBeDefined();
+  });
 });

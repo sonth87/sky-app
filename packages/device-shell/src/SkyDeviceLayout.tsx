@@ -1,13 +1,30 @@
 import { useMemo } from 'react';
 import type { AppModule, PlatformContext } from '@sky-app/kernel';
-import { DeviceLayout } from '@sonth87/device-layout';
+import { APPS_CONFIG, DeviceLayout, type AppConfig } from '@sonth87/device-layout';
 import { toDeviceAppConfigs } from './to-device-app-config.js';
+import { type BuiltInAppId } from './built-in-apps.js';
 
 export interface SkyDeviceLayoutProps {
   apps: AppModule[];
   platform: PlatformContext;
   /** Base URL for device-layout's own assets (wallpapers, icons). Forwarded as-is. */
   assetBaseUrl?: string;
+  /**
+   * device-layout's built-in demo apps (Finder, Terminal, Settings,
+   * Browser, TextEdit, Clock, Notes, Photos, Music, Calendar, Messages) —
+   * on by default (`true`), matching how ThemeProvider behaves when no
+   * `apps` prop is passed at all. Pass `false` to hide all of them, or
+   * `{ exclude: [...] }` to hide specific ones by id (autocompleted —
+   * see BUILT_IN_APP_IDS in built-in-apps.ts).
+   */
+  builtInApps?: boolean | { exclude: BuiltInAppId[] };
+}
+
+function resolveBuiltInApps(option: SkyDeviceLayoutProps['builtInApps']): AppConfig[] {
+  if (option === false) return [];
+  if (option === true || option === undefined) return APPS_CONFIG;
+  const excluded = new Set<string>(option.exclude);
+  return APPS_CONFIG.filter((app) => !excluded.has(app.id));
 }
 
 /**
@@ -15,8 +32,11 @@ export interface SkyDeviceLayoutProps {
  * AppModule[] + PlatformContext and mounts them inside device-layout's
  * desktop-OS chrome (window manager, dock, menu bar).
  */
-export function SkyDeviceLayout({ apps, platform, assetBaseUrl }: SkyDeviceLayoutProps) {
-  const deviceApps = useMemo(() => toDeviceAppConfigs(apps, platform), [apps, platform]);
+export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps }: SkyDeviceLayoutProps) {
+  const deviceApps = useMemo(() => {
+    const builtIn = resolveBuiltInApps(builtInApps);
+    return [...builtIn, ...toDeviceAppConfigs(apps, platform)];
+  }, [apps, platform, builtInApps]);
 
   return <DeviceLayout apps={deviceApps} assetBaseUrl={assetBaseUrl} />;
 }

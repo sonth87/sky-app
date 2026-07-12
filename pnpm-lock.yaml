@@ -120,7 +120,7 @@ importers:
         version: link:../../packages/platform-web
       '@sonth87/device-layout':
         specifier: file:../../.vendor/sonth87-device-layout-0.1.0.tgz
-        version: file:.vendor/sonth87-device-layout-0.1.0.tgz(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))
+        version: file:.vendor/sonth87-device-layout-0.1.0.tgz(@babel/core@7.29.7)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))
       react:
         specifier: ^19.2.7
         version: 19.2.7
@@ -2617,7 +2617,7 @@ packages:
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
   '@sonth87/device-layout@file:.vendor/sonth87-device-layout-0.1.0.tgz':
-    resolution: {integrity: sha512-MvSWS2iRHtEZfvkGisq2iyt/rvVlGkPR+Gp/z1nAugxez4f5hgBly7G9xJAEWVb8Yxj+Jtpi6EQ3Ws1YF5mlwQ==, tarball: file:.vendor/sonth87-device-layout-0.1.0.tgz}
+    resolution: {integrity: sha512-y1Vn1M7k2NpMX23Braa6gOsUeaTjGUBIT2xx83SYl34Nv8cdpqfJyWN1ZIbAVEfO5FIJJEMHpr1CmZi0r+3ipw==, tarball: file:.vendor/sonth87-device-layout-0.1.0.tgz}
     version: 0.1.0
 
   '@standard-schema/spec@1.0.0':
@@ -6347,6 +6347,20 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
+  '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))':
+    dependencies:
+      fast-glob: 3.3.2
+      next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      semver: 7.6.3
+      webpack: 5.108.4(esbuild@0.28.1)
+      workbox-build: 7.1.1(@types/babel__core@7.20.5)
+      workbox-core: 7.1.0
+      workbox-webpack-plugin: 7.1.0(@types/babel__core@7.20.5)(webpack@5.108.4(esbuild@0.28.1))
+      workbox-window: 7.1.0
+    transitivePeerDependencies:
+      - '@types/babel__core'
+      - supports-color
+
   '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))':
     dependencies:
       fast-glob: 3.3.2
@@ -6356,20 +6370,6 @@ snapshots:
       workbox-build: 7.1.1(@types/babel__core@7.20.5)
       workbox-core: 7.1.0
       workbox-webpack-plugin: 7.1.0(@types/babel__core@7.20.5)(webpack@5.108.4(lightningcss@1.32.0))
-      workbox-window: 7.1.0
-    transitivePeerDependencies:
-      - '@types/babel__core'
-      - supports-color
-
-  '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))':
-    dependencies:
-      fast-glob: 3.3.2
-      next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      semver: 7.6.3
-      webpack: 5.108.4(esbuild@0.28.1)
-      workbox-build: 7.1.1(@types/babel__core@7.20.5)
-      workbox-core: 7.1.0
-      workbox-webpack-plugin: 7.1.0(@types/babel__core@7.20.5)(webpack@5.108.4(esbuild@0.28.1))
       workbox-window: 7.1.0
     transitivePeerDependencies:
       - '@types/babel__core'
@@ -7705,9 +7705,9 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@sonth87/device-layout@file:.vendor/sonth87-device-layout-0.1.0.tgz(@babel/core@7.29.7)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))':
+  '@sonth87/device-layout@file:.vendor/sonth87-device-layout-0.1.0.tgz(@babel/core@7.29.7)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))':
     dependencies:
-      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
+      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))
       '@radix-ui/react-context-menu': 2.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@radix-ui/react-dialog': 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@radix-ui/react-dropdown-menu': 2.1.20(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -7729,7 +7729,7 @@ snapshots:
       motion: 12.42.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       nanoid: 5.1.16
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      nuqs: 2.9.0(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      nuqs: 2.9.0(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       tailwind-merge: 3.6.0
@@ -7754,9 +7754,9 @@ snapshots:
       - use-sync-external-store
       - webpack
 
-  '@sonth87/device-layout@file:.vendor/sonth87-device-layout-0.1.0.tgz(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))':
+  '@sonth87/device-layout@file:.vendor/sonth87-device-layout-0.1.0.tgz(@babel/core@7.29.7)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))':
     dependencies:
-      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1))
+      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
       '@radix-ui/react-context-menu': 2.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@radix-ui/react-dialog': 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@radix-ui/react-dropdown-menu': 2.1.20(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -7778,7 +7778,7 @@ snapshots:
       motion: 12.42.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       nanoid: 5.1.16
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      nuqs: 2.9.0(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      nuqs: 2.9.0(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       tailwind-merge: 3.6.0
@@ -9643,7 +9643,7 @@ snapshots:
 
   normalize-path@3.0.0: {}
 
-  nuqs@2.9.0(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7):
+  nuqs@2.9.0(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7):
     dependencies:
       '@standard-schema/spec': 1.0.0
       react: 19.2.7
