@@ -2617,7 +2617,7 @@ packages:
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
   '@sonth87/device-layout@file:.vendor/sonth87-device-layout-0.1.0.tgz':
-    resolution: {integrity: sha512-gLd3iKUHLoqXQx0aaTDB4RhMshv8OyBQjbnAYvAnpvORXVdeRzGToqmdhmHJKvsnGV3xYkBVl17lsHN1HqhL7Q==, tarball: file:.vendor/sonth87-device-layout-0.1.0.tgz}
+    resolution: {integrity: sha512-VnSzZh1t67GsOA/nb8g9QzyTRB1ciAIh5O27DAM175GewpWnklfxNO2M9n7206CLvh9etRV5iv/pdZUap4VfWw==, tarball: file:.vendor/sonth87-device-layout-0.1.0.tgz}
     version: 0.1.0
 
   '@standard-schema/spec@1.0.0':
