@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { AppModule, PlatformContext } from '@sky-app/kernel';
-import { APPS_CONFIG, DeviceLayout, type AppConfig } from '@sonth87/device-layout';
+import { APPS_CONFIG, DeviceLayout, type AppConfig, type ImportWallpaperFn, type WallpaperConfig } from '@sonth87/device-layout';
 import { toDeviceAppConfigs } from './to-device-app-config.js';
 import { type BuiltInAppId } from './built-in-apps.js';
 
@@ -18,6 +18,19 @@ export interface SkyDeviceLayoutProps {
    * see BUILT_IN_APP_IDS in built-in-apps.ts).
    */
   builtInApps?: boolean | { exclude: BuiltInAppId[] };
+  /**
+   * Implements the Wallpaper picker's "Add a Photo" (Electron: native file
+   * picker + copy into userData — see apps/shell-electron/src/main.tsx).
+   * Omit on platforms without file-system access (e.g. web) to hide the
+   * button — forwarded as-is to DeviceLayout.
+   */
+  onImportWallpaper?: ImportWallpaperFn;
+  /**
+   * Overrides device-layout's built-in "Pictures" wallpaper set — omit to
+   * use device-layout's own full set. Forwarded as-is to DeviceLayout (see
+   * apps/shell-electron/src/wallpapers.ts for why sky-app ships a subset).
+   */
+  wallpapers?: WallpaperConfig[];
 }
 
 function resolveBuiltInApps(option: SkyDeviceLayoutProps['builtInApps']): AppConfig[] {
@@ -32,11 +45,18 @@ function resolveBuiltInApps(option: SkyDeviceLayoutProps['builtInApps']): AppCon
  * AppModule[] + PlatformContext and mounts them inside device-layout's
  * desktop-OS chrome (window manager, dock, menu bar).
  */
-export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps }: SkyDeviceLayoutProps) {
+export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps, onImportWallpaper, wallpapers }: SkyDeviceLayoutProps) {
   const deviceApps = useMemo(() => {
     const builtIn = resolveBuiltInApps(builtInApps);
     return [...builtIn, ...toDeviceAppConfigs(apps, platform)];
   }, [apps, platform, builtInApps]);
 
-  return <DeviceLayout apps={deviceApps} assetBaseUrl={assetBaseUrl} />;
+  return (
+    <DeviceLayout
+      apps={deviceApps}
+      assetBaseUrl={assetBaseUrl}
+      onImportWallpaper={onImportWallpaper}
+      wallpapers={wallpapers}
+    />
+  );
 }

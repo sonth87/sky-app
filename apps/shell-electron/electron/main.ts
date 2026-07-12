@@ -1,6 +1,8 @@
-import { app, BrowserWindow, protocol } from 'electron';
+import { app, BrowserWindow, protocol, dialog, ipcMain } from 'electron';
 import { existsSync, cpSync, mkdirSync, readFileSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { copyFile, mkdir } from 'node:fs/promises';
+import { extname, join, basename } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { registerIpcHandlers } from './ipc.js';
 import { ceremonyDataDir, resolveLocalAsset, sampleAssetsDir, vieneuDir } from './slide/data/paths.js';
 import { ceremonyStore } from './slide/data/store.js';
@@ -113,7 +115,10 @@ function createMainWindow() {
 // Đăng ký custom protocol để renderer load ảnh từ ceremony-data (port từ apps/slide).
 protocol.registerSchemesAsPrivileged([
   { scheme: 'ceremony-asset', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  { scheme: 'sky-wallpaper', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
+
+const wallpaperImportDir = () => join(app.getPath('userData'), 'wallpapers');
 
 app.whenReady().then(() => {
   protocol.handle('ceremony-asset', (request) => {
@@ -129,6 +134,54 @@ app.whenReady().then(() => {
       console.error('ceremony-asset not found:', filePath, err);
       return new Response('Not found', { status: 404 });
     }
+  });
+
+  // Serves user-imported wallpapers (docs/guides/... wallpaper picker's
+  // "Add a Photo") — copied into userData/wallpapers by kernel:wallpaper:import
+  // below, not reachable by a normal http/file:// URL from the renderer.
+  protocol.handle('sky-wallpaper', (request) => {
+    const url = new URL(request.url);
+    const relative = decodeURIComponent(url.pathname).replace(/^\/+/, '');
+    const filePath = join(wallpaperImportDir(), relative);
+    try {
+      const data = readFileSync(filePath);
+      return new Response(data, {
+        headers: { 'content-type': mimeFor(filePath), 'cache-control': 'no-store' },
+      });
+    } catch (err) {
+      console.error('sky-wallpaper not found:', filePath, err);
+      return new Response('Not found', { status: 404 });
+    }
+  });
+
+  // Wallpaper picker's "Add a Photo" — native file picker, copies the chosen
+  // image into userData/wallpapers (durable across app restarts, unlike a
+  // reference to wherever the user's original file lives) and returns a
+  // WallpaperConfig device-layout can pass to addCustomWallpaper().
+  ipcMain.handle('kernel:wallpaper:import', async () => {
+    if (!mainWindow) return null;
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose a Photo',
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || filePaths.length === 0) return null;
+
+    const sourcePath = filePaths[0];
+    const destDir = wallpaperImportDir();
+    await mkdir(destDir, { recursive: true });
+    const id = `custom-${randomUUID()}`;
+    const destName = `${id}${extname(sourcePath)}`;
+    await copyFile(sourcePath, join(destDir, destName));
+
+    const url = `sky-wallpaper://local/${destName}`;
+    return {
+      id,
+      name: basename(sourcePath, extname(sourcePath)),
+      kind: 'picture',
+      url,
+      thumbnail: url,
+    };
   });
 
   registerIpcHandlers(() => mainWindow);
