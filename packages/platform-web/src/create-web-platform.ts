@@ -1,4 +1,5 @@
 import { createPlatformContext, createAllowAllEntitlementSet, type PlatformContext } from '@sky-app/kernel';
+import { resolveEntitlementsFromPort } from '@sky-app/licensing';
 import { createWebTtsPort } from './adapters/tts.js';
 import { createWebLicensePort } from './adapters/license.js';
 
@@ -25,7 +26,9 @@ export interface CreateWebPlatformOptions {
  */
 export async function createWebPlatform(opts: CreateWebPlatformOptions = {}): Promise<PlatformContext> {
   const entitlements = opts.licensePublicKeyHex
-    ? await resolveEntitlements(opts.licensePublicKeyHex, opts.deviceId)
+    ? await resolveEntitlementsFromPort(
+        createWebLicensePort({ publicKeyHex: opts.licensePublicKeyHex, deviceId: opts.deviceId }),
+      )
     : ('all' as const);
 
   const platform = createPlatformContext({
@@ -41,12 +44,6 @@ export async function createWebPlatform(opts: CreateWebPlatformOptions = {}): Pr
   platform.services.register('tts', createWebTtsPort(opts.ttsBaseUrl));
 
   return platform;
-}
-
-async function resolveEntitlements(publicKeyHex: string, deviceId?: string): Promise<string[]> {
-  const licensePort = createWebLicensePort({ publicKeyHex, deviceId });
-  const payload = await licensePort.getCurrent();
-  return payload?.entitlements ?? [];
 }
 
 export { createAllowAllEntitlementSet };

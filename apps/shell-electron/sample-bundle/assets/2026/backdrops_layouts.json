@@ -1,0 +1,794 @@
+{
+  "layout-1": {
+    "image": "assets/2026/backdrop.png",
+    "layout": "left",
+    "avatar": {
+      "x": 15,
+      "y": 32,
+      "width": 20,
+      "height": 29
+    },
+    "avatarShape": "circle",
+    "ring": "assets/2026/ring.png",
+    "panels": [
+      {
+        "x": 5,
+        "y": 18,
+        "width": 90,
+        "height": 12,
+        "align": "center",
+        "vAlign": "center",
+        "fieldOrder": [
+          "template_type",
+          "title"
+        ]
+      },
+      {
+        "x": 36,
+        "y": 40,
+        "width": 46,
+        "height": 46,
+        "align": "left",
+        "vAlign": "top",
+        "color": "#ffffff",
+        "fontSize": 3.0,
+        "gap": 1.8,
+        "fieldOrder": [
+          "full_name",
+          "major_name",
+          "quote"
+        ]
+      }
+    ],
+    "fields": {
+      "template_type": {
+        "show": false,
+        "fontSize": 5.0,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true
+      },
+      "title": {
+        "text": "LỄ TRAO BẰNG TỐT NGHIỆP ĐẠI HỌC NĂM 2026",
+        "fontSize": 4.5,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true,
+        "show": false
+      },
+      "full_name": {
+        "fontSize": 3.2,
+        "fontWeight": 600,
+        "color": "#fff871",
+        "uppercase": true
+      },
+      "major_name": {
+        "fontSize": 2.5,
+        "color": "#ffffff",
+        "prefix": "NGÀNH: ",
+        "uppercase": true,
+        "fontWeight": 400
+      },
+      "classification": {
+        "show": false
+      },
+      "quote": {
+        "fontSize": 2.3,
+        "italic": true,
+        "color": "#ffffff"
+      }
+    },
+    "variants": {
+      "25:9": {
+        "image": "assets/2026/backdrop_25-9.jpg",
+        "avatar": {
+          "x": 18,
+          "y": 17.5,
+          "width": 15,
+          "height": 65
+        },
+        "panels": [
+          {
+            "x": 37,
+            "y": 12,
+            "width": 55,
+            "height": 76,
+            "align": "left",
+            "vAlign": "center",
+            "color": "#ffffff",
+            "fontSize": 6.0,
+            "gap": 3.5,
+            "fieldOrder": [
+              "full_name",
+              "major_name",
+              "quote"
+            ]
+          }
+        ],
+        "fields": {
+          "full_name": {
+            "fontSize": 5.2
+          },
+          "major_name": {
+            "fontSize": 3.2
+          },
+          "quote": {
+            "fontSize": 3.0
+          }
+        }
+      }
+    }
+  },
+  "layout-1-with-class": {
+    "image": "assets/2026/backdrop.png",
+    "layout": "left",
+    "avatar": {
+      "x": 15,
+      "y": 32,
+      "width": 20,
+      "height": 29
+    },
+    "avatarShape": "circle",
+    "ring": "assets/2026/ring.png",
+    "panels": [
+      {
+        "x": 5,
+        "y": 18,
+        "width": 90,
+        "height": 12,
+        "align": "center",
+        "vAlign": "center",
+        "fieldOrder": [
+          "template_type",
+          "title"
+        ]
+      },
+      {
+        "x": 36,
+        "y": 40,
+        "width": 46,
+        "height": 46,
+        "align": "left",
+        "vAlign": "top",
+        "color": "#ffffff",
+        "fontSize": 3.0,
+        "gap": 1.8,
+        "fieldOrder": [
+          "full_name",
+          "major_name",
+          "classification",
+          "quote"
+        ]
+      }
+    ],
+    "fields": {
+      "template_type": {
+        "show": false,
+        "fontSize": 5.0,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true
+      },
+      "title": {
+        "text": "LỄ TRAO BẰNG TỐT NGHIỆP ĐẠI HỌC NĂM 2026",
+        "fontSize": 4.5,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true,
+        "show": false
+      },
+      "full_name": {
+        "fontSize": 3.2,
+        "fontWeight": 600,
+        "color": "#fff871",
+        "uppercase": true
+      },
+      "major_name": {
+        "fontSize": 2.5,
+        "color": "#ffffff",
+        "prefix": "NGÀNH: ",
+        "uppercase": true,
+        "fontWeight": 400
+      },
+      "classification": {
+        "fontSize": 3.0,
+        "fontWeight": 600,
+        "color": "#fff871",
+        "prefix": "XẾP LOẠI TỐT NGHIỆP: ",
+        "uppercase": true
+      },
+      "quote": {
+        "fontSize": 2.3,
+        "italic": true,
+        "color": "#ffffff"
+      }
+    },
+    "variants": {
+      "25:9": {
+        "image": "assets/2026/backdrop_25-9.jpg",
+        "avatar": {
+          "x": 18,
+          "y": 17.5,
+          "width": 15,
+          "height": 65
+        },
+        "panels": [
+          {
+            "x": 37,
+            "y": 6,
+            "width": 55,
+            "height": 86,
+            "align": "left",
+            "vAlign": "center",
+            "color": "#ffffff",
+            "fontSize": 6.0,
+            "gap": 3.2,
+            "fieldOrder": [
+              "full_name",
+              "major_name",
+              "classification",
+              "quote"
+            ]
+          }
+        ],
+        "fields": {
+          "full_name": {
+            "fontSize": 5.2
+          },
+          "major_name": {
+            "fontSize": 3.2
+          },
+          "quote": {
+            "fontSize": 3.0
+          }
+        }
+      }
+    }
+  },
+  "layout-2": {
+    "image": "assets/2026/backdrop.png",
+    "layout": "right",
+    "avatar": {
+      "x": 62,
+      "y": 32,
+      "width": 20,
+      "height": 29
+    },
+    "avatarShape": "circle",
+    "ring": "assets/2026/ring.png",
+    "panels": [
+      {
+        "x": 5,
+        "y": 18,
+        "width": 90,
+        "height": 12,
+        "align": "center",
+        "vAlign": "center",
+        "fieldOrder": [
+          "template_type",
+          "title"
+        ]
+      },
+      {
+        "x": 18,
+        "y": 40,
+        "width": 46,
+        "height": 46,
+        "align": "right",
+        "vAlign": "top",
+        "color": "#ffffff",
+        "fontSize": 3.0,
+        "gap": 1.8,
+        "fieldOrder": [
+          "full_name",
+          "major_name",
+          "quote"
+        ]
+      }
+    ],
+    "fields": {
+      "template_type": {
+        "show": false,
+        "fontSize": 5.0,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true
+      },
+      "title": {
+        "text": "LỄ TRAO BẰNG TỐT NGHIỆP ĐẠI HỌC NĂM 2026",
+        "fontSize": 4.5,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true,
+        "show": false
+      },
+      "full_name": {
+        "fontSize": 3.2,
+        "fontWeight": 600,
+        "color": "#fff871",
+        "uppercase": true
+      },
+      "major_name": {
+        "fontSize": 2.5,
+        "color": "#ffffff",
+        "prefix": "NGÀNH: ",
+        "uppercase": true,
+        "fontWeight": 400
+      },
+      "classification": {
+        "show": false
+      },
+      "quote": {
+        "fontSize": 2.3,
+        "italic": true,
+        "color": "#ffffff"
+      }
+    },
+    "variants": {
+      "25:9": {
+        "image": "assets/2026/backdrop_25-9.jpg",
+        "avatar": {
+          "x": 67,
+          "y": 17.5,
+          "width": 15,
+          "height": 65
+        },
+        "panels": [
+          {
+            "x": 8,
+            "y": 12,
+            "width": 55,
+            "height": 76,
+            "align": "right",
+            "vAlign": "center",
+            "color": "#ffffff",
+            "fontSize": 6.0,
+            "gap": 3.5,
+            "fieldOrder": [
+              "full_name",
+              "major_name",
+              "quote"
+            ]
+          }
+        ],
+        "fields": {
+          "full_name": {
+            "fontSize": 5.2
+          },
+          "major_name": {
+            "fontSize": 3.2
+          },
+          "quote": {
+            "fontSize": 3.0
+          }
+        }
+      }
+    }
+  },
+  "layout-2-with-class": {
+    "image": "assets/2026/backdrop.png",
+    "layout": "right",
+    "avatar": {
+      "x": 62,
+      "y": 32,
+      "width": 20,
+      "height": 29
+    },
+    "avatarShape": "circle",
+    "ring": "assets/2026/ring.png",
+    "panels": [
+      {
+        "x": 5,
+        "y": 18,
+        "width": 90,
+        "height": 12,
+        "align": "center",
+        "vAlign": "center",
+        "fieldOrder": [
+          "template_type",
+          "title"
+        ]
+      },
+      {
+        "x": 18,
+        "y": 40,
+        "width": 46,
+        "height": 46,
+        "align": "right",
+        "vAlign": "top",
+        "color": "#ffffff",
+        "fontSize": 3.0,
+        "gap": 1.8,
+        "fieldOrder": [
+          "full_name",
+          "major_name",
+          "classification",
+          "quote"
+        ]
+      }
+    ],
+    "fields": {
+      "template_type": {
+        "show": false,
+        "fontSize": 5.0,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true
+      },
+      "title": {
+        "text": "LỄ TRAO BẰNG TỐT NGHIỆP ĐẠI HỌC NĂM 2026",
+        "fontSize": 4.5,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true,
+        "show": false
+      },
+      "full_name": {
+        "fontSize": 3.2,
+        "fontWeight": 600,
+        "color": "#fff871",
+        "uppercase": true
+      },
+      "major_name": {
+        "fontSize": 2.5,
+        "color": "#ffffff",
+        "prefix": "NGÀNH: ",
+        "uppercase": true,
+        "fontWeight": 400
+      },
+      "classification": {
+        "fontSize": 3.0,
+        "fontWeight": 600,
+        "color": "#fff871",
+        "prefix": "XẾP LOẠI TỐT NGHIỆP: ",
+        "uppercase": true
+      },
+      "quote": {
+        "fontSize": 2.3,
+        "italic": true,
+        "color": "#ffffff"
+      }
+    },
+    "variants": {
+      "25:9": {
+        "image": "assets/2026/backdrop_25-9.jpg",
+        "avatar": {
+          "x": 67,
+          "y": 17.5,
+          "width": 15,
+          "height": 65
+        },
+        "panels": [
+          {
+            "x": 8,
+            "y": 6,
+            "width": 55,
+            "height": 86,
+            "align": "right",
+            "vAlign": "center",
+            "color": "#ffffff",
+            "fontSize": 6.0,
+            "gap": 3.2,
+            "fieldOrder": [
+              "full_name",
+              "major_name",
+              "classification",
+              "quote"
+            ]
+          }
+        ],
+        "fields": {
+          "full_name": {
+            "fontSize": 5.2
+          },
+          "major_name": {
+            "fontSize": 3.2
+          },
+          "quote": {
+            "fontSize": 3.0
+          }
+        }
+      }
+    }
+  },
+  "layout-3": {
+    "image": "assets/2026/backdrop.png",
+    "layout": "center",
+    "avatar": {
+      "x": 38.5,
+      "y": 32,
+      "width": 23,
+      "height": 33
+    },
+    "avatarShape": "circle",
+    "ring": "assets/2026/ring.png",
+    "panels": [
+      {
+        "x": 5,
+        "y": 18,
+        "width": 90,
+        "height": 12,
+        "align": "center",
+        "vAlign": "center",
+        "color": "#fff871",
+        "fontSize": 4.5,
+        "fontWeight": 800,
+        "uppercase": true,
+        "fieldOrder": [
+          "template_type",
+          "title"
+        ]
+      },
+      {
+        "x": 3,
+        "y": 37,
+        "width": 35,
+        "height": 20,
+        "align": "center",
+        "vAlign": "center",
+        "color": "#ffffff",
+        "fontSize": 3.0,
+        "gap": 1.5,
+        "fieldOrder": [
+          "full_name",
+          "major_name"
+        ]
+      },
+      {
+        "x": 62,
+        "y": 37,
+        "width": 35,
+        "height": 20,
+        "align": "center",
+        "vAlign": "center",
+        "color": "#ffffff",
+        "fontSize": 3.0,
+        "gap": 1.5,
+        "fieldOrder": [
+          "danh_hieu",
+          "classification"
+        ]
+      },
+      {
+        "x": 10,
+        "y": 65,
+        "width": 80,
+        "height": 15,
+        "align": "center",
+        "vAlign": "top",
+        "color": "#ffffff",
+        "fontSize": 2.5,
+        "fieldOrder": [
+          "quote"
+        ]
+      }
+    ],
+    "fields": {
+      "template_type": {
+        "show": false,
+        "fontSize": 5.0,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true
+      },
+      "title": {
+        "text": "LỄ TRAO BẰNG TỐT NGHIỆP ĐẠI HỌC NĂM 2026",
+        "fontSize": 4.5,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true,
+        "show": false
+      },
+      "full_name": {
+        "fontSize": 3.2,
+        "fontWeight": 700,
+        "uppercase": true,
+        "color": "#fff871"
+      },
+      "major_name": {
+        "fontSize": 2.2,
+        "color": "#fff871",
+        "prefix": "NGÀNH: ",
+        "uppercase": true,
+        "fontWeight": 600,
+        "prefixFontWeight": 400
+      },
+      "danh_hieu": {
+        "text": "ĐẠT DANH HIỆU",
+        "fontSize": 2.2,
+        "color": "#f1efac",
+        "uppercase": true
+      },
+      "classification": {
+        "fontSize": 2.8,
+        "fontWeight": 600,
+        "color": "#fff871",
+        "uppercase": true
+      },
+      "quote": {
+        "fontSize": 2.3,
+        "italic": true,
+        "color": "#ffffff"
+      }
+    },
+    "variants": {
+      "25:9": {
+        "image": "assets/2026/backdrop_25-9.jpg",
+        "avatar": {
+          "x": 42.5,
+          "y": 17.5,
+          "width": 15,
+          "height": 65
+        },
+        "panels": [
+          {
+            "x": 3,
+            "y": 12,
+            "width": 37.5,
+            "height": 76,
+            "align": "center",
+            "vAlign": "center",
+            "color": "#ffffff",
+            "fontSize": 5.5,
+            "gap": 2.5,
+            "fieldOrder": [
+              "full_name",
+              "major_name",
+              "classification"
+            ]
+          },
+          {
+            "x": 59.5,
+            "y": 12,
+            "width": 37.5,
+            "height": 76,
+            "align": "center",
+            "vAlign": "center",
+            "color": "#ffffff",
+            "fontSize": 5.5,
+            "gap": 2.5,
+            "fieldOrder": [
+              "quote"
+            ]
+          }
+        ],
+        "fields": {
+          "full_name": {
+            "fontSize": 5.2
+          },
+          "major_name": {
+            "fontSize": 3.2
+          },
+          "classification": {
+            "fontSize": 3.8,
+            "fontWeight": 400,
+            "prefix": "ĐẠT DANH HIỆU "
+          },
+          "quote": {
+            "fontSize": 3.0
+          }
+        }
+      }
+    }
+  },
+  "default": {
+    "image": "assets/2026/backdrop.png",
+    "layout": "left",
+    "avatar": {
+      "x": 15,
+      "y": 32,
+      "width": 23,
+      "height": 33
+    },
+    "avatarShape": "circle",
+    "ring": "assets/2026/ring.png",
+    "panels": [
+      {
+        "x": 5,
+        "y": 18,
+        "width": 90,
+        "height": 12,
+        "align": "center",
+        "vAlign": "center",
+        "fieldOrder": [
+          "template_type",
+          "title"
+        ]
+      },
+      {
+        "x": 39,
+        "y": 27,
+        "width": 46,
+        "height": 46,
+        "align": "left",
+        "vAlign": "center",
+        "color": "#ffffff",
+        "fontSize": 3.0,
+        "gap": 1.8,
+        "fieldOrder": [
+          "full_name",
+          "major_name",
+          "quote"
+        ]
+      }
+    ],
+    "fields": {
+      "template_type": {
+        "show": false,
+        "fontSize": 5.0,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true
+      },
+      "title": {
+        "text": "LỄ TRAO BẰNG TỐT NGHIỆP ĐẠI HỌC NĂM 2026",
+        "fontSize": 4.5,
+        "fontWeight": 800,
+        "color": "#f1efac",
+        "uppercase": true,
+        "show": false
+      },
+      "full_name": {
+        "fontSize": 3.2,
+        "fontWeight": 800,
+        "color": "#fff871",
+        "uppercase": true
+      },
+      "major_name": {
+        "fontSize": 2.5,
+        "color": "#ffffff",
+        "prefix": "NGÀNH: ",
+        "uppercase": true,
+        "fontWeight": 600
+      },
+      "classification": {
+        "show": false
+      },
+      "quote": {
+        "fontSize": 2.3,
+        "italic": true,
+        "color": "#ffffff"
+      }
+    },
+    "variants": {
+      "25:9": {
+        "image": "assets/2026/backdrop_25-9.jpg",
+        "avatar": {
+          "x": 18,
+          "y": 17.5,
+          "width": 15,
+          "height": 65
+        },
+        "panels": [
+          {
+            "x": 37,
+            "y": 15,
+            "width": 55,
+            "height": 68,
+            "align": "left",
+            "vAlign": "center",
+            "color": "#ffffff",
+            "fontSize": 6.0,
+            "gap": 3.5,
+            "fieldOrder": [
+              "full_name",
+              "major_name",
+              "quote"
+            ]
+          }
+        ],
+        "fields": {
+          "full_name": {
+            "fontSize": 5.2
+          },
+          "major_name": {
+            "fontSize": 3.2
+          },
+          "quote": {
+            "fontSize": 3.0
+          }
+        }
+      }
+    }
+  }
+}

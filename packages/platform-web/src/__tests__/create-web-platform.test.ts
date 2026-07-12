@@ -135,6 +135,80 @@ describe('TtsPort (web)', () => {
     await expect(tts.speak('hello')).rejects.toThrow('TTS synthesize failed: 500 boom');
   });
 
+  it('speak() dùng X-Sample-Rate=24000 mặc định khi header không có trong response', async () => {
+    // Server luôn trả X-Sample-Rate (main.py's SAMPLE_RATE header), nhưng adapter
+    // có fallback '24000' phòng response thiếu header. Test isolate riêng bằng
+    // vi.resetModules() + import động — module-level `audioCtx` singleton trong
+    // adapters/tts.ts persist giữa các it() cùng file nên phải nạp lại module để
+    // bắt được đúng instance AudioContext mock của chính test này.
+    vi.resetModules();
+    const { ctx } = stubAudioContext();
+    stubLocalStorage();
+
+    const pcm = new Int16Array([1, 2, 3]).buffer;
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => null },
+      arrayBuffer: async () => pcm,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { createWebPlatform: freshCreateWebPlatform } = await import('../create-web-platform.js');
+    const platform = await freshCreateWebPlatform({ ttsBaseUrl: 'http://localhost:9999' });
+    const tts = platform.services.get<{ speak: (t: string, o?: unknown) => Promise<void> }>('tts')!;
+    await tts.speak('mặc định sample rate');
+
+    expect(ctx.createBuffer).toHaveBeenCalledWith(1, 3, 24000);
+  });
+
+  it('speak() throw "Empty PCM buffer" khi server trả audio rỗng (main.py chặn audio rỗng nhưng adapter phải tự vệ)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: (name: string) => (name === 'X-Sample-Rate' ? '24000' : null) },
+      arrayBuffer: async () => new ArrayBuffer(0),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const platform = await createWebPlatform({ ttsBaseUrl: 'http://localhost:9999' });
+    const tts = platform.services.get<{ speak: (t: string, o?: unknown) => Promise<void> }>('tts')!;
+    await expect(tts.speak('rỗng')).rejects.toThrow('Empty PCM buffer');
+  });
+
+  it('speak() KHÔNG forward word_gap/top_k/top_p/repetition_penalty/max_new_frames dù server (TtsRequest ở main.py) chấp nhận các field này', async () => {
+    // GHI CHÚ KIẾN TRÚC (audit GĐ7.5, D1): SpeakOptions (packages/service-contracts/
+    // src/tts.ts) chỉ khai báo voiceId/speed/temperature — không có chỗ cho word_gap/
+    // top_k/top_p/repetition_penalty/max_new_frames dù server's TtsRequest model
+    // (apps/tts-service/server/main.py:501-512) nhận đủ các field "Advanced infer
+    // params (Phase 2)". Test này xác nhận hành vi HIỆN TẠI (chỉ text/speaker_id/
+    // speed/temperature được gửi) — không phải bug, vì Control UI's TTS settings
+    // hiện điều khiển các giá trị này qua PUT /config (global), không qua speak()
+    // per-request. Nếu tương lai cần override per-request từ web, phải mở rộng
+    // SpeakOptions trước — test này sẽ FAIL và nhắc cập nhật adapter khi đó.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => null },
+      arrayBuffer: async () => new ArrayBuffer(0),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const platform = await createWebPlatform({ ttsBaseUrl: 'http://localhost:9999' });
+    const tts = platform.services.get<{ speak: (t: string, o?: unknown) => Promise<void> }>('tts')!;
+    await tts.speak('test', {
+      voiceId: 'NF',
+      speed: 1.0,
+      // @ts-expect-error -- các field này KHÔNG có trong SpeakOptions, cố tình ép kiểu để chứng minh chúng bị bỏ qua
+      word_gap: 2.0,
+      top_k: 50,
+      top_p: 0.9,
+    }).catch(() => {});
+
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body);
+    expect(body).toEqual({ text: 'test', speaker_id: 'NF', speed: 1.0, temperature: undefined });
+    expect(body).not.toHaveProperty('word_gap');
+    expect(body).not.toHaveProperty('top_k');
+    expect(body).not.toHaveProperty('top_p');
+  });
+
   it('listVoices() map label→name, region→language', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

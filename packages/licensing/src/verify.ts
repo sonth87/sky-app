@@ -8,6 +8,7 @@
  */
 import { verifyAsync } from '@noble/ed25519';
 import type { LicensePayload } from '@sky-app/service-contracts';
+import { hexToBytes } from './hex.js';
 
 function base64UrlToBytes(b64url: string): Uint8Array {
   const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
@@ -63,15 +64,6 @@ export async function verifyLicenseKey(
   } catch {
     return null;
   }
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const clean = hex.trim();
-  const bytes = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
 }
 
 function isLicensePayloadShape(v: unknown): v is LicensePayload {

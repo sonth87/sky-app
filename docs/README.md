@@ -10,8 +10,12 @@ Tài liệu được chia theo **đối tượng đọc** và **mục đích**, 
 docs/
 ├── README.md              ← BẠN ĐANG Ở ĐÂY (bản đồ điều hướng)
 │
-├── architecture/          ← 🏛️ KIẾN TRÚC HỆ THỐNG (thiết kế, nguyên tắc, quyết định)
-│   ├── overview.md            Tổng quan: tầm nhìn, nguyên tắc, monorepo, lộ trình
+├── roadmap/               ← 🗺️ CHƯA/ĐANG TRIỂN KHAI (tầm nhìn, kế hoạch, đề xuất)
+│   ├── README.md              Tầm nhìn dài/ngắn hạn, điều hướng tới plans/
+│   └── plans/                 Từng kế hoạch cụ thể, có trạng thái proposed/in_progress/done
+│
+├── architecture/          ← 🏛️ KIẾN TRÚC HỆ THỐNG (mô tả hệ thống ĐANG VẬN HÀNH)
+│   ├── overview.md            Tổng quan: tầm nhìn, nguyên tắc, monorepo, các GĐ đã xong
 │   ├── web-vs-electron.md     2 môi trường khác nhau ra sao, cái gì degrade
 │   └── shared-vs-per-app.md   Ranh giới thành phần chung (packages) vs riêng (modules)
 │
@@ -39,6 +43,7 @@ docs/
 
 | Mục tiêu | Tài liệu |
 |---|---|
+| Biết dự án đang/sẽ đi về đâu, có kế hoạch gì chưa làm | [roadmap/README.md](./roadmap/README.md) |
 | Hiểu Sky-App là gì, kiến trúc tổng | [architecture/overview.md](./architecture/overview.md) |
 | Biết cái gì chạy web, cái gì chỉ electron | [architecture/web-vs-electron.md](./architecture/web-vs-electron.md) |
 | Biết code nào để `packages/` vs `modules/` | [architecture/shared-vs-per-app.md](./architecture/shared-vs-per-app.md) |
@@ -51,10 +56,13 @@ docs/
 
 ## Loại tài liệu — phân biệt để không nhầm
 
-- **architecture/** = *tại sao & thiết kế thế nào* (thay đổi chậm, cần review kỹ).
+- **roadmap/** = *sẽ/đang làm gì, chưa chắc chắn 100%* (kế hoạch, đề xuất — có trạng thái proposed/in_progress/done).
+- **architecture/** = *tại sao & thiết kế thế nào của cái ĐANG chạy thật* (thay đổi chậm, cần review kỹ, luôn khớp hệ thống hiện tại).
 - **guides/** = *làm thế nào* (hướng dẫn thao tác, cập nhật khi quy trình đổi).
 - **reference/** = *chính xác là gì* (interface/API — phải khớp code khi có code).
 - **apps/ services/** = *mô tả từng thành phần nghiệp vụ*.
 - **dev/** = *quy định vận hành + nhật ký* (versioning, history, tooling).
+
+**Vòng đời 1 ý tưởng:** `roadmap/plans/*.md` (status: proposed) → triển khai (status: in_progress, theo dõi tiến độ ở `dev/history.md`) → xong (status: done, nội dung chính thức chuyển vào `architecture/`/`guides/`/`apps/`/`services/`, field `implemented_doc` trỏ tới đó, file plan giữ lại làm lịch sử).
 
 > Tài liệu cho AI (quy định làm việc) nằm ở [`../AGENTS.md`](../AGENTS.md), KHÔNG nằm trong `docs/`.

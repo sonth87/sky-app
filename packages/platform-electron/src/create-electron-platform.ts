@@ -1,4 +1,5 @@
 import { createPlatformContext, type PlatformContext } from '@sky-app/kernel';
+import { resolveEntitlementsFromPort } from '@sky-app/licensing';
 import { createElectronTtsPort } from './adapters/tts.js';
 import { createElectronDisplayPort } from './adapters/display.js';
 import { createElectronLicensePort } from './adapters/license.js';
@@ -29,7 +30,9 @@ export async function createElectronPlatform(
   opts: CreateElectronPlatformOptions = {},
 ): Promise<PlatformContext> {
   const entitlements = opts.licensePublicKeyHex
-    ? await resolveEntitlements(opts.licensePublicKeyHex, opts.deviceId)
+    ? await resolveEntitlementsFromPort(
+        createElectronLicensePort({ publicKeyHex: opts.licensePublicKeyHex, deviceId: opts.deviceId }),
+      )
     : ('all' as const);
 
   const platform = createPlatformContext({
@@ -43,10 +46,4 @@ export async function createElectronPlatform(
   platform.services.register('display', createElectronDisplayPort());
 
   return platform;
-}
-
-async function resolveEntitlements(publicKeyHex: string, deviceId?: string): Promise<string[]> {
-  const licensePort = createElectronLicensePort({ publicKeyHex, deviceId });
-  const payload = await licensePort.getCurrent();
-  return payload?.entitlements ?? [];
 }

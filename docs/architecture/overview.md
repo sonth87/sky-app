@@ -1,10 +1,12 @@
 # Kiến trúc tổng quan Sky-App
 
-> Tài liệu **kiến trúc hệ thống** — tầm nhìn, nguyên tắc, monorepo layout, các trục thiết kế cốt lõi, lộ trình. Đây là tài liệu gốc; chi tiết thao tác nằm ở [guides/](../guides/), interface chính xác ở [reference/contract-reference.md](../reference/contract-reference.md).
+> Tài liệu **kiến trúc hệ thống** — tầm nhìn, nguyên tắc, monorepo layout, các trục thiết kế cốt lõi. Mô tả hệ thống **đang vận hành**, cập nhật khi kiến trúc thay đổi. Chi tiết thao tác nằm ở [guides/](../guides/), interface chính xác ở [reference/contract-reference.md](../reference/contract-reference.md).
 >
-> **Trạng thái:** thiết kế — chưa triển khai code.
+> **Trạng thái:** đang vận hành — GĐ1-7 (kernel → web parity) đã triển khai xong, verify xanh từng bước.
 >
 > **Nguồn gốc:** tiến hóa từ định hướng multi-app của dự án `trao-bang-tot-nghiep-2026` (`docs/multi-verse.md` bên repo đó), nâng từ "Electron shell 1-process" lên "nền tảng web+electron, online+offline, có licensing".
+>
+> Kế hoạch gốc lập lúc khởi tạo repo (2026-07-11) và nhật ký triển khai từng giai đoạn: [`docs/roadmap/plans/platform-architecture-ga1-7.md`](../roadmap/plans/platform-architecture-ga1-7.md) (kế hoạch, trạng thái `done`) · [`docs/dev/history.md`](../dev/history.md) (nhật ký theo ngày). Các kế hoạch đang chờ triển khai: [`docs/roadmap/`](../roadmap/).
 
 ---
 
@@ -87,7 +89,9 @@ License ký **Ed25519** chứa `{ entitlements[], expiry, deviceBinding? }`, ver
 
 ---
 
-## 5. Lộ trình triển khai (không big-bang; mỗi bước verify được)
+## 5. Các giai đoạn đã triển khai (GĐ1-7 — hoàn thành)
+
+Xây dựng không big-bang, mỗi bước verify xanh trước khi sang bước kế:
 
 | GĐ | Nội dung | Verify |
 |---|---|---|
@@ -99,7 +103,11 @@ License ký **Ed25519** chứa `{ entitlements[], expiry, deviceBinding? }`, ver
 | **6** | TTS Studio tách + Licensing thật (Ed25519 + EntitlementGate) | app khóa khi thiếu entitlement |
 | **7** | Web parity: adapter web thật cho port khả thi; app không hỗ trợ web degrade | mở desktop trên browser, chạy app web-compatible |
 
-**Nguyên tắc giảm rủi ro:** GĐ1-3 chỉ dựng interface + impl tối thiểu + **1 mock app**, CHƯA port Slide. Chỉ khi mock app chạy cả 2 môi trường mới port app thật — nếu contract sai, sửa khi còn rẻ.
+**Nguyên tắc giảm rủi ro đã áp dụng:** GĐ1-3 chỉ dựng interface + impl tối thiểu + **1 mock app**, chưa port Slide — chỉ khi mock app chạy cả 2 môi trường mới port app thật.
+
+Kế hoạch gốc đầy đủ (bối cảnh, lựa chọn đã cân nhắc, rủi ro dự kiến lúc lập): [`docs/roadmap/plans/platform-architecture-ga1-7.md`](../roadmap/plans/platform-architecture-ga1-7.md). Nhật ký chi tiết từng giai đoạn theo ngày: [`docs/dev/history.md`](../dev/history.md).
+
+**Giai đoạn tiếp theo (đang tiến hành/đang chờ):** xem [`docs/roadmap/`](../roadmap/).
 
 ---
 

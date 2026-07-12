@@ -5,25 +5,11 @@
 import { getPublicKeyAsync, signAsync, utils } from '@noble/ed25519';
 import type { LicensePayload } from '@sky-app/service-contracts';
 import { encodeLicenseKey } from './verify.js';
+import { bytesToHex, hexToBytes } from './hex.js';
 
 export interface LicenseKeyPair {
   privateKeyHex: string;
   publicKeyHex: string;
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const clean = hex.trim();
-  const bytes = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
 }
 
 /** Sinh cặp khóa mới — chạy 1 lần khi thiết lập, private key giữ bí mật (KHÔNG commit). */

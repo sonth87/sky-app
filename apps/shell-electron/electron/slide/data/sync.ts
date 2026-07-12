@@ -610,6 +610,18 @@ function offlineResult(message: string): SyncResult {
   return { ok: false, updated: 0, added: 0, photosChanged: 0, offline: true, message };
 }
 
+/** Đọc riêng `config` từ bundle.json trên đĩa, không qua ceremonyStore (có thể chưa load). */
+function readConfigFromDisk(): CeremonyBundle['config'] | null {
+  try {
+    const p = bundleJsonPath();
+    if (!existsSync(p)) return null;
+    const raw = JSON.parse(readFileSync(p, 'utf-8')) as CeremonyBundle;
+    return raw.config ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Merge an toàn: thông tin tĩnh lấy từ bundle mới, trạng thái vận hành giữ từ session.
  * Không đụng SV đang on_stage.
@@ -622,6 +634,19 @@ function applyMerge(newBundle: CeremonyBundle, onProgress?: (pct: number) => voi
   let updated = 0;
   let added = 0;
   let photosChanged = 0;
+
+  // Giữ nguyên config đang dùng (idle-timeout, delay_seconds, kiosk_mode...) khi merge —
+  // newBundle.config tới từ nguồn mới (sample/server/ZIP) và thường chỉ mang giá trị mặc
+  // định, không phản ánh cấu hình user đã chỉnh qua OptionsToggle/ApiConfigContent. Không
+  // giữ lại sẽ mất cấu hình mỗi lần sync (kể cả tự động lúc khởi động với useSampleData).
+  //
+  // `current` (ceremonyStore.getBundle()) là null lúc bootstrapSlideBackend() gọi syncBundle
+  // ngay khi khởi động (chưa từng load() lần nào trong bộ nhớ) — phải đọc thẳng bundle.json
+  // trên đĩa để lấy config cũ trong trường hợp đó, không chỉ dựa vào ceremonyStore in-memory.
+  const existingConfig = current?.config ?? readConfigFromDisk();
+  if (existingConfig) {
+    newBundle.config = existingConfig;
+  }
 
   if (current) {
     const currentByCode = new Map(current.students.map((s) => [s.student_code, s]));

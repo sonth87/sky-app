@@ -130,7 +130,7 @@
 }
 
 @import "tailwindcss";
-@source "./control/**/*.{ts,tsx}";
+@source "./**/*.{ts,tsx}";
 
 @custom-variant dark (&:is(.dark *));
 

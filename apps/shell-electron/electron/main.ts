@@ -7,12 +7,24 @@ import { registerIpcHandlers } from './ipc.js';
 import { ceremonyDataDir, resolveLocalAsset, sampleAssetsDir, vieneuDir } from './slide/data/paths.js';
 import { ceremonyStore } from './slide/data/store.js';
 import { sessionStore } from './slide/session-store.js';
-import { getUseSampleData, startSocketServer, stopSocketServer } from './slide/socket-server.js';
+import {
+  autoLoadFirstIfConfigured,
+  getUseSampleData,
+  setBackdropAspectRatioListener,
+  startSocketServer,
+  stopSocketServer,
+} from './slide/socket-server.js';
 import { startHttpServer, stopHttpServer } from './slide/http-server.js';
 import { startPythonServer, stopPythonServer } from './slide/python-server.js';
 import { apiLogger } from './slide/api-logger.js';
-import { registerIpcHandlers as registerSlideIpcHandlers } from './slide/ipc.js';
-import { setMainWindow } from './slide/windows.js';
+import { notifyBackdropState, registerIpcHandlers as registerSlideIpcHandlers } from './slide/ipc.js';
+import {
+  closeBackdropWindow,
+  resizeBackdropForAspectRatio,
+  setBackdropStateListener,
+  setMainWindow,
+} from './slide/windows.js';
+import { setAppMenu } from './slide/menu.js';
 
 // Built as CJS (package.json has no "type": "module") — __dirname is native here.
 let mainWindow: BrowserWindow | null = null;
@@ -66,7 +78,14 @@ async function bootstrapSlideBackend() {
   cleanupImportStaging();
   if (getUseSampleData()) {
     const { syncBundle } = await import('./slide/data/sync.js');
-    await syncBundle({ useSample: true });
+    const result = await syncBundle({ useSample: true });
+    // Sample data thất bại (vd sample-bundle/ thiếu trong bản build) không được để
+    // Ceremony trắng trơn nếu đĩa đã có bundle.json thật từ lần import trước — nếu
+    // không fallback, ceremonyStore rỗng và Backdrop kẹt "Đang tải…" vĩnh viễn dù dữ
+    // liệu thật vẫn còn nguyên (GĐ7.5 audit runtime, không phải bug port).
+    if (!result.ok && !ceremonyStore.hasData()) {
+      ceremonyStore.loadFromDisk();
+    }
   } else {
     ceremonyStore.loadFromDisk();
   }
@@ -81,6 +100,14 @@ async function bootstrapSlideBackend() {
   startPythonServer(vieneuDir()); // non-blocking: warmup chạy nền
 
   registerSlideIpcHandlers();
+  setAppMenu('vi'); // Renderer gửi lại ngôn ngữ thật (đã lưu) ngay khi mount, xem 'app:setLanguage'.
+  // Báo Control mỗi khi Backdrop mở/đóng (kể cả đóng bằng nút X)
+  setBackdropStateListener(() => notifyBackdropState());
+  // Resize cửa sổ Backdrop (khi đang windowed) theo đúng tỷ lệ vừa chọn ở Control
+  setBackdropAspectRatioListener((aspectRatio) => resizeBackdropForAspectRatio(aspectRatio));
+
+  // Tự load SV đầu tiên nếu cấu hình (chỉ khi chưa có SV đang on_stage)
+  autoLoadFirstIfConfigured();
 }
 
 function createMainWindow() {
@@ -194,6 +221,30 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });
+});
+
+app.on('before-quit', (event) => {
+  if (mainWindow) {
+    event.preventDefault();
+    dialog
+      .showMessageBox(mainWindow, {
+        type: 'question',
+        title: 'Xác nhận tắt ứng dụng',
+        message: 'Bạn có chắc chắn muốn tắt ứng dụng?',
+        buttons: ['Hủy', 'Tắt'],
+        defaultId: 0,
+        cancelId: 0,
+      })
+      .then((result) => {
+        if (result.response === 1) {
+          closeBackdropWindow();
+          stopSocketServer();
+          stopHttpServer();
+          stopPythonServer();
+          app.exit(0);
+        }
+      });
+  }
 });
 
 app.on('window-all-closed', () => {

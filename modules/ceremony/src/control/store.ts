@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { BackdropAspectRatio, Ceremony, OperatingMode, Student } from '@sky-app/slide-shared';
 import i18n from './i18n';
 import { applyTheme, applyAppearance } from './theme';
+import { STORAGE_KEY, OLD_STORAGE_KEY } from './storage-key';
 
 export type ApiEnvironment = 'prod' | 'test';
 
@@ -481,7 +482,22 @@ export const useControlStore = create<ControlState>()(
   setShowAllStudents: (showAllStudents) => set({ showAllStudents }),
 }),
     {
-      name: 'ceremony-control-storage',
+      name: STORAGE_KEY,
+      // GĐ7.5 BUG-005: bản gốc (trao-bang-tot-nghiep-2026) dùng key 'slide-control-storage'.
+      // Khi port sang Ceremony, key đổi tên nhưng thiếu bước migrate — user nâng cấp từ app cũ
+      // mất toàn bộ cấu hình đã lưu (confetti/tts/theme/language...).
+      //
+      // zustand/persist's `migrate` option CHỈ chạy khi `storage.getItem(name)` (đọc theo
+      // key MỚI) trả về 1 giá trị non-null có `version` khác — nếu key mới hoàn toàn không
+      // tồn tại (đúng tình huống bug này), `migrate` không bao giờ được gọi (xem
+      // zustand/esm/middleware.mjs's `hydrate()`, dòng ~391: `if (deserializedStorageValue)`).
+      // Do đó phải tự viết `storage.getItem` fallback đọc key CŨ khi key mới rỗng, thay vì
+      // dựa vào `migrate`.
+      storage: createJSONStorage(() => ({
+        getItem: (name: string) => localStorage.getItem(name) ?? localStorage.getItem(OLD_STORAGE_KEY),
+        setItem: (name: string, value: string) => localStorage.setItem(name, value),
+        removeItem: (name: string) => localStorage.removeItem(name),
+      })),
       partialize: (state) => ({
         showAllStudents: state.showAllStudents,
         confettiEnabled: state.confettiEnabled,

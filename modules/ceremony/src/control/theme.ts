@@ -1,6 +1,5 @@
 import type { AppFont, ShadowLevel, ThemeMode, ThemePalette } from './store';
-
-const STORAGE_KEY = 'ceremony-control-storage';
+import { readPersistedState } from './storage-key';
 
 const VALID_PALETTES: ThemePalette[] = [
   'green', 'violet-bloom', 'yellow', 'tangerine', 'summer', 'starry-night',
@@ -76,27 +75,22 @@ function readPersistedTheme(): {
     mode: 'system' as ThemeMode, palette: 'green' as ThemePalette,
     font: 'Inter' as AppFont, letterSpacing: 0, spacing: 0.25, shadowLevel: 'medium' as ShadowLevel,
   };
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    const mode = parsed?.state?.themeMode;
-    const palette = parsed?.state?.themePalette;
-    const font = parsed?.state?.appFont;
-    const letterSpacing = parsed?.state?.letterSpacing;
-    const spacing = parsed?.state?.appSpacing;
-    const shadowLevel = parsed?.state?.shadowLevel;
-    return {
-      mode: mode === 'light' || mode === 'dark' || mode === 'system' ? mode : fallback.mode,
-      palette: VALID_PALETTES.includes(palette) ? palette : fallback.palette,
-      font: VALID_FONTS.includes(font) ? font : fallback.font,
-      letterSpacing: typeof letterSpacing === 'number' ? letterSpacing : fallback.letterSpacing,
-      spacing: typeof spacing === 'number' ? spacing : fallback.spacing,
-      shadowLevel: VALID_SHADOW_LEVELS.includes(shadowLevel) ? shadowLevel : fallback.shadowLevel,
-    };
-  } catch {
-    return fallback;
-  }
+  const state = readPersistedState();
+  if (!state) return fallback;
+  const mode = state.themeMode as ThemeMode | undefined;
+  const palette = state.themePalette as ThemePalette | undefined;
+  const font = state.appFont as AppFont | undefined;
+  const letterSpacing = state.letterSpacing;
+  const spacing = state.appSpacing;
+  const shadowLevel = state.shadowLevel as ShadowLevel | undefined;
+  return {
+    mode: mode === 'light' || mode === 'dark' || mode === 'system' ? mode : fallback.mode,
+    palette: palette && VALID_PALETTES.includes(palette) ? palette : fallback.palette,
+    font: font && VALID_FONTS.includes(font) ? font : fallback.font,
+    letterSpacing: typeof letterSpacing === 'number' ? letterSpacing : fallback.letterSpacing,
+    spacing: typeof spacing === 'number' ? spacing : fallback.spacing,
+    shadowLevel: shadowLevel && VALID_SHADOW_LEVELS.includes(shadowLevel) ? shadowLevel : fallback.shadowLevel,
+  };
 }
 
 function resolveThemeMode(mode: ThemeMode): 'light' | 'dark' {

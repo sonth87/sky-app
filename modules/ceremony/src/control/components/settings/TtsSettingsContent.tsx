@@ -144,19 +144,28 @@ export function TtsSettingsContent() {
 
   const handleStartPregen = async (regenerate = false) => {
     setPregenRunning(true);
-    const result = await window.slide.pregenStart({
-      regenerate,
-      config: {
-        template: localTemplate,
-        ttsModel: localModel,
-        ttsSpeed: localSpeed,
-        ttsConditions: localConditions,
-      },
-    });
-    if (!result.ok) {
-      alert(result.error ?? 'Không thể bắt đầu pre-generate');
+    try {
+      const result = await window.slide.pregenStart({
+        regenerate,
+        config: {
+          template: localTemplate,
+          ttsModel: localModel,
+          ttsSpeed: localSpeed,
+          ttsConditions: localConditions,
+        },
+      });
+      if (!result.ok) {
+        alert(result.error ?? 'Không thể bắt đầu pre-generate');
+      }
+    } catch (err) {
+      // GĐ7.5 BUG-006: IPC call có thể reject (crash Python engine, timeout, lỗi bất kỳ) —
+      // không có try/catch trước đây khiến pregenRunning kẹt ở true vĩnh viễn, nút "Tạo
+      // giọng đọc" bị disable tới khi reload toàn bộ Control app.
+      console.error('[TtsSettingsContent] pregenStart lỗi:', err);
+      alert('Không thể bắt đầu pre-generate (lỗi kết nối)');
+    } finally {
+      setPregenRunning(false);
     }
-    setPregenRunning(false);
   };
 
   const handleCancelPregen = () => window.slide.pregenCancel();

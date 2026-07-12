@@ -26,6 +26,18 @@ export interface CreateLicensePortOptions {
   fetchRemoteLicenseKey?: () => Promise<string | null>;
 }
 
+/**
+ * Đọc entitlements hiện có từ 1 LicensePort — dùng bởi createElectronPlatform/
+ * createWebPlatform khi build PlatformContext (audit GĐ7.5, E4 #2: trước đây
+ * mỗi platform tự định nghĩa 1 bản `resolveEntitlements()` giống hệt nhau ở
+ * create-electron-platform.ts và create-web-platform.ts — gộp lại đây vì cả 2
+ * package đó đã phụ thuộc @sky-app/licensing sẵn, không phát sinh dependency mới).
+ */
+export async function resolveEntitlementsFromPort(port: LicensePort): Promise<string[]> {
+  const payload = await port.getCurrent();
+  return payload?.entitlements ?? [];
+}
+
 export function createLicensePort(opts: CreateLicensePortOptions): LicensePort {
   async function verifyStored(): Promise<LicensePayload | null> {
     const raw = await opts.storage.read();
