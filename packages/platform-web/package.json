@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@sky-app/kernel": "workspace:*",
+    "@sky-app/licensing": "workspace:*",
     "@sky-app/service-contracts": "workspace:*"
   },
   "devDependencies": {

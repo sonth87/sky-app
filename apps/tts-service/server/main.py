@@ -34,6 +34,7 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
@@ -265,6 +266,21 @@ async def lifespan(app: FastAPI):
 # ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="TTS Service", lifespan=lifespan)
+
+# CORS — apps/shell-web (GĐ7 web parity, packages/platform-web's
+# createWebTtsPort) fetch() thẳng tới service này từ trình duyệt, origin
+# khác cổng (service tự chọn port rảnh, xem _find_free_port bên dưới) nên
+# cần CORS. Electron's window.slide bridge (python-server.ts) gọi qua main
+# process, không qua trình duyệt — không cần CORS, thêm middleware này
+# không ảnh hưởng đường đó. allow_origin_regex thay vì "*" vì dev server
+# (Vite) đổi port ngẫu nhiên giữa các lần chạy.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://localhost:\d+",
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
+    expose_headers=["X-Sample-Rate", "X-Quality-Score", "X-Quality-Flags"],
+)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
