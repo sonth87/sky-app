@@ -74,6 +74,34 @@ Ed25519 offline verify **ngăn sửa entitlement thông thường** (user không
 
 → Xác định rõ mức đe dọa thực tế trước khi đầu tư thêm (anti-tamper, obfuscation...). Với ngữ cảnh nội bộ/khách tin cậy, mức này thường đủ.
 
+## Cấp dev license (local testing)
+
+Cần license hợp lệ trong máy dev để mở app có khai `entitlement` (vd Ceremony) — không có thì app bị ẩn khỏi dock (Tầng 1 ở trên), kể cả khi đã wire vào shell.
+
+**1. Sinh license key** (chạy từ root repo, không phải từ 1 package con):
+
+```bash
+node scripts/gen-dev-license.mjs app.ceremony
+# nhiều entitlement cùng lúc:
+node scripts/gen-dev-license.mjs app.ceremony feature.ceremony.voice-clone
+```
+
+In ra 1 chuỗi JWT-like (payload base64 + chữ ký), ký bằng DEV private key cố định trong script (KHÔNG dùng để cấp license thật cho khách).
+
+**2. Nạp key vào đúng nơi shell đó đọc:**
+
+- **Web** (`shell-web`) — license đọc từ `localStorage['sky-app-license']`. Mở DevTools console tại trang app đang chạy, chạy:
+  ```js
+  localStorage.setItem('sky-app-license', '<key vừa in ra>')
+  ```
+  rồi reload trang.
+
+- **Electron** (`shell-electron`) — license đọc từ file `userData/license.key` qua IPC (`kernel:license:read`/`write`, xem `apps/shell-electron/electron/ipc.ts`), không có UI nhập sẵn. Cách nhanh nhất trong dev: gọi IPC ghi file từ DevTools console của renderer:
+  ```js
+  await window.sky.invoke('kernel:license:write', '<key vừa in ra>')
+  ```
+  rồi reload cửa sổ.
+
 ## Checklist khi thêm feature trả phí
 
 - [ ] Đặt tên entitlement theo quy ước (`app.*` / `feature.*.*`)
