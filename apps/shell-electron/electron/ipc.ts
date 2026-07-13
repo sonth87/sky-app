@@ -1,6 +1,7 @@
 import { ipcMain, app, type BrowserWindow } from 'electron';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { isUpdateReadyToInstall, getPendingNativeUpdateInfo } from './update-checker';
 
 /**
  * IPC router — the main-process counterpart to platform-electron's preload
@@ -58,5 +59,14 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     const path = licenseFilePath();
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, licenseKey, 'utf-8');
+  });
+
+  // GĐ8 OTA (Loại 2a) — bản native/main-process mới đã tải xong nền, chờ cài
+  // khi app thoát (autoUpdater.autoInstallOnAppQuit — xem update-checker.ts).
+  ipcMain.handle('kernel:nativeUpdateStatus', async () => {
+    return {
+      downloaded: isUpdateReadyToInstall(),
+      pendingVersion: getPendingNativeUpdateInfo()?.version ?? null,
+    };
   });
 }

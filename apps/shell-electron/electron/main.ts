@@ -4,6 +4,10 @@ import { copyFile, mkdir } from 'node:fs/promises';
 import { extname, join, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { registerIpcHandlers } from './ipc.js';
+import { loadEnv } from './slide/env.js';
+import { checkAndApplyRendererUpdate, resolveActiveRendererDir } from './slide/renderer-updater.js';
+import { initUpdateChecker } from './update-checker.js';
+import { registerUpdateFilePickerIpc } from './update-file-picker.js';
 import { ceremonyDataDir, resolveLocalAsset, sampleAssetsDir, vieneuDir } from './slide/data/paths.js';
 import { ceremonyStore } from './slide/data/store.js';
 import { sessionStore } from './slide/session-store.js';
@@ -110,6 +114,17 @@ async function bootstrapSlideBackend() {
   autoLoadFirstIfConfigured();
 }
 
+/**
+ * Bản renderer tốt nhất để loadFile — OTA đã tải+verify gần nhất (GĐ8), hoặc
+ * fallback dist/index.html gốc đóng gói sẵn nếu chưa từng tải OTA thành công
+ * hoặc thư mục bản đó bị thiếu file.
+ */
+function resolveRendererEntry(): string {
+  const activeDir = resolveActiveRendererDir();
+  if (activeDir) return join(activeDir, 'index.html');
+  return join(__dirname, '../../dist/index.html');
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -125,7 +140,7 @@ function createMainWindow() {
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    mainWindow.loadFile(join(__dirname, '../../dist/index.html'));
+    mainWindow.loadFile(resolveRendererEntry());
   }
 
   mainWindow.on('closed', () => {
@@ -148,6 +163,10 @@ protocol.registerSchemesAsPrivileged([
 const wallpaperImportDir = () => join(app.getPath('userData'), 'wallpapers');
 
 app.whenReady().then(() => {
+  // Sớm nhất có thể — process.env.RENDERER_MANIFEST_URL (GĐ8 OTA) và mọi biến
+  // .env khác phải sẵn sàng trước createMainWindow()/bootstrapSlideBackend().
+  loadEnv();
+
   protocol.handle('ceremony-asset', (request) => {
     const url = new URL(request.url);
     const relative = decodeURIComponent(url.pathname).replace(/^\/+/, '');
@@ -212,7 +231,26 @@ app.whenReady().then(() => {
   });
 
   registerIpcHandlers(() => mainWindow);
+  registerUpdateFilePickerIpc(() => mainWindow);
   createMainWindow();
+
+  // GĐ8 OTA (Loại 2a) — electron-updater cần app-update.yml, chỉ có trong
+  // bản đã đóng gói qua electron-builder; không chạy (và không nên chạy) ở dev.
+  if (app.isPackaged) {
+    initUpdateChecker();
+  }
+
+  // GĐ8 OTA (Loại 1a) — non-blocking, fire-and-forget. Không chặn app mở:
+  // dùng bản đã có sẵn (OTA cũ hoặc dist/ gốc); bản mới tải xong chỉ áp dụng
+  // ở lần mở app KẾ TIẾP (resolveRendererEntry() đọc lại current.json).
+  const manifestUrl = process.env.RENDERER_MANIFEST_URL;
+  if (manifestUrl) {
+    checkAndApplyRendererUpdate(manifestUrl, (p) => {
+      mainWindow?.webContents.send('renderer-update:progress', p);
+    }).catch((err) => {
+      console.error('[shell-electron] checkAndApplyRendererUpdate failed:', err);
+    });
+  }
 
   bootstrapSlideBackend().catch((err) => {
     console.error('[shell-electron] bootstrapSlideBackend failed:', err);

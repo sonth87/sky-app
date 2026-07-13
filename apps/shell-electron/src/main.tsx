@@ -7,6 +7,7 @@ import { mockAppModule } from '@sky-app/module-mock-app';
 import { ceremonyModule } from '@sky-app/module-ceremony';
 import { DEV_LICENSE_PUBLIC_KEY_HEX } from '@sky-app/licensing';
 import { WALLPAPERS } from './wallpapers.js';
+import { updateActions } from './updates.js';
 import './tailwind-layer-order.css';
 import '@sonth87/device-layout/style.css';
 import '@sky-app/module-ceremony/styles.css';
@@ -27,6 +28,7 @@ async function main() {
         platform={platform}
         onImportWallpaper={importWallpaper}
         wallpapers={WALLPAPERS}
+        updateActions={updateActions}
       />
     </StrictMode>,
   );

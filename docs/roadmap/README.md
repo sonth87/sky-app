@@ -43,11 +43,11 @@ Sky-App là nền tảng multi-app (Web + Electron, Online + Offline, có licens
 | Kế hoạch | Trạng thái | Mô tả ngắn |
 |---|---|---|
 | [platform-architecture-ga1-7.md](./plans/platform-architecture-ga1-7.md) | `done` | Kế hoạch kiến trúc gốc dựng nền tảng — nay là [architecture/overview.md](../architecture/overview.md) |
-| [ota-update-strategy.md](./plans/ota-update-strategy.md) | `proposed` | Chiến lược cập nhật OTA cho renderer (không cần cài lại) và main process (qua auto-update) — tránh phải build tay + gửi lại installer mỗi lần sửa bug/thêm tính năng |
+| [ota-update-strategy.md](./plans/ota-update-strategy.md) | `in_progress` | Chiến lược cập nhật OTA cho renderer (không cần cài lại, Loại 1a — code xong, verify end-to-end) và main process (electron-updater + GitHub Releases, Loại 2a — code xong, chờ GitHub repo thật để test full flow) |
 
-**GĐ7.5 (audit port Trao Bằng → sky-app)** hiện đang ở plan mode riêng của phiên làm việc (`/Users/skyline/.claude/plans/mighty-honking-meteor.md`), chưa được user duyệt (`ExitPlanMode`) — sẽ chuyển vào `plans/` sau khi duyệt và có phiên bản ổn định để lưu trữ lâu dài.
+**GĐ7.5 (audit port Trao Bằng → sky-app)** đã hoàn thành, xem `docs/roadmap/plans/ga7.5-audit.md`.
 
 ## Thứ tự ưu tiên đề xuất (ngắn hạn)
 
-1. **GĐ7.5 — Audit port Ceremony/TTS** (đang chờ duyệt) — xác nhận toàn bộ chức năng đã port từ `trao-bang-tot-nghiep-2026` hoạt động đúng như bản gốc trước khi đầu tư thêm.
-2. **GĐ8 (đề xuất) — OTA Update strategy** (`ota-update-strategy.md`, đang `proposed`) — giải quyết bài toán delivery, ưu tiên sau khi audit ổn định vì mỗi lần fix bug từ audit hiện vẫn phải build tay.
+1. **GĐ7.5 — Audit port Ceremony/TTS** — hoàn thành.
+2. **GĐ8 — OTA Update strategy** (`ota-update-strategy.md`, `in_progress`) — cơ chế delivery đã code+verify (Phase A/B/C xong); còn lại là bước hạ tầng (GitHub repo thật, hosting renderer bundle) trước khi coi là `done`.

@@ -24,6 +24,7 @@ import { getIO, getUseSampleData, setUseSampleData, getTtsPregenConfig, getApiEn
 import { sessionStore } from './session-store';
 import { apiLogger } from './api-logger';
 import { setAppMenu, refreshAppMenu, type MenuLanguage } from './menu';
+import { readCurrentState as readCurrentRendererState, getPendingUpdateInfo } from './renderer-updater';
 
 /** Báo cho Control biết trạng thái Backdrop (mở/đóng) đã thay đổi */
 export function notifyBackdropState() {
@@ -439,6 +440,17 @@ export function registerIpcHandlers() {
   // Lấy version app
   ipcMain.handle('app:version', () => {
     return { version: app.getVersion() };
+  });
+
+  // GĐ8 OTA (Loại 1a) — bản renderer đang chạy + bản mới hơn (nếu vừa tải
+  // xong trong phiên này) đang chờ áp dụng ở lần mở app kế tiếp.
+  ipcMain.handle('app:rendererUpdateStatus', () => {
+    const pending = getPendingUpdateInfo();
+    return {
+      runningVersion: readCurrentRendererState()?.version ?? 'bundled',
+      pendingVersion: pending?.bundleVersion ?? null,
+      pendingReleaseNotes: pending?.releaseNotes ?? null,
+    };
   });
 
   // Renderer báo đổi ngôn ngữ → rebuild native menu theo ngôn ngữ mới

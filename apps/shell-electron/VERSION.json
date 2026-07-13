@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "version": "0.1.0",
+      "date": "2026-07-13",
+      "bump": "minor",
+      "summary": "Khởi tạo cơ chế cập nhật OTA (renderer self-update) và cập nhật qua file thủ công.",
+      "breaking": false,
+      "minAppVersion": "0.1.0"
+    }
+  ]
+}

@@ -17,6 +17,11 @@ import { registerSlideBridge } from './slide/preload.js';
  */
 const skyBridge: SkyBridge = {
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+  on: (channel, cb) => {
+    const handler = (_e: unknown, ...args: unknown[]) => cb(...args);
+    ipcRenderer.on(channel, handler);
+    return () => ipcRenderer.removeListener(channel, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('sky', skyBridge);

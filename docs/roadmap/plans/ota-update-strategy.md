@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in_progress
 owner: sonth87
 created: 2026-07-12
 target_version: chưa gán (chờ xếp lịch sau GĐ7.5)
@@ -9,9 +9,9 @@ implemented_doc: null
 
 # Kế hoạch: Chiến lược cập nhật OTA (Web + Electron)
 
-> **Trạng thái: Proposed — research xong, chưa triển khai.** Đây là kế hoạch/đề xuất, KHÔNG phải tài liệu kiến trúc chính thức. Khi triển khai xong, kết quả sẽ được viết thành tài liệu chính thức trong `docs/architecture/` hoặc `docs/guides/` (cập nhật field `implemented_doc` ở trên trỏ tới đó), còn file này giữ lại làm lịch sử quyết định.
+> **Trạng thái: In progress.** Phase A (electron-builder), Phase B (renderer OTA — Loại 1a) và Phase C (electron-updater + GitHub Releases — Loại 2a) đã code xong và verify được (Phase A/B full end-to-end bằng local build + local static server; Phase C chỉ verify build/typecheck, chưa test full flow vì chưa có GitHub repo thật — xem "Việc còn mở" cập nhật bên dưới). Chưa `done` vì còn phụ thuộc infra thật (GitHub repo, hosting cho renderer bundle) trước khi coi là hoàn tất. Khi đó, cập nhật `status: done`, viết tài liệu chính thức vào `docs/architecture/` hoặc `docs/guides/`, trỏ `implemented_doc` về đó.
 >
-> Phụ thuộc: đề xuất triển khai **sau khi hoàn tất GĐ7.5** (audit port trao-bang → sky-app — xem `/Users/skyline/.claude/plans/mighty-honking-meteor.md`). Tạm gọi đây là **GĐ8: Delivery/Update**.
+> Chi tiết implementation: `docs/dev/versioning.md`'s mục "OTA Update (GĐ8)" (quy tắc quyết định Loại 1 vs Loại 2), `apps/shell-electron/electron/slide/renderer-updater.ts`, `apps/shell-electron/electron/update-checker.ts`, `apps/shell-electron/electron-builder.yml`.
 
 ## 1. Mô tả & mong muốn của user (nguyên văn/paraphrase từ hội thoại)
 
@@ -125,13 +125,20 @@ Dependency renderer khá "rich" nhưng không bất thường: `framer-motion`, 
 2. **Cho các đợt chỉ sửa renderer** (dự kiến chiếm đa số — God component ở `modules/ceremony`, TTS settings, confetti... đều là renderer theo khảo sát GĐ7.5): áp dụng **1a** (renderer self-update, giữ offline fallback).
 3. **Cho các đợt đụng main process/IPC/binary TTS**: phát hành qua **2a hoặc 2b** (electron-updater) khi đã sẵn sàng đầu tư signing, hoặc tạm dùng **2c** (thủ công nhưng nhanh hơn hiện tại) nếu chưa muốn đầu tư ngay.
 
-## 7. Việc còn mở, cần quyết định trước khi triển khai
+## 7. Quyết định đã chốt (2026-07-13) và việc còn mở
 
-- Chọn cụ thể 1a hay khác cho renderer update (đã có khuyến nghị ở mục 6).
-- Chọn hạ tầng phát hành cho Loại 2: GitHub Releases (2a) hay tự host (2b) hay tạm hoãn (2c).
-- Có đầu tư code signing ngay không, hay chấp nhận cảnh báo "unknown publisher" giai đoạn đầu.
-- Có kế hoạch wire `module-ceremony` vào `shell-web` không — ảnh hưởng tới khả năng dùng chung 1 pipeline deliver cho cả 2 target trong tương lai (hiện 2 target chưa chạy chung bundle ceremony).
-- Vị trí chính xác của "GĐ8: Delivery/Update" trong roadmap — sau GĐ7.5 audit, trước hay sau các tính năng mới khác.
+**Đã chốt, đã implement:**
+- Renderer update: **1a** (renderer self-update, offline-first). Implement: `electron/slide/renderer-updater.ts`, `electron/slide/env.ts`, `scripts/build-renderer-bundle.mjs`. Verify end-to-end bằng local static server (tải, checksum verify, extract, swap, fallback offline, fallback checksum sai — tất cả PASS).
+- Hạ tầng Loại 2: **2a** (GitHub Releases + electron-updater). Implement: `electron/update-checker.ts`, `publish` config trong `electron-builder.yml` (owner/repo còn placeholder). Build local verify OK (`app-update.yml` đóng gói đúng vào `Resources/`); **chưa test full flow thật** — cần GitHub repo thật (xem dưới).
+- Code signing: **chưa đầu tư** — chấp nhận cảnh báo "unknown publisher". Hệ quả xác nhận khi implement: **electron-updater trên macOS không hoạt động đáng tin cậy nếu không ký code** (giới hạn Squirrel.Mac, không phải bug) — macOS dùng phân phối thủ công (2c, `.dmg` unsigned) cho Loại 2 cho tới khi đầu tư Apple Developer cert. Windows (NSIS) hoạt động được không cần ký.
+- Bước nền tảng electron-builder: xong, `pnpm dist`/`dist:mac`/`dist:win` chạy được, verify ra `.dmg` hợp lệ.
+
+**Còn mở, cần làm khi có điều kiện:**
+- Điền `owner`/`repo` thật vào `electron-builder.yml`'s `publish` khi có GitHub repo — hiện là `PLACEHOLDER_OWNER`/`PLACEHOLDER_REPO`.
+- Test full flow electron-updater thật (`electron-builder --publish always` cần `GH_TOKEN`, cài bản cũ hơn, xác nhận tự phát hiện+tải+cài khi quit) — chưa làm được vì thiếu repo/token thật.
+- Chọn hosting tĩnh cho renderer bundle (`manifest.json` + zip) — GitHub Releases/S3/Cloudflare Pages, chưa chốt cụ thể; `scripts/build-renderer-bundle.mjs` sinh output local, upload là bước thủ công riêng.
+- `apps/shell-electron/resources/` (TTS binary + voice data cho `extraResources`) chưa tồn tại — `pnpm dist` ra installer chạy được nhưng TTS không hoạt động đầy đủ; build `apps/tts-service` thật là việc riêng.
+- Có kế hoạch wire `module-ceremony` vào `shell-web` không — không chặn GĐ8 (1a chỉ target Electron renderer) nhưng ảnh hưởng khả năng dùng chung pipeline deliver cho 2 target trong tương lai.
 
 ## 8. Khi triển khai xong
 

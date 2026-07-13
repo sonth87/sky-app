@@ -1,26 +1,12 @@
 import { createServer, type Server as HttpServer } from 'node:http';
-import { dirname, join as joinPath } from 'node:path';
-import { app as electronApp } from 'electron';
-import { config as loadDotenv } from 'dotenv';
 import { Server as SocketIOServer } from 'socket.io';
+import { loadEnv } from './env';
 
-// electron-vite chỉ tự inject .env vào import.meta.env cho biến có prefix VITE_/MAIN_VITE_,
-// KHÔNG đưa vào process.env của main process — nên phải tự nạp .env ở đây, sớm nhất có thể
-// (trước khi loadDefaultApiIntegrations() đọc process.env['DEFAULT_API_CONFIG'] bên dưới).
-const dotenvCandidates = [
-  // Dev: chạy từ thư mục apps/slide
-  joinPath(process.cwd(), '.env'),
-  // Dev fallback: app path hiện tại
-  joinPath(electronApp.getAppPath(), '.env'),
-  // Packaged: file .env được bundle vào resources/.env
-  process.resourcesPath ? joinPath(process.resourcesPath, '.env') : '',
-  // Cho phép đặt .env cạnh file exe/app để override tại máy chạy
-  joinPath(dirname(process.execPath), '.env'),
-].filter(Boolean);
-
-for (const envPath of dotenvCandidates) {
-  loadDotenv({ path: envPath, override: false });
-}
+// .env đã được nạp sớm ở main.ts's app.whenReady() (GĐ8 OTA — cần
+// process.env.RENDERER_MANIFEST_URL sẵn sàng trước createMainWindow()).
+// loadEnv() có guard idempotent nên gọi lại ở đây vẫn an toàn (phòng
+// trường hợp module này được import độc lập, ví dụ test).
+loadEnv();
 import type {
   ApiIntegration,
   BackdropAspectRatio,

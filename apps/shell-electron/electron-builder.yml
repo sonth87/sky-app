@@ -1,0 +1,62 @@
+# electron-builder config — GĐ8 OTA Update, Phase A (bước nền tảng).
+# Chưa code signing (chấp nhận cảnh báo "unknown publisher" của OS) —
+# xem docs/roadmap/plans/ota-update-strategy.md và Phase C của kế hoạch GĐ8.
+#
+# `pnpm dist:win`/`dist:all` (cross-compile NSIS installer Windows từ máy
+# mac) đã verify chạy được KHÔNG CẦN Wine (2026-07-13, macOS arm64,
+# electron-builder 26) — với `signAndEditExecutable: false` (không code
+# sign), electron-builder tự set icon/metadata qua thư viện JS thuần, không
+# gọi tới Wine. Nếu sau này bật code signing hoặc electron-builder đổi hành
+# vi, có thể cần Wine trở lại (`brew install --cask wine-stable`) — Apple
+# Silicon có vấn đề tương thích Wine đã biết trên 1 số phiên bản.
+appId: com.skyapp.shell
+productName: Sky-App
+
+directories:
+  # PHẢI khác "dist" (renderer output của electron-vite) và "dist-electron"
+  # (main/preload output) để tránh electron-builder ghi đè build renderer.
+  output: release
+
+files:
+  - dist-electron/**/*
+  - dist/**/*
+  - package.json
+
+# TODO(GĐ8): apps/shell-electron/resources/ (piper/, sample-bundle/, vn/,
+# python-backend/, voice-ref/, voice-previews/, voice-registry.json) chưa
+# tồn tại trong repo — electron/slide/data/paths.ts và
+# electron/slide/python-server.ts đọc các path này từ process.resourcesPath
+# khi app.isPackaged. Cho tới khi apps/tts-service có build output thật để
+# map vào đây, bản cài đặt từ `pnpm dist` mở được nhưng TTS không hoạt động
+# đầy đủ — chấp nhận được cho Phase A, xem "Rủi ro" trong kế hoạch GĐ8.
+# extraResources:
+#   - from: ../tts-service/dist/<platform>
+#     to: .
+#   - from: resources
+#     to: .
+
+mac:
+  target: dmg
+  # Không code sign — user cần "right-click → Open" lần đầu để bypass Gatekeeper.
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+
+win:
+  target: nsis
+  # Không code sign — SmartScreen cảnh báo "Windows protected your PC",
+  # user chọn "More info → Run anyway".
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+# Loại 2a (GĐ8 Phase C) — electron-updater đọc publish config này để tạo
+# latest.yml/latest-mac.yml. owner/repo là placeholder, điền khi có repo
+# GitHub thật; build local (`pnpm dist`, không kèm --publish) không gọi
+# GitHub API nên placeholder không chặn Phase A/B.
+publish:
+  provider: github
+  owner: PLACEHOLDER_OWNER
+  repo: PLACEHOLDER_REPO

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { AppModule, PlatformContext } from '@sky-app/kernel';
-import { APPS_CONFIG, DeviceLayout, type AppConfig, type ImportWallpaperFn, type WallpaperConfig } from '@sonth87/device-layout';
+import { APPS_CONFIG, DeviceLayout, type AppConfig, type ImportWallpaperFn, type WallpaperConfig, type UpdateActions } from '@sonth87/device-layout';
 import { toDeviceAppConfigs } from './to-device-app-config.js';
 import { type BuiltInAppId } from './built-in-apps.js';
 
@@ -31,6 +31,13 @@ export interface SkyDeviceLayoutProps {
    * apps/shell-electron/src/wallpapers.ts for why sky-app ships a subset).
    */
   wallpapers?: WallpaperConfig[];
+  /**
+   * Implements OTA-update status + native "pick an update file" (offline
+   * install via .zip/.dmg/.exe — see apps/shell-electron/src/updates.ts).
+   * Omit to hide the Update Settings section's status/action rows. Forwarded
+   * as-is to DeviceLayout.
+   */
+  updateActions?: UpdateActions;
 }
 
 function resolveBuiltInApps(option: SkyDeviceLayoutProps['builtInApps']): AppConfig[] {
@@ -45,7 +52,7 @@ function resolveBuiltInApps(option: SkyDeviceLayoutProps['builtInApps']): AppCon
  * AppModule[] + PlatformContext and mounts them inside device-layout's
  * desktop-OS chrome (window manager, dock, menu bar).
  */
-export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps, onImportWallpaper, wallpapers }: SkyDeviceLayoutProps) {
+export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps, onImportWallpaper, wallpapers, updateActions }: SkyDeviceLayoutProps) {
   const deviceApps = useMemo(() => {
     const builtIn = resolveBuiltInApps(builtInApps);
     return [...builtIn, ...toDeviceAppConfigs(apps, platform)];
@@ -57,6 +64,7 @@ export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps, onI
       assetBaseUrl={assetBaseUrl}
       onImportWallpaper={onImportWallpaper}
       wallpapers={wallpapers}
+      updateActions={updateActions}
     />
   );
 }

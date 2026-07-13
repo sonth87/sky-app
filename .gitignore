@@ -24,3 +24,7 @@ apps/tts-service/build/
 apps/tts-service/dist/
 __pycache__/
 *.pyc
+
+# GĐ8 OTA Update — output electron-builder + renderer bundle publish local
+release/
+apps/shell-electron/release-renderer/
