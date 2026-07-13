@@ -15,6 +15,8 @@ Cấu hình: [`apps/shell-electron/electron-builder.yml`](../../apps/shell-elect
 
 `dist:mac`/`dist:win`/`dist:all` (`apps/shell-electron/package.json`) tự chạy `pnpm --filter @sky-app/tts-service build:mac`/`build:win` **trước** khi đóng gói — bước này build binary TTS (Python → PyInstaller) và stage model AI vào `apps/shell-electron/resources/`, nơi `electron-builder.yml`'s `extraResources` bundle vào app cuối cùng. Không chạy thẳng `electron-builder` mà bỏ qua bước này — app vẫn mở được nhưng TTS không hoạt động (thiếu `vieneu-server`/`vieneu-server.exe` + model).
 
+**Vì sao script tự chạy `electron-vite build` dù `turbo.json` đã khai `dependsOn: ["build"]`:** CI (`.github/workflows/build-shell-electron.yml`) gọi thẳng `pnpm --filter @sky-app/shell-electron dist:${target}`, KHÔNG qua `turbo run` — nên `dependsOn` của turbo không áp dụng ở đó, script phải tự đủ (self-contained). Khi chạy qua `pnpm app:mac` ở root (có qua turbo), renderer build 2 lần liên tiếp (turbo's `dependsOn` + script tự gọi) — dư vài giây, không phải lỗi. Cố tình giữ nguyên (không bỏ 1 trong 2 phía) để không phá đường CI.
+
 ### macOS (dev/test — máy phát triển)
 
 ```bash

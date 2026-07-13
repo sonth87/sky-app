@@ -38,7 +38,15 @@ files:
 # python-server.ts đọc các path này qua process.resourcesPath khi packaged.
 # Không map piper/ (Piper — engine TTS cũ trước VieNeu, không còn data thật
 # trong repo) hay python-backend/ (chỉ dùng dev-mode verify engine mở rộng).
+#
+# .env: bundle để electron/slide/env.ts's loadEnv() có sẵn cấu hình mặc định
+# (DEFAULT_API_CONFIG/BUNDLE_URL/RENDERER_MANIFEST_URL...) ngay lần chạy đầu
+# mà không cần người vận hành tự thêm .env cạnh app sau khi cài (candidate
+# path #4 trong loadEnv() vẫn cho override thủ công nếu cần). File .env thật
+# không commit (gitignored) — dev tự tạo từ .env.example trước khi build.
 extraResources:
+  - from: .env
+    to: .env
   - from: sample-bundle
     to: sample-bundle
   - from: resources/vn
@@ -51,7 +59,19 @@ extraResources:
     to: voice-registry.json
 
 mac:
-  target: dmg
+  # TODO: icon: build-assets/icons/icon.icns (chưa có asset — xem
+  # build-assets/icons/README.md). Thiếu icon → dùng icon mặc định Electron,
+  # không chặn build.
+  #
+  # zip (cạnh dmg): KHÔNG chỉ để phân phối thêm — Squirrel.Mac (cơ chế
+  # electron-updater dùng để auto-update trên macOS, xem `publish:` dưới)
+  # BẮT BUỘC định dạng .zip, không đọc .dmg trực tiếp. Chuẩn bị sẵn để
+  # không phải sửa lại config khi bật OTA Phase C. Auto-update trên mac vẫn
+  # CHƯA hoạt động được lúc này vì app chưa code-sign (Squirrel.Mac không
+  # tin cậy trên app unsigned) — xem docs/roadmap/plans/ota-update-strategy.md.
+  target:
+    - dmg
+    - zip
   # Không code sign — user cần "right-click → Open" lần đầu để bypass Gatekeeper.
   identity: null
   hardenedRuntime: false
@@ -61,7 +81,14 @@ mac:
       to: vieneu-server
 
 win:
-  target: nsis
+  # TODO: icon: build-assets/icons/icon.ico (chưa có asset — xem
+  # build-assets/icons/README.md).
+  #
+  # portable: bản .exe chạy thẳng không cần cài đặt, tiện test nhanh trên
+  # máy không muốn cài. nsis vẫn là target chính cho máy hội trường (production).
+  target:
+    - nsis
+    - portable
   # Không code sign — SmartScreen cảnh báo "Windows protected your PC",
   # user chọn "More info → Run anyway".
   signAndEditExecutable: false
