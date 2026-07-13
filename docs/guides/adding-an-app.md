@@ -1,8 +1,10 @@
 # Guide: Thêm một app con mới
 
-> Hướng dẫn từng bước tạo 1 app con mới cắm vào nền tảng. Đây là luồng quan trọng nhất cho mục tiêu "dễ mở rộng".
+> Hướng dẫn **từng bước** tạo 1 app con mới cắm vào nền tảng. Đây là luồng quan trọng nhất cho mục tiêu "dễ mở rộng".
 >
-> ⚠️ Code chưa tồn tại — guide này mô tả *thiết kế dự kiến*. Cập nhật khi kernel được implement (GĐ1).
+> 📖 Đọc [app-spec.md](./app-spec.md) TRƯỚC — đó là quy chuẩn đầy đủ (một app *là gì*, *phải/không được làm gì*, vòng đời, capability, giao tiếp, anti-patterns). Guide này chỉ là các **bước thao tác** cụ thể của flow §10 trong app-spec.
+>
+> ⚠️ Một số chi tiết dưới là *thiết kế dự kiến* — code thật là chân lý (xem app-spec §0). Ví dụ: đăng ký app thật ở `main.tsx` qua prop `apps={[...]}`, không phải file `apps.ts`.
 
 ## Nguyên tắc: thêm app = thêm 1 package, KHÔNG sửa core
 
@@ -78,9 +80,14 @@ export const APPS = [ceremonyModule, myAppModule];
 - Nếu app cần capability chưa có → thêm vào enum `Capability` ([reference](../reference/contract-reference.md)) + implement ở cả 2 `platform-*` (hoặc để web trả `false`).
 - Nếu app có tính năng trả phí → khai `entitlement` + xem [licensing-entitlement.md](./licensing-entitlement.md).
 
+### 5.5. Scope CSS & theme (BẮT BUỘC nếu app có style riêng)
+
+App render **trong cùng trang** với shell và app khác — CSS không tự cô lập. Phải scope theme theo root class riêng, re-map token `--color-*` của Tailwind, và cho overlay `position: fixed` neo trong vùng nội dung (không tràn title bar). Đây là các bug đã trả giá thật — làm theo [app-css-theming.md](./app-css-theming.md) **trước khi** viết CSS.
+
 ### 6. Verify
 
 - Chạy web (`vite dev` ở `shell-web`) và Electron (`electron-vite dev` ở `shell-electron`) → app xuất hiện ở dock, mở được.
+- Đổi theme app → chỉ vùng app đổi màu (shell + app khác giữ nguyên); mở modal → không tràn title bar; đổi palette → utility class đổi màu. Xem [app-css-theming.md](./app-css-theming.md).
 - Nếu app cần capability web thiếu → kiểm nó **degrade** đúng (ẩn UI, không crash).
 - Cập nhật [dev/versioning.md](../dev/versioning.md) + tạo changeset + ghi [dev/history.md](../dev/history.md) nếu là quyết định đáng kể.
 
@@ -89,6 +96,7 @@ export const APPS = [ceremonyModule, myAppModule];
 - [ ] Package trong `modules/`, dep đúng chiều (chỉ `packages/*`, không app khác)
 - [ ] `AppModule` khai đủ `requiredCapabilities`/`requiredServices`/`entitlement`
 - [ ] UI chỉ dùng `platform.*`, không gọi môi trường trực tiếp
+- [ ] CSS/theme scope theo root class app — theo [app-css-theming.md](./app-css-theming.md) (không rò rỉ shell, không kẹt màu, overlay không tràn title bar)
 - [ ] Đăng ký vào cả `shell-electron` và `shell-web`
 - [ ] Chạy được / degrade đúng ở cả 2 môi trường
 - [ ] Không import chéo code app khác (dùng EventBus/ServiceRegistry)

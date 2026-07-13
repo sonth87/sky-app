@@ -17,11 +17,10 @@
     "changeset": "changeset",
     "dev:electron": "turbo run dev --filter=@sky-app/shell-electron",
     "dev:web": "turbo run dev --filter=@sky-app/shell-web",
-    "dist": "turbo run dist --filter=@sky-app/shell-electron",
-    "dist:mac": "turbo run dist:mac --filter=@sky-app/shell-electron",
-    "dist:win": "turbo run dist:win --filter=@sky-app/shell-electron",
-    "dist:all": "turbo run dist:all --filter=@sky-app/shell-electron",
-    "build:renderer-bundle": "turbo run build:renderer-bundle --filter=@sky-app/shell-electron"
+    "app:mac": "turbo run dist:mac --filter=@sky-app/shell-electron",
+    "app:win": "turbo run dist:win --filter=@sky-app/shell-electron",
+    "app:all": "turbo run dist:all --filter=@sky-app/shell-electron",
+    "app:renderer-bundle": "turbo run build:renderer-bundle --filter=@sky-app/shell-electron"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.7",

@@ -20,7 +20,9 @@ docs/
 │   └── shared-vs-per-app.md   Ranh giới thành phần chung (packages) vs riêng (modules)
 │
 ├── guides/                ← 🧭 HƯỚNG DẪN DEV (làm việc cụ thể theo bước)
-│   ├── adding-an-app.md       Thêm 1 app con mới vào nền tảng
+│   ├── app-spec.md            ⭐ QUY CHUẨN APP CON — đọc TRƯỚC khi tạo/sửa app (spine, trỏ tới các guide dưới)
+│   ├── adding-an-app.md       Thêm 1 app con mới vào nền tảng (các bước cụ thể)
+│   ├── app-css-theming.md     CSS & theme isolation cho app con (scope, --color-*, fixed overlay)
 │   ├── ports-and-adapters.md  Viết port mới + adapter Electron/Web
 │   └── licensing-entitlement.md  Gate app/feature theo license
 │
@@ -47,7 +49,9 @@ docs/
 | Hiểu Sky-App là gì, kiến trúc tổng | [architecture/overview.md](./architecture/overview.md) |
 | Biết cái gì chạy web, cái gì chỉ electron | [architecture/web-vs-electron.md](./architecture/web-vs-electron.md) |
 | Biết code nào để `packages/` vs `modules/` | [architecture/shared-vs-per-app.md](./architecture/shared-vs-per-app.md) |
-| Thêm 1 app con mới | [guides/adding-an-app.md](./guides/adding-an-app.md) |
+| **Hiểu 1 app con PHẢI như thế nào (tạo mới hay sửa)** | [guides/app-spec.md](./guides/app-spec.md) ⭐ |
+| Thêm 1 app con mới (các bước) | [guides/adding-an-app.md](./guides/adding-an-app.md) |
+| Scope CSS/theme cho app con (khỏi rò rỉ ra shell, kẹt màu, tràn title bar) | [guides/app-css-theming.md](./guides/app-css-theming.md) |
 | Thêm khả năng truy cập môi trường (fs, tts...) | [guides/ports-and-adapters.md](./guides/ports-and-adapters.md) |
 | Khóa/mở app-feature theo license | [guides/licensing-entitlement.md](./guides/licensing-entitlement.md) |
 | Tra interface chính xác | [reference/contract-reference.md](./reference/contract-reference.md) |

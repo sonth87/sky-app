@@ -9,6 +9,16 @@
 # gọi tới Wine. Nếu sau này bật code signing hoặc electron-builder đổi hành
 # vi, có thể cần Wine trở lại (`brew install --cask wine-stable`) — Apple
 # Silicon có vấn đề tương thích Wine đã biết trên 1 số phiên bản.
+#
+# LƯU Ý QUAN TRỌNG — TTS binary KHÔNG cross-compile được: `dist:mac`/
+# `dist:win`/`dist:all` (package.json) chạy `pnpm --filter tts-service
+# build:mac`/`build:win` TRƯỚC electron-builder để build vieneu-server
+# (PyInstaller) — nhưng PyInstaller đóng gói Python THỰC THI TRÊN CHÍNH OS
+# đang build, không cross-compile như electron-builder's NSIS. Trên máy
+# mac, `dist:all` chỉ chạy `build:mac` (không thể tạo vieneu-server.exe từ
+# mac) — bản .exe sinh ra vẫn hợp lệ nhưng THIẾU TTS Windows thật. Muốn có
+# bản Windows đầy đủ TTS, phải build trên máy Windows thật hoặc CI (xem
+# .github/workflows/build-shell-electron.yml, docs/dev/build-and-release.md).
 appId: com.skyapp.shell
 productName: Sky-App
 
@@ -22,18 +32,23 @@ files:
   - dist/**/*
   - package.json
 
-# TODO(GĐ8): apps/shell-electron/resources/ (piper/, sample-bundle/, vn/,
-# python-backend/, voice-ref/, voice-previews/, voice-registry.json) chưa
-# tồn tại trong repo — electron/slide/data/paths.ts và
-# electron/slide/python-server.ts đọc các path này từ process.resourcesPath
-# khi app.isPackaged. Cho tới khi apps/tts-service có build output thật để
-# map vào đây, bản cài đặt từ `pnpm dist` mở được nhưng TTS không hoạt động
-# đầy đủ — chấp nhận được cho Phase A, xem "Rủi ro" trong kế hoạch GĐ8.
-# extraResources:
-#   - from: ../tts-service/dist/<platform>
-#     to: .
-#   - from: resources
-#     to: .
+# TTS bundled resources — sinh ra bởi `pnpm --filter @sky-app/tts-service
+# build:mac`/`build:win` (chạy TRƯỚC electron-builder, xem package.json's
+# dist:mac/dist:win) vào apps/shell-electron/resources/. paths.ts/
+# python-server.ts đọc các path này qua process.resourcesPath khi packaged.
+# Không map piper/ (Piper — engine TTS cũ trước VieNeu, không còn data thật
+# trong repo) hay python-backend/ (chỉ dùng dev-mode verify engine mở rộng).
+extraResources:
+  - from: sample-bundle
+    to: sample-bundle
+  - from: resources/vn
+    to: vn
+  - from: resources/voice-ref
+    to: voice-ref
+  - from: resources/voice-previews
+    to: voice-previews
+  - from: resources/voice-registry.json
+    to: voice-registry.json
 
 mac:
   target: dmg
@@ -41,12 +56,18 @@ mac:
   identity: null
   hardenedRuntime: false
   gatekeeperAssess: false
+  extraResources:
+    - from: resources/vieneu-server
+      to: vieneu-server
 
 win:
   target: nsis
   # Không code sign — SmartScreen cảnh báo "Windows protected your PC",
   # user chọn "More info → Run anyway".
   signAndEditExecutable: false
+  extraResources:
+    - from: resources/vieneu-server.exe
+      to: vieneu-server.exe
 
 nsis:
   oneClick: false

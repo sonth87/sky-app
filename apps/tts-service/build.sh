@@ -16,17 +16,32 @@ if [ "$PY_MAJOR" -lt 3 ] || ([ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]); t
 fi
 echo "[Build] Python $PY_VERSION OK"
 
-# ─── Đường dẫn tới apps/slide/resources/ ──────────────────────────────────
-# apps/tts-service/ → apps/slide/resources/ là ../slide/resources
-SLIDE_RESOURCES="$(cd "$(dirname "$0")/../slide/resources" && pwd)"
-VIENEU_DIR="$SLIDE_RESOURCES/vieneu"
-PREVIEW_DIR="$SLIDE_RESOURCES/voice-previews"
-REF_DIR="$SLIDE_RESOURCES/voice-ref"
+# ─── Đường dẫn tới apps/shell-electron/resources/ ─────────────────────────
+# apps/tts-service/ → apps/shell-electron/resources/ là ../shell-electron/resources
+SHELL_RESOURCES="$(cd "$(dirname "$0")/../shell-electron/resources" 2>/dev/null && pwd || (mkdir -p "$(dirname "$0")/../shell-electron/resources" && cd "$(dirname "$0")/../shell-electron/resources" && pwd))"
+VIENEU_DIR="$SHELL_RESOURCES/vieneu"
+PREVIEW_DIR="$SHELL_RESOURCES/voice-previews"
+REF_DIR="$SHELL_RESOURCES/voice-ref"
 VIENEU_SNAPSHOT_MARKER="$VIENEU_DIR/.snapshot"
 PREVIEW_SNAPSHOT_MARKER="$PREVIEW_DIR/.snapshot"
 VENV_REQ_MARKER="venv/.requirements.sha256"
 VENV_PY_MARKER="venv/.python-version"
 FORCE_REFRESH=0
+
+# ─── Đồng bộ voice-ref/registry tĩnh (do dev tự thêm giọng) từ resources/
+# nội bộ tts-service sang đích SHELL_RESOURCES — build.sh/build-win.js chỉ
+# ĐỌC REF_DIR làm input (smoke test, generate preview), không tự tạo.
+TTS_SERVICE_RESOURCES="$(cd "$(dirname "$0")" && pwd)/resources"
+if [ -d "$TTS_SERVICE_RESOURCES/voice-ref" ] && [ ! -d "$REF_DIR" ]; then
+  echo "[Build] Copy voice-ref vào $REF_DIR ..."
+  mkdir -p "$SHELL_RESOURCES"
+  cp -r "$TTS_SERVICE_RESOURCES/voice-ref" "$REF_DIR"
+fi
+if [ -f "$TTS_SERVICE_RESOURCES/voice-registry.json" ] && [ ! -f "$SHELL_RESOURCES/voice-registry.json" ]; then
+  echo "[Build] Copy voice-registry.json vào $SHELL_RESOURCES ..."
+  mkdir -p "$SHELL_RESOURCES"
+  cp "$TTS_SERVICE_RESOURCES/voice-registry.json" "$SHELL_RESOURCES/voice-registry.json"
+fi
 
 for arg in "$@"; do
   case "$arg" in
@@ -74,7 +89,7 @@ previews_are_current() {
   [ -f "$PREVIEW_DIR/SM.wav" ]
 }
 
-echo "[Build] SLIDE_RESOURCES = $SLIDE_RESOURCES"
+echo "[Build] SHELL_RESOURCES = $SHELL_RESOURCES"
 
 # ─── Rebuild venv ──────────────────────────────────────────────────────────
 REQ_HASH=$(shasum -a 256 requirements.txt | awk '{print $1}')
@@ -105,7 +120,7 @@ else
   source venv/bin/activate
 fi
 
-# ─── Download VieNeu models vào apps/slide/resources/vieneu/ ──────────────
+# ─── Download VieNeu models vào apps/shell-electron/resources/vieneu/ ─────
 CURRENT_SNAPSHOT=$(get_current_snapshot || true)
 if [ "$FORCE_REFRESH" -ne 1 ] && has_required_snapshot "$CURRENT_SNAPSHOT"; then
   echo "[Build] VieNeu cache OK ($CURRENT_SNAPSHOT), skip download."
@@ -168,10 +183,10 @@ fi
 echo "[Build] Đóng gói vieneu-server bằng PyInstaller..."
 pyinstaller --clean vieneu-server.spec
 
-# ─── Copy binary vào apps/slide/resources/ ────────────────────────────────
-echo "[Build] Copy binary vào $SLIDE_RESOURCES ..."
-mkdir -p "$SLIDE_RESOURCES"
-cp dist/vieneu-server "$SLIDE_RESOURCES/vieneu-server"
+# ─── Copy binary vào apps/shell-electron/resources/ ───────────────────────
+echo "[Build] Copy binary vào $SHELL_RESOURCES ..."
+mkdir -p "$SHELL_RESOURCES"
+cp dist/vieneu-server "$SHELL_RESOURCES/vieneu-server"
 
 echo "[Build] Đóng gói hoàn tất!"
-echo "[Build] Binary: $SLIDE_RESOURCES/vieneu-server"
+echo "[Build] Binary: $SHELL_RESOURCES/vieneu-server"

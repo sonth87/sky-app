@@ -25,6 +25,14 @@ apps/tts-service/dist/
 __pycache__/
 *.pyc
 
+# apps/shell-electron/resources/ — THƯ MỤC ĐÍCH của build TTS (~1.2GB), KHÔNG commit.
+# Toàn bộ được sinh/copy lúc build (apps/tts-service/build.sh + build-win.js +
+# stage-models.js): vieneu/ = HF cache tải về; vn/ = staged bundle flatten symlink;
+# vieneu-server(.exe) = binary PyInstaller; voice-ref/voice-previews/voice-registry.json
+# = copy từ SOURCE thật ở apps/tts-service/resources/ (cái đó MỚI được commit).
+# Nguồn giọng thật do dev thêm nằm ở apps/tts-service/resources/, không phải đây.
+apps/shell-electron/resources/
+
 # GĐ8 OTA Update — output electron-builder + renderer bundle publish local
 release/
 apps/shell-electron/release-renderer/

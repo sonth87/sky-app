@@ -172,6 +172,21 @@
 
 .ceremony-root {
   font-family: var(--font-sans);
+
+  /*
+   * Confine `position: fixed` overlays (Modal.tsx, Radix Dialog/AlertDialog/
+   * Sheet, InfoTip, Toaster — tất cả dùng `fixed inset-0`) vào đúng vùng content
+   * của app thay vì cả cửa sổ Electron. Radix portal đã được route vào subtree
+   * này qua PortalContainerContext, nhưng `fixed` vẫn resolve theo viewport nếu
+   * không có ancestor nào tạo containing block → overlay tràn lên title bar +
+   * status bar của device-layout. `transform` (kèm `contain` để chắc chắn) biến
+   * `.ceremony-root` thành containing block cho mọi con `position: fixed`.
+   * `.ceremony-root` là `h-full`, ăn khít window-body của device-layout nên
+   * overlay giờ phủ đúng khung content.
+   */
+  transform: translateZ(0);
+  contain: layout paint;
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -235,6 +250,56 @@
   --warning-foreground: oklch(0.28 0.06 75);
   --info: oklch(0.62 0.19 255);
   --info-foreground: oklch(0.98 0.02 255);
+
+  /*
+   * Re-map Tailwind color token (`--color-*`) NGAY TẠI scope `.ceremony-root`.
+   * BẮT BUỘC: `@theme` (cuối file) chỉ emit được `--color-primary: var(--primary,…)`
+   * ra `:root, :host` global — nơi `--primary` (chỉ tồn tại trong `.ceremony-root`)
+   * CHƯA định nghĩa, nên `var()` rơi về fallback green và ĐÓNG BĂNG ở đó. Utility
+   * class `.bg-primary`/`.text-primary`… đọc `var(--color-primary)` nên kẹt màu
+   * green bất kể `data-theme` → "đổi palette không đổi màu". Khai báo lại ở đây,
+   * `var(--primary)` resolve đúng tại scope có palette (kể cả `[data-theme]`/`.dark`
+   * variant override `--primary`), specificity `.ceremony-root` > `:root` nên thắng.
+   * KHÔNG cần fallback: các biến nguồn luôn có mặt ở block base này.
+   */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
 }
 
 .ceremony-root.dark {

@@ -1,0 +1,37 @@
+name: Build Shell Electron
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+          - os: macos-latest
+            target: mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build & package Shell Electron (${{ matrix.target }})
+        run: pnpm --filter @sky-app/shell-electron dist:${{ matrix.target }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: shell-electron-${{ matrix.target }}
+          path: |
+            apps/shell-electron/release/*.exe
+            apps/shell-electron/release/*.dmg
+          if-no-files-found: ignore

@@ -18,9 +18,9 @@ const { join, resolve, basename } = require('node:path');
 
 const cwd = __dirname;                                    // apps/tts-service/
 const rootDir = resolve(cwd, '..', '..');                 // monorepo root
-const slideResourcesDir = join(rootDir, 'apps', 'slide', 'resources');
-const vieneuCacheDir = join(slideResourcesDir, 'vieneu'); // nguồn: HF cache
-const vieneuStageDir = join(slideResourcesDir, 'vn');     // đích: staged bundle
+const shellResourcesDir = join(rootDir, 'apps', 'shell-electron', 'resources');
+const vieneuCacheDir = join(shellResourcesDir, 'vieneu'); // nguồn: HF cache
+const vieneuStageDir = join(shellResourcesDir, 'vn');     // đích: staged bundle
 const stageSnapshotFile = join(vieneuStageDir, '.snapshot');
 const forceRefresh = process.env.TTS_BUILD_FORCE === '1' || process.argv.includes('--force');
 

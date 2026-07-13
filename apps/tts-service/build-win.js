@@ -1,16 +1,16 @@
 const { spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
-const { existsSync, rmSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } = require('node:fs');
+const { existsSync, rmSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, cpSync } = require('node:fs');
 const { join, resolve, basename } = require('node:path');
 
 const cwd = __dirname;                                       // apps/tts-service/
 const rootDir = resolve(cwd, '..', '..');                    // monorepo root
-const slideResourcesDir = join(rootDir, 'apps', 'slide', 'resources');
+const shellResourcesDir = join(rootDir, 'apps', 'shell-electron', 'resources');
 // vieneuCacheDir: HF cache format (download về) — dùng khi build.
 // Bước flatten sang resources/vn nằm trong stage-models.js (dùng chung mac + win).
-const vieneuCacheDir = join(slideResourcesDir, 'vieneu');
-const voicePreviewsDir = join(slideResourcesDir, 'voice-previews');
-const voiceRefDir = join(slideResourcesDir, 'voice-ref');
+const vieneuCacheDir = join(shellResourcesDir, 'vieneu');
+const voicePreviewsDir = join(shellResourcesDir, 'voice-previews');
+const voiceRefDir = join(shellResourcesDir, 'voice-ref');
 const venvDir = join(cwd, 'venv');
 const forceRefresh = process.argv.includes('--force') || process.env.TTS_BUILD_FORCE === '1';
 
@@ -22,6 +22,27 @@ function fail(msg) {
   console.error(`[FAIL] ${msg}`);
   process.exit(1);
 }
+
+// ─── Đồng bộ voice-ref/registry tĩnh (do dev tự thêm giọng) từ resources/
+// nội bộ tts-service sang shellResourcesDir — build-win.js chỉ ĐỌC voiceRefDir
+// làm input (smoke test, generate preview), không tự tạo.
+function syncStaticVoiceAssets() {
+  const ttsServiceResources = join(cwd, 'resources');
+  const srcRef = join(ttsServiceResources, 'voice-ref');
+  const srcRegistry = join(ttsServiceResources, 'voice-registry.json');
+  if (existsSync(srcRef) && !existsSync(voiceRefDir)) {
+    log(`Copy voice-ref vao ${voiceRefDir} ...`);
+    mkdirSync(shellResourcesDir, { recursive: true });
+    cpSync(srcRef, voiceRefDir, { recursive: true });
+  }
+  const dstRegistry = join(shellResourcesDir, 'voice-registry.json');
+  if (existsSync(srcRegistry) && !existsSync(dstRegistry)) {
+    log(`Copy voice-registry.json vao ${shellResourcesDir} ...`);
+    mkdirSync(shellResourcesDir, { recursive: true });
+    copyFileSync(srcRegistry, dstRegistry);
+  }
+}
+syncStaticVoiceAssets();
 
 function resolveSnapshotPointers(dir) {
   const { readdirSync, statSync } = require('node:fs');
@@ -274,12 +295,12 @@ if (!existsSync(pyinstallerBin)) fail(`Khong tim thay pyinstaller.exe: ${pyinsta
 
 if (!run(pyinstallerBin, ['--clean', 'vieneu-server.spec'])) fail('PyInstaller that bai');
 
-// ─── Copy binary vào apps/slide/resources/ ────────────────────────────────
-log(`Copy binary vao ${slideResourcesDir} ...`);
-if (!existsSync(slideResourcesDir)) mkdirSync(slideResourcesDir, { recursive: true });
+// ─── Copy binary vào apps/shell-electron/resources/ ───────────────────────
+log(`Copy binary vao ${shellResourcesDir} ...`);
+if (!existsSync(shellResourcesDir)) mkdirSync(shellResourcesDir, { recursive: true });
 
 const sourceExe = join(cwd, 'dist', 'vieneu-server.exe');
-const targetExe = join(slideResourcesDir, 'vieneu-server.exe');
+const targetExe = join(shellResourcesDir, 'vieneu-server.exe');
 if (!existsSync(sourceExe)) fail(`Khong tim thay binary output: ${sourceExe}`);
 copyFileSync(sourceExe, targetExe);
 
