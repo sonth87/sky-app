@@ -1,9 +1,10 @@
-import type { TtsPort, Voice } from '@sky-app/service-contracts';
+import type { SpeakOptions, SynthesizeResult, TtsPort, Voice } from '@sky-app/service-contracts';
 
 interface RawVoice {
   id: string;
   label: string;
   region?: string;
+  gender?: string;
 }
 
 let audioCtx: AudioContext | null = null;
@@ -48,6 +49,29 @@ async function playPcm(buffer: ArrayBuffer, sampleRate: number): Promise<void> {
   source.start(0);
 }
 
+/** POST /synthesize + đọc raw PCM — dùng chung bởi speak() (tự phát) và synthesizeBuffer() (trả buffer). */
+async function fetchSynthesize(
+  baseUrl: string,
+  text: string,
+  opts?: SpeakOptions,
+): Promise<SynthesizeResult> {
+  const res = await fetch(`${baseUrl}/synthesize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text,
+      speaker_id: opts?.voiceId ?? 'NF',
+      speed: opts?.speed ?? 1.0,
+      temperature: opts?.temperature,
+    }),
+  });
+  if (!res.ok) throw new Error(`TTS synthesize failed: ${res.status} ${await res.text()}`);
+
+  const sampleRate = Number(res.headers.get('X-Sample-Rate') ?? '24000');
+  const buffer = await res.arrayBuffer();
+  return { buffer, sampleRate };
+}
+
 /**
  * Web TtsPort — calls apps/tts-service's FastAPI server directly from the
  * browser (CORS enabled server-side, see server/main.py). Same backend
@@ -58,20 +82,7 @@ async function playPcm(buffer: ArrayBuffer, sampleRate: number): Promise<void> {
 export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
   return {
     async speak(text, opts) {
-      const res = await fetch(`${baseUrl}/synthesize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          speaker_id: opts?.voiceId ?? 'NF',
-          speed: opts?.speed ?? 1.0,
-          temperature: opts?.temperature,
-        }),
-      });
-      if (!res.ok) throw new Error(`TTS synthesize failed: ${res.status} ${await res.text()}`);
-
-      const sampleRate = Number(res.headers.get('X-Sample-Rate') ?? '24000');
-      const buffer = await res.arrayBuffer();
+      const { buffer, sampleRate } = await fetchSynthesize(baseUrl, text, opts);
       await playPcm(buffer, sampleRate);
     },
 
@@ -79,7 +90,15 @@ export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
       const res = await fetch(`${baseUrl}/voices`);
       if (!res.ok) throw new Error(`TTS listVoices failed: ${res.status}`);
       const raw = (await res.json()) as RawVoice[];
-      return raw.map((v): Voice => ({ id: v.id, name: v.label, language: v.region }));
+      return raw.map((v): Voice => ({ id: v.id, name: v.label, language: v.region, gender: v.gender }));
+    },
+
+    async synthesizeBuffer(text, opts) {
+      return fetchSynthesize(baseUrl, text, opts);
+    },
+
+    async getPreviewUrl(voiceId) {
+      return `${baseUrl}/preview/${voiceId}`;
     },
   };
 }

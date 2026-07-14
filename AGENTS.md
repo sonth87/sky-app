@@ -42,9 +42,11 @@ Mỗi thay đổi đáng kể phải cập nhật đúng loại log — **phân 
 |---|---|---|
 | **Version** | `package.json` từng package | Bump theo [`docs/dev/versioning.md`](./docs/dev/versioning.md) (SemVer + Changesets) |
 | **Changelog** (cho người dùng) | `CHANGELOG.md` mỗi package (Changesets tự sinh) | Tính năng/fix theo góc nhìn người dùng |
-| **History / nhật ký kỹ thuật** | [`docs/dev/history.md`](./docs/dev/history.md) | Quyết định kỹ thuật, lý do, ngày (context cho AI/dev sau) |
+| **History / nhật ký kỹ thuật** | [`docs/dev/history/`](./docs/dev/history/README.md) | Quyết định kỹ thuật, lý do, ngày (context cho AI/dev sau) |
 
-Quy tắc đầy đủ: [`docs/dev/versioning.md`](./docs/dev/versioning.md) và [`docs/dev/history.md`](./docs/dev/history.md).
+Quy tắc đầy đủ: [`docs/dev/versioning.md`](./docs/dev/versioning.md) và [`docs/dev/history/`](./docs/dev/history/README.md).
+
+**⚠️ Đã sửa bất kỳ file nào trong `apps/shell-electron/electron/` (main process, IPC, preload)?** Đây LUÔN là câu hỏi bắt buộc phải tự hỏi trước khi báo "xong" — quên bước này phá cơ chế OTA đã dựng sẵn (renderer mới gọi IPC channel main process cũ không có → crash tại hiện trường). Đọc ngay [`docs/dev/versioning.md`](./docs/dev/versioning.md) mục "Quy trình BẮT BUỘC khi sửa code renderer/Electron" — xác định Loại 1/Loại 2, bump `apps/shell-electron/package.json` + thêm entry `apps/shell-electron/VERSION.json` (MAJOR/MINOR bắt buộc kèm `detailsRef` trỏ file mới trong `docs/dev/history/`). KHÔNG tự cho qua vì "chỉ là thêm 1 handler nhỏ" — chính là ví dụ Loại 2 kinh điển trong bảng.
 
 ## 5. Trước khi báo "xong"
 

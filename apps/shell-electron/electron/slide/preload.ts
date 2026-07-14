@@ -132,6 +132,21 @@ const api: SlideApi = {
       }
       return { ok: res.ok, error: res.error };
     }),
+  // tts-studio: channel riêng, KHÔNG cache/log/pregen (khác tts:speak dùng bởi Ceremony).
+  synthesizeTts: (text: string, voiceId?: string, speed?: number): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }> =>
+    ipcRenderer.invoke('tts-studio:synthesize', { text, voiceId, speed }).then((res) => {
+      if (res.ok && res.buffer) {
+        return {
+          ok: true,
+          sampleRate: res.sampleRate ?? 48000,
+          buffer: res.buffer.buffer.slice(
+            res.buffer.byteOffset,
+            res.buffer.byteOffset + res.buffer.byteLength
+          )
+        };
+      }
+      return { ok: res.ok, error: res.error };
+    }),
   warmupTts: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('tts:warmup'),
   getTtsDebug: (): Promise<{

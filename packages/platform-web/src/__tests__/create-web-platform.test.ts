@@ -209,25 +209,74 @@ describe('TtsPort (web)', () => {
     expect(body).not.toHaveProperty('top_p');
   });
 
-  it('listVoices() map label→name, region→language', async () => {
+  it('listVoices() map label→name, region→language, giữ gender', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => [
-        { id: 'NF', label: 'Lan Anh', region: 'Bắc' },
-        { id: 'SM', label: 'Gia Huy', region: 'Nam' },
+        { id: 'NF', label: 'Lan Anh', region: 'Bắc', gender: 'female' },
+        { id: 'SM', label: 'Gia Huy', region: 'Nam', gender: 'male' },
       ],
     });
     vi.stubGlobal('fetch', fetchMock);
 
     const platform = await createWebPlatform({ ttsBaseUrl: 'http://localhost:9999' });
-    const tts = platform.services.get<{ listVoices: () => Promise<{ id: string; name: string; language?: string }[]> }>('tts')!;
+    const tts = platform.services.get<{ listVoices: () => Promise<{ id: string; name: string; language?: string; gender?: string }[]> }>('tts')!;
     const voices = await tts.listVoices();
 
     expect(fetchMock).toHaveBeenCalledWith('http://localhost:9999/voices');
     expect(voices).toEqual([
-      { id: 'NF', name: 'Lan Anh', language: 'Bắc' },
-      { id: 'SM', name: 'Gia Huy', language: 'Nam' },
+      { id: 'NF', name: 'Lan Anh', language: 'Bắc', gender: 'female' },
+      { id: 'SM', name: 'Gia Huy', language: 'Nam', gender: 'male' },
     ]);
+  });
+
+  it('synthesizeBuffer() POST tới /synthesize, trả buffer thô KHÔNG tự phát', async () => {
+    const pcm = new Int16Array([1, 2, 3]).buffer;
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: (name: string) => (name === 'X-Sample-Rate' ? '48000' : null) },
+      arrayBuffer: async () => pcm,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { ctx } = stubAudioContext();
+
+    const platform = await createWebPlatform({ ttsBaseUrl: 'http://localhost:9999' });
+    const tts = platform.services.get<{
+      synthesizeBuffer: (t: string, o?: unknown) => Promise<{ buffer: ArrayBuffer; sampleRate: number }>;
+    }>('tts')!;
+    const result = await tts.synthesizeBuffer('xin chào', { voiceId: 'NF2', speed: 1.2 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:9999/synthesize',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ text: 'xin chào', speaker_id: 'NF2', speed: 1.2, temperature: undefined }),
+      }),
+    );
+    expect(result).toEqual({ buffer: pcm, sampleRate: 48000 });
+    // Không tự phát — AudioContext không được tạo/dùng.
+    expect(ctx.createBufferSource).not.toHaveBeenCalled();
+  });
+
+  it('synthesizeBuffer() throw khi server trả lỗi', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => 'boom' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const platform = await createWebPlatform({ ttsBaseUrl: 'http://localhost:9999' });
+    const tts = platform.services.get<{ synthesizeBuffer: (t: string) => Promise<unknown> }>('tts')!;
+    await expect(tts.synthesizeBuffer('hello')).rejects.toThrow('TTS synthesize failed: 500 boom');
+  });
+
+  it('getPreviewUrl() trả URL /preview/<voiceId> không cần fetch', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const platform = await createWebPlatform({ ttsBaseUrl: 'http://localhost:9999' });
+    const tts = platform.services.get<{ getPreviewUrl: (id: string) => Promise<string> }>('tts')!;
+    const url = await tts.getPreviewUrl('NF');
+
+    expect(url).toBe('http://localhost:9999/preview/NF');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

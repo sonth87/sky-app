@@ -198,6 +198,12 @@ export interface SlideApi {
     speed?: number,
     studentCode?: string,
   ): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }>;
+  /** Sinh audio KHÔNG cache/log/pregen — dùng bởi tts-studio (app tách biệt Ceremony), không nhận studentCode. */
+  synthesizeTts(
+    text: string,
+    voiceId?: string,
+    speed?: number,
+  ): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }>;
   warmupTts(): Promise<{ ok: boolean }>;
   getTtsDebug(): Promise<{
     port: number;

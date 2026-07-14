@@ -89,7 +89,7 @@ App render **trong cùng trang** với shell và app khác — CSS không tự c
 - Chạy web (`vite dev` ở `shell-web`) và Electron (`electron-vite dev` ở `shell-electron`) → app xuất hiện ở dock, mở được.
 - Đổi theme app → chỉ vùng app đổi màu (shell + app khác giữ nguyên); mở modal → không tràn title bar; đổi palette → utility class đổi màu. Xem [app-css-theming.md](./app-css-theming.md).
 - Nếu app cần capability web thiếu → kiểm nó **degrade** đúng (ẩn UI, không crash).
-- Cập nhật [dev/versioning.md](../dev/versioning.md) + tạo changeset + ghi [dev/history.md](../dev/history.md) nếu là quyết định đáng kể.
+- Cập nhật [dev/versioning.md](../dev/versioning.md) + tạo changeset + ghi 1 file mới trong [dev/history/](../dev/history/README.md) nếu là quyết định đáng kể.
 
 ## Checklist thêm app
 

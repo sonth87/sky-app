@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-electron-version-bump.sh 2>/dev/null || true",
+            "statusMessage": "Kiểm tra version OTA..."
+          }
+        ]
+      }
+    ]
+  }
+}

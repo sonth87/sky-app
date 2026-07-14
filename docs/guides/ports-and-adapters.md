@@ -81,7 +81,7 @@ Ceremony (trước đây gọi là Trao Bằng, port từ dự án `apps/slide`)
 2. **Bọc dần** thành `TtsPort`/`DataPort`/`DisplayPort` — thay call-site theo nhóm, không codemod 1 lần.
 3. 7 event-listener (`onPregenProgress`...) map sang callback/observable trong port.
 
-Xem [dev/history.md](../dev/history.md) để biết chi tiết bridge Ceremony.
+Xem [dev/history/](../dev/history/README.md) để biết chi tiết bridge Ceremony.
 
 ## Anti-pattern (tuyệt đối tránh)
 

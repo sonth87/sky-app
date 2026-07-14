@@ -56,7 +56,7 @@ docs/
 | Khóa/mở app-feature theo license | [guides/licensing-entitlement.md](./guides/licensing-entitlement.md) |
 | Tra interface chính xác | [reference/contract-reference.md](./reference/contract-reference.md) |
 | Biết quy tắc bump version | [dev/versioning.md](./dev/versioning.md) |
-| Xem lịch sử quyết định kỹ thuật | [dev/history.md](./dev/history.md) |
+| Xem lịch sử quyết định kỹ thuật | [dev/history/](./dev/history/README.md) |
 
 ## Loại tài liệu — phân biệt để không nhầm
 
@@ -67,6 +67,6 @@ docs/
 - **apps/ services/** = *mô tả từng thành phần nghiệp vụ*.
 - **dev/** = *quy định vận hành + nhật ký* (versioning, history, tooling).
 
-**Vòng đời 1 ý tưởng:** `roadmap/plans/*.md` (status: proposed) → triển khai (status: in_progress, theo dõi tiến độ ở `dev/history.md`) → xong (status: done, nội dung chính thức chuyển vào `architecture/`/`guides/`/`apps/`/`services/`, field `implemented_doc` trỏ tới đó, file plan giữ lại làm lịch sử).
+**Vòng đời 1 ý tưởng:** `roadmap/plans/*.md` (status: proposed) → triển khai (status: in_progress, theo dõi tiến độ ở `dev/history/`) → xong (status: done, nội dung chính thức chuyển vào `architecture/`/`guides/`/`apps/`/`services/`, field `implemented_doc` trỏ tới đó, file plan giữ lại làm lịch sử).
 
 > Tài liệu cho AI (quy định làm việc) nằm ở [`../AGENTS.md`](../AGENTS.md), KHÔNG nằm trong `docs/`.

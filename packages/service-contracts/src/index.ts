@@ -1,4 +1,4 @@
-export type { TtsPort, Voice, SpeakOptions } from './tts.js';
+export type { TtsPort, Voice, SpeakOptions, SynthesizeResult } from './tts.js';
 export type { DataPort, SyncProgress } from './data.js';
 export type { DisplayPort, DisplayInfo } from './display.js';
 export type { CardReaderPort, CardScanEvent } from './card-reader.js';

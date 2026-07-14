@@ -251,7 +251,7 @@ import { myAppModule } from '@sky-app/module-my-app';
 |---|---|---|
 | UI thuần, không side-effect nền | `modules/mock-app` | Tối giản: chỉ `render`, không cần `activate/deactivate`. |
 | App nghiệp vụ đầy đủ (form, dữ liệu, TTS, màn phụ) | `modules/ceremony` | Theme scoped, `isActive` gate card-reader, port TTS/Data, backdrop kiosk. |
-| App dùng chung service TTS nhưng nghiệp vụ riêng | (dự kiến) `modules/tts-studio` | Tiêu thụ `TtsPort` qua registry; nghiệp vụ ở module, service ở shared. |
+| App dùng chung service TTS nhưng nghiệp vụ riêng | `modules/tts-studio` | Tiêu thụ `TtsPort.synthesizeBuffer()` qua registry (buffer thô, không tự phát); nghiệp vụ ở module, service ở shared. |
 | App cần dữ liệu từ app khác | — | KHÔNG import chéo → EventBus/ServiceRegistry (§5). |
 | App có cửa sổ phụ (màn ngoài) | Ceremony Backdrop | Entry riêng ngoài device-layout, không phải AppModule (§8). |
 | App có feature trả phí | Ceremony (`app.ceremony`) | Gate tầng 2 trong app bằng `entitlements.has('app.<id>.<feature>')`. |
@@ -269,7 +269,7 @@ import { myAppModule } from '@sky-app/module-my-app';
 7. **Đăng ký** (§8) vào cả `shell-electron` + `shell-web`.
 8. **Capability/entitlement mới** nếu cần: thêm enum + implement 2 platform ([ports-and-adapters.md](./ports-and-adapters.md)); khai license ([licensing-entitlement.md](./licensing-entitlement.md)).
 9. **Verify** (§11) ở CẢ Electron và Web.
-10. **Ghi lại**: changeset (versioning), `docs/apps/<app>.md` (mô tả nghiệp vụ), `dev/history.md` nếu là quyết định đáng kể.
+10. **Ghi lại**: changeset (versioning), `docs/apps/<app>.md` (mô tả nghiệp vụ), 1 file mới trong `dev/history/` nếu là quyết định đáng kể.
 
 ## §11. Flow: SỬA một app đang có
 
@@ -315,4 +315,4 @@ import { myAppModule } from '@sky-app/module-my-app';
 
 - [adding-an-app.md](./adding-an-app.md) · [app-css-theming.md](./app-css-theming.md) · [ports-and-adapters.md](./ports-and-adapters.md) · [licensing-entitlement.md](./licensing-entitlement.md)
 - [../architecture/overview.md](../architecture/overview.md) · [../architecture/shared-vs-per-app.md](../architecture/shared-vs-per-app.md) · [../architecture/web-vs-electron.md](../architecture/web-vs-electron.md)
-- [../reference/contract-reference.md](../reference/contract-reference.md) · [../dev/history.md](../dev/history.md)
+- [../reference/contract-reference.md](../reference/contract-reference.md) · [../dev/history/](../dev/history/README.md)

@@ -11,7 +11,7 @@ implemented_doc: ../../architecture/overview.md
 
 > **Trạng thái: Done — toàn bộ GĐ1-7 đã triển khai và verify.** Đây là kế hoạch kiến trúc gốc lập lúc khởi tạo repo (2026-07-11), giữ lại làm lịch sử quyết định. Tài liệu kiến trúc **hiện hành** (mô tả hệ thống đang chạy, cập nhật liên tục) nằm ở [`docs/architecture/overview.md`](../../architecture/overview.md) — đọc file đó để biết trạng thái mới nhất, không đọc file này.
 >
-> Nhật ký triển khai từng giai đoạn (ngày, chi tiết, bug đã fix): [`docs/dev/history.md`](../../dev/history.md).
+> Nhật ký triển khai từng giai đoạn (ngày, chi tiết, bug đã fix): [`docs/dev/history/`](../../dev/history/README.md).
 
 ## Context
 
@@ -201,8 +201,8 @@ App chỉ thấy port. `requiredCapabilities` cho phép app biết trước cái
 
 ---
 
-## Kết quả thật so với kế hoạch (tóm tắt — chi tiết đầy đủ ở history.md)
+## Kết quả thật so với kế hoạch (tóm tắt — chi tiết đầy đủ ở dev/history/)
 
-Toàn bộ GĐ1-7 đã hoàn thành đúng thứ tự đề ra, verify xanh từng bước, không big-bang. Tên module `trao-bang`/`trao-bang-backdrop` trong kế hoạch gốc thực tế đổi thành `ceremony`/`ceremony-backdrop` khi triển khai. Chi tiết từng giai đoạn, ngày tháng, bug đã gặp và fix: xem các mục `## 2026-07-11 — Giai đoạn N...` và `## 2026-07-12 — Giai đoạn N...` trong [`docs/dev/history.md`](../../dev/history.md).
+Toàn bộ GĐ1-7 đã hoàn thành đúng thứ tự đề ra, verify xanh từng bước, không big-bang. Tên module `trao-bang`/`trao-bang-backdrop` trong kế hoạch gốc thực tế đổi thành `ceremony`/`ceremony-backdrop` khi triển khai. Chi tiết từng giai đoạn, ngày tháng, bug đã gặp và fix: xem các file `2026-07-11-giai-doan-N-*.md` và `2026-07-12-giai-doan-N-*.md` trong [`docs/dev/history/`](../../dev/history/README.md).
 
 Phát hiện trong quá trình audit GĐ7.5 (xem [`docs/roadmap/plans/`](./) mục audit): một số bước wiring trong GĐ4/GĐ5 (port backend) đã bị sót so với bản gốc `trao-bang-tot-nghiep-2026` — không phải sai lệch với *kế hoạch* này (kế hoạch không đặc tả từng dòng code), mà là sai lệch khi *thực thi* port. Xem chi tiết trong plan audit GĐ7.5 tương ứng.

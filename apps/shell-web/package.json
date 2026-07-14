@@ -13,6 +13,7 @@
     "@sky-app/licensing": "workspace:*",
     "@sky-app/module-ceremony": "workspace:*",
     "@sky-app/module-mock-app": "workspace:*",
+    "@sky-app/module-tts-studio": "workspace:*",
     "@sky-app/platform-web": "workspace:*",
     "@sonth87/device-layout": "file:../../.vendor/sonth87-device-layout-0.1.0.tgz",
     "react": "^19.2.7",

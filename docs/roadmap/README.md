@@ -29,7 +29,7 @@ implemented_doc: <đường dẫn tới doc chính thức khi status=done, null 
 ```
 
 - **proposed** — đã research/thiết kế, chưa code. Có thể còn điểm mở cần quyết định trước khi bắt tay làm.
-- **in_progress** — đang triển khai. Cập nhật ngay trong file này (không tạo bản sao) khi có tiến triển lớn; chi tiết ngày-qua-ngày vẫn ghi ở `docs/dev/history.md`.
+- **in_progress** — đang triển khai. Cập nhật ngay trong file này (không tạo bản sao) khi có tiến triển lớn; chi tiết ngày-qua-ngày vẫn ghi ở `docs/dev/history/`.
 - **done** — đã triển khai xong, verify được. Nội dung chính thức (thiết kế cuối cùng, cách dùng) chuyển thành tài liệu ở `docs/architecture/` hoặc `docs/guides/`, field `implemented_doc` trỏ tới đó. File plan giữ nguyên làm lịch sử quyết định — **không xóa**.
 
 Khi 1 kế hoạch mới thay thế hoàn toàn 1 kế hoạch cũ (đổi hướng giữa chừng), đặt `supersedes` trỏ về file cũ thay vì sửa đè.

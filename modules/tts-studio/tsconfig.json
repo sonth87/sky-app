@@ -1,0 +1,13 @@
+{
+  "extends": "@sky-app/tsconfig/react-library.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["src/__tests__", "dist", "node_modules"]
+}

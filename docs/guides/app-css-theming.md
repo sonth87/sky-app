@@ -2,7 +2,7 @@
 
 > Mỗi app con (`modules/*`) render **bên trong cửa sổ ảo của device-layout** — chung một trang (`document`) với shell và mọi app khác. CSS không tự cô lập theo cửa sổ. Guide này là các rule BẮT BUỘC để style của app không rò rỉ ra shell, không kẹt màu theme, và overlay không tràn ra ngoài vùng nội dung.
 >
-> Mọi rule dưới đây đã phải trả giá bằng bug thật (xem [dev/history.md](../dev/history.md) và các mục "verify" cuối mỗi phần). Đừng bỏ qua vì "trông như one-liner".
+> Mọi rule dưới đây đã phải trả giá bằng bug thật (xem [dev/history/](../dev/history/README.md) và các mục "verify" cuối mỗi phần). Đừng bỏ qua vì "trông như one-liner".
 
 ## Bối cảnh: tại sao app con khác một web app thường
 
@@ -131,7 +131,7 @@ import '@sonth87/device-layout/style.css';         // CSS của library
 import '@sky-app/module-ceremony/styles.css';      // CSS của app
 ```
 
-**Why:** Tailwind v4 `@source` **không quét qua ranh giới dependency** — class runtime của library (vd `pointer-events-auto`) sẽ vắng mặt hoàn toàn trong CSS output nếu host không import CSS đã build sẵn của library, gây bug hit-test/style khó lần. Và khi 2 bundle Tailwind độc lập cùng trang, thứ tự `@layer` phải được forward-declare giống hệt nhau, nếu không `@theme` token của bên "thua" tính ra rỗng. Chi tiết: [dev/history.md](../dev/history.md) (mục "không mở được bất kỳ app nào" và `tailwind-layer-order.css`).
+**Why:** Tailwind v4 `@source` **không quét qua ranh giới dependency** — class runtime của library (vd `pointer-events-auto`) sẽ vắng mặt hoàn toàn trong CSS output nếu host không import CSS đã build sẵn của library, gây bug hit-test/style khó lần. Và khi 2 bundle Tailwind độc lập cùng trang, thứ tự `@layer` phải được forward-declare giống hệt nhau, nếu không `@theme` token của bên "thua" tính ra rỗng. Chi tiết: [dev/history/2026-07-12-giai-doan-5-ceremony-module.md](../dev/history/2026-07-12-giai-doan-5-ceremony-module.md) (mục "không mở được bất kỳ app nào" và `tailwind-layer-order.css`).
 
 ---
 
@@ -150,4 +150,4 @@ import '@sky-app/module-ceremony/styles.css';      // CSS của app
 
 - [adding-an-app.md](./adding-an-app.md) — luồng thêm app tổng thể
 - [shared-vs-per-app.md](../architecture/shared-vs-per-app.md) — ranh giới code shared/per-app
-- [dev/history.md](../dev/history.md) — nhật ký các bug CSS/theme đã gặp và cách fix
+- [dev/history/](../dev/history/README.md) — nhật ký các bug CSS/theme đã gặp và cách fix

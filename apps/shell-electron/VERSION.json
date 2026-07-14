@@ -2,6 +2,15 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.2.0",
+      "date": "2026-07-14",
+      "bump": "minor",
+      "summary": "Thêm ứng dụng TTS Studio — chọn giọng đọc, chỉnh tốc độ, nhập văn bản và tạo file âm thanh riêng, lưu lại lịch sử các bản đã tạo để nghe/tải lại.",
+      "breaking": true,
+      "minAppVersion": "0.2.0",
+      "detailsRef": "history/2026-07-14-tts-studio-app-moi.md"
+    },
+    {
       "version": "0.1.0",
       "date": "2026-07-13",
       "bump": "minor",

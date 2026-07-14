@@ -17,9 +17,36 @@
 | **MAJOR** (**0**.1.0→**1**.0.0) | Breaking change | đổi interface `AppModule`, đổi contract port, đổi format license |
 
 **Đặc thù nền tảng:**
-- Đổi **contract trong `packages/kernel`/`service-contracts`** → thường **MAJOR** (mọi app phụ thuộc). Cân nhắc kỹ, ghi [history.md](./history.md).
+- Đổi **contract trong `packages/kernel`/`service-contracts`** → thường **MAJOR** (mọi app phụ thuộc). Cân nhắc kỹ, ghi 1 file mới trong [history/](./history/README.md).
 - Thêm **app con mới** (`modules/*`) → **MINOR** của package app đó (không ảnh hưởng version core).
 - Đổi **adapter** (`platform-*`) không đổi port → **PATCH/MINOR**.
+
+## Độ chi tiết `summary` theo mức bump — BẮT BUỘC, khác nhau rõ rệt
+
+`summary` trong `VERSION.json` **không phải ghi chú nội bộ** — nó là `releaseNotes` thật hiển thị cho **người dùng cuối** trong Settings > Update (`build-renderer-bundle.mjs` đọc thẳng `entries[0].summary` làm `manifest.releaseNotes` — xem code, không phải suy đoán). Vì vậy độ chi tiết bắt buộc khác nhau theo mức bump, không viết đồng đều:
+
+| Mức | `summary` (người dùng cuối đọc trong app) | `detailsRef` (bắt buộc hay không) |
+|---|---|---|
+| **MAJOR** | 2-4 câu, giải thích rõ đổi gì + ảnh hưởng gì tới người dùng | **Bắt buộc** — trỏ tới 1 file mới trong `docs/dev/history/YYYY-MM-DD-slug.md` (bối cảnh kỹ thuật đầy đủ: tại sao, sửa gì, cân nhắc gì) |
+| **MINOR** | 1-2 câu, nêu tính năng/thay đổi chính | **Bắt buộc** — cùng cơ chế trên |
+| **PATCH** | 1 câu ngắn, kiểu "Fix lỗi X" | Không cần |
+
+**Quy tắc gộp PATCH khi build lặp nhiều lần để test cùng 1 lỗi:** vẫn bump version + thêm entry MỚI mỗi lần build (để phân biệt build nào là build nào — `bundleVersion` phải khớp đúng 1 build cụ thể, không được tái dùng). Nhưng `summary` của các entry liên tiếp cùng sửa 1 lỗi **được phép lặp lại y hệt** (vd "Fix lỗi hiển thị tên sinh viên" ở cả 3 entry PATCH liên tiếp) — không cần viết diễn giải khác nhau cho mỗi lần build nội bộ. Chỉ cần khác nhau khi thực sự là fix khác nhau.
+
+**`detailsRef`** (field mới trong entry `VERSION.json`, optional — chỉ có ở MAJOR/MINOR): string, đường dẫn tương đối từ `docs/dev/versioning.md` tới file trong `docs/dev/history/`, ví dụ `"history/2026-07-14-tts-studio-app-moi.md"`. Không hiển thị cho người dùng cuối (UI chỉ đọc `summary`) — dùng khi dev/AI cần tra lại "MINOR này thực chất đổi gì, tại sao".
+
+**Ví dụ 1 entry MAJOR/MINOR đầy đủ:**
+```json
+{
+  "version": "0.3.0",
+  "date": "2026-07-14",
+  "bump": "minor",
+  "summary": "Thêm ứng dụng TTS Studio — chọn giọng đọc, chỉnh tốc độ, nhập văn bản và tạo file âm thanh riêng, lưu lại lịch sử các bản đã tạo để nghe/tải lại.",
+  "breaking": true,
+  "minAppVersion": "0.3.0",
+  "detailsRef": "history/2026-07-14-tts-studio-app-moi.md"
+}
+```
 
 ## Quy trình (khi đã có Changesets)
 
@@ -40,9 +67,9 @@ pnpm changeset publish     # (nếu publish package)
 |---|---|---|---|
 | **version** | `package.json` mỗi package | máy/tooling | số version SemVer |
 | **CHANGELOG.md** | mỗi package (Changesets sinh) | người dùng | tính năng/fix theo góc nhìn dùng |
-| **history.md** | [dev/history.md](./history.md) | dev/AI tương lai | quyết định kỹ thuật + LÝ DO + ngày |
+| **history/** | [dev/history/](./history/README.md) | dev/AI tương lai | quyết định kỹ thuật + LÝ DO + ngày |
 
-→ Changeset mô tả **cho người dùng** (vào CHANGELOG). Quyết định kiến trúc/lý do sâu **cho dev** → ghi [history.md](./history.md). Đừng nhét lý do kỹ thuật dài vào CHANGELOG, và đừng để history.md thành changelog.
+→ Changeset mô tả **cho người dùng** (vào CHANGELOG). Quyết định kiến trúc/lý do sâu **cho dev** → tạo 1 file mới trong [history/](./history/README.md). Đừng nhét lý do kỹ thuật dài vào CHANGELOG, và đừng để history/ thành changelog.
 
 ## Version toàn nền tảng (app phân phối)
 

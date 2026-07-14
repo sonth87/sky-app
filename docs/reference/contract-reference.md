@@ -123,7 +123,8 @@ Interface trung lập môi trường; implement ở `platform-electron`/`platfor
 interface TtsPort {
   speak(text: string, opts?: SpeakOptions): Promise<void>;
   listVoices(): Promise<Voice[]>;
-  // ... (chi tiết bổ sung khi implement — port hóa dần từ window.slide.tts:*)
+  synthesizeBuffer(text: string, opts?: SpeakOptions): Promise<SynthesizeResult>; // buffer thô, không tự phát — dùng bởi tts-studio
+  getPreviewUrl(voiceId: string): Promise<string>;
 }
 interface DataPort { /* import/sync/export dữ liệu app */ }
 interface DisplayPort { /* mở/điều khiển màn phụ (Backdrop) */ }

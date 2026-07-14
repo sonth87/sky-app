@@ -1,6 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElectronPlatform } from '../create-electron-platform.js';
 
+/** Minimal AudioContext stub — node has no Web Audio API; adapters/tts.ts's
+ * playPcm() (dùng bởi speak()) chỉ cần vài method này. */
+function stubAudioContext() {
+  const source = { connect: vi.fn(), start: vi.fn(), onended: null as (() => void) | null, stop: vi.fn() };
+  const ctx = {
+    state: 'running',
+    resume: vi.fn().mockResolvedValue(undefined),
+    createBuffer: vi.fn().mockReturnValue({ copyToChannel: vi.fn() }),
+    createBufferSource: vi.fn().mockReturnValue(source),
+    destination: {},
+  };
+  vi.stubGlobal('AudioContext', vi.fn().mockImplementation(() => ctx));
+  return { ctx, source };
+}
+
 describe('createElectronPlatform', () => {
   beforeEach(() => {
     // @ts-expect-error -- test stub for the preload-exposed bridge
@@ -10,6 +25,7 @@ describe('createElectronPlatform', () => {
   afterEach(() => {
     // @ts-expect-error -- cleanup
     delete globalThis.window;
+    vi.unstubAllGlobals();
   });
 
   it('env = electron', async () => {
@@ -31,12 +47,82 @@ describe('createElectronPlatform', () => {
     expect(platform.services.has('display')).toBe(true);
   });
 
-  it('TtsPort.speak gọi window.sky.invoke đúng channel', async () => {
+  it('TtsPort.speak gọi window.slide.speak đúng tham số, phát PCM trả về', async () => {
+    stubAudioContext();
+    const pcm = new Int16Array([0, 100, -100]).buffer;
+    // @ts-expect-error -- test stub cho window.slide (bridge riêng Ceremony, adapters/tts.ts dùng trực tiếp)
+    globalThis.window.slide = {
+      speak: vi.fn().mockResolvedValue({ ok: true, buffer: pcm, sampleRate: 24000 }),
+    };
+
     const platform = await createElectronPlatform();
     const tts = platform.services.get<{ speak: (t: string, o?: unknown) => Promise<void> }>('tts')!;
-    await tts.speak('hello', { voiceId: 'v1' });
+    await tts.speak('hello', { voiceId: 'v1', speed: 1.2 });
 
-    expect(window.sky.invoke).toHaveBeenCalledWith('kernel:tts:speak', 'hello', { voiceId: 'v1' });
+    // @ts-expect-error -- test stub
+    expect(window.slide.speak).toHaveBeenCalledWith('hello', 'v1', 1.2);
+  });
+
+  it('TtsPort.synthesizeBuffer gọi window.slide.synthesizeTts, trả buffer thô KHÔNG tự phát', async () => {
+    const { ctx } = stubAudioContext();
+    const pcm = new Int16Array([1, 2, 3]).buffer;
+    // @ts-expect-error -- test stub
+    globalThis.window.slide = {
+      synthesizeTts: vi.fn().mockResolvedValue({ ok: true, buffer: pcm, sampleRate: 48000 }),
+    };
+
+    const platform = await createElectronPlatform();
+    const tts = platform.services.get<{
+      synthesizeBuffer: (t: string, o?: unknown) => Promise<{ buffer: ArrayBuffer; sampleRate: number }>;
+    }>('tts')!;
+    const result = await tts.synthesizeBuffer('xin chào', { voiceId: 'NF', speed: 1.0 });
+
+    // @ts-expect-error -- test stub
+    expect(window.slide.synthesizeTts).toHaveBeenCalledWith('xin chào', 'NF', 1.0);
+    expect(result).toEqual({ buffer: pcm, sampleRate: 48000 });
+    // Không tự phát — AudioContext không được tạo/dùng.
+    expect(ctx.createBufferSource).not.toHaveBeenCalled();
+  });
+
+  it('TtsPort.synthesizeBuffer throw khi window.slide.synthesizeTts trả lỗi', async () => {
+    // @ts-expect-error -- test stub
+    globalThis.window.slide = {
+      synthesizeTts: vi.fn().mockResolvedValue({ ok: false, error: 'boom' }),
+    };
+
+    const platform = await createElectronPlatform();
+    const tts = platform.services.get<{ synthesizeBuffer: (t: string) => Promise<unknown> }>('tts')!;
+    await expect(tts.synthesizeBuffer('hello')).rejects.toThrow('boom');
+  });
+
+  it('TtsPort.getPreviewUrl gọi window.slide.getTtsPreviewUrl', async () => {
+    // @ts-expect-error -- test stub
+    globalThis.window.slide = {
+      getTtsPreviewUrl: vi.fn().mockResolvedValue('http://127.0.0.1:8093/preview/NF'),
+    };
+
+    const platform = await createElectronPlatform();
+    const tts = platform.services.get<{ getPreviewUrl: (id: string) => Promise<string> }>('tts')!;
+    const url = await tts.getPreviewUrl('NF');
+
+    // @ts-expect-error -- test stub
+    expect(window.slide.getTtsPreviewUrl).toHaveBeenCalledWith('NF');
+    expect(url).toBe('http://127.0.0.1:8093/preview/NF');
+  });
+
+  it('TtsPort.listVoices map thêm field gender từ window.slide.listVoices', async () => {
+    // @ts-expect-error -- test stub
+    globalThis.window.slide = {
+      listVoices: vi.fn().mockResolvedValue([
+        { id: 'NF', label: 'Lan Anh', gender: 'female', region: 'Bắc', type: 'cloned', hidden: false },
+      ]),
+    };
+
+    const platform = await createElectronPlatform();
+    const tts = platform.services.get<{ listVoices: () => Promise<{ id: string; name: string; language?: string; gender?: string }[]> }>('tts')!;
+    const voices = await tts.listVoices();
+
+    expect(voices).toEqual([{ id: 'NF', name: 'Lan Anh', language: 'Bắc', gender: 'female' }]);
   });
 
   it('DisplayPort.setFullscreen gọi window.sky.invoke đúng channel', async () => {

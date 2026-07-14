@@ -7,6 +7,7 @@ import { ceremonyStore } from './data/store';
 import { syncBundle, commitImport, cancelImport, isIoBusy } from './data/sync';
 import { ceremonyDataDir, autoPlayJsonPath, piperBinPath, piperModelPath, ttsPregenWavPath, ttsPregenDir, PHOTO_DIR_NAMES, ttsPregenManifestPath, vieneuDir, resolveLocalAsset } from './data/paths';
 import { runVieneu, warmupVieneu } from './vieneu-tts';
+import { synthesizeTtsStudio } from './tts-studio';
 import { getTtsDebugInfo, getPythonStatus, getPythonPort, stopPythonServer, startPythonServer, getPythonPath } from './python-server';
 import { PreGenQueue } from './pregen-queue';
 import type { PreGenStatus, ManifestEntry } from './pregen-queue';
@@ -638,6 +639,15 @@ export function registerIpcHandlers() {
     }
 
     return result;
+  });
+
+  // ── TTS Studio (app riêng, gọi thẳng /synthesize, không cache/log/pregen) ────
+  // Tách biệt hoàn toàn khỏi hệ tts:* của Ceremony ở trên.
+  ipcMain.handle('tts-studio:synthesize', async (_e, { text, voiceId, speed }: {
+    text: string; voiceId?: string; speed?: number;
+  }) => {
+    if (!text?.trim()) return { ok: false, error: 'Empty text' };
+    return synthesizeTtsStudio(text.trim(), voiceId || 'NF', speed ?? 1.0);
   });
 
   function _saveRealtimeWav(

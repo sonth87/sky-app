@@ -6,6 +6,7 @@ export interface Voice {
   id: string;
   name: string;
   language?: string;
+  gender?: string;
 }
 
 export interface SpeakOptions {
@@ -14,7 +15,16 @@ export interface SpeakOptions {
   temperature?: number;
 }
 
+export interface SynthesizeResult {
+  buffer: ArrayBuffer;
+  sampleRate: number;
+}
+
 export interface TtsPort {
   speak(text: string, opts?: SpeakOptions): Promise<void>;
   listVoices(): Promise<Voice[]>;
+  /** Sinh audio, trả buffer thô thay vì tự phát — dùng cho app cần giữ/lưu/tải audio (vd tts-studio). */
+  synthesizeBuffer(text: string, opts?: SpeakOptions): Promise<SynthesizeResult>;
+  /** URL để nghe thử 1 giọng trước khi chọn (vd audio tag src). */
+  getPreviewUrl(voiceId: string): Promise<string>;
 }
