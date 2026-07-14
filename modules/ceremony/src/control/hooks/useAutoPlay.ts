@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { useControlStore } from '../store';
 import { useSocketRef } from '../SocketContext';
 import { useScrollContext } from '../ScrollContext';
+import { useSlide } from '../lib/slide';
 
 /**
  * Hook quản lý toàn bộ logic auto play:
@@ -13,6 +14,7 @@ import { useScrollContext } from '../ScrollContext';
  * countdown và progress được expose để AutoPlayBar hiển thị.
  */
 export function useAutoPlay() {
+  const slide = useSlide('autoplay-persistence');
   const socket = useSocketRef();
   const { scrollTo } = useScrollContext();
   const { autoPlay, setAutoPlay, scanLog, students, mode } = useControlStore();
@@ -34,19 +36,23 @@ export function useAutoPlay() {
 
   // Persist mỗi khi state thay đổi
   useEffect(() => {
-    if (!loadedRef.current) return;
+    if (!loadedRef.current || !slide) return;
     const scannedCodes = scanLogRef.current.map((e) => e.student.student_code);
-    window.slide.saveAutoPlay({
+    slide.saveAutoPlay({
       scannedCodes,
       playedCodes: autoPlay.playedCodes,
       currentCode: autoPlay.currentCode,
       delaySeconds: autoPlay.delaySeconds,
     });
-  }, [autoPlay.playedCodes, autoPlay.currentCode, autoPlay.delaySeconds, scanLog]);
+  }, [autoPlay.playedCodes, autoPlay.currentCode, autoPlay.delaySeconds, scanLog, slide]);
 
   // Load state từ đĩa khi mount
   useEffect(() => {
-    window.slide.loadAutoPlay().then((saved) => {
+    if (!slide) {
+      loadedRef.current = true;
+      return;
+    }
+    slide.loadAutoPlay().then((saved) => {
       if (!saved) {
         loadedRef.current = true;
         return;

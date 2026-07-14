@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { useControlStore } from '../store';
 import { ToolbarGroup } from './ToolbarGroup';
+import { useSlide } from '../lib/slide';
 
 export function OptionsToggle() {
   const { t } = useTranslation();
+  const slide = useSlide('slide-config');
   const showAll = useControlStore((s) => s.showAllStudents);
   const setShowAll = useControlStore((s) => s.setShowAllStudents);
   const delaySeconds = useControlStore((s) => s.delaySeconds);
@@ -17,8 +19,9 @@ export function OptionsToggle() {
     const val = parseFloat(e.target.value);
     const cleanVal = isNaN(val) ? 0 : Math.max(0, val);
     setDelaySeconds(cleanVal);
+    if (!slide) return;
     try {
-      await window.slide.updateConfig({ delay_seconds: cleanVal });
+      await slide.updateConfig({ delay_seconds: cleanVal });
     } catch (err) {
       console.error('[OptionsToggle] Failed to update delay seconds:', err);
     }
@@ -26,8 +29,9 @@ export function OptionsToggle() {
 
   const handleIdleTimeoutToggle = async (checked: boolean) => {
     setIdleTimeoutEnabled(checked);
+    if (!slide) return;
     try {
-      await window.slide.updateConfig({ idle_timeout_enabled: checked });
+      await slide.updateConfig({ idle_timeout_enabled: checked });
     } catch (err) {
       console.error('[OptionsToggle] Failed to update idle timeout enabled:', err);
     }
@@ -37,8 +41,9 @@ export function OptionsToggle() {
     const val = parseInt(e.target.value, 10);
     const cleanVal = isNaN(val) ? 1 : Math.max(1, val);
     setIdleTimeoutSeconds(cleanVal);
+    if (!slide) return;
     try {
-      await window.slide.updateConfig({ idle_timeout_seconds: cleanVal });
+      await slide.updateConfig({ idle_timeout_seconds: cleanVal });
     } catch (err) {
       console.error('[OptionsToggle] Failed to update idle timeout seconds:', err);
     }

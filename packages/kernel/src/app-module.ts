@@ -8,6 +8,30 @@ import type { EntitlementSet } from './entitlement.js';
 import type { EventBus } from './event-bus.js';
 import type { ServiceRegistry } from './service-registry.js';
 
+/**
+ * Menu bar khai báo bởi app — device-layout tự vẽ khác nhau theo platform-mode
+ * (macOS: top menu bar toàn cục; Windows/iPad: menu bar riêng dưới title bar
+ * mỗi cửa sổ; iPhone/Android: hamburger + bottom-sheet). Cấu trúc trùng
+ * device-layout's MenuBarMenu/MenuBarItem theo chủ đích (structural typing,
+ * không import ngược từ device-layout — kernel giữ độc lập, giống cách
+ * hasMenuBar/hasStatusBar bên dưới không phụ thuộc type device-layout).
+ */
+export interface AppMenuBarItem {
+  key: string;
+  label: string;
+  /** Dispatch qua CustomEvent 'app:menu:action' — xử lý trong AppModule.render qua device-layout's useMenuAction(appId, handler). */
+  action?: string;
+  shortcut?: string;
+  separator?: boolean;
+  disabled?: boolean;
+  children?: AppMenuBarItem[];
+}
+
+export interface AppMenuBarMenu {
+  label: string;
+  items: AppMenuBarItem[];
+}
+
 export interface AppWindowConfig {
   defaultSize?: { width: number; height: number };
   minSize?: { width: number; height: number };
@@ -15,6 +39,8 @@ export interface AppWindowConfig {
   hasStatusBar?: boolean;
   /** Trên theme iOS/Android của device-layout, luôn mở fullscreen */
   mobileFullscreen?: boolean;
+  /** Khai menu app-aware — xem docs guide tích hợp menu của device-layout. */
+  menuBarMenus?: AppMenuBarMenu[];
 }
 
 export interface PlatformContext {

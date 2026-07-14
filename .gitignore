@@ -36,3 +36,7 @@ apps/shell-electron/resources/
 # GĐ8 OTA Update — output electron-builder + renderer bundle publish local
 release/
 apps/shell-electron/release-renderer/
+
+# apps/data-service — bundle.json local-dev là state runtime, không commit
+# (seed lại tự động từ apps/shell-electron/sample-bundle/ khi thiếu file).
+apps/data-service/data/bundle.json

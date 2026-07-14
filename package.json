@@ -15,7 +15,7 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "changeset": "changeset",
-    "dev:electron": "turbo run dev --filter=@sky-app/shell-electron",
+    "dev:app": "turbo run dev --filter=@sky-app/shell-electron",
     "dev:web": "turbo run dev --filter=@sky-app/shell-web",
     "app:mac": "turbo run dist:mac --filter=@sky-app/shell-electron",
     "app:win": "turbo run dist:win --filter=@sky-app/shell-electron",

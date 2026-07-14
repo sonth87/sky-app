@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Toaster } from 'sonner';
-import { useStore as useDeviceLayoutStore } from '@sonth87/device-layout';
+import { useStore as useDeviceLayoutStore, useMenuAction } from '@sonth87/device-layout';
+import type { PlatformContext } from '@sky-app/kernel';
+import type { DataPort } from '@sky-app/service-contracts';
 import { useControlStore } from './store';
 import { useSocket } from './hooks/useSocket';
 import { useGlobalCardReader } from './hooks/useGlobalCardReader';
@@ -11,6 +13,8 @@ import { setupDebugInspect } from './lib/debugInspect';
 import { SocketContext } from './SocketContext';
 import { ScrollProvider } from './ScrollContext';
 import { PortalContainerContext } from './PortalContainerContext';
+import { PlatformProvider } from './PlatformContext';
+import { useSlide } from './lib/slide';
 import { buildCeremonyThemeStyle } from './theme';
 import { cn } from './lib/cn';
 import { ScanInbox } from './components/ScanInbox';
@@ -41,6 +45,18 @@ const normalizeCode = (s: string | null | undefined) => {
 
 export interface ControlAppProps {
   /**
+   * appId trong device-shell (luôn 'ceremony' trong sky-app hiện tại) — cần
+   * để subscribe device-layout's useMenuAction (menu bar app-aware, chạy cả
+   * web lẫn Electron). undefined khi ControlApp mount ngoài device-shell.
+   */
+  appId?: string;
+  /**
+   * Ports/capabilities của môi trường đang chạy (Electron/Web) — undefined
+   * khi ControlApp mount ngoài device-shell (vd test, Storybook). Component
+   * con lấy qua usePlatform() (control/PlatformContext.tsx) thay vì prop-drill.
+   */
+  platform?: PlatformContext;
+  /**
    * True khi Ceremony là app đang active/focus trong shell. Gate cho global
    * side-effect mà app không nên chạy khi ẩn/không focus: native menu action
    * (menu vẫn là của cả cửa sổ, không riêng app này) và global keyboard
@@ -49,7 +65,7 @@ export interface ControlAppProps {
   isActive?: boolean;
 }
 
-export function ControlApp({ isActive = true }: ControlAppProps = {}) {
+export function ControlApp({ appId, platform, isActive = true }: ControlAppProps = {}) {
   const { t } = useTranslation();
   const {
     ceremony, setMeta, students, setPythonStatus, logsDrawerOpen,
@@ -115,7 +131,10 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
     [socketRef, students, t],
   );
 
+  const slideForPython = useSlide('tts-python-status');
+
   useEffect(() => {
+    if (!slideForPython) return;
     let cancelled = false;
 
     // Poll liên tục cho đến khi nhận được trạng thái xác định (ready/error)
@@ -123,7 +142,7 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
     const poll = async () => {
       while (!cancelled) {
         try {
-          const s = await window.slide.getTtsStatus?.();
+          const s = await slideForPython.getTtsStatus?.();
           console.log('[ControlApp] poll getTtsStatus =>', s);
           if (s && !cancelled) {
             setPythonStatus(s.status, s.detail);
@@ -137,7 +156,7 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
     };
     poll();
 
-    const unsub = window.slide.onPythonStatus?.((payload) => {
+    const unsub = slideForPython.onPythonStatus?.((payload) => {
       setPythonStatus(payload.status, payload.detail);
     });
 
@@ -145,47 +164,68 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
       cancelled = true;
       unsub?.();
     };
-  }, [setPythonStatus]);
+  }, [setPythonStatus, slideForPython]);
+
+  const slideForMeta = useSlide('data-meta');
 
   useEffect(() => {
     setupDebugInspect();
-    window.slide.getMeta().then((meta) => {
+    // DataPort nếu môi trường có đăng ký (web → apps/data-service; Electron
+    // chưa có adapter DataPort, dùng window.slide trực tiếp — xem
+    // docs/guides/ports-and-adapters.md, DataPort chỉ build cho web).
+    const dataPort = platform?.services.get<DataPort>('data');
+    const getMeta = dataPort ? dataPort.getMeta() : slideForMeta?.getMeta();
+    getMeta?.then((raw) => {
+      const meta = raw as {
+        ceremony: unknown;
+        students: unknown;
+        syncedAt: string | null;
+        config?: { ws_port?: number; mode?: string; delay_seconds?: number; idle_timeout_enabled?: boolean; idle_timeout_seconds?: number } | null;
+        apiEnvironment?: string;
+      };
       console.log('[ControlApp] Got meta, ws_port:', meta.config?.ws_port);
       setMeta({
-        ceremony: meta.ceremony,
-        students: meta.students,
-        syncedAt: meta.syncedAt,
+        ceremony: meta.ceremony as Parameters<typeof setMeta>[0]['ceremony'],
+        students: meta.students as Parameters<typeof setMeta>[0]['students'],
+        syncedAt: meta.syncedAt ?? null,
         wsPort: meta.config?.ws_port ?? 8765,
-        mode: meta.config?.mode ?? 'manual',
+        mode: (meta.config?.mode as Parameters<typeof setMeta>[0]['mode']) ?? 'manual',
         delaySeconds: meta.config?.delay_seconds ?? 0,
         idleTimeoutEnabled: meta.config?.idle_timeout_enabled ?? false,
         idleTimeoutSeconds: meta.config?.idle_timeout_seconds ?? 60,
-        apiEnvironment: meta.apiEnvironment ?? 'prod',
+        apiEnvironment: (meta.apiEnvironment as Parameters<typeof setMeta>[0]['apiEnvironment']) ?? 'prod',
       });
 
-      // Load initial pre-gen audio files status
-      window.slide.pregenGetStatus().then((status) => {
+      // Load initial pre-gen audio files status — Electron-only (pregen queue ngoài phạm vi DataPort).
+      slideForMeta?.pregenGetStatus().then((status) => {
         useControlStore.setState({ pregenStatus: status });
       });
     });
-  }, [setMeta]);
+  }, [setMeta, platform, slideForMeta]);
+
+  const slideForLanguage = useSlide('app-language');
+  const slideForImportExport = useSlide('data-import-export');
+  const slideForMenu = useSlide('native-menu');
+  const slideForReset = useSlide('data-reset');
 
   // Báo main process ngôn ngữ hiện tại để rebuild native menu (labels App/Data/Develop/Help)
   useEffect(() => {
-    window.slide.setAppLanguage(language);
-  }, [language]);
+    slideForLanguage?.setAppLanguage(language);
+  }, [language, slideForLanguage]);
 
   const handleImportZip = useCallback(async () => {
-    const zipPath = await window.slide.openBundleFile();
+    const slide = slideForImportExport;
+    if (!slide) return;
+    const zipPath = await slide.openBundleFile();
     if (!zipPath) return;
     // Cảnh báo file nặng — nhất quán với SyncPanel.
-    const { size } = await window.slide.statBundleFile(zipPath);
+    const { size } = await slide.statBundleFile(zipPath);
     if (size >= IMPORT_WARN_SIZE) {
       if (!window.confirm(t('debugMenu.largeFileConfirm', { size: formatGB(size) }))) return;
     }
     try {
       showSuccessToast(t('debugMenu.checkingData'));
-      const result = await window.slide.syncData({ zipPath });
+      const result = await slide.syncData({ zipPath });
 
       // Import 2 pha: verify xong → hỏi xác nhận trước khi ghi đè.
       if (result.pendingConfirm) {
@@ -195,8 +235,8 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
             ? t('debugMenu.importConfirmWithErrors', { valid: p.valid, invalid: p.invalid.length, total: p.total })
             : t('debugMenu.importConfirm', { valid: p.valid, total: p.total })
         );
-        if (!ok) { await window.slide.cancelImport(); return; }
-        const committed = await window.slide.confirmImport();
+        if (!ok) { await slide.cancelImport(); return; }
+        const committed = await slide.confirmImport();
         if (committed.ok) {
           showSuccessToast(t('debugMenu.importSuccess'));
           setTimeout(() => window.location.reload(), 1000);
@@ -215,11 +255,13 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
     } catch (err) {
       alert(t('debugMenu.genericError', { message: err instanceof Error ? err.message : String(err) }));
     }
-  }, [t]);
+  }, [t, slideForImportExport]);
 
   const handleExportZip = useCallback(async () => {
+    const slide = slideForImportExport;
+    if (!slide) return;
     try {
-      const result = await window.slide.exportData();
+      const result = await slide.exportData();
       if (result.ok) {
         showSuccessToast(t('debugMenu.exportSuccess'));
       } else {
@@ -230,59 +272,69 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
     } catch (err) {
       alert(t('debugMenu.genericError', { message: err instanceof Error ? err.message : String(err) }));
     }
-  }, [t]);
+  }, [t, slideForImportExport]);
 
-  // Xử lý action từ native menu (App/Data/Develop)
+  // Xử lý action từ menu — dùng chung cho cả 2 nguồn dispatch:
+  // 1. window.slide.onMenuAction (Electron native OS menu, kênh cũ — guard qua slideForMenu).
+  // 2. device-layout's useMenuAction (app:menu:action CustomEvent, từ AppModule.window.menuBarMenus —
+  //    chạy cả web lẫn Electron, xem modules/ceremony/src/index.ts).
+  // Cả 2 dispatch cùng action string nên dùng chung 1 handler, tránh duplicate logic.
+  const handleMenuAction = useCallback((id: string) => {
+    if (!isActive) return; // menu là của cả cửa sổ — chỉ app active mới xử lý action
+    switch (id) {
+      case 'about':
+        setAboutModalOpen(true);
+        break;
+      case 'settings:general':
+        openSettingsModal('general');
+        break;
+      case 'settings:tts':
+        openSettingsModal('tts');
+        break;
+      case 'settings:variable':
+        openSettingsModal('variable');
+        break;
+      case 'settings:layout':
+        openSettingsModal('layout');
+        break;
+      case 'settings:api':
+        openSettingsModal('api');
+        break;
+      case 'settings:backup':
+        openSettingsModal('backup');
+        break;
+      case 'data:import':
+        handleImportZip();
+        break;
+      case 'data:export':
+        handleExportZip();
+        break;
+      case 'data:reset:qr':
+        setDeleteModalOpen('scans');
+        break;
+      case 'data:reset:students':
+        setDeleteModalOpen('students');
+        break;
+      case 'data:reset:cache':
+        setDeleteModalOpen('cache');
+        break;
+      case 'develop:sampleData':
+        slideForMenu?.getUseSampleData().then((val) => slideForMenu.setUseSampleData(!val).then(() => window.location.reload()));
+        break;
+      case 'develop:apiTest':
+        openSettingsModal('api');
+        break;
+    }
+  }, [isActive, handleImportZip, handleExportZip, openSettingsModal, setAboutModalOpen, setDeleteModalOpen, slideForMenu]);
+
   useEffect(() => {
-    const unsub = window.slide.onMenuAction((id) => {
-      if (!isActive) return; // menu là của cả cửa sổ — chỉ app active mới xử lý action
-      switch (id) {
-        case 'about':
-          setAboutModalOpen(true);
-          break;
-        case 'settings:general':
-          openSettingsModal('general');
-          break;
-        case 'settings:tts':
-          openSettingsModal('tts');
-          break;
-        case 'settings:variable':
-          openSettingsModal('variable');
-          break;
-        case 'settings:layout':
-          openSettingsModal('layout');
-          break;
-        case 'settings:api':
-          openSettingsModal('api');
-          break;
-        case 'settings:backup':
-          openSettingsModal('backup');
-          break;
-        case 'data:import':
-          handleImportZip();
-          break;
-        case 'data:export':
-          handleExportZip();
-          break;
-        case 'data:reset:qr':
-          setDeleteModalOpen('scans');
-          break;
-        case 'data:reset:students':
-          setDeleteModalOpen('students');
-          break;
-        case 'data:reset:cache':
-          setDeleteModalOpen('cache');
-          break;
-        case 'develop:sampleData':
-          window.slide.getUseSampleData().then((val) => window.slide.setUseSampleData(!val).then(() => window.location.reload()));
-          break;
-        case 'develop:apiTest':
-          openSettingsModal('api');
-          break;
-      }
-    });
+    const unsub = slideForMenu?.onMenuAction(handleMenuAction);
     return unsub;
-  }, [isActive, handleImportZip, handleExportZip, openSettingsModal, setAboutModalOpen, setDeleteModalOpen]);
+  }, [slideForMenu, handleMenuAction]);
+
+  // appId undefined khi ControlApp mount ngoài device-shell (test/Storybook) —
+  // useMenuAction cần 1 appId cố định, bỏ qua subscribe trong trường hợp đó.
+  useMenuAction(appId ?? '__no-app__', handleMenuAction);
 
   // Global HID card reader: detect rapid input (5+ chars in 100ms) from any source.
   // Gated by isActive — don't steal keystrokes when another app in the shell has focus.
@@ -293,6 +345,7 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
   });
 
   return (
+    <PlatformProvider value={platform}>
     <PortalContainerContext.Provider value={ceremonyRootRef}>
     <TooltipProvider>
     <ScrollProvider>
@@ -356,8 +409,9 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
           loading={resetting}
           onCancel={() => setResetConfirmOpen(false)}
           onConfirm={async () => {
+            if (!slideForReset) return;
             setResetting(true);
-            const result = await window.slide.resetData();
+            const result = await slideForReset.resetData();
             setResetting(false);
             if (result.ok) {
               alert(result.message);
@@ -376,8 +430,9 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
           countdownSeconds={10}
           onCancel={() => setDeleteModalOpen(false)}
           onConfirm={async () => {
+            if (!slideForReset) return;
             setDeleting(true);
-            const result = await window.slide.resetStudents();
+            const result = await slideForReset.resetStudents();
             setDeleting(false);
             if (result.ok) {
               showSuccessToast(t('debugMenu.deleteStudentsSuccess'));
@@ -396,8 +451,9 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
           countdownSeconds={10}
           onCancel={() => setDeleteModalOpen(false)}
           onConfirm={async () => {
+            if (!slideForReset) return;
             setDeleting(true);
-            const result = await window.slide.clearScans();
+            const result = await slideForReset.clearScans();
             setDeleting(false);
             if (result.ok) {
               showSuccessToast(t('debugMenu.deleteScansSuccess'));
@@ -416,8 +472,9 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
           countdownSeconds={10}
           onCancel={() => setDeleteModalOpen(false)}
           onConfirm={async () => {
+            if (!slideForReset) return;
             setDeleting(true);
-            const result = await window.slide.clearCache();
+            const result = await slideForReset.clearCache();
             setDeleting(false);
             if (result.ok) {
               showSuccessToast(t('debugMenu.clearCacheSuccess'));
@@ -432,5 +489,6 @@ export function ControlApp({ isActive = true }: ControlAppProps = {}) {
     </ScrollProvider>
     </TooltipProvider>
     </PortalContainerContext.Provider>
+    </PlatformProvider>
   );
 }

@@ -141,6 +141,8 @@ interface ControlState {
   ttsVoicePool: string[];
   // Điều khiển mở/đóng LogsDrawer (nhật ký hệ thống + gọi API)
   logsDrawerOpen: boolean;
+  // Chiều cao LogsDrawer (px) — kéo được qua handle ở mép trên, kiểu bottom-sheet.
+  logsDrawerHeight: number;
   // Modal About (menu native App > About)
   aboutModalOpen: boolean;
   // Modal Settings gộp (General/TTS/Variable/Layout/Api) + tab đang chọn
@@ -249,6 +251,7 @@ interface ControlState {
   setCustomVariables: (v: any[]) => void;
   setTtsVoicePool: (v: string[]) => void;
   setLogsDrawerOpen: (v: boolean) => void;
+  setLogsDrawerHeight: (v: number) => void;
   setAboutModalOpen: (v: boolean) => void;
   openSettingsModal: (tab?: SettingsTab) => void;
   setSettingsModalOpen: (v: boolean) => void;
@@ -327,6 +330,7 @@ export const useControlStore = create<ControlState>()(
   customVariables: [],
   ttsVoicePool: ['vieneu-NF', 'vieneu-NM1'],
   logsDrawerOpen: false,
+  logsDrawerHeight: 288, // = h-72 cũ, giữ nguyên trải nghiệm mặc định
   aboutModalOpen: false,
   settingsModalOpen: false,
   settingsModalTab: 'general' as SettingsTab,
@@ -433,6 +437,7 @@ export const useControlStore = create<ControlState>()(
   setCustomVariables: (customVariables) => set({ customVariables }),
   setTtsVoicePool: (ttsVoicePool) => set({ ttsVoicePool }),
   setLogsDrawerOpen: (logsDrawerOpen) => set({ logsDrawerOpen }),
+  setLogsDrawerHeight: (logsDrawerHeight) => set({ logsDrawerHeight }),
   setAboutModalOpen: (aboutModalOpen) => set({ aboutModalOpen }),
   openSettingsModal: (tab) => set({ settingsModalOpen: true, settingsModalTab: tab ?? 'general' }),
   setSettingsModalOpen: (settingsModalOpen) => set({ settingsModalOpen }),

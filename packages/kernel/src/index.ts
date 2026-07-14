@@ -17,6 +17,8 @@ export {
 export type {
   AppModule,
   AppWindowConfig,
+  AppMenuBarMenu,
+  AppMenuBarItem,
   AppContentProps,
   PlatformContext,
 } from './app-module.js';

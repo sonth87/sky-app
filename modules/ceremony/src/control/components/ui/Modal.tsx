@@ -5,17 +5,25 @@ import { cn } from '../../lib/cn';
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full' | { width: string; maxHeight?: string };
 
+// `h-[90vh]` (trước đây) tính theo viewport TRÌNH DUYỆT — sai khi Ceremony
+// chạy trong device-layout's giả lập cửa sổ (window chỉ là 1 div, không phải
+// viewport thật), khiến modal cao hơn cửa sổ và tràn ra ngoài viền. Dùng
+// `max-h-full` thay vì `h-[90vh]`: modal co theo chiều cao containing block
+// thật (backdrop's `fixed inset-0` bên dưới, đã đúng theo window content area
+// nhờ Window.tsx's transform tạo containing block cho `position: fixed`) —
+// hoạt động đúng cả khi chạy standalone Electron (containing block = viewport
+// thật, hành vi không đổi) lẫn trong device-layout (containing block = window).
 const SIZE_CLASS: Record<Exclude<ModalSize, object>, string> = {
   sm: 'w-96',
   md: 'w-[560px]',
   lg: 'w-[620px]',
-  xl: 'w-[1020px] max-w-[95%] h-[90vh]',
-  full: 'w-[1200px] max-w-[95%] h-[90vh]',
+  xl: 'w-[1020px] max-w-[95%] max-h-full',
+  full: 'w-[1200px] max-w-[95%] max-h-full',
 };
 
 const BACKDROP_CLASS: Record<'plain' | 'blur', string> = {
   plain: 'bg-black/40',
-  blur: 'bg-black/60 backdrop-blur-sm',
+  blur: 'bg-black/25 backdrop-blur-sm',
 };
 
 interface ModalProps {
@@ -65,7 +73,7 @@ export function Modal({
   return (
     <div
       className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center',
+        'fixed inset-0 z-50 flex items-center justify-center p-8',
         BACKDROP_CLASS[backdrop]
       )}
       onClick={closeOnBackdrop ? onClose : undefined}

@@ -2,9 +2,12 @@ import { createPlatformContext, createAllowAllEntitlementSet, type PlatformConte
 import { resolveEntitlementsFromPort } from '@sky-app/licensing';
 import { createWebTtsPort } from './adapters/tts.js';
 import { createWebLicensePort } from './adapters/license.js';
+import { createWebDataPort } from './adapters/data.js';
 
 export interface CreateWebPlatformOptions {
   ttsBaseUrl?: string;
+  /** apps/data-service base URL — REST backend cho DataPort (local-dev-only). */
+  dataBaseUrl?: string;
   assetUrl?: (path: string) => string;
   /**
    * Public key Ed25519 (hex) nhúng trong app — xác định entitlements nào
@@ -42,6 +45,7 @@ export async function createWebPlatform(opts: CreateWebPlatformOptions = {}): Pr
   });
 
   platform.services.register('tts', createWebTtsPort(opts.ttsBaseUrl));
+  platform.services.register('data', createWebDataPort(opts.dataBaseUrl));
 
   return platform;
 }

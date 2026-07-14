@@ -4,6 +4,7 @@ import { Globe, Plus, Trash2, Download, Upload, Save, FileText } from 'lucide-re
 import { showSuccessToast } from '../../lib/toast';
 import type { ApiIntegration } from '@sky-app/slide-shared';
 import { useControlStore } from '../../store';
+import { useSlide } from '../../lib/slide';
 
 const ACTION_OPTION_KEYS = [
   { value: 'qr_scan', key: 'qrScan' },
@@ -108,6 +109,7 @@ function getAutocompleteSuggestions(
 /** Nội dung cấu hình API/webhook tích hợp — nhúng làm 1 tab trong SettingsModal. */
 export function ApiConfigContent() {
   const { t } = useTranslation();
+  const slide = useSlide('api-integrations');
   const ACTION_OPTIONS = ACTION_OPTION_KEYS.map((opt) => ({
     value: opt.value,
     label: t(`apiConfig.actions.${opt.key}`),
@@ -141,7 +143,8 @@ export function ApiConfigContent() {
 
   // Load integrations
   useEffect(() => {
-    window.slide.getApiIntegrations().then((list) => {
+    if (!slide) return;
+    slide.getApiIntegrations().then((list) => {
       setApiIntegrations(list);
       if (list.length > 0) {
         setSelectedId(list[0].id);
@@ -152,11 +155,11 @@ export function ApiConfigContent() {
       }
     });
 
-    window.slide.hasDefaultApiIntegrations().then((hasDefault) => {
+    slide.hasDefaultApiIntegrations().then((hasDefault) => {
       setHasDefaultConfig(hasDefault);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiEnvironment]);
+  }, [apiEnvironment, slide]);
 
   // Sync selected integration to form
   useEffect(() => {
@@ -352,6 +355,7 @@ export function ApiConfigContent() {
       alert(t('apiConfig.alerts.urlRequired'));
       return;
     }
+    if (!slide) return;
 
     const itemToSave: ApiIntegration = {
       id: isEditingNew ? `api-${Date.now()}` : selectedId!,
@@ -369,7 +373,7 @@ export function ApiConfigContent() {
       nextList = apiIntegrations.map((i) => (i.id === selectedId ? itemToSave : i));
     }
 
-    const updated = await window.slide.setApiIntegrations(nextList);
+    const updated = await slide.setApiIntegrations(nextList);
     setApiIntegrations(updated);
     setSelectedId(itemToSave.id);
     setIsEditingNew(false);
@@ -379,9 +383,10 @@ export function ApiConfigContent() {
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!window.confirm(t('apiConfig.confirms.deleteConfig'))) return;
+    if (!slide) return;
 
     const nextList = apiIntegrations.filter((i) => i.id !== id);
-    const updated = await window.slide.setApiIntegrations(nextList);
+    const updated = await slide.setApiIntegrations(nextList);
     setApiIntegrations(updated);
 
     if (selectedId === id) {
@@ -411,6 +416,7 @@ export function ApiConfigContent() {
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!slide) return;
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
@@ -435,7 +441,7 @@ export function ApiConfigContent() {
             alert(t('apiConfig.alerts.duplicateActionInImport'));
             return;
           }
-          const updated = await window.slide.setApiIntegrations(parsed);
+          const updated = await slide.setApiIntegrations(parsed);
           setApiIntegrations(updated);
           if (updated.length > 0) {
             setSelectedId(updated[0].id);
@@ -455,9 +461,10 @@ export function ApiConfigContent() {
   };
 
   const handleResetToDefault = async () => {
+    if (!slide) return;
     setResetLoading(true);
     try {
-      const updated = await window.slide.resetApiIntegrationsToDefault();
+      const updated = await slide.resetApiIntegrationsToDefault();
       setApiIntegrations(updated);
       if (updated.length > 0) {
         setSelectedId(updated[0].id);

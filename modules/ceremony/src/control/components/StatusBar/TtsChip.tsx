@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info } from 'lucide-react';
+import type { SlideApi } from '@sky-app/slide-shared';
 import { useControlStore } from '../../store';
 import { useVoiceCatalog } from '../VoicePickerPopover';
+import { useSlide } from '../../lib/slide';
 import { Dot } from './Dot';
 import { StatusPopover } from './StatusPopover';
 import { StatRow } from './statusRow';
 
-type TtsDebug = Awaited<ReturnType<typeof window.slide.getTtsDebug>>;
+type TtsDebug = Awaited<ReturnType<SlideApi['getTtsDebug']>>;
 
 export function TtsChip({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
@@ -33,20 +35,24 @@ export function TtsChip({ open, onToggle }: { open: boolean; onToggle: () => voi
 
   const isUnhealthy = pythonStatus !== 'ready';
 
+  const slide = useSlide('tts-debug');
+
   const fetchDebug = async () => {
+    if (!slide) return;
     setLoadingDebug(true);
     try {
-      setDebug(await window.slide.getTtsDebug());
+      setDebug(await slide.getTtsDebug());
     } finally {
       setLoadingDebug(false);
     }
   };
 
   const handleRestart = async () => {
+    if (!slide) return;
     setRestarting(true);
     setDebug(null);
     try {
-      await window.slide.restartTts();
+      await slide.restartTts();
     } finally {
       setRestarting(false);
     }

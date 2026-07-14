@@ -4,43 +4,48 @@ import type { DisplayInfo } from '@sky-app/slide-shared';
 import type { BackdropAspectRatio } from '@sky-app/slide-shared';
 import { useControlStore } from '../store';
 import { useSocketRef } from '../SocketContext';
+import { useSlide } from '../lib/slide';
 
 const ASPECT_RATIOS: BackdropAspectRatio[] = ['16:9', '25:9'];
 
 /** Chọn màn hình + bật/tắt fullscreen + tỷ lệ khung hình cho cửa sổ Backdrop */
 export function DisplayPicker() {
   const { t } = useTranslation();
+  const slide = useSlide('backdrop-display');
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
   const backdropAspectRatio = useControlStore((s) => s.backdropAspectRatio);
   const socket = useSocketRef();
 
   useEffect(() => {
-    window.slide.listDisplays().then(setDisplays);
+    if (!slide) return;
+    slide.listDisplays().then(setDisplays);
 
     // Kiểm tra trạng thái fullscreen ban đầu
-    window.slide.isBackdropOpen().then((open) => {
+    slide.isBackdropOpen().then((open) => {
       if (open) {
-        window.slide.isBackdropFullscreen().then(setFullscreen);
+        slide.isBackdropFullscreen().then(setFullscreen);
       } else {
         setFullscreen(false);
       }
     });
 
-    const off = window.slide.onBackdropState((payload) => {
+    const off = slide.onBackdropState((payload) => {
       setFullscreen(payload.fullscreen);
     });
     return off;
-  }, []);
+  }, [slide]);
 
   async function handleMove(d: DisplayInfo) {
-    await window.slide.moveBackdrop(d.id, false);
+    if (!slide) return;
+    await slide.moveBackdrop(d.id, false);
     setFullscreen(false);
   }
 
   async function toggleFullscreen() {
+    if (!slide) return;
     const next = !fullscreen;
-    await window.slide.setBackdropFullscreen(next);
+    await slide.setBackdropFullscreen(next);
     setFullscreen(next);
   }
 

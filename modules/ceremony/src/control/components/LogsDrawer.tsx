@@ -19,6 +19,10 @@ import { useTranslation } from 'react-i18next';
 import { useControlStore } from '../store';
 import { showSuccessToast, showErrorToast } from '../lib/toast';
 import { CopyButton } from './StudentList/CopyButton';
+import { useSlide } from '../lib/slide';
+import { VerticalResizeHandle } from './VerticalResizeHandle';
+
+const MIN_HEIGHT = 180;
 
 // Dựng lệnh curl tương đương từ request đã lưu trong log (URL/method/headers/body đã interpolate thực tế).
 function buildCurlCommand(request: { url: string; method: string; headers: Record<string, string>; body?: string }): string {
@@ -34,7 +38,10 @@ function buildCurlCommand(request: { url: string; method: string; headers: Recor
 
 export function LogsDrawer() {
   const { t } = useTranslation();
+  const slide = useSlide('logs');
   const setLogsDrawerOpen = useControlStore((s) => s.setLogsDrawerOpen);
+  const logsDrawerHeight = useControlStore((s) => s.logsDrawerHeight);
+  const setLogsDrawerHeight = useControlStore((s) => s.setLogsDrawerHeight);
   const [logs, setLogs] = useState<any[]>([]);
   const [filter, setFilter] = useState<'all' | 'scan' | 'play' | 'clear' | 'api'>('all');
   const [search, setSearch] = useState('');
@@ -42,6 +49,18 @@ export function LogsDrawer() {
   const [isSubmittingLogs, setIsSubmittingLogs] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  // Kéo lên = tăng chiều cao (dy âm), kéo xuống = giảm. Max tính động theo
+  // chiều cao thật của khối cha (window-body, gồm cả chính drawer) tại thời
+  // điểm kéo — không hardcode, tự đúng theo mọi kích thước cửa sổ/resize.
+  const handleResize = (dy: number) => {
+    const parentHeight = drawerRef.current?.parentElement?.getBoundingClientRect().height;
+    // Chừa ~40px cho phần Control phía trên luôn thấy được, dù drawer có to đến đâu.
+    const maxHeight = parentHeight ? parentHeight - 40 : Infinity;
+    const current = useControlStore.getState().logsDrawerHeight;
+    setLogsDrawerHeight(Math.min(maxHeight, Math.max(MIN_HEIGHT, current - dy)));
+  };
 
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => {
@@ -54,12 +73,13 @@ export function LogsDrawer() {
 
   // Tải dữ liệu ban đầu và đăng ký listener cập nhật thực tế
   useEffect(() => {
-    window.slide.getLogs().then(setLogs);
-    const unsub = window.slide.onLogsChanged((updatedLogs) => {
+    if (!slide) return;
+    slide.getLogs().then(setLogs);
+    const unsub = slide.onLogsChanged((updatedLogs) => {
       setLogs(updatedLogs);
     });
     return unsub;
-  }, []);
+  }, [slide]);
 
   // Cuộn xuống cuối khi có log mới
   useEffect(() => {
@@ -70,8 +90,9 @@ export function LogsDrawer() {
 
   // Thử lại một dòng lỗi API
   const handleRetrySingle = async (logId: string) => {
+    if (!slide) return;
     try {
-      await window.slide.retryLog(logId);
+      await slide.retryLog(logId);
       showSuccessToast(t('logsDrawer.toast.retryingSingle'));
     } catch (err) {
       showErrorToast(t('logsDrawer.toast.retrySingleError'));
@@ -80,9 +101,10 @@ export function LogsDrawer() {
 
   // Thử lại toàn bộ
   const handleRetryAll = async () => {
+    if (!slide) return;
     setIsRetryingAll(true);
     try {
-      await window.slide.retryAllFailed();
+      await slide.retryAllFailed();
       showSuccessToast(t('logsDrawer.toast.retryingAll'));
     } catch (err) {
       showErrorToast(t('logsDrawer.toast.retryAllError'));
@@ -93,8 +115,9 @@ export function LogsDrawer() {
 
   // Xuất file txt
   const handleExport = async () => {
+    if (!slide) return;
     try {
-      const res = await window.slide.exportLogs();
+      const res = await slide.exportLogs();
       if (res.ok) {
         showSuccessToast(res.message);
       } else {
@@ -107,9 +130,10 @@ export function LogsDrawer() {
 
   // Đẩy toàn bộ log lên API
   const handleSubmitLogs = async () => {
+    if (!slide) return;
     setIsSubmittingLogs(true);
     try {
-      const success = await window.slide.submitLogs();
+      const success = await slide.submitLogs();
       if (success) {
         showSuccessToast(t('logsDrawer.toast.submitSuccess'));
       } else {
@@ -124,9 +148,10 @@ export function LogsDrawer() {
 
   // Xóa logs
   const handleClear = async () => {
+    if (!slide) return;
     if (confirm(t('logsDrawer.confirmClear'))) {
       try {
-        await window.slide.clearLogs();
+        await slide.clearLogs();
         showSuccessToast(t('logsDrawer.toast.clearSuccess'));
       } catch (err) {
         showErrorToast(t('logsDrawer.toast.clearError'));
@@ -241,7 +266,12 @@ export function LogsDrawer() {
   };
 
   return (
-    <div className="flex h-72 flex-col border-t border-border bg-muted shadow-2xl z-40">
+    <div
+      ref={drawerRef}
+      className="flex flex-col border-t border-border bg-muted shadow-2xl z-40"
+      style={{ height: logsDrawerHeight }}
+    >
+      <VerticalResizeHandle onDrag={handleResize} />
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2 select-none">
         <div className="flex items-center gap-3">

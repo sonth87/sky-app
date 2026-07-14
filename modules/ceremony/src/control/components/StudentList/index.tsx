@@ -14,6 +14,7 @@ import { RowContextMenu } from '../RowContextMenu';
 import { ResizeHandle } from './ResizeHandle';
 import { StudentDetailPopover } from './StudentDetailPopover';
 import { getRowColorClass } from './rowColor';
+import { useSlide } from '../../lib/slide';
 
 const ROW_HEIGHT = 48;
 const HEADER_HEIGHT = 32;
@@ -108,6 +109,7 @@ export function StudentList({
   headerSlot,
 }: StudentListProps) {
   const { t } = useTranslation();
+  const slide = useSlide('pregen');
   const students = useControlStore((s) => s.students);
   const scanLog = useControlStore((s) => s.scanLog);
   const onStage = useControlStore((s) => s.onStage);
@@ -918,10 +920,10 @@ export function StudentList({
             setPopoverMode('card');
           }}
           onPlayAudio={async () => {
-            const res = await window.slide.pregenGetAudio(ctxMenu.student.student_code);
-            if (res.ok && res.buffer) await playPcm(res.buffer.slice(44), 48000);
+            const res = await slide?.pregenGetAudio(ctxMenu.student.student_code);
+            if (res?.ok && res.buffer) await playPcm(res.buffer.slice(44), 48000);
           }}
-          onRegenAudio={() => window.slide.pregenRequeue(ctxMenu.student.student_code)}
+          onRegenAudio={() => slide?.pregenRequeue(ctxMenu.student.student_code)}
           onToggleAbsent={() => {
             const s = ctxMenu.student;
             const next = s.status === 'absent' ? 'registered' : 'absent';

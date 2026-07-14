@@ -1,35 +1,39 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSlide } from '../lib/slide';
 
 function useBackdropState() {
+  const slide = useSlide('backdrop-display');
   const [open, setOpen] = useState<boolean>(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    window.slide.isBackdropOpen().then((isOpen) => {
+    if (!slide) return;
+    slide.isBackdropOpen().then((isOpen) => {
       setOpen(isOpen);
       if (isOpen) {
-        window.slide.isBackdropFullscreen().then(setFullscreen);
+        slide.isBackdropFullscreen().then(setFullscreen);
       } else {
         setFullscreen(false);
       }
     });
 
-    const off = window.slide.onBackdropState((payload) => {
+    const off = slide.onBackdropState((payload) => {
       setOpen(payload.open);
       setFullscreen(payload.fullscreen);
     });
     return off;
-  }, []);
+  }, [slide]);
 
   async function toggle() {
+    if (!slide) return;
     setBusy(true);
     try {
-      const { open: nextOpen } = await window.slide.toggleBackdrop();
+      const { open: nextOpen } = await slide.toggleBackdrop();
       setOpen(nextOpen);
       if (nextOpen) {
-        const isFS = await window.slide.isBackdropFullscreen();
+        const isFS = await slide.isBackdropFullscreen();
         setFullscreen(isFS);
       } else {
         setFullscreen(false);
@@ -40,8 +44,9 @@ function useBackdropState() {
   }
 
   async function toggleFullscreen() {
+    if (!slide) return;
     const next = !fullscreen;
-    await window.slide.setBackdropFullscreen(next);
+    await slide.setBackdropFullscreen(next);
     setFullscreen(next);
   }
 

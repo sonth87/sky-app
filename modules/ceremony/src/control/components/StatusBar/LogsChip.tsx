@@ -2,20 +2,23 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useControlStore } from '../../store';
 import { Dot } from './Dot';
+import { useSlide } from '../../lib/slide';
 
 export function LogsChip() {
   const { t } = useTranslation();
+  const slide = useSlide('logs');
   const logsDrawerOpen = useControlStore((s) => s.logsDrawerOpen);
   const setLogsDrawerOpen = useControlStore((s) => s.setLogsDrawerOpen);
   const [logs, setLogs] = useState<any[]>([]);
 
   useEffect(() => {
-    window.slide.getLogs().then(setLogs);
-    const unsub = window.slide.onLogsChanged((updatedLogs) => {
+    if (!slide) return;
+    slide.getLogs().then(setLogs);
+    const unsub = slide.onLogsChanged((updatedLogs) => {
       setLogs(updatedLogs);
     });
     return unsub;
-  }, []);
+  }, [slide]);
 
   const failedCount = logs.filter((l) => l.apiStatus === 'failed').length;
   const pendingCount = logs.filter((l) => l.apiStatus === 'pending').length;

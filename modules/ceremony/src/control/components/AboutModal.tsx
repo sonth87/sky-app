@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from './ui/Modal';
+import { useSlide } from '../lib/slide';
 
 interface AboutModalProps {
   open: boolean;
@@ -9,13 +10,14 @@ interface AboutModalProps {
 
 export function AboutModal({ open, onClose }: AboutModalProps) {
   const { t } = useTranslation();
+  const slide = useSlide('about-version');
   const [version, setVersion] = useState('');
 
   useEffect(() => {
     if (open) {
-      window.slide.getAppVersion().then((v) => setVersion(v.version));
+      slide?.getAppVersion().then((v) => setVersion(v.version));
     }
-  }, [open]);
+  }, [open, slide]);
 
   return (
     <Modal open={open} onClose={onClose} size="sm">

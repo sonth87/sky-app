@@ -13,19 +13,12 @@ import { isUpdateReadyToInstall, getPendingNativeUpdateInfo } from './update-che
  * a completely different (real, Slide-specific) purpose — both bridges are
  * registered in the same ipcMain, so channel names must be globally unique.
  *
- * GĐ3 scope: mock implementations (no real TTS service or secondary
- * BrowserWindow yet — that's GĐ4-5). The point here is proving the
- * preload -> ipcMain.handle round trip works end-to-end, not real behavior.
+ * Display channels are still mock (no secondary BrowserWindow yet). TTS no
+ * longer routes through here — platform-electron's TtsPort adapter now
+ * calls window.slide directly (the real Slide-specific bridge), see
+ * packages/platform-electron/src/adapters/tts.ts.
  */
 export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
-  ipcMain.handle('kernel:tts:speak', async (_event, text: string) => {
-    console.log('[mock tts:speak]', text);
-  });
-
-  ipcMain.handle('kernel:tts:listVoices', async () => {
-    return [{ id: 'mock-voice-1', name: 'Mock Voice' }];
-  });
-
   ipcMain.handle('kernel:display:list', async () => {
     return [];
   });

@@ -4,9 +4,11 @@ import { useControlStore } from '../../store';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { Dot } from './Dot';
 import { StatusPopover } from './StatusPopover';
+import { useSlide } from '../../lib/slide';
 
 export function EnvChip({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
+  const slide = useSlide('api-integrations');
   const apiEnvironment = useControlStore((s) => s.apiEnvironment);
   const setApiEnvironment = useControlStore((s) => s.setApiEnvironment);
   const [saving, setSaving] = useState(false);
@@ -18,11 +20,11 @@ export function EnvChip({ open, onToggle }: { open: boolean; onToggle: () => voi
   };
 
   const handleConfirmChange = async () => {
-    if (!pendingEnv || saving) return;
+    if (!pendingEnv || saving || !slide) return;
 
     setSaving(true);
     try {
-      const updated = await window.slide.setApiEnvironment(pendingEnv);
+      const updated = await slide.setApiEnvironment(pendingEnv);
       setApiEnvironment(updated);
       setPendingEnv(null);
       onToggle();

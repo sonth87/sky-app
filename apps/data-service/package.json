@@ -1,0 +1,23 @@
+{
+  "name": "@sky-app/data-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "REST backend cho DataPort (web) — sync/import/export sinh viên, local-dev-only",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.1.0",
+    "@sky-app/slide-shared": "workspace:*",
+    "fastify": "^5.2.0"
+  },
+  "devDependencies": {
+    "@sky-app/tsconfig": "workspace:*",
+    "@types/node": "^20.19.20",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  }
+}

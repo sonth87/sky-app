@@ -1,8 +1,11 @@
 import { useState, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Download } from 'lucide-react';
+import type { TtsPort } from '@sky-app/service-contracts';
 import { useControlStore } from '../store';
-import { playPcm, stopPcm } from '../../lib/audio';
+import { stopPcm } from '../../lib/audio';
+import { usePlatform } from '../PlatformContext';
+import { useSlide } from '../lib/slide';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { VoicePickerRow } from './VoicePickerRow';
 import { cn } from '../lib/cn';
@@ -26,6 +29,8 @@ interface Props {
 
 export function VoicePickerPopover({ value, onChange, compact }: Props) {
   const { t } = useTranslation();
+  const platform = usePlatform();
+  const slide = useSlide('tts-preview-url');
   const [open, setOpen] = useState(false);
   const [previewStates, setPreviewStates] = useState<Record<string, PreviewState>>({});
   const stopFnRef = useRef<(() => void) | null>(null);
@@ -54,22 +59,23 @@ export function VoicePickerPopover({ value, onChange, compact }: Props) {
     const speakerId = voice.id.replace(/^vieneu-/, '');
 
     if (modelDownloaded) {
-      // Model đã tải: dùng TTS engine tổng hợp realtime, buffer là raw PCM 16-bit
+      // Model đã tải: dùng TTS engine tổng hợp realtime qua TtsPort (tự phát
+      // audio — chạy được cả Electron lẫn Web, xem docs/guides/ports-and-adapters.md).
+      const tts = platform?.services.get<TtsPort>('tts');
       try {
-        const result = await window.slide?.speak(PREVIEW_TEXT, voice.id, 1.0);
-        if (!result?.ok || !result.buffer) throw new Error(result?.error ?? 'no audio');
+        if (!tts) throw new Error('TtsPort không khả dụng');
         setPreviewStates((p) => ({ ...p, [voice.id]: 'playing' }));
-        // playPcm nhận raw PCM Int16 ArrayBuffer, sampleRate từ server (48kHz)
-        await playPcm(result.buffer, result.sampleRate ?? 48000);
+        await tts.speak(PREVIEW_TEXT, { voiceId: voice.id, speed: 1.0 });
         setPreviewStates((p) => ({ ...p, [voice.id]: 'idle' }));
         stopFnRef.current = null;
       } catch {
         setPreviewStates((p) => ({ ...p, [voice.id]: 'error' }));
       }
     } else {
-      // Model chưa tải: phát WAV mẫu bundled qua /preview endpoint
+      // Model chưa tải: phát WAV mẫu bundled qua /preview endpoint — chỉ
+      // Electron có window.slide.getTtsPreviewUrl, không có tương đương port.
       try {
-        const url = await window.slide?.getTtsPreviewUrl?.(speakerId);
+        const url = await slide?.getTtsPreviewUrl?.(speakerId);
         if (!url) throw new Error('no preview url');
         const audio = new Audio(url);
         audio.onended = () => setPreviewStates((p) => ({ ...p, [voice.id]: 'idle' }));
@@ -81,7 +87,7 @@ export function VoicePickerPopover({ value, onChange, compact }: Props) {
         setPreviewStates((p) => ({ ...p, [voice.id]: 'error' }));
       }
     }
-  }, [previewStates, stopCurrent, modelDownloaded]);
+  }, [previewStates, stopCurrent, modelDownloaded, platform, slide]);
 
   const handleSelect = (voice: VoiceInfo) => {
     if (!modelDownloaded) return; // Không cho chọn khi chưa tải

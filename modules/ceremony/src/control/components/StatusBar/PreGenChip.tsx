@@ -4,18 +4,20 @@ import { useControlStore } from '../../store';
 import { PreGenPopover } from '../PreGenPopover';
 import { Dot } from './Dot';
 import { StatusPopover } from './StatusPopover';
+import { useSlide } from '../../lib/slide';
 
 export function PreGenChip({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
+  const slide = useSlide('pregen');
   const pregenStatus = useControlStore((s) => s.pregenStatus);
 
   // Subscribe to IPC progress events and keep store in sync
   useEffect(() => {
-    const unsub = window.slide.onPregenProgress((status) => {
+    const unsub = slide?.onPregenProgress((status) => {
       useControlStore.setState({ pregenStatus: status });
-    });
+    }) ?? (() => {});
     return unsub;
-  }, []);
+  }, [slide]);
 
   if (!pregenStatus) return null;
 

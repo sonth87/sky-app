@@ -3,6 +3,7 @@ import { X, Send, Copy, Check, Terminal, Globe, Key, FileJson, Play } from 'luci
 import { useTranslation } from 'react-i18next';
 import { useControlStore } from '../store';
 import { showSuccessToast, showErrorToast } from '../lib/toast';
+import { useSlide } from '../lib/slide';
 
 interface ApiTestModalProps {
   open: boolean;
@@ -11,6 +12,7 @@ interface ApiTestModalProps {
 
 export function ApiTestModal({ open, onClose }: ApiTestModalProps) {
   const { t } = useTranslation();
+  const slide = useSlide('api-integrations');
   const awardLocationCode = useControlStore((s) => s.awardLocationCode ?? 0);
   const students = useControlStore((s) => s.students || []);
 
@@ -44,10 +46,11 @@ export function ApiTestModal({ open, onClose }: ApiTestModalProps) {
   const jsonString = JSON.stringify(payload, null, 2);
 
   const handleSend = async () => {
+    if (!slide) return;
     setIsLoading(true);
     setResponse(null);
     try {
-      const res = await window.slide.apiRequest({
+      const res = await slide.apiRequest({
         url,
         method: 'POST',
         headers: {

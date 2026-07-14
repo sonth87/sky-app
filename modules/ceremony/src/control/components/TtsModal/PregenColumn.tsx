@@ -5,6 +5,7 @@ import { translateStyle, type VoiceInfo } from '../VoicePickerPopover';
 import type { PreGenStatus } from '../../store';
 import { VoiceConditionRules } from './VoiceConditionRules';
 import { Button } from '../ui/Button';
+import { useSlide } from '../../lib/slide';
 
 interface DistributionEntry {
   id: string;
@@ -82,6 +83,7 @@ export function PregenColumn({
   getVoiceForStudent,
 }: PregenColumnProps) {
   const { t } = useTranslation();
+  const slide = useSlide('pregen');
   const renderStudentVoiceTag = (student: Student) => {
     const vId = getVoiceForStudent(student, localConditions, localModel);
     const voiceInfo = voiceCatalog.find((v) => v.id === vId);
@@ -309,11 +311,11 @@ export function PregenColumn({
         ) : (
           <div className="flex gap-2 mt-1">
             {pregenStatus.paused ? (
-              <Button variant="primary" size="md" fullWidth className="rounded-xl" onClick={() => window.slide.pregenResume()}>
+              <Button variant="primary" size="md" fullWidth className="rounded-xl" onClick={() => slide?.pregenResume()}>
                 {t('ttsModal.pregen.resume')}
               </Button>
             ) : (
-              <Button variant="secondary" size="md" fullWidth className="rounded-xl" onClick={() => window.slide.pregenPause()}>
+              <Button variant="secondary" size="md" fullWidth className="rounded-xl" onClick={() => slide?.pregenPause()}>
                 {t('ttsModal.pregen.pause')}
               </Button>
             )}

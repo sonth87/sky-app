@@ -20,6 +20,7 @@
   "dependencies": {
     "@radix-ui/react-tooltip": "^1.2.12",
     "@sky-app/kernel": "workspace:*",
+    "@sky-app/service-contracts": "workspace:*",
     "@sky-app/slide-shared": "workspace:*",
     "@sonth87/device-layout": "file:../../.vendor/sonth87-device-layout-0.1.0.tgz",
     "@tanstack/react-virtual": "^3.14.5",

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { PreGenStatus } from '../store';
 import { playPcm } from '../../lib/audio';
 import { useControlStore } from '../store';
+import { useSlide } from '../lib/slide';
 
 function removeDiacritics(str: string): string {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -33,6 +34,7 @@ interface Props {
 
 export function PreGenPopover({ status }: Props) {
   const { t } = useTranslation();
+  const slide = useSlide('pregen');
   const students = useControlStore((s) => s.students);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'done' | 'failed' | 'pending' | 'suspect'>('all');
@@ -82,10 +84,11 @@ export function PreGenPopover({ status }: Props) {
 
   async function handlePlay(studentCode: string) {
     if (playingCode === studentCode) return;
+    if (!slide) return;
     setPlayingCode(studentCode);
     try {
       console.log('[PreGenPopover] play request studentCode=', studentCode);
-      const res = await window.slide.pregenGetAudio(studentCode);
+      const res = await slide.pregenGetAudio(studentCode);
       console.log('[PreGenPopover] play response studentCode=', studentCode, 'ok=', res.ok, 'hasBuffer=', !!res.buffer, 'error=', res.error);
       if (res.ok && res.buffer) {
         console.log('[PreGenPopover] playPcm studentCode=', studentCode, 'pcmBytes=', res.buffer.slice(44).byteLength);
@@ -97,8 +100,9 @@ export function PreGenPopover({ status }: Props) {
   }
 
   async function handleRequeueSelected() {
+    if (!slide) return;
     for (const code of selected) {
-      await window.slide.pregenRequeue(code);
+      await slide.pregenRequeue(code);
     }
     setSelected(new Set());
   }
@@ -133,7 +137,7 @@ export function PreGenPopover({ status }: Props) {
           {status.running && !status.paused && (
             <button
               className="rounded border border-border bg-card px-2 py-0.5 text-xs text-foreground hover:bg-muted"
-              onClick={() => window.slide.pregenPause()}
+              onClick={() => slide?.pregenPause()}
             >
               {t('preGenPopover.pause')}
             </button>
@@ -141,7 +145,7 @@ export function PreGenPopover({ status }: Props) {
           {status.paused && (
             <button
               className="rounded border border-info/40 bg-info/10 px-2 py-0.5 text-xs text-info-foreground hover:bg-info/15"
-              onClick={() => window.slide.pregenResume()}
+              onClick={() => slide?.pregenResume()}
             >
               {t('preGenPopover.resume')}
             </button>
@@ -274,7 +278,7 @@ export function PreGenPopover({ status }: Props) {
                         {(pgSt === 'failed' || pgSt === 'done') && (
                           <button
                             title={t('preGenPopover.requeueTitle')}
-                            onClick={() => window.slide.pregenRequeue(s.student_code)}
+                            onClick={() => slide?.pregenRequeue(s.student_code)}
                             className="rounded p-1 text-muted-foreground hover:bg-muted"
                           >
                             <RefreshCw size={13} />

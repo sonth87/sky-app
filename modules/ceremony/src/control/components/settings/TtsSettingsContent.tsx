@@ -6,6 +6,7 @@ import { VoiceCloneModal } from '../VoiceCloneModal';
 import { type Student, type TtsCondition } from '@sky-app/slide-shared';
 import { ConfigColumn } from '../TtsModal/ConfigColumn';
 import { PregenColumn } from '../TtsModal/PregenColumn';
+import { useSlide } from '../../lib/slide';
 
 function getVoiceForStudentLocal(
   student: Student,
@@ -41,6 +42,7 @@ function getVoiceForStudentLocal(
 /** Nội dung cấu hình TTS + pre-generation — nhúng làm 1 tab trong SettingsModal. */
 export function TtsSettingsContent() {
   const VOICE_CATALOG = useVoiceCatalog();
+  const slide = useSlide('pregen');
   const socket = useSocketRef();
   const ttsModel = useControlStore((s) => s.ttsModel);
   const ttsSpeed = useControlStore((s) => s.ttsSpeed);
@@ -83,12 +85,12 @@ export function TtsSettingsContent() {
 
   // Subscribe pre-gen progress
   useEffect(() => {
-    const unsub = window.slide.onPregenProgress((status) => {
+    const unsub = slide?.onPregenProgress((status) => {
       useControlStore.setState({ pregenStatus: status });
-    });
+    }) ?? (() => {});
     progressListenerRef.current = unsub;
     return () => { unsub(); };
-  }, []);
+  }, [slide]);
 
   // Đóng menu thêm giọng khi click ngoài
   useEffect(() => {
@@ -143,9 +145,10 @@ export function TtsSettingsContent() {
   };
 
   const handleStartPregen = async (regenerate = false) => {
+    if (!slide) return;
     setPregenRunning(true);
     try {
-      const result = await window.slide.pregenStart({
+      const result = await slide.pregenStart({
         regenerate,
         config: {
           template: localTemplate,
@@ -168,11 +171,12 @@ export function TtsSettingsContent() {
     }
   };
 
-  const handleCancelPregen = () => window.slide.pregenCancel();
+  const handleCancelPregen = () => slide?.pregenCancel();
 
   const handleRequeueSelected = async () => {
+    if (!slide) return;
     for (const code of selectedCodes) {
-      await window.slide.pregenRequeue(code);
+      await slide.pregenRequeue(code);
     }
     setSelectedCodes(new Set());
   };

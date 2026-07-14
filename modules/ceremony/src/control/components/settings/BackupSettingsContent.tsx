@@ -5,6 +5,7 @@ import { useControlStore, type AppFont } from '../../store';
 import { useSocketRef } from '../../SocketContext';
 import { cn } from '../../lib/cn';
 import { showErrorToast, showSuccessToast } from '../../lib/toast';
+import { useSlide } from '../../lib/slide';
 import {
   buildBackupFile,
   downloadJsonFile,
@@ -25,6 +26,7 @@ const GROUP_LABELS: Record<SettingsGroupKey, string> = {
 /** Tab Backup của SettingsModal — export/import chọn lọc nhiều nhóm cấu hình cùng lúc (không phải dữ liệu sự kiện). */
 export function BackupSettingsContent() {
   const { t } = useTranslation();
+  const slide = useSlide('api-integrations');
   const socket = useSocketRef();
   const [mode, setMode] = useState<'export' | 'import'>('export');
 
@@ -48,8 +50,8 @@ export function BackupSettingsContent() {
       const state = useControlStore.getState();
       const groups: Partial<Record<SettingsGroupKey, unknown>> = {};
 
-      if (exportSelection.has('apiConfig')) {
-        groups.apiConfig = await window.slide.getApiIntegrations();
+      if (exportSelection.has('apiConfig') && slide) {
+        groups.apiConfig = await slide.getApiIntegrations();
       }
       if (exportSelection.has('customVariables')) {
         groups.customVariables = state.customVariables;
@@ -126,8 +128,8 @@ export function BackupSettingsContent() {
     if (!parsedRaw || importSelection.size === 0) return;
     setImporting(true);
     try {
-      if (importSelection.has('apiConfig') && parsedRaw.apiConfig) {
-        await window.slide.setApiIntegrations(parsedRaw.apiConfig);
+      if (importSelection.has('apiConfig') && parsedRaw.apiConfig && slide) {
+        await slide.setApiIntegrations(parsedRaw.apiConfig);
       }
       if (importSelection.has('customVariables') && parsedRaw.customVariables) {
         socket.current?.emit('cmd:setCustomVariables', { variables: parsedRaw.customVariables });

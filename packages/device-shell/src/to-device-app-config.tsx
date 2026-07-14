@@ -49,6 +49,7 @@ export function toDeviceAppConfig(app: AppModule, platform: PlatformContext): Ap
     hasMenuBar: app.window?.hasMenuBar,
     hasStatusBar: app.window?.hasStatusBar,
     mobileFullscreen: app.window?.mobileFullscreen,
+    menuBarMenus: app.window?.menuBarMenus,
     render: Bridged,
   };
 }

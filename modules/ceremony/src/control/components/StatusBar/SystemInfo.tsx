@@ -3,19 +3,22 @@ import { useTranslation } from 'react-i18next';
 import { StatusPopover } from './StatusPopover';
 import { StatRow } from './statusRow';
 import type { SystemStats } from './types';
+import { useSlide } from '../../lib/slide';
 
 export function SystemInfo() {
   const { t } = useTranslation();
+  const slide = useSlide('system-stats');
   const [stats, setStats] = useState<SystemStats | null>(null);
   const prevCpuRef = useRef<{ user: number; system: number; time: number } | null>(null);
   const [cpuPercent, setCpuPercent] = useState<number | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   useEffect(() => {
+    if (!slide) return;
     let cancelled = false;
     const fetch = async () => {
       if (cancelled) return;
-      const s = await window.slide.getSystemStats();
+      const s = await slide.getSystemStats();
       if (cancelled) return;
       setStats(s);
 
@@ -35,7 +38,7 @@ export function SystemInfo() {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+  }, [slide]);
 
   if (!stats) return <span className="px-2 text-muted-foreground">{t('statusBar.system.ramDash')}</span>;
 

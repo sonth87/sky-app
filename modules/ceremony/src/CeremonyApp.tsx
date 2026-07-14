@@ -3,10 +3,11 @@ import { ControlApp } from './control/ControlApp.js';
 
 /**
  * AppModule.render entry — bridges kernel's AppContentProps to ControlApp.
- * ControlApp itself doesn't touch PlatformContext yet (it still calls
- * window.slide directly — see docs/guides/ports-and-adapters.md's migration
- * strategy), only isActive is wired through for now.
+ * `platform` gives ControlApp access to ports (TtsPort/DataPort) registered
+ * per-environment — see docs/guides/ports-and-adapters.md's migration
+ * strategy. Methods without a port (~100, Electron-only) still go through
+ * window.slide directly, guarded via control/lib/slide.ts's useSlide().
  */
-export function CeremonyApp({ isActive }: AppContentProps) {
-  return <ControlApp isActive={isActive} />;
+export function CeremonyApp({ appId, platform, isActive }: AppContentProps) {
+  return <ControlApp appId={appId} platform={platform} isActive={isActive} />;
 }
