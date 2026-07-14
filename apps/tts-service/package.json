@@ -1,0 +1,10 @@
+{
+  "name": "@sky-app/tts-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VieNeu TTS FastAPI service — builds to standalone binary bundled in shell-electron",
+  "scripts": {
+    "build:mac": "bash build.sh",
+    "build:win": "node build-win.js"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "extends": "@sky-app/tsconfig/react-library.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    // electron/slide/* là code port nguyên vẹn từ apps/slide (repo
+    // trao-bang-tot-nghiep-2026), viết theo tsconfig.base.json gốc — có
+    // strict:true nhưng KHÔNG bật noUncheckedIndexedAccess (riêng của
+    // @sky-app/tsconfig). Tắt ở đây để giữ code port 100%, không sửa logic
+    // đã chạy production. Xem docs/dev/history.md "Giai đoạn 4".
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["src", "electron"]
+}

@@ -1,0 +1,110 @@
+# electron-builder config — GĐ8 OTA Update, Phase A (bước nền tảng).
+# Chưa code signing (chấp nhận cảnh báo "unknown publisher" của OS) —
+# xem docs/roadmap/plans/ota-update-strategy.md và Phase C của kế hoạch GĐ8.
+#
+# `pnpm dist:win`/`dist:all` (cross-compile NSIS installer Windows từ máy
+# mac) đã verify chạy được KHÔNG CẦN Wine (2026-07-13, macOS arm64,
+# electron-builder 26) — với `signAndEditExecutable: false` (không code
+# sign), electron-builder tự set icon/metadata qua thư viện JS thuần, không
+# gọi tới Wine. Nếu sau này bật code signing hoặc electron-builder đổi hành
+# vi, có thể cần Wine trở lại (`brew install --cask wine-stable`) — Apple
+# Silicon có vấn đề tương thích Wine đã biết trên 1 số phiên bản.
+#
+# LƯU Ý QUAN TRỌNG — TTS binary KHÔNG cross-compile được: `dist:mac`/
+# `dist:win`/`dist:all` (package.json) chạy `pnpm --filter tts-service
+# build:mac`/`build:win` TRƯỚC electron-builder để build vieneu-server
+# (PyInstaller) — nhưng PyInstaller đóng gói Python THỰC THI TRÊN CHÍNH OS
+# đang build, không cross-compile như electron-builder's NSIS. Trên máy
+# mac, `dist:all` chỉ chạy `build:mac` (không thể tạo vieneu-server.exe từ
+# mac) — bản .exe sinh ra vẫn hợp lệ nhưng THIẾU TTS Windows thật. Muốn có
+# bản Windows đầy đủ TTS, phải build trên máy Windows thật hoặc CI (xem
+# .github/workflows/build-shell-electron.yml, docs/dev/build-and-release.md).
+appId: com.skyapp.shell
+productName: Sky-App
+
+directories:
+  # PHẢI khác "dist" (renderer output của electron-vite) và "dist-electron"
+  # (main/preload output) để tránh electron-builder ghi đè build renderer.
+  output: release
+
+files:
+  - dist-electron/**/*
+  - dist/**/*
+  - package.json
+
+# TTS bundled resources — sinh ra bởi `pnpm --filter @sky-app/tts-service
+# build:mac`/`build:win` (chạy TRƯỚC electron-builder, xem package.json's
+# dist:mac/dist:win) vào apps/shell-electron/resources/. paths.ts/
+# python-server.ts đọc các path này qua process.resourcesPath khi packaged.
+# Không map piper/ (Piper — engine TTS cũ trước VieNeu, không còn data thật
+# trong repo) hay python-backend/ (chỉ dùng dev-mode verify engine mở rộng).
+#
+# .env: bundle để electron/slide/env.ts's loadEnv() có sẵn cấu hình mặc định
+# (DEFAULT_API_CONFIG/BUNDLE_URL/RENDERER_MANIFEST_URL...) ngay lần chạy đầu
+# mà không cần người vận hành tự thêm .env cạnh app sau khi cài (candidate
+# path #4 trong loadEnv() vẫn cho override thủ công nếu cần). File .env thật
+# không commit (gitignored) — dev tự tạo từ .env.example trước khi build.
+extraResources:
+  - from: .env
+    to: .env
+  - from: sample-bundle
+    to: sample-bundle
+  - from: resources/vn
+    to: vn
+  - from: resources/voice-ref
+    to: voice-ref
+  - from: resources/voice-previews
+    to: voice-previews
+  - from: resources/voice-registry.json
+    to: voice-registry.json
+
+mac:
+  # TODO: icon: build-assets/icons/icon.icns (chưa có asset — xem
+  # build-assets/icons/README.md). Thiếu icon → dùng icon mặc định Electron,
+  # không chặn build.
+  #
+  # zip (cạnh dmg): KHÔNG chỉ để phân phối thêm — Squirrel.Mac (cơ chế
+  # electron-updater dùng để auto-update trên macOS, xem `publish:` dưới)
+  # BẮT BUỘC định dạng .zip, không đọc .dmg trực tiếp. Chuẩn bị sẵn để
+  # không phải sửa lại config khi bật OTA Phase C. Auto-update trên mac vẫn
+  # CHƯA hoạt động được lúc này vì app chưa code-sign (Squirrel.Mac không
+  # tin cậy trên app unsigned) — xem docs/roadmap/plans/ota-update-strategy.md.
+  target:
+    - dmg
+    - zip
+  # Không code sign — user cần "right-click → Open" lần đầu để bypass Gatekeeper.
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  extraResources:
+    - from: resources/vieneu-server
+      to: vieneu-server
+
+win:
+  # TODO: icon: build-assets/icons/icon.ico (chưa có asset — xem
+  # build-assets/icons/README.md).
+  #
+  # portable: bản .exe chạy thẳng không cần cài đặt, tiện test nhanh trên
+  # máy không muốn cài. nsis vẫn là target chính cho máy hội trường (production).
+  target:
+    - nsis
+    - portable
+  # Không code sign — SmartScreen cảnh báo "Windows protected your PC",
+  # user chọn "More info → Run anyway".
+  signAndEditExecutable: false
+  extraResources:
+    - from: resources/vieneu-server.exe
+      to: vieneu-server.exe
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+# Loại 2a (GĐ8 Phase C) — electron-updater đọc publish config này để tạo
+# latest.yml/latest-mac.yml. owner/repo là placeholder, điền khi có repo
+# GitHub thật; build local (`pnpm dist`, không kèm --publish) không gọi
+# GitHub API nên placeholder không chặn Phase A/B.
+publish:
+  provider: github
+  owner: PLACEHOLDER_OWNER
+  repo: PLACEHOLDER_REPO

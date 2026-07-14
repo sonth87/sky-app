@@ -1,0 +1,50 @@
+{
+  "name": "@sky-app/shell-electron",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist-electron/main/main.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dist": "electron-vite build && electron-builder --config electron-builder.yml",
+    "dist:mac": "pnpm --filter @sky-app/tts-service build:mac && electron-vite build && electron-builder --config electron-builder.yml --mac",
+    "dist:win": "pnpm --filter @sky-app/tts-service build:win && electron-vite build && electron-builder --config electron-builder.yml --win",
+    "dist:all": "pnpm --filter @sky-app/tts-service build:mac && electron-vite build && electron-builder --config electron-builder.yml --mac --win",
+    "build:renderer-bundle": "node scripts/build-renderer-bundle.mjs"
+  },
+  "dependencies": {
+    "@sky-app/device-shell": "workspace:*",
+    "@sky-app/licensing": "workspace:*",
+    "@sky-app/module-ceremony": "workspace:*",
+    "@sky-app/module-mock-app": "workspace:*",
+    "@sky-app/platform-electron": "workspace:*",
+    "@sky-app/slide-shared": "workspace:*",
+    "@sonth87/device-layout": "file:../../.vendor/sonth87-device-layout-0.1.0.tgz",
+    "adm-zip": "^0.6.0",
+    "archiver": "^8.0.0",
+    "dotenv": "^17.4.2",
+    "electron-updater": "^6.6.2",
+    "express": "^4.22.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@sky-app/tsconfig": "workspace:*",
+    "@types/adm-zip": "^0.5.8",
+    "@types/archiver": "^8.0.0",
+    "@types/express": "^4.17.23",
+    "@types/node": "^20.19.20",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@tailwindcss/vite": "^4.3.2",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^43.1.0",
+    "electron-builder": "^26.0.20",
+    "electron-vite": "^5.0.0",
+    "tailwindcss": "^4.3.2",
+    "vite": "^7.3.6",
+    "typescript": "^5.9.3"
+  }
+}

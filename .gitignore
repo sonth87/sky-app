@@ -1,0 +1,42 @@
+node_modules/
+dist/
+dist-electron/
+dist-lib/
+coverage/
+.turbo/
+*.log
+.DS_Store
+.env
+.env.local
+*.local
+
+# Local dependency tarballs (built from external repos, e.g. device-layout).
+# Not committed — regenerate via scripts/vendor-device-layout.sh (see .vendor/README.md).
+.vendor/*.tgz
+
+# License private keys — KHÔNG BAO GIỜ commit
+*.private.pem
+license-signing-key*
+
+# apps/tts-service (Python) — venv/build tự tạo lại, không commit binary nặng
+apps/tts-service/venv/
+apps/tts-service/build/
+apps/tts-service/dist/
+__pycache__/
+*.pyc
+
+# apps/shell-electron/resources/ — THƯ MỤC ĐÍCH của build TTS (~1.2GB), KHÔNG commit.
+# Toàn bộ được sinh/copy lúc build (apps/tts-service/build.sh + build-win.js +
+# stage-models.js): vieneu/ = HF cache tải về; vn/ = staged bundle flatten symlink;
+# vieneu-server(.exe) = binary PyInstaller; voice-ref/voice-previews/voice-registry.json
+# = copy từ SOURCE thật ở apps/tts-service/resources/ (cái đó MỚI được commit).
+# Nguồn giọng thật do dev thêm nằm ở apps/tts-service/resources/, không phải đây.
+apps/shell-electron/resources/
+
+# GĐ8 OTA Update — output electron-builder + renderer bundle publish local
+release/
+apps/shell-electron/release-renderer/
+
+# apps/data-service — bundle.json local-dev là state runtime, không commit
+# (seed lại tự động từ apps/shell-electron/sample-bundle/ khi thiếu file).
+apps/data-service/data/bundle.json

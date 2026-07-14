@@ -1,0 +1,310 @@
+# History — Nhật ký kỹ thuật
+
+> Nhật ký **quyết định kỹ thuật + LÝ DO**, theo thứ tự thời gian (mới nhất trên cùng). Đây KHÔNG phải changelog (thứ đó cho người dùng, do Changesets sinh) — đây là ngữ cảnh cho **dev/AI tương lai** hiểu *vì sao* làm thế.
+>
+> **Cách ghi:** mỗi mục = ngày + tiêu đề + quyết định + lý do + (liên kết). Ghi khi có quyết định đáng kể (kiến trúc, đổi contract, chọn công nghệ, bỏ hướng đã cân nhắc).
+
+---
+
+## 2026-07-12 — Giai đoạn 7: Web parity — TtsPort + Licensing thật cho web
+
+**Bối cảnh:** GĐ1-6 đã xong đầy đủ (xác nhận qua rà soát: 13/13 typecheck sạch, 65/65 test pass, build sạch trước khi bắt đầu). Chỉ còn GĐ7 theo roadmap gốc. Trước khi code, rà soát ra 1 phát hiện quan trọng: `TtsPort` (kernel, `packages/service-contracts`) **chưa từng được nối thật ở platform nào** — kể cả Electron adapter cũng chỉ mock (`console.log`) qua `kernel:tts:*` IPC channel, hoàn toàn tách biệt với Ceremony's `window.slide.speak` (đường riêng, đã thật từ GĐ4-5). `TtsPort` dành cho app tương lai dùng TTS qua port trung lập, chưa có ai dùng — quyết định vẫn nối thật (không chỉ khung sườn) để chứng minh kiến trúc ports & adapters hoạt động đúng, không chỉ typecheck.
+
+**Phát hiện `apps/tts-service` đã là FastAPI HTTP server thật** (không phải stdin/stdout process như đoán ban đầu) — endpoint `/synthesize` (POST, trả raw PCM Int16 + header `X-Sample-Rate`), `/voices`, `/health` đã tồn tại đầy đủ, chỉ thiếu CORS (chỉ được Electron main gọi nội bộ qua `python-server.ts`, chưa bao giờ cần browser gọi thẳng).
+
+**`apps/tts-service/server/main.py`**: thêm `CORSMiddleware` (`allow_origin_regex=r"http://localhost:\d+"` — dev server đổi port ngẫu nhiên; `expose_headers` tường minh cho `X-Sample-Rate`/`X-Quality-*`, thiếu bước này JS phía client đọc header sẽ ra `null` dù server có gửi — lỗi khó debug nếu bỏ sót). Comment đầu file cảnh báo "backward compat với apps/slide, KHÔNG thay đổi" — chỉ **thêm** middleware, không đổi bất kỳ endpoint nào.
+
+**`packages/platform-web/src/adapters/tts.ts`**: viết lại hoàn toàn — endpoint đúng `/synthesize` (không phải `/speak` như khung sườn cũ đoán), body `{text, speaker_id, speed, temperature}` khớp `TtsRequest` Pydantic model thật. Response PCM Int16 → Web Audio API (`AudioContext.createBuffer` + `copyToChannel`) — port logic từ `modules/ceremony/src/lib/audio.ts`'s `playPcm` (đã verify thật ở GĐ5) nhưng viết lại độc lập, không import trực tiếp (sai hướng dependency — module không nên là dependency của platform package). `listVoices()` map `label→name`, `region→language` (voice registry thật dùng field `label`, không phải `name` như `Voice` interface).
+
+**`packages/platform-web/src/adapters/license.ts`** (mới): `createWebLicensePort` dùng `localStorage` làm `LicenseStorage` — cùng interface `packages/licensing`'s `createLicensePort` đã dùng cho Electron (file qua IPC), chỉ khác adapter cụ thể. `createWebPlatform` đổi thành `async` theo đúng cùng lý do `createElectronPlatform` đã async ở GĐ6 (verify license trước khi dock quyết định app nào bị khóa).
+
+**Gộp `DEV_LICENSE_PUBLIC_KEY_HEX` về 1 nguồn chung** (`packages/licensing/src/dev-key.ts`, export qua `index.ts`) — trước đó chỉ tồn tại trong `apps/shell-electron/src/license-config.ts`. Quyết định: 1 license cấp cho khách phải verify được ở **bất kỳ shell nào** họ dùng (Electron hôm nay, web mai sau), nên 1 nguồn chân lý duy nhất thay vì copy giá trị sang từng app (dễ lệch khi đổi key). `apps/shell-electron` xóa file cũ, import từ `@sky-app/licensing`; `apps/shell-web` import cùng nguồn.
+
+**Setup để test thật:** `apps/tts-service` cần `voice-ref/*.wav` (6 file mẫu, ~972KB) để encode giọng — trước đây chỉ tồn tại trong `userData` do Electron tự copy lúc chạy, chưa từng có trong repo nên server không tự chạy độc lập được. Copy từ repo gốc `trao-bang-tot-nghiep-2026/apps/slide/resources/voice-ref/` vào `apps/tts-service/resources/voice-ref/`, quyết định commit thẳng (972KB không đáng kể, cần thiết để server chạy được ngay sau khi clone).
+
+**Kết quả verify (Playwright, browser thật — không phải chỉ vitest mock):**
+- CORS: `curl -X OPTIONS` xác nhận `access-control-allow-origin` khớp đúng origin gửi lên qua regex.
+- TtsPort web thật: gọi trực tiếp `platform.services.get('tts')` (đúng public API app tương lai sẽ dùng, không phải tự viết lại logic) từ trong page context — `listVoices()` trả đúng 6 giọng map đúng field, `speak()` chạy thành công qua toàn bộ chuỗi CORS→fetch→PCM 48kHz thật (280KB, 2.92s cho câu tiếng Việt)→`AudioContext` thật (`state: running`), không lỗi.
+- Desktop trên web thật: mở `http://localhost:5180` — toàn bộ demo apps + Mock App hiện đúng, `tts:ready` (không còn `tts:unavailable` như trước khi nối thật), `secondary-display:no` (degrade đúng — web không có capability đó), dock kích thước mới hiển thị đúng.
+- Licensing web: 11/11 unit test pass (bao gồm case có/không license lưu trong localStorage, entitlements đúng payload). UI-level "app bị ẩn khỏi dock" dùng chung code `EntitlementGate`/`toDeviceAppConfig` đã verify kỹ ở Electron (GĐ6) — không lặp lại toàn bộ chuỗi UI vì phần khác biệt duy nhất giữa 2 platform chỉ là `LicenseStorage` adapter, đã test riêng.
+- Electron không bị phá sau khi đổi vị trí `DEV_LICENSE_PUBLIC_KEY_HEX`: license đã lưu từ trước vẫn verify đúng, Ceremony vẫn hiện trên dock.
+
+`pnpm -r run typecheck` 13/13 sạch, `pnpm -r run test` **70/70 pass** (tăng từ 65 — 2 test mock-app/kernel không đổi, +5 licensing web mới, sửa 4 test TtsPort web theo API thật), `pnpm -r run build` sạch.
+
+**Còn thiếu (để sau, không chặn gì):** chưa có license server thật (`fetchRemoteLicenseKey` vẫn optional/chưa cấp cho web, giống Electron) — theo đúng "quyết định còn mở" đã ghi từ đầu dự án. `modules/tts-studio` vẫn hoãn có chủ đích (chưa có app thứ 2 dùng TTS ngoài Ceremony's đường riêng `window.slide`). Roadmap 7 giai đoạn gốc nay đã hoàn thành đầy đủ.
+
+---
+
+## 2026-07-12 — Tinh chỉnh Wallpaper picker + fix fullscreen thật + dock size slider
+
+**Bối cảnh:** Sau khi làm xong Wallpaper Settings + true fullscreen (mục trước), người dùng review kỹ và chỉ ra 6 điểm cần sửa — toàn bộ ở `device-layout` (repo riêng), không đụng sky-app lần này.
+
+**Wallpaper picker layout:** đổi từ 2 cột (danh sách trái, detail panel phải) sang 1 cột dọc — `WallpaperDetailPanel` (preview + Fit Mode + Shuffle) lên đầu, `WallpaperSection` (Pictures/Colors/Your Photos) xếp bên dưới. `WallpaperPickerContent.tsx` bỏ hẳn cơ chế "expandedSection ẩn sibling" (trước đó Show All mở view riêng, ẩn mọi section+panel khác) — giờ `WallpaperSection` tự quản lý state `expanded` nội bộ, Show All chỉ đổi `flex-wrap` tại chỗ, mọi section luôn hiện đồng thời. Modal width thu từ 600px→420px (`w-105`) cho hợp bố cục 1 cột.
+
+**Fix "giãn cách quá" khi Colors Show All:** nguyên nhân — mỗi color swatch khi `expanded=true` không có width cố định, `flex-wrap` giãn theo `gap-3` (12px) + nội dung tự do. Fix: `gap-2` (8px) + width cố định `w-12` cho item khi expanded, `WallpaperThumb`'s `size="sm"` khi expanded+circle (dot nhỏ hơn `size="md"` bình thường) — khớp đúng mật độ lưới macOS thật.
+
+**Bug thật phát hiện khi test fullscreen — window không chiếm đủ viewport:** `Window.tsx`'s style branch cho `isFullscreen` dùng `{ position:'absolute', inset:0 }` nhưng KHÔNG reset `x`/`y`/`width`/`height` — đây là 3 giá trị đến từ Framer Motion's `useMotionValue` (`mx`/`my`/`mw`/`mh`), được set imperatively lên DOM node ngoài React's style diffing. Khi style object đổi nhánh (không còn tham chiếu `mw`/`mh`), Framer Motion KHÔNG tự dọn giá trị cũ — window giữ nguyên `width/height` của lần floating trước đó dù CSS có `inset:0`. Fix: tường minh set `x:0, y:0, width:'100%', height:'100%'` đè lên MotionValue cũ trong nhánh fullscreen. Xác nhận qua `getBoundingClientRect()` trước/sau fix (800×560 cố định → đúng bằng viewport).
+
+**Title bar cửa sổ ẩn hoàn toàn khi fullscreen:** `Window.tsx`'s điều kiện render chrome trước đó là `(isFloatingWindow || win.isMaximized)` — thiếu `&& !win.isFullScreen`, nên title bar (traffic lights) vẫn hiện dù đang fullscreen. Thêm điều kiện, đồng thời thêm nhánh render riêng: khi `win.isFullScreen`, `WindowChrome` bọc trong `motion.div` overlay tuyệt đối (không phải flex-column member — tránh đẩy nội dung xuống khi hiện), animate theo `y: fullscreenChromeRevealed ? 0 : '-100%'`.
+
+**Title bar + menu bar trượt xuống cùng lúc khi hover top:** trước đó chỉ có `MacOSTheme.tsx`'s local state `menuBarRevealed` điều khiển riêng menu bar hệ thống — `Window.tsx` không biết giá trị này nên title bar cửa sổ (nhánh mới ở trên) không đồng bộ. Nâng state lên `window-slice.ts`'s `fullscreenChromeRevealed` (ephemeral, KHÔNG persist — giống `isEditingWidgets` pattern) để cả `MacOSTheme.tsx` và `Window.tsx` đọc chung 1 nguồn. `AUTO_HIDE_DELAY_MS` 3000→1500 theo yêu cầu.
+
+**Dock size slider:** `DockItem.tsx`'s `BASE_SIZE=54`/`MAX_SIZE=80` trước là hằng số module-level — chuyển thành props `baseSize`/`maxSize` nhận từ `Dock.tsx`, đọc từ `desktop-slice.ts`'s `dockSize`(px)/`dockMagnification`(hệ số nhân, 0 = macOS's "Off"). `MAX_SIZE = dockSize * (1 + dockMagnification)`. Default `dockSize=43` (54−20%, đúng yêu cầu), `dockMagnification=0.48` (giữ tỷ lệ phóng to cũ 80/54 để hover-zoom cảm giác không đổi, chỉ base nhỏ hơn). `SettingsDesktopDock.tsx` thêm 2 slider "Size"/"Magnification" (`<input type=range>` `accent-red-500`, đúng màu macOS) ngay đầu trang, đổi 2 chiều với `Dock.tsx` qua store — kéo slider cập nhật dock thật ngay lập tức (verify qua Playwright: kéo Size→max, icon dock phóng to đúng).
+
+**Translation:** thêm `dockSize`/`dockMagnification`/`dockMagnificationOff` vào cả 6 ngôn ngữ (`en`/`vi`/`ja`/`ko`/`zh`/`th`) trong `useTranslation.ts` bằng script Python (chèn theo anchor `dockAppsDesc:` để không lệch dòng giữa các khối).
+
+**Kết quả verify (Playwright, cả Next.js dev lẫn Electron thật qua CDP)**: layout wallpaper picker mới đúng bố cục 1 cột; Colors Show All hiện lưới 11 màu gọn, "Show Less" quay lại đúng; fullscreen — window chiếm đúng 100% viewport (`1400×900` khớp chính xác viewport test), title bar+menu bar cùng trượt xuống khi hover top (y≈2, cả 2 đọc rõ), tự ẩn sau ~1.5-1.8s, Escape thoát về windowed đúng (title bar+menu bar+dock hiện lại bình thường); dock icon nhỏ hơn rõ rệt mặc định, Settings > Desktop & Dock có đủ 2 slider, kéo Size→max phóng to dock realtime. `tsc --noEmit` sạch, `pnpm build:lib` thành công, sky-app: `pnpm -r run typecheck` 13/13 sạch, `pnpm -r run test` 65/65 pass, `pnpm -r run build` sạch.
+
+---
+
+## 2026-07-12 — Wallpaper Settings kiểu macOS (Pictures/Colors/Custom + Shuffle) + fix nền trắng
+
+**Bối cảnh:** Người dùng hỏi tại sao nền desktop hiện màu trắng thay vì wallpaper. Điều tra ra **2 bug riêng biệt**: (1) `apps/shell-electron` chưa từng copy 55MB wallpaper thật của device-layout vào asset — path `/wallpapers/bg-1.jpg` 404; (2) `useImageReady.ts`'s `onerror` handler set `loadedSrc = src` giống hệt `onload` — khi ảnh lỗi, hook vẫn báo "ready", khiến `backgroundImage: url(...)` trỏ vào URL hỏng thay vì giữ màu fallback `#1e1e2e`, browser render CSS `background-image` lỗi thành khoảng trắng. `LockScreen.tsx` còn có `backgroundColor: '#fff'` hardcode riêng, cũng góp phần.
+
+Từ đó, theo yêu cầu người dùng, mở rộng thành **redesign toàn bộ Wallpaper Settings theo đúng macOS Sonoma+** (2 ảnh tham khảo người dùng cung cấp): section "Pictures" (cuộn ngang + Show All), "Colors" (chấm tròn solid), custom folder người dùng tự import + Shuffle (auto-cycle). Phạm vi đã chốt trước khi code: (1) Shuffle chỉ đổi theo khoảng thời gian cố định (5p/10p/30p/1h/2h/5h/1 ngày), KHÔNG làm Dynamic Desktop kiểu sunrise/sunset; (2) wallpaper người dùng import: Electron copy file vào `userData`, lưu path qua store persist; (3) copy đủ 55MB wallpaper thật trong lần này (không để dành).
+
+**device-layout (repo riêng) — thay đổi lớn:**
+- `types/desktop.ts`: `WallpaperConfig` thêm `kind: 'picture'|'color'|'live'` + `colorHex?`; mới `WallpaperFitMode` (fill/fit/stretch/center/tile), `WallpaperCycleConfig`/`WallpaperCycleInterval`.
+- `config/wallpapers.config.ts`: tách `WALLPAPERS` (pictures) / `LIVE_WALLPAPERS` / `WALLPAPER_COLORS` (11 màu solid mới) / `ALL_WALLPAPERS` (lookup gộp). `isLive: true` cũ đổi thành `kind: 'live'`.
+- `store/desktop-slice.ts`: thêm `wallpaperFitMode`, `customWallpapers: WallpaperConfig[]`, `wallpaperCycle: WallpaperCycleConfig` + actions — persist qua `store/index.ts`'s `partialize`.
+- **Fix `useImageReady.ts`**: tách `erroredSrc` state riêng khỏi `loadedSrc` — `onerror` không còn báo "ready" nữa, giữ đúng fallback màu khi ảnh 404.
+- Mới `hooks/useResolvedWallpaper.ts`: tìm wallpaper theo id trong cả `ALL_WALLPAPERS` lẫn `customWallpapers`, fallback về default nếu id lạ/mất (dùng chung ở `Wallpaper.tsx`+`LockScreen.tsx`, thay `.find()` rải rác từng nơi).
+- Mới `lib/wallpaper-fit.ts`: map `WallpaperFitMode` → CSS `background-size`/`repeat`/`position`.
+- Mới `lib/wallpaper-import.ts`: `WallpaperImportContext` — cho host (Electron) cấp callback "mở file picker thật", ẩn nút "Add a Photo" nếu host không cấp (ports & adapters — device-layout không tự đụng fs).
+- Mới `hooks/useWallpaperCycle.ts`: mount ở `ThemeProvider`, `setInterval` theo `wallpaperCycle` config, đổi random hoặc tuần tự trong nhóm `builtin`/`custom`.
+- Mới `components/wallpaper/`: `WallpaperThumb` (ảnh/màu/live badge dùng chung), `WallpaperSection` (1 hàng cuộn ngang + Show All, state `expanded` nâng lên cha để ẩn section khác + panel chi tiết khi 1 section mở rộng — khớp macOS, tránh nhồi grid vào cột hẹp), `WallpaperDetailPanel` (preview + dropdown Fit Mode + Shuffle config, giữ đúng bố cục ảnh macOS thật người dùng cung cấp), `WallpaperPickerContent` (kết hợp mọi section — dùng chung ở CẢ modal desktop lẫn trang Settings app, xóa `WallpaperPicker.tsx`/`SettingsWallpaper.tsx` cũ viết trùng lặp).
+- `lib.tsx`: export thêm `WallpaperConfig`/`WallpaperFitMode`/`WallpaperCycleInterval`/`WallpaperCycleConfig`/`ImportWallpaperFn`; `DeviceLayout` nhận prop `onImportWallpaper`.
+- `Wallpaper.tsx`/`LockScreen.tsx`: dùng `useResolvedWallpaper()` thay `.find()` trực tiếp, xử lý cả 3 `kind`, xóa hardcode `#fff`.
+
+**sky-app:**
+- Copy 55MB wallpaper thật (16 ảnh + 2 video live) từ device-layout vào `apps/shell-electron/public/wallpapers/` — Vite's `public/` tự serve đúng path root-relative, không cần đổi `assetBaseUrl` (giữ mặc định `''`).
+- `packages/device-shell`'s `SkyDeviceLayout` thêm prop `onImportWallpaper?: ImportWallpaperFn`, forward xuống `DeviceLayout`.
+- `apps/shell-electron/electron/main.ts`: đăng ký protocol `sky-wallpaper://` (song song `ceremony-asset://` đã có) serve ảnh từ `userData/wallpapers/`; IPC handler `kernel:wallpaper:import` — `dialog.showOpenDialog` chọn ảnh, copy vào `userData/wallpapers/`, trả `WallpaperConfig` với url `sky-wallpaper://local/<id>.<ext>`.
+- `src/main.tsx`: cấp `importWallpaper` qua `window.sky.invoke('kernel:wallpaper:import')`.
+
+**Quyết định giữ repo nhỏ — không commit đủ 55MB:** thay vì copy nguyên 16 ảnh + 2 video live (55MB) vào git, chỉ giữ **6 ảnh nhỏ nhất (9MB)**. Để làm điều này mà không đổi hành vi mặc định của device-layout (Next.js dev app cần đủ 16 ảnh), thêm cơ chế override mới ở device-layout: `lib/wallpaper-catalog.ts`'s `WallpaperCatalogContext` — mọi nơi từng import thẳng `WALLPAPERS`/`ALL_WALLPAPERS` từ `config/wallpapers.config.ts` (4 chỗ: `WallpaperPickerContent`, `useResolvedWallpaper`, `useWallpaperCycle`) đổi sang đọc qua `useWallpaperCatalog()`. `DeviceLayout` thêm prop `wallpapers?: WallpaperConfig[]` — không truyền thì dùng catalog đầy đủ mặc định (không đổi hành vi Next.js dev), sky-app truyền `apps/shell-electron/src/wallpapers.ts` (6 entry) qua `SkyDeviceLayout`'s `wallpapers` prop (forward xuống `DeviceLayout`).
+
+**Kết quả verify**: Next.js dev (device-layout) — modal picker + trang Settings > Wallpaper đều render đúng cấu trúc macOS, chọn Pictures/Colors đổi nền ngay lập tức, Show All mở đúng grid full-width, Shuffle bật hiện đúng Interval + Randomly, badge shuffle-icon hiện đúng trên item đang cycle. Electron thật (CDP) — wallpaper thật hiển thị (không còn trắng), section "Your Photos" + nút "Add a Photo" chỉ xuất hiện ở Electron (không phải Next.js dev, đúng vì chỉ Electron cấp `onImportWallpaper`), "Show All (6)" xác nhận danh sách override hoạt động đúng (không phải 16 mặc định). `tsc --noEmit` (device-layout) + `pnpm -r run typecheck` (sky-app, 13/13) sạch, `pnpm -r run test` 65/65 pass, `pnpm build:lib` + `pnpm -r run build` sạch.
+
+**Còn thiếu (để sau)**: chưa test thật việc chọn file qua native OS dialog (không tự động hóa an toàn qua Playwright — dialog OS, không phải web content) — đã xác nhận nút render đúng điều kiện + IPC channel khớp tên 2 phía, chưa chạy thử thao tác người dùng thật chọn 1 file.
+
+---
+
+## 2026-07-12 — Built-in demo apps trở lại + true macOS fullscreen trong device-layout
+
+**Bối cảnh:** Sau GĐ5-6, desktop chỉ còn Ceremony + Mock App — các app demo mặc định của device-layout (Finder, Notes, Calendar, Photos, Music, Terminal, Settings, Browser, TextEdit, Clock, Messages) đã biến mất. Điều tra: đây là hành vi thiết kế đúng, không phải bug — `ThemeProvider({ apps = APPS_CONFIG })` chỉ dùng default khi KHÔNG truyền `apps` prop; `SkyDeviceLayout` luôn truyền `apps` tường minh (chỉ AppModule đã đăng ký) nên override hoàn toàn. Quyết định: muốn có lại demo apps, mặc định bật, tắt được theo từng app hoặc tất cả, khai báo type-safe.
+
+**`packages/device-shell`**: `APPS_CONFIG` trước đây KHÔNG export từ `device-layout`'s `lib.tsx` (chỉ export types) — thêm export (xem commit riêng bên device-layout). `SkyDeviceLayout` thêm prop `builtInApps?: boolean | { exclude: BuiltInAppId[] }` — mặc định `true` (giữ đúng hành vi ThemeProvider không truyền `apps`), `false` ẩn hết, `{ exclude: [...] }` ẩn từng app theo id (autocomplete qua `BUILT_IN_APP_IDS` — 11 id liệt kê thủ công trong `built-in-apps.ts`, không có coupling runtime với device-layout, chỉ để type-safety). 3 test mới verify qua `useStore.getState().apps`.
+
+**device-layout (repo riêng): true macOS fullscreen** — nhân tiện sửa 1 gap UX macOS phát hiện khi thao tác thật: nút xanh lá (traffic light) trước gọi chung `toggleMaximize` với double-click title bar, không có khái niệm fullscreen thật (ẩn menu bar + dock, chiếm toàn viewport) như macOS. Thêm `WindowState.isFullScreen` tách biệt hẳn `isMaximized`:
+- `window-slice.ts`: `enterFullScreen`/`exitFullScreen`/`toggleFullScreen`. Zoom lúc đang fullscreen tự thoát fullscreen trước (không giữ đồng thời cả 2).
+- `WindowChrome.tsx`: nút xanh lá → `toggleFullScreen`; double-click title bar vẫn `toggleMaximize` — theo đúng macOS thật (2 hành vi khác nhau, quyết định đã hỏi trước khi làm thay vì đoán).
+- `MacOSTheme.tsx`: menu bar giờ CŨNG auto-hide (trước chỉ dock) khi có window fullscreen — hover mép trên (20px) hiện lại, tự ẩn sau 3s rời chuột. Dock auto-hide mở rộng theo cả `isMaximized` LẪN `isFullScreen` (trước chỉ maximized).
+- `Window.tsx`: Escape thoát fullscreen (không có title bar để bấm lại nút xanh lá) — chỉ áp dụng window đang `isFocused`.
+- `url-codec.ts`/`useWindowUrlSync.ts`: thêm bit 4 = fullscreen vào URL persistence.
+
+**Kết quả verify (CDP, Electron thật, cả chuỗi)**: click xanh lá → menu bar + dock biến mất, window chiếm toàn viewport → hover mép trên (y≈2) → menu bar trượt xuống đè lên nội dung → rời chuột 3.5s → tự trượt lên ẩn → Escape → về windowed đúng (title bar + menu bar + dock hiện lại bình thường). Double-click title bar (zoom) xác nhận KHÔNG ảnh hưởng menu bar (tách biệt đúng 2 hành vi).
+
+`pnpm -r run typecheck` 13/13 sạch, `pnpm -r run test` 65/65 pass (không regression), `tsc --noEmit` + `pnpm build:lib` sạch bên device-layout.
+
+---
+
+## 2026-07-12 — Giai đoạn 6 (phần 1): Licensing thật — packages/licensing + gate dock hoạt động end-to-end
+
+**Quyết định:** Chỉ làm phần Licensing của GĐ6, **hoãn `modules/tts-studio`**. Lý do: UI cấu hình TTS hiện nằm sâu trong Ceremony Control (~1.860 dòng qua 7 component, dùng chung store/socket) — tách thành module độc lập lúc này là refactor lớn dựa trên suy đoán (chỉ có 1 app dùng TTS, chưa có điểm dữ liệu thứ 2 để biết đúng ranh giới interface). Giữ nguyên trong Ceremony, tách khi có app thứ 2 thật cần dùng chung. Licensing không phụ thuộc quyết định này, có giá trị độc lập, rủi ro thấp.
+
+**`packages/licensing`** (mới) — verify Ed25519 offline theo đúng thiết kế đã chốt ở `docs/guides/licensing-entitlement.md`:
+- Dùng **`@noble/ed25519`** (không phải `node:crypto`) vì cần chạy được cả Electron renderer lẫn Web (browser không có `node:crypto`).
+- `verify.ts`: license key = `base64url(JSON payload) + "." + base64url(signature)`, verify chữ ký trên UTF-8 bytes của JSON payload (không re-serialize sau khi parse — tránh lệch nếu key order/whitespace khác giữa lúc ký và verify).
+- `license.ts`: `isPayloadValid()` tách riêng khỏi verify chữ ký — kiểm expiry + deviceBinding, nhận `now`/`deviceId` để test được (không đọc `Date.now()`/thiết bị thật ngầm).
+- `license-port.ts`: `createLicensePort()` nhận `LicenseStorage` (chỉ `read()`/`write()`) làm tham số — package không tự chạm fs/localStorage, đúng ports & adapters. `refresh()` offline-first: lỗi mạng/server hoặc license mới không hợp lệ đều fallback về license cũ đang verify được, không throw.
+- `sign.ts`: chỉ dùng phía phát hành (CLI/test) — `generateLicenseKeyPair()` + `signLicense()`.
+- 21 test (round-trip, tamper detection, wrong-key rejection, expiry, deviceBinding, storage side-effect, refresh offline-first).
+
+**Nối vào `packages/device-shell`**: `toDeviceAppConfig()` dùng `createEntitlementGate(platform.entitlements)` set `AppConfig.disabled` theo `app.entitlement`. **Phát hiện hành vi thật khác thiết kế dự kiến khi verify runtime**: guide mô tả app thiếu quyền "hiện mờ + khóa" (học gating của mfe-shell), nhưng device-layout's `IconGrid.tsx:137` (`apps.filter((a) => !a.disabled)`) **lọc bỏ hẳn** app disabled khỏi dock — không hiện mờ. Đã sửa comment/guide khớp hành vi thật thay vì sửa device-layout (repo riêng, có thể ảnh hưởng dự án khác dùng chung lib) — gate vẫn đúng chức năng (app không license không mở được), chỉ khác UX (ẩn thay vì mờ).
+
+**`createElectronPlatform` đổi thành `async`** — quyết định so 2 phương án: (A) async, verify license trước `render()`; (B) `EntitlementSet` reactive (`subscribe()`) để không chặn UI. Chọn (A): đọc + verify license là I/O file local (không gọi mạng), độ trễ không đáng kể so với các bước bootstrap Electron khác; (B) thêm độ phức tạp thật (sửa kernel contract, `useSyncExternalStore`) để giải quyết vấn đề chưa có use case cụ thể (đổi license giữa chừng không cần restart) — để dành đến khi cần thật.
+
+**Electron license storage**: renderer không có fs trực tiếp (contextIsolation) → thêm `kernel:license:read`/`kernel:license:write` IPC handler (`apps/shell-electron/electron/ipc.ts`), đọc/ghi `userData/license.key`. `packages/platform-electron/src/adapters/license.ts`'s `createElectronLicensePort()` gọi qua `window.sky.invoke` (bridge đã có từ GĐ3), dùng chung `createLicensePort()` từ `packages/licensing`.
+
+**Dev key + script cấp license**: `apps/shell-electron/src/license-config.ts` nhúng 1 **DEV public key** (ghi rõ KHÔNG phải key sản xuất thật). `scripts/gen-dev-license.mjs` ký license bằng DEV private key tương ứng — chỉ để test/dev, key sản xuất thật phải `generateLicenseKeyPair()` riêng và giữ private key ngoài repo hoàn toàn.
+
+**`ceremonyModule.entitlement = 'app.ceremony'`** — gate thật lần đầu tiên trên 1 app thật, không chỉ hạ tầng.
+
+**Kết quả verify (qua CDP, cả 3 trạng thái)**:
+- Không có `license.key` trong `userData` → Ceremony ẩn khỏi dock, Mock App (không khai entitlement) vẫn hiện.
+- License hợp lệ với `entitlements: ['app.ceremony']` → Ceremony xuất hiện lại.
+- License hợp lệ (chữ ký đúng) nhưng entitlement sai (`app.some-other-app`) → Ceremony vẫn ẩn.
+
+`pnpm -r run typecheck` 13/13 sạch, `pnpm -r run test` **62/62 pass** (14 kernel + 5 mock-app + 6 platform-web + 21 licensing + 8 platform-electron + 8 device-shell), `pnpm -r run build` sạch.
+
+**Còn thiếu (để sau)**: `modules/tts-studio` (hoãn có chủ đích, xem trên). Web (`platform-web`) chưa nối licensing thật — vẫn `entitlements: 'all'`, hợp lý vì chưa có license server (đó là việc GĐ7 web parity). Chưa có CLI cấp phát license "thật" cho khách (chỉ có dev script) — theo đúng "quyết định còn mở" đã ghi trong `docs/architecture/overview.md`.
+
+---
+
+## 2026-07-12 — Dọn nốt việc treo của Giai đoạn 5: Backdrop port + fix bug `getControlWindow` luôn null + venv Python
+
+**Quyết định:** Port nốt `modules/ceremony-backdrop`'s UI (BackdropApp.tsx, ~1.380 dòng — confetti/ribbon animation, TTS phát tên qua PCM, sync socket) — phần còn thiếu duy nhất để GĐ5 thực sự đầy đủ Control+Backdrop như plan gốc. Port dưới dạng `modules/ceremony/src/backdrop/` (không tách package riêng — dùng chung dependency với Control, chỉ khác entry point), export `BackdropApp` qua `modules/ceremony`'s `index.ts`. `apps/shell-electron` thêm entry `backdrop.html` + `src/backdrop-main.tsx` (thin wrapper mount `BackdropApp`), `electron.vite.config.ts`'s renderer chuyển sang multi-page build (`input: { index, backdrop }`).
+
+**Bug thật phát hiện khi port: `getControlWindow()` luôn trả `null`, làm im lặng mọi event backend→Control (backdrop:state, tts:*-progress, menu:action, pregen-progress...).** Nguyên nhân: `windows.ts`'s `createControlWindow()` — vốn tạo 1 BrowserWindow riêng cho Control theo kiến trúc Slide gốc — không còn được gọi từ GĐ5 trở đi (Control giờ render trong `mainWindow` qua device-layout, xem GĐ5 ở trên), nhưng 20+ chỗ trong `menu.ts`/`api-logger.ts`/`ipc.ts` vẫn gọi `getControlWindow()?.webContents.send(...)` — luôn no-op vì biến `controlWindow` chưa từng được set. Đây là kiểu bug "không throw, không log, chỉ lặng lẽ mất tính năng" — chỉ lộ ra khi port Backdrop và cố tình test `backdrop:state` sync. Fix: xóa hẳn `createControlWindow`/`controlWindow` (dead code sau GĐ5), thêm `setMainWindow()`/`getMainWindow()` trong `windows.ts`, `main.ts`'s `createMainWindow()` gọi `setMainWindow(mainWindow)` ngay sau khi tạo, rename toàn bộ `getControlWindow` → `getMainWindow` (sed 20+ call site, giữ nguyên logic — chỉ đổi nguồn window).
+
+**`apps/tts-service` thiếu `numpy`:** nguyên nhân là chạy bằng system Python (không tìm thấy venv), đúng fallback path trong `python-server.ts` (dòng ~104 `console.warn('venv not found, using system Python')`) — không phải bug, chỉ là chưa tạo venv trong sky-app (theo đúng quyết định GĐ4: không copy `venv/` 600MB từ repo gốc, chỉ copy `server/` 1MB). Fix: `python3 -m venv venv && pip install -r requirements.txt` trong `apps/tts-service/` — cài xong, Python Server log xác nhận `venv found`. **Lộ ra vấn đề khác không thuộc phạm vi lần này:** engine `vieneu` cần tải model từ HuggingFace Hub lần đầu (cache trống), lỗi `LocalEntryNotFoundError` khi không có mạng — để dành, không chặn Backdrop UI (Backdrop vẫn render đúng, chỉ phần đọc tên bằng giọng nói cần mạng lần đầu).
+
+**Kết quả verify:** Backdrop mở đúng thành 1 `BrowserWindow`/page riêng (`backdrop.html`, tách biệt `index.html`) qua nút "Bật màn hình" trong Ceremony Control — xác nhận qua CDP (`context.pages()` tăng từ 1 lên 2). DOM render đúng style Tailwind (`flex h-full w-full items-center justify-center bg-black text-white`), hiển thị "Đang tải…" đúng hành vi gốc khi chưa có dữ liệu ceremony (chưa sync/import — việc đó ngoài phạm vi lần dọn dẹp này). `pnpm -r run typecheck` 12/12 sạch, `pnpm -r run test` 34/34 pass (không regression), `pnpm -r run build` multi-entry ra đúng `dist/backdrop.html` + `dist/index.html` riêng biệt.
+
+**Còn thiếu (để sau, không chặn gì):** chưa test Backdrop với dữ liệu ceremony thật (cần bật sample data + trigger sync qua UI, không chỉ set cờ `setUseSampleData`). Model `vieneu` cần tải về khi có mạng (không phải việc code).
+
+---
+
+## 2026-07-12 — Giai đoạn 5: Ceremony UI thật thành module, mở được trong device-layout (bug hit-test xuyên suốt đã fix)
+
+**Quyết định:** Port nguyên vẹn UI Control của Ceremony (105 file, ~15.300 dòng, từ `apps/slide/src/control/` repo gốc) thành `modules/ceremony` (`@sky-app/module-ceremony`) — module thật đầu tiên có UI hiển thị trong device-layout, thay `mock-app` làm ứng dụng chính. Theo 3 quyết định đã chốt trước khi làm: localStorage key đổi hẳn sang `ceremony-control-storage` (không giữ tên cũ); global keyboard listener (card reader) + menu action handler chỉ active khi `isActive===true` (app đang focus) — implement ngay, không ghi nợ kỹ thuật; port nguyên style, chỉ sửa điểm chạm CSS khi phát hiện xung đột thật qua kiểm chứng runtime (không scope trước).
+
+**`AppContentProps` (packages/kernel) thêm field `isActive: boolean`** — biết app có đang là app focus của shell hay không, dùng để gate side-effect toàn cục (keyboard listener, native menu handler) mà app không nên chạy khi bị che khuất. `device-shell`'s `Bridged` component tính `isActive = useStore(s => s.activeAppId === appId)` từ device-layout's zustand store, cần export `useStore` mới từ `device-layout/src/lib.tsx`.
+
+**`SlideApi` tách thành `packages/slide-shared/src/slide-api.ts`** (quyết định đã hỏi, chọn cách đúng chuẩn thay vì import type xuyên workspace boundary) — toàn bộ type cho `window.slide` (86 method, các type `PreGenStatus`/`TtsConfig`/`DisplayInfo`/...) copy chính xác từ `apps/shell-electron/electron/slide/preload.ts` thật, KHÔNG đoán shape. `preload.ts` giờ `const api: SlideApi = {...}` import type từ slide-shared, re-export để giữ backward-compat cho các file `electron/slide/*` khác.
+
+**Lỗi TS4023 (Zustand middleware declaration emission) — nợ kỹ thuật từ GĐ2 lộ ra lần đầu:** build `device-layout`'s `store/index.ts` bị lỗi `WritableNonArrayDraft` không export public khi emit `.d.ts`, khiến `store/index.d.ts` thiếu hoàn toàn. Annotate type tường minh `UseBoundStore<Mutate<StoreApi<RootStore>, [['zustand/immer', never], ['zustand/persist', unknown]]>>` mới đúng — thử đơn giản hơn (`UseBoundStore<StoreApi<RootStore>>`) làm mất `.persist.hasHydrated()`. Import side-effect `zustand/middleware/immer`/`persist` bị TypeScript's declaration emitter "elide" khỏi `.d.ts` dù cần cho module augmentation — fix bằng để **consumer** (`device-shell`) tự thêm import side-effect + devDependency `zustand`+`immer`, không cố ép trong chính device-layout.
+
+**Bug lớn nhất — không mở được BẤT KỲ app nào (kể cả mock-app) sau khi CSS Tailwind hoạt động đúng:** hit-test hoàn toàn sai — mọi click/hover trên MenuBar, Dock, App icon đều bị "xuyên qua" tới lớp desktop-canvas phía dưới, xác nhận bằng CDP `DOM.getNodeForLocation` (compositor-level, không phải bug Playwright). Đã loại trừ hàng loạt giả thuyết sai: StrictMode, `backdrop-filter`+SVG filter (LiquidGlass), `contain`/`isolation`/`z-index` (kể cả set trực tiếp z-index cực cao không có tác dụng), GPU cache cũ (đã restart Electron sạch), HMR bẩn (đã full reload). **Nguyên nhân thật:** class Tailwind `pointer-events-auto` (và mọi utility khác mà device-layout dùng runtime) **hoàn toàn không tồn tại trong CSS output** — `count: 0` khi query CSSOM. Lý do gốc: Tailwind v4's `@source` chỉ quét `./control/**/*.{ts,tsx}` (code Ceremony), không bao giờ quét vào `@sonth87/device-layout` (dependency đã build sẵn trong `node_modules`) — mà `shell-electron`/`shell-web` lại **quên hẳn import `@sonth87/device-layout/style.css`** (package đã có sẵn export `"./style.css": "./dist-lib/style.css"` đúng chuẩn cho đúng tình huống này, chỉ là chưa ai dùng tới). Không có `pointer-events-auto` → mọi phần tử `pointer-events-none` (menu bar wrapper, dock wrapper, sibling-overlay của Wallpaper) chặn toàn bộ con cháu của nó khỏi hit-test, kể cả những phần tử định set lại `pointer-events-auto`. Fix: thêm `import '@sonth87/device-layout/style.css'` vào cả `shell-electron`/`shell-web`'s `main.tsx` + khai `@sonth87/device-layout` làm dependency trực tiếp của cả 2 app (trước đó chỉ có `device-shell` khai, pnpm strict node_modules chặn import xuyên tầng). **Bài học:** khi 1 published UI library dùng Tailwind v4 CSS-only config, app host BẮT BUỘC phải tự import CSS export của nó — `@source` scanning không tự động lan qua dependency boundary, kể cả khi host cũng dùng Tailwind v4.
+
+**Kết quả verify:** cả `apps/shell-electron` (qua Electron thật, CDP `connectOverCDP` + screenshot) lẫn `apps/shell-web` (qua Chromium thường) đều mở được app đúng — Ceremony hiển thị UI Control đầy đủ (toggle Auto/Manual, dropdown Hội trường, Confetti/Lan Anh/Tùy chọn, bảng sinh viên, panel sân khấu — không thấy style leak/xung đột với device-layout's theme), Mock App hiển thị đúng `isActive:yes`. `pnpm -r run build` sạch (index CSS 306.5kB — xác nhận đủ cả 2 nguồn Tailwind). `pnpm -r run typecheck` 12/12 package pass. `pnpm -r run test` 34/34 test pass (14 kernel + 5 mock-app + 5 platform-electron + 6 platform-web + 4 device-shell, có test riêng verify `isActive`).
+
+**Còn thiếu ở GĐ5 (để sau nếu cần):** `modules/ceremony-backdrop` (BrowserWindow kiosk riêng, ngoài device-layout — theo plan gốc, Backdrop tách biệt Control) chưa port, để dành khi cần dùng thật. `apps/tts-service` thiếu `numpy` trong Python venv hiện tại (lỗi khởi động server, không liên quan tới UI/style, không chặn GĐ5).
+
+---
+
+## 2026-07-11 — Giai đoạn 4: Port backend Ceremony thật vào sky-app, chạy thật (WS/HTTP/Python/window.slide)
+
+**Quyết định:** Port nguyên vẹn 19 file TypeScript (~6.500 dòng: `socket-server.ts`, `http-server.ts`, `python-server.ts`, `ipc.ts` 78 handler, `pregen-queue.ts`, `api-logger.ts`, `engine-installer.ts`, `download-task.ts`, `menu.ts`, `vieneu-tts.ts`, `windows.ts`, `session-store.ts`, `preload.ts`, `data/{paths,store,sync}.ts`, `lib/{customVariables,renderTemplate}.ts`) từ `apps/slide/electron/` (repo `trao-bang-tot-nghiep-2026`) vào `apps/shell-electron/electron/slide/`, cộng `apps/tts-service` (Python, chỉ `server/` — không copy `venv/`/`build/`/`dist/`, 1MB thay vì 600MB). Theo đúng nguyên tắc ports-and-adapters.md: **giữ nguyên bridge `window.slide`** song song `window.sky` (kernel), KHÔNG codemod 117 call-site ngay — bọc dần thành port ở GĐ5+.
+
+**Port `@trao-bang/shared/node` thành `packages/slide-shared`** (quyết định đã hỏi trước khi làm): copy nguyên `types.ts`/`socket-events.ts`/`status.ts`/`format.ts`/`constants.ts` (576 dòng) — chỉ phần `/node` (không dùng React), độc lập hoàn toàn với repo gốc từ đây.
+
+**Vấn đề gặp & fix:**
+1. **Thiếu `electron/lib/` và `windows.ts` ở lần copy đầu** — khảo sát ban đầu bỏ sót, phát hiện khi `menu.ts`/`api-logger.ts` import `./windows` không tồn tại. Bài học: khảo sát bằng agent Explore vẫn có thể sót — luôn double-check import chain thực tế khi port, không chỉ tin danh sách file đã liệt kê.
+2. **`noUncheckedIndexedAccess` (flag riêng của `@sky-app/tsconfig`, KHÔNG có trong tsconfig gốc của Slide) gây 27 lỗi type** ở code port — không phải bug logic thật, code gốc chạy đúng production với tsconfig ít nghiêm ngặt hơn. Đã hỏi người dùng, chọn **nới lỏng tsconfig cho `apps/shell-electron`** (tắt `noUncheckedIndexedAccess` toàn app, không sửa logic đã chạy thật) thay vì sửa 27 chỗ bằng `!`/guard — giữ code port nguyên vẹn 100%. `format.ts` trong `slide-shared` (package share, không phải app) vẫn sửa 1 chỗ bằng `!` có comment vì package đó cố tình giữ strict cao hơn.
+3. **`ModuleNotFoundError: numpy`** khi Python server spawn — **không phải bug**, môi trường Python (`venv/`) cố tình không copy theo kế hoạch (407MB, tự setup khi cần chạy TTS thật). Bootstrap Slide backend vẫn thành công (không throw) vì `startPythonServer` là non-blocking, không chặn các service khác.
+4. **Xung đột IPC channel: `Attempted to register a second handler for 'display:list'`** — cả `electron/ipc.ts` (kernel port, GĐ3) và `electron/slide/ipc.ts` (window.slide, GĐ4) đều dùng bare `'display:list'`/`'tts:speak'` cho 2 mục đích hoàn toàn khác nhau, cùng đăng ký vào 1 `ipcMain` global namespace. Fix: đổi channel của kernel port thành prefix `kernel:tts:*`/`kernel:display:*` (sửa `packages/platform-electron/src/adapters/{tts,display}.ts` + `apps/shell-electron/electron/ipc.ts` + test tương ứng), giữ nguyên `window.slide`'s bare `tts:*`/`display:*` (không đổi API 78-handler đã có).
+5. **Test verify script tạm (Playwright, không phải test suite chính thức) gọi tên channel cũ** sau khi đổi namespace — chỉnh script, không phải bug code.
+
+**Kết quả verify RUNTIME THẬT** (Playwright `connectOverCDP`, `electron-vite dev` thật):
+- `[SocketServer] Listening on port 8765` — Socket.IO thật, xác nhận qua `curl http://localhost:8765/socket.io/...` → 200.
+- `curl http://localhost:8080/health` → `{"ok":true}` — Express HTTP server thật.
+- `[Python Server] Khởi chạy port=8093: python3 .../apps/tts-service/server/main.py` — `findMonoRoot()` (dò `pnpm-workspace.yaml`) tự tìm đúng `apps/tts-service/server` từ vị trí mới, logic port đúng nguyên vẹn không cần sửa.
+- `window.slide.getMeta()` (bridge 78-handler thật) round-trip đúng qua IPC thật, trả `{"config":null,"ceremony":null,"students":[],...}` (rỗng vì chưa import data — đúng trạng thái ban đầu).
+- `window.sky.invoke('kernel:tts:listVoices')` (kernel port GĐ3) vẫn hoạt động bình thường, không bị ảnh hưởng bởi việc thêm backend Slide — 2 bridge độc lập cùng tồn tại.
+- **Toàn workspace: 21/21 turbo task xanh, 33/33 test pass.**
+
+**Còn thiếu ở GĐ4 (để GĐ5):** chưa mở `createControlWindow()`/`createBackdropWindow()` (Slide UI thật) — renderer chính vẫn là `SkyDeviceLayout`+`mockAppModule` từ GĐ3. `ControlApp.tsx` (React 18, UI thật của Ceremony) chưa port, chưa trở thành 1 `AppModule`. Chưa test import/sync data thật (ZIP), chưa test TTS synthesize thật (cần setup Python venv), chưa xử lý style isolation Tailwind v4 (device-layout `@theme` vs Slide `@theme` — chỉ phát sinh khi Slide UI thật được nhúng).
+
+---
+
+## 2026-07-11 — Giai đoạn 3: platform-electron + platform-web + 2 shell mỏng, chạy thật cả Electron lẫn browser
+
+**Quyết định:** Dựng `packages/platform-web`, `packages/platform-electron`, `apps/shell-web`, `apps/shell-electron` — mỗi platform implement `TtsPort` (+ `DisplayPort` cho Electron) và build `PlatformContext` với capability đúng thực tế môi trường. Mục tiêu GĐ3 theo overview.md §5: **cùng 1 `mock-app` chạy thật cả Electron lẫn Web**, không còn chỉ jsdom mock như GĐ1-2.
+
+**Đã tạo:**
+- `platform-web`: `createWebTtsPort` (fetch → `/api/tts/*`, chưa có backend thật — GĐ4+), `createWebPlatform` (capability chỉ `network`+`tts`, KHÔNG `secondary-display`/`card-reader`/`tts-local`/`keystore` — degrade đúng thiết kế).
+- `platform-electron`: `bridge-types.ts` (interface `SkyBridge` dùng chung), `createElectronTtsPort`/`createElectronDisplayPort` (gọi `window.sky.invoke(channel, ...args)` — 1 hàm generic duy nhất, không method-per-port, đúng gợi ý ports-and-adapters.md), `createElectronPlatform` (đủ 7 capability).
+- `apps/shell-web`: Vite SPA thuần, `main.tsx` render `<SkyDeviceLayout apps={[mockAppModule]} platform={createWebPlatform()}/>`.
+- `apps/shell-electron`: electron-vite app — `electron/main.ts` (BrowserWindow + `registerIpcHandlers`), `electron/ipc.ts` (mock handler cho `tts:*`/`display:*`, chứng minh round-trip chứ chưa phải backend thật), `electron/preload.ts`, `src/main.tsx`.
+
+**Chuỗi lỗi thật gặp khi verify Electron runtime (quan trọng — đọc trước khi đụng lại preload/electron-vite config):**
+1. **Version bừa lại tái diễn** (đã cảnh báo ở GĐ2 nhưng vẫn mắc): ghi `electron@^38.7.1` không tồn tại (thật `43.1.0`), `jsdom@^27` (thật `29`), `@testing-library/react@^16.3.0` thiếu patch. Bài học nhắc lại: LUÔN `npm view <pkg> version` trước khi ghi version, kể cả khi "chỉ áng chừng".
+2. **electron-vite@5 không hỗ trợ Vite 8** (peer `^5||^6||^7`). `shell-electron` phải dùng Vite 7.3.6 (không phải 8 như `shell-web`) + `@vitejs/plugin-react@5.2.0` (bản duy nhất hỗ trợ cả Vite 7 và 8, dùng chung cho cả 2 shell tránh lệch version). **2 shell KHÔNG bắt buộc cùng version Vite** — chúng độc lập, chỉ cần mỗi cái tương thích đúng tooling của nó.
+3. **`onlyBuiltDependencies` thiếu `electron`** trong `pnpm-workspace.yaml` → binary Electron không tự tải khi `pnpm install` (pnpm mặc định chặn postinstall script của dependency lạ). Thêm `electron`+`esbuild` vào `onlyBuiltDependencies`. Ngay cả sau khi thêm, **`pnpm install` không tự rebuild package đã cài trước đó** — cần `pnpm rebuild electron` hoặc chạy thẳng `node .../electron/install.js` một lần.
+4. **`electron.vite.config.ts` cần `input` tuyệt đối** (`resolve(__dirname, 'electron/main.ts')`), KHÔNG string tương đối (`'electron/main.ts'`) — string tương đối bị hiểu nhầm là bare specifier nên `externalizeDepsPlugin()` cố externalize chính entry file, lỗi "Entry module cannot be external". Xác nhận bằng cách đọc `apps/slide/electron.vite.config.ts` ở repo gốc — luôn dùng `resolve(__dirname, ...)`.
+5. **Preload extension mismatch**: khi `apps/shell-electron/package.json` có `"type": "module"`, electron-vite build preload ra `preload.mjs`, nhưng `main.ts` gọi cứng `preload.js` → preload không load, `window.sky` không tồn tại (không có lỗi rõ ràng, chỉ im lặng thiếu global).
+6. **Lỗi gốc nghiêm trọng nhất — Electron sandboxed preload KHÔNG hỗ trợ ESM `import`, kể cả file `.mjs`.** Console báo `SyntaxError: Cannot use import statement outside a module` dù extension đúng ESM — đây là giới hạn thật của `runPreloadScript`/`executeSandboxedPreloadScripts` trong Electron (không phải bug config). Fix bước 1: bỏ `"type": "module"` khỏi `shell-electron/package.json` → preload build ra CJS thật (`preload.js`, `require(...)`).
+7. **Sau khi preload là CJS, `require("@sky-app/platform-electron/preload")` vẫn fail — "module not found"`, dù `node -e "require(...)"` chạy Node thường thành công.** Kết luận: **Electron's `preloadRequire` (sandbox) có module resolver RIÊNG, không đọc `exports` field / subpath export của package.json qua pnpm symlink** như Node/Vite làm — đây là giới hạn thật, đã verify chéo (Node thường OK, chỉ Electron sandbox fail). **Giải pháp đúng, không phải workaround**: preload KHÔNG được `require`/`import` runtime code từ package ngoài qua bare specifier — bundle logic trực tiếp trong `apps/shell-electron/electron/preload.ts` (chỉ `import type` cho type-only). Đây chính xác là pattern `apps/slide/electron/preload.ts` ở repo gốc đã dùng — xác nhận bằng cách đọc file đó (`import type {...} from '@trao-bang/shared/node'`, không bao giờ import runtime).
+8. **Sau khi sửa preload, renderer lại vỡ**: Vite dev server (browser native ESM `import` qua `/@fs/...`) không đọc được named export CJS-style (`exports.createElectronPlatform = ...`) khi `platform-electron`'s package.json không có `"type"` field rõ ràng — thử `"type": "commonjs"` tường minh vẫn fail (native browser `import` trên đường dẫn `/@fs/` không tương thích CJS export dù có `__esModule` marker). **Fix đúng: trả `platform-electron` về ESM thuần** (`"type": "module"`, `tsconfig` dùng `module: ESNext` mặc định từ `react-library.json`, exports chỉ `"import"`) — khớp với `platform-web`/`kernel`/`device-shell` đã hoạt động đúng từ đầu. **Bài học tổng: một package KHÔNG thể vừa CJS (cho preload sandbox) vừa ESM (cho Vite renderer) qua cùng file `exports` map — 2 world có yêu cầu module system xung đột nhau. Giải pháp không phải "làm package dual-format", mà là tách: preload luôn viết logic in-app (không import runtime từ package khác); mọi package renderer-facing dùng ESM thuần nhất quán.**
+
+**Kết quả verify runtime thật (không phải chỉ build/typecheck):**
+- **shell-web**: dùng Playwright + Chrome hệ thống (`chromium.launch({executablePath: ...})`) kết nối `vite dev` thật. Xác nhận: desktop render (53KB), click mở Mock App window, `data-env="web"`, `tts:ready` (adapter fetch đã register), KHÔNG có request lỗi.
+- **shell-electron**: `env -u ELECTRON_RUN_AS_NODE electron-vite dev -- --remote-debugging-port=9333`, Playwright `chromium.connectOverCDP(...)` bắt vào renderer world thật của app Electron đang chạy (không phải Chrome giả). Xác nhận: desktop render, mở Mock App, `data-env="electron"`, **`secondary-display:yes`** (khác web `:no` — capability degrade logic đúng), và **IPC round-trip thật**: `window.sky.invoke('tts:listVoices')` → preload → `ipcMain.handle` trong `electron/ipc.ts` → trả đúng `[{"id":"mock-voice-1","name":"Mock Voice"}]`.
+- Thêm test còn thiếu cho `platform-web`/`platform-electron` (vitest coi "0 test file" là lỗi, không phải pass) — capability đúng theo môi trường, port đăng ký đúng, gọi đúng channel/endpoint.
+- **Toàn workspace: 19/19 turbo task xanh, 33/33 test pass** (14 kernel + 6 platform-web + 5 platform-electron + 5 mock-app + 3 device-shell).
+
+**Còn thiếu ở GĐ3 (để GĐ4+):** IPC handler trong `apps/shell-electron/electron/ipc.ts` toàn mock (chưa nối TTS Python service/window quản lý thật — đó là GĐ4-5). Chưa build production (`electron-vite build`) — mới verify dev mode. Chưa test `shell-web`/`shell-electron` tự động hoá trong CI (verify lần này làm thủ công qua Playwright script tạm, không phải test suite cố định).
+
+---
+
+## 2026-07-11 — Giai đoạn 2: device-layout thành lib + device-shell nối kernel, verify xanh
+
+**Quyết định:** Refactor repo `device-layout` (riêng, `~/PROJECTS/device-layout`) để nó xuất bản một pipeline build **song song** với Next.js hiện có (giữ Next chạy y hệt), tạo `packages/device-shell` trong sky-app import bản build đó dạng dependency (tarball local, không submodule/copy source — đúng quyết định đã chốt).
+
+**Thay đổi ở device-layout (2 commit: `7eee5b3` feat, `0f89f2f` fix):**
+- `src/types/app.ts`: `AppConfig.component` chuyển thành optional, thêm `render?: ComponentType<AppContentProps>` — app ngoài truyền thẳng component, không cần đăng ký vào `APP_COMPONENTS` registry nội bộ. `AppContentProps` chuyển từ định nghĩa cục bộ trong `AppRegistry.tsx` sang nguồn chung ở `types/app.ts`.
+- `AppRegistry.tsx`: `AppContent` ưu tiên `appConfig.render` nếu có, fallback logic cũ nếu không — additive, không phá app built-in (Finder/Terminal/...).
+- `ThemeProvider.tsx`: nhận `apps?: AppConfig[]` qua prop, default `= APPS_CONFIG` — Next.js gọi `<ThemeProvider />` không tham số vẫn y hệt hành vi cũ; host lib truyền danh sách riêng.
+- `src/lib/asset-base.ts` (mới): `AssetBaseProvider`/`useAssetBase`/`resolveAssetUrl` — cho phép override base URL wallpaper/icon, default `''` (giữ path tuyệt đối `/wallpapers/...` như Next hiện tại). Áp dụng ở `Wallpaper.tsx` + `LockScreen.tsx`.
+- `Taskbar.tsx`: `next/image` → `<img>` (chỉ 28x28 icon, mất tối ưu không đáng kể) — cần thiết vì file này nằm trong lõi component mà lib import, `next/image` cần Next.js server không tồn tại trong Vite build.
+- `src/lib.tsx` (mới): entry lib, export `<DeviceLayout>` (đổi tên public từ `ThemeProvider`) + types cần thiết. KHÔNG import gì từ `src/app/` — 2 pipeline hoàn toàn tách biệt.
+- `vite.config.ts` (mới): `build.lib` → `dist-lib/` (ESM + `.d.ts` qua `vite-plugin-dts` + CSS qua `@tailwindcss/vite`). **`publicDir: false` bắt buộc** — mặc định Vite copy nguyên `public/` (wallpaper jpg + live-wallpaper mp4, hàng chục MB) vào output, phình gói từ 1.5MB lên 56MB; host tự cấp asset qua `assetBaseUrl`.
+- `tsconfig.json`/`tsconfig.node.json`: loại `vite.config.ts` khỏi phạm vi typecheck Next (tránh Next `tsc` báo lỗi field lạ của config Vite — 2 pipeline, 2 tsconfig).
+
+**Lỗi gặp khi dựng vite-plugin-dts:** dùng nhầm field cũ (`outDir` thay vì `outDirs`, và `rollupTypes` không tồn tại trong `unplugin-dts` v5 — API đổi giữa các major). Fix bằng cách đọc trực tiếp `.d.mts` của package đã cài thay vì đoán từ tài liệu/trí nhớ.
+
+**Thay đổi ở sky-app:** `packages/device-shell` mới — `to-device-app-config.tsx` (bridge `AppModule` kernel → `AppConfig` device-layout, tiêm `platform: PlatformContext` vào component con qua closure vì `AppConfig.render` chỉ nhận `{appId, windowId}`), `SkyDeviceLayout.tsx` (component chính sky-app render). Cài `@sonth87/device-layout` qua `file:../../.vendor/*.tgz` — script `scripts/vendor-device-layout.sh` build + pack device-layout, `.vendor/*.tgz` gitignored (không commit binary từ repo khác).
+
+**Bug nghiêm trọng phát hiện & fix: trùng phiên bản React.** `device-shell` test báo "Invalid hook call" — nguyên nhân: `kernel`/`mock-app` ghim `react@^19.2.4`, package khác resolve `19.2.7` mới nhất → 2 bundle React khác nhau cùng tồn tại trong `node_modules/.pnpm`, component từ bundle A gọi hook trong cây bundle B thì vỡ. Đây là bẫy kinh điển của monorepo dùng React làm peer dep — fix bằng `pnpm.overrides` ở root `package.json` ép toàn bộ workspace 1 version, cộng xóa sạch `node_modules`+lockfile cài lại (override không áp dụng cho resolution đã cache). Cũng phát hiện tôi ghi sai version cụ thể trong package.json vài chỗ (`@types/react-dom@^19.2.7` không tồn tại, bản thật `19.2.3`) — bài học: dù đã chọn "cài bản mới nhất" thay vì pin cứng, vẫn cần xác minh version ghi tay bằng `npm view <pkg> version` trước khi tin, không đoán số.
+
+**Test bổ sung:** jsdom thiếu `ResizeObserver`/`window.matchMedia` (device-layout dùng thật ở `AppViewport`/`ThemeProvider`) → polyfill tối thiểu trong `vitest.setup.ts` của `device-shell`.
+
+**Kết quả verify:** device-layout — `next build`/`next dev` không regression (HTTP 200), `pnpm build:lib` ra `dist-lib/` 1.5MB đầy đủ ESM+d.ts+CSS. sky-app — **10/10 turbo task xanh, 22/22 test pass** (14 kernel + 5 mock-app + 3 device-shell, trong đó có test render `mock-app` thật qua `SkyDeviceLayout` bằng `@testing-library/react` — chứng minh toàn bộ chuỗi kernel→device-shell→device-layout hoạt động end-to-end, không chỉ mock rời rạc).
+
+**Còn thiếu ở GĐ2 (để GĐ3):** chưa có `apps/shell-electron`/`apps/shell-web` thật chạy `SkyDeviceLayout` trong Electron/browser thực — mới verify bằng jsdom test. Cơ chế publish device-layout vẫn là tarball thủ công (script), chưa CI/registry — theo đúng "quyết định còn mở" đã ghi ở lần trước.
+
+---
+
+## 2026-07-11 — Giai đoạn 1: Kernel + contract implement xong, verify xanh
+
+**Quyết định:** Scaffold monorepo pnpm+Turbo thật (không chỉ docs) và implement `packages/kernel` + `packages/service-contracts` với interface đầy đủ + logic tối thiểu, cộng 1 `modules/mock-app` chứng minh contract dùng được end-to-end. Theo đúng nguyên tắc giảm rủi ro trong overview.md §5: mock-app-first, CHƯA đụng device-layout/Slide thật.
+
+**Đã tạo:**
+- Root: `pnpm-workspace.yaml` (`apps/*`, `packages/*`, `modules/*`), `turbo.json`, root `package.json` (Changesets + turbo + typescript), `packages/tsconfig` (base.json ES2022/NodeNext/strict, react-library.json).
+- `packages/kernel`: `capability.ts` (Capability union + CapabilitySet), `event-bus.ts` (EventBus với **sticky/replay** — học từ mfe-shell, `persistMs`+`replayLatest`, có test hết-hạn sticky), `service-registry.ts` (Map-based, typed get/register), `entitlement.ts` (EntitlementSet + EntitlementGate + `createAllowAllEntitlementSet` cho mock/dev), `app-module.ts` (AppModule/AppContentProps/PlatformContext — đúng contract-reference.md), `platform-context.ts` (`createPlatformContext` thật + `createMockPlatformContext` tiện cho test/mock app), `index.ts` export tổng.
+- `packages/service-contracts`: 6 port thuần interface (TtsPort, DataPort, DisplayPort, CardReaderPort, FsPort, LicensePort) — verify KHÔNG import Electron/fetch/browser API, đúng nguyên tắc port trung lập.
+- `modules/mock-app`: `MockApp.tsx` (component chỉ chạm platform.services/platform.capabilities, không gọi môi trường trực tiếp) + `index.ts` (AppModule đầy đủ, activate/deactivate có state).
+- Test: 14 test kernel (event-bus sticky/replay/expiry, service-registry typed, entitlement gate open/blocked, capability) + 5 test mock-app (lifecycle, entitlement pass-through, resolve TtsPort qua registry, web vs electron capability khác nhau).
+
+**Kết quả verify:** `pnpm install` sạch (156 package, node 20/pnpm 10.21/turbo 2.10.4/vitest 3.2.7/typescript 5.9.3 — bản mới nhất ổn định tại thời điểm cài). `turbo run typecheck` 5/5 package pass. `turbo run test` **19/19 test pass**.
+
+**Lỗi gặp & fix:** comment JSDoc trong `MockApp.tsx` chứa chuỗi `window.*/ipcRenderer` — TypeScript parser hiểu `*/` là kết thúc block comment sớm → lỗi cú pháp. Sửa thành `window.x / ipcRenderer`. Bài học: tránh `*/` trong JSDoc.
+
+**Còn thiếu ở GĐ1 (để làm tiếp — GĐ2/GĐ3):** chưa có `apps/shell-web` hay `apps/shell-electron` thật, chưa có device-layout tích hợp, chưa render React thật ra DOM (mock-app mới test bằng vitest node, chưa test bằng @testing-library/react hay browser).
+
+---
+
+## 2026-07-11 — Khởi tạo repo + chốt kiến trúc nền tảng
+
+**Quyết định:** Dựng Sky-App làm nền tảng multi-app đa môi trường (web+electron, online+offline) có licensing, thay vì chỉ port Ceremony (khi đó còn gọi là Trao Bằng) vào device-layout.
+
+**Lý do:** Người dùng định hình tầm nhìn lớn hơn — device-layout + Ceremony + TTS chỉ là phần đầu; cần nền tảng mở rộng được, tích hợp nhiều app/service, hỗ trợ cả web lẫn electron, có license theo tính năng.
+
+**Các quyết định con:**
+- **Ports & Adapters ở tâm** — vì học từ khảo sát `sdk-hub` + `mfe-shell-app`: cả 2 đều thiếu lớp tách môi trường và lifecycle contract tường minh. Sky-App đặt 2 thứ đó làm trung tâm để chạy được web+electron từ 1 codebase.
+- **KHÔNG Module Federation** (dù sdk-hub/mfe dùng) — vì offline-first, static bundle đơn giản & tin cậy hơn micro-frontend runtime.
+- **device-layout giữ repo riêng, tích hợp dạng dependency** — vì device-layout tái dùng cho nhiều dự án khác; không submodule/copy để tránh lệch nhánh.
+- **device-layout giữ song song Next.js + thêm pipeline Vite lib** — xác minh rẻ: chỉ 2/130 file dùng Next API, 96/130 đã 'use client'. Không cần bỏ Next.
+- **Licensing Ed25519 offline verify** — hợp offline-first; chấp nhận không chống crack tuyệt đối.
+- **Monorepo pnpm+Turbo, React 19/shadcn/Tailwind v4/TanStack** — công nghệ mới, phổ biến, đồng bộ device-layout.
+
+**Facts kỹ thuật quan trọng (dùng khi code):**
+- Ceremony (trước đây gọi là Trao Bằng) bridge tên **`window.slide`** (không phải electronAPI), 117 call-site/30 file, 78 IPC channel + 7 event-listener trả unsubscribe. 2 renderer: Control (trong shell) + Backdrop (kiosk riêng, state Socket.IO). Main giữ WS8765+HTTP8080+Python TTS.
+- Ceremony React 18 → cần nâng 19. Cả Slide + device-layout đều Tailwind v4 `@theme` global → rủi ro style leakage.
+- Điểm nối device-layout nhận app ngoài: `AppRegistry.tsx` (AppContent/AppViewportProvider), `ThemeProvider.tsx` (bỏ hardcode registerApps), `types/app.ts` (thêm `render?`).
+
+**Trạng thái:** chốt tài liệu kiến trúc + khởi tạo repo docs. CHƯA viết code. Lộ trình 7 GĐ ở [architecture/overview.md](../architecture/overview.md) §5.
+
+**Liên quan:** dự án gốc `trao-bang-tot-nghiep-2026` `docs/multi-verse.md`, `docs/multi-app-roadmap.md`.
+
+---
+
+<!-- Thêm mục mới PHÍA TRÊN dòng này, giữ mới-nhất-trên-cùng -->
+```
+## YYYY-MM-DD — <tiêu đề>
+**Quyết định:** ...
+**Lý do:** ...
+**Liên quan:** ...
+```

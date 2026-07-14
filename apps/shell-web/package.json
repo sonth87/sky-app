@@ -1,0 +1,31 @@
+{
+  "name": "@sky-app/shell-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@sky-app/device-shell": "workspace:*",
+    "@sky-app/licensing": "workspace:*",
+    "@sky-app/module-ceremony": "workspace:*",
+    "@sky-app/module-mock-app": "workspace:*",
+    "@sky-app/platform-web": "workspace:*",
+    "@sonth87/device-layout": "file:../../.vendor/sonth87-device-layout-0.1.0.tgz",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@sky-app/tsconfig": "workspace:*",
+    "@tailwindcss/vite": "^4.3.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "tailwindcss": "^4.3.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.1.4"
+  }
+}

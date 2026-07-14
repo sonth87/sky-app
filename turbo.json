@@ -1,0 +1,45 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "dist-lib/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "lint": {},
+    "dist": {
+      "dependsOn": ["build"],
+      "outputs": ["release/**"],
+      "cache": false
+    },
+    "dist:mac": {
+      "dependsOn": ["build"],
+      "outputs": ["release/**"],
+      "cache": false
+    },
+    "dist:win": {
+      "dependsOn": ["build"],
+      "outputs": ["release/**"],
+      "cache": false
+    },
+    "dist:all": {
+      "dependsOn": ["build"],
+      "outputs": ["release/**"],
+      "cache": false
+    },
+    "build:renderer-bundle": {
+      "dependsOn": ["build"],
+      "outputs": ["release-renderer/**"],
+      "cache": false
+    }
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "voices": {
+    "NF": {
+      "type": "cloned",
+      "label": "Lan Anh",
+      "gender": "female",
+      "region": "Bắc",
+      "ref_file": "nu-bac.wav",
+      "hidden": false
+    },
+    "NF2": {
+      "type": "cloned",
+      "label": "Ngọc Huyền",
+      "gender": "female",
+      "region": "Bắc",
+      "ref_file": "nu-bac-2.wav",
+      "hidden": false
+    },
+    "SF": {
+      "type": "cloned",
+      "label": "Mai Linh",
+      "gender": "female",
+      "region": "Nam",
+      "ref_file": "nu-nam.wav",
+      "hidden": false
+    },
+    "NM1": {
+      "type": "cloned",
+      "label": "Minh Quân",
+      "gender": "male",
+      "region": "Bắc",
+      "ref_file": "nam-bac.wav",
+      "hidden": false
+    },
+    "SM": {
+      "type": "cloned",
+      "label": "Gia Huy",
+      "gender": "male",
+      "region": "Nam",
+      "ref_file": "nam-nam.wav",
+      "hidden": false
+    },
+    "ADAM": {
+      "type": "cloned",
+      "label": "Adam",
+      "gender": "male",
+      "region": "Bắc",
+      "ref_file": "adam-low-tone.wav",
+      "hidden": false
+    },
+    "preset-NgocLan": {
+      "type": "preset",
+      "label": "Ngọc Lan",
+      "gender": "female",
+      "region": "Nam",
+      "preset_id": "Ngọc Lan",
+      "hidden": true
+    },
+    "preset-GiaBao": {
+      "type": "preset",
+      "label": "Gia Bảo",
+      "gender": "male",
+      "region": "Nam",
+      "preset_id": "Gia Bảo",
+      "hidden": true
+    },
+    "preset-ThaiSon": {
+      "type": "preset",
+      "label": "Thái Sơn",
+      "gender": "male",
+      "region": "Nam",
+      "preset_id": "Thái Sơn",
+      "hidden": true
+    },
+    "preset-DucTri": {
+      "type": "preset",
+      "label": "Đức Trí",
+      "gender": "male",
+      "region": "Nam",
+      "preset_id": "Đức Trí",
+      "hidden": true
+    },
+    "preset-MyDuyen": {
+      "type": "preset",
+      "label": "Mỹ Duyên",
+      "gender": "female",
+      "region": "Nam",
+      "preset_id": "Mỹ Duyên",
+      "hidden": true
+    },
+    "preset-TrucLy": {
+      "type": "preset",
+      "label": "Trúc Ly",
+      "gender": "female",
+      "region": "Nam",
+      "preset_id": "Trúc Ly",
+      "hidden": true
+    },
+    "preset-XuanVinh": {
+      "type": "preset",
+      "label": "Xuân Vĩnh",
+      "gender": "male",
+      "region": "Nam",
+      "preset_id": "Xuân Vĩnh",
+      "hidden": true
+    },
+    "preset-TrongHuu": {
+      "type": "preset",
+      "label": "Trọng Hữu",
+      "gender": "male",
+      "region": "Nam",
+      "preset_id": "Trọng Hữu",
+      "hidden": true
+    },
+    "preset-BinhAn": {
+      "type": "preset",
+      "label": "Bình An",
+      "gender": "male",
+      "region": "Nam",
+      "preset_id": "Bình An",
+      "hidden": true
+    },
+    "preset-NgocLinh": {
+      "type": "preset",
+      "label": "Ngọc Linh",
+      "gender": "female",
+      "region": "Nam",
+      "preset_id": "Ngọc Linh",
+      "hidden": true
+    }
+  }
+}

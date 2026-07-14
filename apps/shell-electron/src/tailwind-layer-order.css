@@ -1,0 +1,23 @@
+/*
+ * Pins CSS Cascade Layers order BEFORE any Tailwind v4 bundle loads.
+ *
+ * This shell loads TWO independently-built Tailwind v4 bundles on the same
+ * page: @sonth87/device-layout/style.css and @sky-app/module-ceremony's
+ * styles.css. Each is compiled in isolation, and Tailwind only emits the
+ * `@layer theme, base, components, utilities;` forward-declaration when its
+ * compiler judges it necessary for that single file — which differs between
+ * two separately-built bundles even on identical Tailwind versions (observed:
+ * device-layout's production build omits it, Ceremony's dev-server-served
+ * build includes it). Without an explicit, IDENTICAL forward-declaration
+ * appearing before both bundles, CSS Cascade Layers order is decided by
+ * whichever bundle happens to declare a given layer name first on the page —
+ * silently breaking `@theme` custom properties (e.g. --spacing computing as
+ * empty, blowing up any `calc(var(--spacing) * N)` utility) in whichever
+ * bundle loses that race. This file's only job is to declare the order
+ * first, deterministically, regardless of what either bundle's own compiled
+ * output does or doesn't include.
+ *
+ * MUST be imported before both '@sonth87/device-layout/style.css' and
+ * '@sky-app/module-ceremony/styles.css' — see src/main.tsx.
+ */
+@layer theme, base, components, utilities;

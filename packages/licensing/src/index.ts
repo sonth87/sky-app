@@ -1,0 +1,8 @@
+export { verifyLicenseKey, encodeLicenseKey } from './verify.js';
+export { generateLicenseKeyPair, signLicense } from './sign.js';
+export type { LicenseKeyPair } from './sign.js';
+export { isPayloadValid } from './license.js';
+export type { IsPayloadValidOptions } from './license.js';
+export { createLicensePort, resolveEntitlementsFromPort } from './license-port.js';
+export type { LicenseStorage, CreateLicensePortOptions } from './license-port.js';
+export { DEV_LICENSE_PUBLIC_KEY_HEX } from './dev-key.js';
