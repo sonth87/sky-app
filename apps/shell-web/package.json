@@ -15,7 +15,7 @@
     "@sky-app/module-mock-app": "workspace:*",
     "@sky-app/module-tts-studio": "workspace:*",
     "@sky-app/platform-web": "workspace:*",
-    "@sonth87/device-layout": "file:../../.vendor/sonth87-device-layout-0.1.0.tgz",
+    "@sonth87/device-layout": "github:sonth87/device-layout#v0.1.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

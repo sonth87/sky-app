@@ -10,10 +10,6 @@ coverage/
 .env.local
 *.local
 
-# Local dependency tarballs (built from external repos, e.g. device-layout).
-# Not committed — regenerate via scripts/vendor-device-layout.sh (see .vendor/README.md).
-.vendor/*.tgz
-
 # License private keys — KHÔNG BAO GIỜ commit
 *.private.pem
 license-signing-key*

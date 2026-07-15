@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@sky-app/kernel": "workspace:*",
-    "@sonth87/device-layout": "file:../../.vendor/sonth87-device-layout-0.1.0.tgz"
+    "@sonth87/device-layout": "github:sonth87/device-layout#v0.1.0"
   },
   "devDependencies": {
     "@sky-app/module-mock-app": "workspace:*",

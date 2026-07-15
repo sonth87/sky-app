@@ -6,6 +6,8 @@
 
 ## Mục lục (mới nhất trên cùng)
 
+- [2026-07-15 — device-layout: chuyển sang git dependency (commit dist-lib + git tag), bỏ tarball local](./2026-07-15-device-layout-git-dependency-commit-dist-lib.md)
+- [2026-07-14 — Đánh giá lại: device-layout giữ tarball local (⚠️ đã bị thay thế 2026-07-15)](./2026-07-14-danh-gia-device-layout-git-dependency.md)
 - [2026-07-14 — App mới `tts-studio`: mở rộng TtsPort thay vì port riêng](./2026-07-14-tts-studio-app-moi.md)
 - [2026-07-12 — Giai đoạn 7: Web parity — TtsPort + Licensing thật cho web](./2026-07-12-giai-doan-7-web-parity.md)
 - [2026-07-12 — Tinh chỉnh Wallpaper picker + fix fullscreen thật + dock size slider](./2026-07-12-tinh-chinh-wallpaper-fullscreen-dock.md)
