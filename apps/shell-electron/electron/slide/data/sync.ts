@@ -1,9 +1,10 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, statSync, renameSync, readdirSync, statfsSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, renameSync, readdirSync, statfsSync } from 'node:fs';
 import { join } from 'node:path';
 import { app } from 'electron';
 import AdmZip from 'adm-zip';
 import type { CeremonyBundle, Student } from '@sky-app/slide-shared';
 import { IMPORT_WARN_SIZE, IMPORT_MAX_SIZE, formatGB } from '@sky-app/slide-shared';
+import { getCeremonyBundle as dbGetCeremonyBundle, saveCeremonyBundle as dbSaveCeremonyBundle } from '@sky-app/ceremony-db';
 import { ceremonyDataDir, bundleJsonPath, sampleDataDir, PHOTO_DIR_NAMES, ttsPregenDir } from './paths';
 import { ceremonyStore } from './store';
 import { sessionStore } from '../session-store';
@@ -610,13 +611,13 @@ function offlineResult(message: string): SyncResult {
   return { ok: false, updated: 0, added: 0, photosChanged: 0, offline: true, message };
 }
 
-/** Đọc riêng `config` từ bundle.json trên đĩa, không qua ceremonyStore (có thể chưa load). */
+/** Đọc riêng `config` từ ceremony.db, không qua ceremonyStore.getBundle() (có thể chưa load()
+ * lần nào trong memory — dùng chung executor với ceremonyStore để không mở 2 kết nối tới
+ * cùng 1 file .db). */
 function readConfigFromDisk(): CeremonyBundle['config'] | null {
   try {
-    const p = bundleJsonPath();
-    if (!existsSync(p)) return null;
-    const raw = JSON.parse(readFileSync(p, 'utf-8')) as CeremonyBundle;
-    return raw.config ?? null;
+    const loaded = dbGetCeremonyBundle(ceremonyStore.getExecutor(), 'default');
+    return loaded?.config ?? null;
   } catch {
     return null;
   }
@@ -677,7 +678,16 @@ function applyMerge(newBundle: CeremonyBundle, onProgress?: (pct: number) => voi
   }
 
   newBundle._synced_at = new Date().toISOString();
-  writeFileSync(bundleJsonPath(), JSON.stringify(newBundle, null, 2), 'utf-8');
+  // Ghi trong 1 transaction SQL (ceremony+config+students) — thay writeFileSync toàn file
+  // cũ, giải quyết rủi ro "không rollback nếu crash giữa chừng" (xem file 18 §2 blueprint).
+  console.log('[DEBUG applyMerge] before save, students:', newBundle.students.length, 'ceremony.id:', newBundle.ceremony?.id);
+  try {
+    dbSaveCeremonyBundle(ceremonyStore.getExecutor(), newBundle);
+    console.log('[DEBUG applyMerge] save OK');
+  } catch (e) {
+    console.error('[DEBUG applyMerge] save FAILED:', e);
+    throw e;
+  }
   ceremonyStore.load(newBundle);
 
   return {

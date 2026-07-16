@@ -7,8 +7,14 @@ export function ceremonyDataDir(): string {
   return join(app.getPath('userData'), 'ceremony-data');
 }
 
+/** @deprecated Giai đoạn 0 chuyển sang SQLite — giữ hàm này chỉ để cancelImport/commitStaging
+ * dọn dẹp file bundle.json cũ có thể còn sót từ bản cài trước, không còn được ghi mới. */
 export function bundleJsonPath(): string {
   return join(ceremonyDataDir(), 'bundle.json');
+}
+
+export function ceremonyDbPath(): string {
+  return join(ceremonyDataDir(), 'ceremony.db');
 }
 
 export function appConfigJsonPath(): string {

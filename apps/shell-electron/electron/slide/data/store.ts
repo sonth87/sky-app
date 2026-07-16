@@ -1,7 +1,15 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import type { CeremonyBundle, SessionState, Student } from '@sky-app/slide-shared';
-import { bundleJsonPath, ceremonyDataDir, PHOTO_DIR_NAMES } from './paths';
+import {
+  BetterSqlite3Executor,
+  runMigrations,
+  getCeremonyBundle as dbGetCeremonyBundle,
+  patchStudent as dbPatchStudent,
+  clearStudents as dbClearStudents,
+  upsertAppConfig as dbUpsertAppConfig,
+} from '@sky-app/ceremony-db';
+import { ceremonyDbPath, ceremonyDataDir, PHOTO_DIR_NAMES } from './paths';
 
 /**
  * Tìm thư mục ảnh đang thực sự tồn tại trong ceremony-data.
@@ -60,16 +68,36 @@ function normalizeStudentPhoto(s: Student): Student {
 const LEGACY_BACKDROPS_CONFIG_NAMES = new Set(['assets/2026/backdrops.json']);
 const CURRENT_BACKDROPS_CONFIG = 'assets/2026/backdrops_layouts.json';
 
+const ROOM_ID = 'default';
+
 /**
- * Store dữ liệu đợt trong bộ nhớ (main process).
- * - bundle: dữ liệu nguồn (read-mostly) từ Portal.
- * - students: tra cứu nhanh theo msv.
+ * Store dữ liệu đợt trong bộ nhớ (main process) — nguồn lưu trữ lâu dài là SQLite
+ * (ceremony.db, qua @sky-app/ceremony-db), memory chỉ là cache đọc nhanh cho tra cứu
+ * (findByMsv/neighborByStt gọi liên tục mỗi lần quét QR/next/prev).
  * Trạng thái vận hành (session) do session-store quản lý riêng.
  */
 class CeremonyStore {
+  private executor: BetterSqlite3Executor | null = null;
   private bundle: CeremonyBundle | null = null;
   private byMsv = new Map<string, Student>();
 
+  private getExecutorOrOpen(): BetterSqlite3Executor {
+    if (!this.executor) {
+      this.executor = new BetterSqlite3Executor(ceremonyDbPath());
+      runMigrations(this.executor);
+    }
+    return this.executor;
+  }
+
+  /** Executor dùng chung cho sync.ts (đọc config lúc bootstrap trước khi có bundle trong memory). */
+  getExecutor(): BetterSqlite3Executor {
+    return this.getExecutorOrOpen();
+  }
+
+  /**
+   * Nạp bundle vào memory — KHÔNG tự ghi DB (caller ghi trước nếu cần persist, VD
+   * sync.ts's applyMerge() gọi dbSaveCeremonyBundle() rồi mới load(), tránh ghi 2 lần).
+   */
   load(bundle: CeremonyBundle) {
     bundle.students = bundle.students.map(normalizeStudentPhoto);
     // Migrate tên file config cũ mỗi khi bundle được nạp (từ đĩa hoặc build mới) —
@@ -82,12 +110,13 @@ class CeremonyStore {
     this.byMsv = new Map(bundle.students.map((s) => [s.student_code, s]));
   }
 
-  /** Đọc bundle.json từ đĩa nếu có */
+  /** Đọc dữ liệu đã lưu trong ceremony.db, nếu có */
   loadFromDisk(): boolean {
-    const p = bundleJsonPath();
-    if (!existsSync(p)) return false;
-    const raw = readFileSync(p, 'utf-8');
-    this.load(JSON.parse(raw) as CeremonyBundle);
+    const loaded = dbGetCeremonyBundle(this.getExecutorOrOpen(), ROOM_ID);
+    if (!loaded) return false;
+    loaded.students = loaded.students.map(normalizeStudentPhoto);
+    this.bundle = loaded;
+    this.byMsv = new Map(loaded.students.map((s) => [s.student_code, s]));
     return true;
   }
 
@@ -149,10 +178,19 @@ class CeremonyStore {
     return students[idx + dir];
   }
 
+  /**
+   * UPDATE ngay lập tức trong SQLite (không còn "chỉ sửa memory, chờ ghi toàn file" như trước —
+   * xem docs/roadmap/plans/layout-designer/18-luu-tru-sqlite-supabase.md §2), đồng thời cập
+   * nhật cache memory để các lần đọc tiếp theo (findByMsv/getStudents) thấy ngay hiệu ứng.
+   */
   patchStudent(code: string, patch: Partial<Student>): Student | undefined {
     const s = this.byMsv.get(code);
     if (!s) return undefined;
     Object.assign(s, patch);
+    if (this.bundle) {
+      const ceremonyId = this.bundle.ceremony.id;
+      dbPatchStudent(this.getExecutorOrOpen(), ceremonyId, code, patch);
+    }
     return s;
   }
 
@@ -167,22 +205,22 @@ class CeremonyStore {
     this.bundle.students = [];
     this.byMsv.clear();
     try {
-      writeFileSync(bundleJsonPath(), JSON.stringify(this.bundle, null, 2), 'utf-8');
+      dbClearStudents(this.getExecutorOrOpen(), this.bundle.ceremony.id);
     } catch (e) {
-      console.error('[CeremonyStore] Failed to persist bundle after clearStudents:', e);
+      console.error('[CeremonyStore] Failed to persist clearStudents:', e);
     }
   }
 
-  updateConfig(patch: Partial<any>) {
+  updateConfig(patch: Partial<CeremonyBundle['config']>) {
     if (!this.bundle) return;
     if (!this.bundle.config) {
-      this.bundle.config = {} as any;
+      this.bundle.config = {} as CeremonyBundle['config'];
     }
     Object.assign(this.bundle.config, patch);
     try {
-      writeFileSync(bundleJsonPath(), JSON.stringify(this.bundle, null, 2), 'utf-8');
+      dbUpsertAppConfig(this.getExecutorOrOpen(), this.bundle.ceremony.id, this.bundle.config);
     } catch (e) {
-      console.error('[CeremonyStore] Failed to persist bundle after updateConfig:', e);
+      console.error('[CeremonyStore] Failed to persist updateConfig:', e);
     }
   }
 }

@@ -80,9 +80,12 @@ async function bootstrapSlideBackend() {
   ensureDefaultAssets();
   const { cleanupImportStaging } = await import('./slide/data/sync.js');
   cleanupImportStaging();
+  console.log('[DEBUG bootstrap] getUseSampleData():', getUseSampleData());
   if (getUseSampleData()) {
     const { syncBundle } = await import('./slide/data/sync.js');
+    console.log('[DEBUG bootstrap] calling syncBundle({useSample:true})...');
     const result = await syncBundle({ useSample: true });
+    console.log('[DEBUG bootstrap] syncBundle result:', JSON.stringify(result));
     // Sample data thất bại (vd sample-bundle/ thiếu trong bản build) không được để
     // Ceremony trắng trơn nếu đĩa đã có bundle.json thật từ lần import trước — nếu
     // không fallback, ceremonyStore rỗng và Backdrop kẹt "Đang tải…" vĩnh viễn dù dữ
@@ -93,6 +96,7 @@ async function bootstrapSlideBackend() {
   } else {
     ceremonyStore.loadFromDisk();
   }
+  console.log('[DEBUG bootstrap] hasData():', ceremonyStore.hasData(), 'students:', ceremonyStore.getStudents().length);
   sessionStore.init(ceremonyStore.getInitialSession());
 
   const config = ceremonyStore.getConfig();

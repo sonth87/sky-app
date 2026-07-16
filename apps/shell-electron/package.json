@@ -14,6 +14,7 @@
     "build:renderer-bundle": "node scripts/build-renderer-bundle.mjs"
   },
   "dependencies": {
+    "@sky-app/ceremony-db": "workspace:*",
     "@sky-app/device-shell": "workspace:*",
     "@sky-app/licensing": "workspace:*",
     "@sky-app/module-ceremony": "workspace:*",

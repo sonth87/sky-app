@@ -1,0 +1,206 @@
+<svg viewBox="0 0 1400 1270" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SF Mono, Consolas, monospace">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b6f85"/>
+    </marker>
+    <marker id="arrowWarn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff9466"/>
+    </marker>
+  </defs>
+
+  <style>
+    .bgrect { fill: #12141c; }
+    .title { font-size: 17px; font-weight: 700; fill: #e7e8f1; font-family: -apple-system, sans-serif; }
+    .subtitle { font-size: 11px; fill: #9ca0b8; font-family: Georgia, serif; }
+    .lane-label { font-size: 11px; letter-spacing: 0.08em; fill: #9ca0b8; text-transform: uppercase; }
+    .box { fill: #191c27; stroke: #2c3040; stroke-width: 1; }
+    .box-title { font-size: 12.5px; font-weight: 700; fill: #e7e8f1; font-family: -apple-system, sans-serif; }
+    .box-sub { font-size: 10.5px; fill: #9ca0b8; font-family: Georgia, serif; }
+    .box-field { font-size: 10px; fill: #6b6f85; }
+    .flowline { fill: none; stroke: #6b6f85; stroke-width: 1.3; marker-end: url(#arrow); }
+    .flowline.accent { stroke: #8b9bff; stroke-width: 1.6; }
+    .flowline.warn { stroke: #ff9466; stroke-width: 1.8; stroke-dasharray: 4 3; marker-end: url(#arrowWarn); }
+    .lane-bg { fill: #212533; opacity: 0.5; }
+    .warn-tag { font-size: 9.5px; fill: #ff9466; font-weight: 700; letter-spacing: 0.03em; }
+    .legend-text { font-size: 10px; fill: #9ca0b8; font-family: -apple-system, sans-serif; }
+  </style>
+
+  <rect class="bgrect" x="0" y="0" width="1400" height="1270"/>
+
+  <text class="title" x="30" y="34">Sơ đồ luồng hoạt động tổng thể — Layout Designer + Event + Ceremony</text>
+  <text class="subtitle" x="30" y="52">Rà soát blueprint 2026-07-15 · điểm cam = mâu thuẫn/thiếu mô tả, xem docs/roadmap/plans/layout-designer/14-rasoat-2026-07-15.md</text>
+
+  <!-- Lane backgrounds -->
+  <rect class="lane-bg" x="20" y="90" width="430" height="330" rx="10"/>
+  <rect class="lane-bg" x="20" y="450" width="1360" height="330" rx="10"/>
+  <rect class="lane-bg" x="20" y="810" width="1360" height="400" rx="10"/>
+
+  <text class="lane-label" x="35" y="112">Thiết kế trước (offline) — layout-designer</text>
+  <text class="lane-label" x="35" y="472">Soạn đợt lễ (offline) — ceremony / control</text>
+  <text class="lane-label" x="35" y="832">Trình chiếu (runtime) — ceremony / backdrop</text>
+
+  <!-- ===== LANE 1: layout-designer ===== -->
+  <g>
+    <rect class="box" x="60" y="140" width="350" height="90" rx="8"/>
+    <text class="box-title" x="80" y="165">Editor kéo-thả</text>
+    <text class="box-sub" x="80" y="183">Đặt item (text/ảnh/hình/loop), chèn</text>
+    <text class="box-sub" x="80" y="198">token @var@, thiết kế theo px trên</text>
+    <text class="box-sub" x="80" y="213">canvas chuẩn (refW×refH)</text>
+  </g>
+
+  <g>
+    <rect class="box" x="60" y="260" width="350" height="70" rx="8"/>
+    <text class="box-title" x="80" y="283">LayoutDocument</text>
+    <text class="box-field" x="80" y="300">variants[] · items[] · variables[] · selector?</text>
+    <text class="box-field" x="80" y="314">→ LayoutStore (local/file → Supabase)</text>
+  </g>
+
+  <g>
+    <rect class="box" x="60" y="350" width="350" height="55" rx="8"/>
+    <text class="box-title" x="80" y="372">Layout Library</text>
+    <text class="box-field" x="80" y="388">Sao chép variant chéo giữa mọi layout</text>
+  </g>
+
+  <path class="flowline" d="M235,230 L235,260"/>
+  <path class="flowline" d="M235,330 L235,350"/>
+
+  <!-- ===== LANE 2: Event soạn thảo ===== -->
+  <g>
+    <rect class="box" x="480" y="490" width="270" height="110" rx="8"/>
+    <text class="box-title" x="500" y="515">DataSource</text>
+    <text class="box-field" x="500" y="533">mode: pooled | consumable</text>
+    <text class="box-field" x="500" y="548">records: Subject[] | Group[]</text>
+    <text class="box-field" x="500" y="563">từ FieldMappingProfile (raw→canonical)</text>
+    <text class="box-field" x="500" y="581" fill="#ff9466">⚠ union tách 2 mảng — xem #14</text>
+  </g>
+
+  <g>
+    <rect class="box" x="800" y="490" width="300" height="145" rx="8"/>
+    <text class="box-title" x="820" y="515">EventDocument</text>
+    <text class="box-field" x="820" y="533">layoutRefs[] · customVariables[]</text>
+    <text class="box-field" x="820" y="548">dataSourceId · consumedIds?</text>
+    <text class="box-field" x="820" y="563">status: draft/scheduled/active/archived</text>
+    <text class="box-field" x="820" y="581" fill="#ff9466">⚠ dataSourceId: optional ở 1 file,</text>
+    <text class="box-field" x="820" y="595" fill="#ff9466">  bắt buộc ở file khác — xem #2</text>
+    <text class="box-field" x="820" y="613" fill="#ff9466">⚠ layoutRefs dùng field "selector" mà</text>
+    <text class="box-field" x="820" y="626" fill="#ff9466">  schema gốc chưa khai báo — xem #1</text>
+  </g>
+
+  <g>
+    <rect class="box" x="1150" y="490" width="200" height="80" rx="8"/>
+    <text class="box-title" x="1170" y="515">EventStore</text>
+    <text class="box-field" x="1170" y="533">list · get · save</text>
+    <text class="box-field" x="1170" y="548">setActive(id) — THỦ CÔNG</text>
+    <text class="box-field" x="1170" y="563">getCurrentActive()</text>
+  </g>
+
+  <path class="flowline accent" d="M410,295 C620,295 620,460 800,500" />
+  <path class="flowline" d="M750,540 L800,540"/>
+  <path class="flowline" d="M1100,530 L1150,530"/>
+  <path class="flowline" d="M615,490 L615,405" />
+
+  <g>
+    <rect class="box" x="480" y="650" width="620" height="90" rx="8" stroke="#5a63a8"/>
+    <text class="box-title" x="500" y="675">Người vận hành, trong control/ (bảng kéo-thả)</text>
+    <text class="box-field" x="500" y="693">Chọn DataSource → gán nhiều layoutRefs, sắp ưu tiên (priority = thứ tự kéo)</text>
+    <text class="box-field" x="500" y="708">→ định nghĩa customVariables riêng đợt này → preview với data thật → Lưu</text>
+    <text class="box-field" x="500" y="726" fill="#5ce0a8">✓ Kích hoạt Event luôn là hành động bấm tay — không có gợi ý tự động</text>
+  </g>
+  <path class="flowline" d="M950,635 L950,650"/>
+  <path class="flowline" d="M790,650 L790,635"/>
+
+  <!-- ===== LANE 3: Runtime ===== -->
+  <g>
+    <rect class="box" x="60" y="850" width="230" height="70" rx="8"/>
+    <text class="box-title" x="80" y="873">Ceremony khởi động</text>
+    <text class="box-field" x="80" y="890">EventStore.getCurrentActive()</text>
+    <text class="box-field" x="80" y="904">→ null? chờ, có thông báo rõ</text>
+  </g>
+
+  <g>
+    <rect class="box" x="330" y="850" width="230" height="70" rx="8"/>
+    <text class="box-title" x="350" y="873">1 record được gọi lên</text>
+    <text class="box-field" x="350" y="890">Subject (cá nhân) hoặc</text>
+    <text class="box-field" x="350" y="904">Group (tập thể, có/không members)</text>
+  </g>
+
+  <path class="flowline" d="M290,885 L330,885"/>
+
+  <g>
+    <rect class="box" x="600" y="830" width="270" height="110" rx="8"/>
+    <text class="box-title" x="620" y="853">resolveLayout(record, event)</text>
+    <text class="box-field" x="620" y="871">Duyệt layoutRefs theo priority giảm dần</text>
+    <text class="box-field" x="620" y="886">Rule đầu tiên match (AND trong rule,</text>
+    <text class="box-field" x="620" y="901">OR bằng nhiều layoutRefs) → thắng</text>
+    <text class="box-field" x="620" y="919" fill="#ff9466">⚠ attr trỏ vào record.extra.* — cách</text>
+    <text class="box-field" x="620" y="930" fill="#ff9466">  resolve path chưa mô tả — xem #17</text>
+  </g>
+  <path class="flowline" d="M560,885 L600,885"/>
+
+  <g>
+    <rect class="box" x="920" y="830" width="250" height="90" rx="8"/>
+    <text class="box-title" x="940" y="853">resolveVariant(layout, aspect)</text>
+    <text class="box-field" x="940" y="871">min(|Δtỷ lệ|) trong variants[]</text>
+    <text class="box-field" x="940" y="886">→ scale-to-fit nếu lệch (letterbox)</text>
+  </g>
+  <path class="flowline" d="M870,885 L920,885"/>
+
+  <path class="flowline warn" d="M735,830 C735,790 950,790 950,830"/>
+  <text class="warn-tag" x="760" y="785">⚠ thứ tự layout-trước/variant-sau chưa xác nhận — #9</text>
+
+  <g>
+    <rect class="box" x="60" y="990" width="380" height="130" rx="8"/>
+    <text class="box-title" x="80" y="1015">LayoutRenderer(variant, record, event.customVariables)</text>
+    <text class="box-field" x="80" y="1035">Mọi Box(x,y,w,h)·fontSize × scale chung của variant</text>
+    <text class="box-field" x="80" y="1050">Token @key@: CustomVariable → lõi canonical → extra → ""</text>
+    <text class="box-field" x="80" y="1068">LoopItem: lặp itemTemplate theo members[]</text>
+    <text class="box-field" x="80" y="1083">  overflow: shrink (co ô) | truncate (+N người)</text>
+    <text class="box-field" x="80" y="1101" fill="#ff9466">⚠ record.mode không tồn tại — mode thuộc</text>
+    <text class="box-field" x="80" y="1112" fill="#ff9466">  DataSource, không thuộc record — #15</text>
+  </g>
+  <path class="flowline" d="M1045,920 C1045,960 250,960 250,990"/>
+
+  <g>
+    <rect class="box" x="480" y="990" width="230" height="80" rx="8"/>
+    <text class="box-title" x="500" y="1015">Hiển thị backdrop</text>
+    <text class="box-field" x="500" y="1033">Fail-soft: thiếu biến → rỗng,</text>
+    <text class="box-field" x="500" y="1048">không throw giữa lễ</text>
+  </g>
+  <path class="flowline" d="M440,1045 L480,1045"/>
+
+  <g>
+    <rect class="box" x="750" y="990" width="270" height="90" rx="8"/>
+    <text class="box-title" x="770" y="1015">Nếu DataSource.mode='consumable'</text>
+    <text class="box-field" x="770" y="1033">Sau khi trình chiếu → thêm record.id</text>
+    <text class="box-field" x="770" y="1048">vào event.consumedIds → EventStore.save</text>
+    <text class="box-field" x="770" y="1066" fill="#ff9466">⚠ ai gọi bước này, lúc nào? chưa mô tả — #15</text>
+  </g>
+  <path class="flowline" d="M710,1030 L750,1030"/>
+
+  <g>
+    <rect class="box" x="1070" y="990" width="290" height="120" rx="8"/>
+    <text class="box-title" x="1090" y="1015">Đợt lễ SAU (dùng chung DataSource)</text>
+    <text class="box-field" x="1090" y="1033">mode='consumable': loại trừ ID đã</text>
+    <text class="box-field" x="1090" y="1048">dùng ở MỌI Event từng trỏ nguồn này</text>
+    <text class="box-field" x="1090" y="1063">mode='pooled': đọc lại toàn bộ,</text>
+    <text class="box-field" x="1090" y="1078">không bị ảnh hưởng Event trước</text>
+  </g>
+  <path class="flowline" d="M1020,1035 L1070,1060"/>
+
+  <!-- cross-lane connectors -->
+  <path class="flowline accent" d="M235,405 C235,640 480,680 480,690" />
+  <text x="250" y="630" font-size="10" fill="#8b9bff">layout được chọn khi gán vào Event</text>
+
+  <path class="flowline" d="M1250,570 C1250,730 250,790 250,850"/>
+  <text x="900" y="730" font-size="10" fill="#6b6f85">Event active → nạp layout+data+biến khi ceremony khởi động</text>
+
+  <!-- Legend -->
+  <g transform="translate(30, 1230)">
+    <rect x="0" y="-8" width="14" height="3" fill="#8b9bff"/>
+    <text class="legend-text" x="20" y="-2">Luồng dữ liệu chính</text>
+    <rect x="220" y="-8" width="14" height="3" fill="#6b6f85"/>
+    <text class="legend-text" x="240" y="-2">Luồng điều khiển / thứ tự bước</text>
+    <rect x="460" y="-8" width="14" height="3" fill="#ff9466"/>
+    <text class="legend-text" x="480" y="-2">Mâu thuẫn hoặc thiếu mô tả — xem file 14-rasoat-2026-07-15.md</text>
+  </g>
+</svg>
