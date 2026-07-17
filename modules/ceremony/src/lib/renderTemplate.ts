@@ -1,5 +1,6 @@
 // SYNC: keep identical to electron/lib/renderTemplate.ts
 import type { Student, CustomVariable } from '@sky-app/slide-shared';
+import { resolveTokens } from '@sky-app/slide-shared';
 import { resolveCustomVariables } from './customVariables';
 
 function titleCaseIfAllCaps(str: string): string {
@@ -15,7 +16,7 @@ export function renderTemplate(
   customVars: CustomVariable[] = []
 ): string {
   const resolved = resolveCustomVariables(student, customVars);
-  return template.replace(/@([a-zA-Z_]+)/g, (_, key) => {
+  return resolveTokens(template, (key) => {
     // Biến điều kiện tùy chỉnh ưu tiên hơn field gốc của Student
     if (key in resolved) return resolved[key];
     const val = (student as unknown as Record<string, unknown>)[key];

@@ -75,14 +75,21 @@ có editor web đa-tab):
   liệu (thiết kế layout cả tuần rồi mất trắng). → Gọi **`navigator.storage.persist()`** xin quyền
   lưu bền + **nhắc export định kỳ**. Việc nhỏ, làm cùng SqliteWasmAdapter.
 
-### 1a-ter. `node:sqlite` — cơ hội bỏ ABI dance (thử đầu GĐ1)
+### 1a-ter. `node:sqlite` — ĐÃ THỬ 2026-07-17, KẾT QUẢ: giữ `better-sqlite3`
 
 `better-sqlite3` là native addon → phải rebuild theo ABI mỗi khi đổi giữa Electron/Node (đã gặp
-thật ở GĐ0, ghi trong plan). **Node ≥22.5 có `node:sqlite` builtin** — KHÔNG phải native addon,
-không rebuild ABI. Kiến trúc `SqlExecutor` cho phép đổi driver không đụng query nào. → **Thử
-nghiệm đầu GĐ1** (chốt 2026-07-16): kiểm chứng Electron 43 có bundle Node ≥22.5 + API `node:sqlite`
-(exec/prepare/transaction) đủ dùng không. Ổn → viết `NodeSqliteExecutor` thay `better-sqlite3`,
-bỏ hẳn ABI dance. Không ổn → giữ `better-sqlite3` (không mất gì). Ghi vào plan GĐ1.
+thật ở GĐ0). **Node ≥22.5 có `node:sqlite` builtin** — không rebuild ABI.
+
+**Kiểm chứng thật (đầu GĐ1):** Electron 43.1.1 bundle **Node 24.18.0** (`electron -e
+"console.log(process.versions.node)"`) — thừa điều kiện. `node:sqlite`'s `DatabaseSync` chạy
+đúng trong Electron main process (test CREATE TABLE/INSERT/SELECT pass). **Nhưng** máy dev hệ
+thống chạy **Node 20.19.1** (< 22.5) — `apps/data-service` (Node thường qua `tsx`, KHÔNG phải
+Electron) sẽ không dùng được `node:sqlite`.
+
+**Chốt (Sonth, 2026-07-17): GIỮ `better-sqlite3` cho toàn bộ** (Electron + data-service), không
+tách 2 driver khác nhau cho 2 môi trường chỉ để né ABI dance — đơn giản hơn overall dù vẫn còn
+rủi ro ABI đã biết (đã có 2 script `pnpm db:rebuild:node`/`db:rebuild:electron` từ GĐ0 để xử lý).
+Có thể xem lại quyết định này nếu Node hệ thống của môi trường dev sau này nâng lên ≥22.5.
 
 ## 2. Vì sao đổi từ JSON/localStorage sang SQLite — đánh giá thẳng
 
