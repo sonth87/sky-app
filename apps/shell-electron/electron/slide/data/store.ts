@@ -8,7 +8,7 @@ import {
   patchStudent as dbPatchStudent,
   clearStudents as dbClearStudents,
   upsertAppConfig as dbUpsertAppConfig,
-} from '@sky-app/ceremony-db';
+} from '@sky-app/ceremony-db/node';
 import { ceremonyDbPath, ceremonyDataDir, PHOTO_DIR_NAMES } from './paths';
 
 /**
@@ -68,7 +68,6 @@ function normalizeStudentPhoto(s: Student): Student {
 const LEGACY_BACKDROPS_CONFIG_NAMES = new Set(['assets/2026/backdrops.json']);
 const CURRENT_BACKDROPS_CONFIG = 'assets/2026/backdrops_layouts.json';
 
-const ROOM_ID = 'default';
 
 /**
  * Store dữ liệu đợt trong bộ nhớ (main process) — nguồn lưu trữ lâu dài là SQLite
@@ -110,9 +109,10 @@ class CeremonyStore {
     this.byMsv = new Map(bundle.students.map((s) => [s.student_code, s]));
   }
 
-  /** Đọc dữ liệu đã lưu trong ceremony.db, nếu có */
+  /** Đọc dữ liệu đã lưu trong ceremony.db, nếu có — không lọc theo room_id (DB local chỉ
+   * chứa 1 ceremony; room_id do nguồn seed quyết định, VD 'H1', không phải hằng cố định). */
   loadFromDisk(): boolean {
-    const loaded = dbGetCeremonyBundle(this.getExecutorOrOpen(), ROOM_ID);
+    const loaded = dbGetCeremonyBundle(this.getExecutorOrOpen());
     if (!loaded) return false;
     loaded.students = loaded.students.map(normalizeStudentPhoto);
     this.bundle = loaded;

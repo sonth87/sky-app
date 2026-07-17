@@ -102,6 +102,10 @@ không phải migrate dữ liệu. Xem phân tích đầy đủ 6 trách nhiệm
 export interface EventDocument {
   id: string;                    // "trao-bang-dot-2-2026"
   name: string;                  // "Lễ trao bằng đợt 2 năm 2026"
+  // status: 'active' chỉ là NHÃN theo dõi/lọc/tìm kiếm — KHÔNG mang nghĩa tự động (không "đến
+  // ngày X tự active", không "vì active nên cái khác không được active"). Kể cả bỏ 'active'
+  // cũng không sao. setActive() thủ công (A9) là cách duy nhất đổi Event đang chạy. Chốt
+  // 2026-07-16, xem 20-rasoat-2026-07-16.md §A1 (không cần tách con trỏ cục bộ).
   status: 'draft' | 'scheduled' | 'active' | 'archived';
   scheduledAt?: string;          // ISO datetime — khi nào đợt này diễn ra
   archivedAt?: string;
@@ -136,6 +140,11 @@ export interface EventDocument {
 
 export interface EventLayoutRef {
   layoutId: string;              // trỏ LayoutDocument.id
+  layoutVersion: number;         // MỚI 2026-07-16 (file 21) — GHIM version layout đã chọn lúc
+                                  // gán vào Event. Runtime load ĐÚNG version này, không tự lấy
+                                  // bản mới nhất → lễ đang chạy ổn định dù designer đang sửa
+                                  // layout đó. Layout publish version mới → Event hiện notice,
+                                  // user chủ động update (có bước check token). Xem file 21 §5.
   // Điều kiện + độ ưu tiên chọn layout này trong Event — CHỐT 2026-07-15 (xem
   // 14-rasoat-2026-07-15.md §1a): "điều kiện chọn layout ở ceremony; design layout chỉ quản
   // lý danh sách các layout." → selector KHÔNG nằm trong LayoutDocument (đã bỏ ở file 04),
@@ -144,6 +153,10 @@ export interface EventLayoutRef {
   // override CỤC BỘ cho event này theo TỪNG TỶ LỆ — dùng Record để tránh dựa vào thứ tự
   // mảng (mảng phẳng dễ lệch nếu LayoutDocument.variants gốc đổi thứ tự/thêm bớt variant)
   overrides?: Record<string /* aspect id, VD "16:9" */, Partial<Pick<LayoutVariant, 'background'>>>;
+  // Map từng token của layout (đúng version ghim) → nguồn giá trị. ĐỊNH NGHĨA ĐẦY ĐỦ ở file 13
+  // §"EventLayoutRef.fieldMap" (FieldMapSource: raw/computed/unmapped) — nhắc ở đây để interface
+  // đầy đủ, tránh 2 nơi định nghĩa lệch nhau (như từng xảy ra với LoopItem).
+  fieldMap: Record<string /* token */, FieldMapSource>;
 }
 ```
 
@@ -224,21 +237,18 @@ ceremony (runtime): EventStore.getCurrentActive() → load Event đã được s
                    → hiển thị
 ```
 
-## Câu hỏi mở (bổ sung vào 08)
+## Câu hỏi mở (bổ sung vào 08) — PHẦN LỚN ĐÃ CHỐT, xem cột "Trạng thái"
 
-- **Đặt tên:** "Event" hay "Đợt lễ" hay "Chiến dịch" hay "Campaign"? Ảnh hưởng namespace code
-  (`EventDocument` vs `CampaignDocument`). Đề xuất tạm: **Event** (trung lập, không trùng nghĩa
-  với "Ceremony" đã dùng cho app/module).
-- **GĐ1 triển khai ở đâu:** nhúng tab trong ceremony (nhanh) hay tách module riêng luôn (sạch
-  hơn nhưng chậm hơn)? Đề xuất: nhúng UI nhưng tách schema — xem khuyến nghị E2 ở trên.
-- **"Nhân bản layout"** (fork LayoutDocument mới từ 1 layout có sẵn, đổi tự do) — cần thêm vào
-  file 04, hiện chưa có cơ chế này trong schema `LayoutDocument`.
-- **Ai chuyển Event active:** hoàn toàn tự động theo `scheduledAt`, hay luôn cần người bấm xác
-  nhận (an toàn hơn — tránh tự động chuyển nhầm giữa lúc đang chạy lễ dở dang)? Nghiêng: **bán
-  tự động** — hệ thống gợi ý/cảnh báo "sắp đến giờ Event X" nhưng người vận hành bấm xác nhận.
-- **Data giữa các Event có tách biệt hoàn toàn không?** (VD Event "Trao bằng đợt 2" có được
-  nhìn thấy/tái dùng danh sách sinh viên đã import ở "đợt 1" không, hay luôn import mới?)
-- **Version lịch sử Event đã archived** — có cần giữ lại để xem/nhân bản về sau không (khả năng
-  cao là CÓ, vì "đợt sau giống đợt trước" là chính yêu cầu ban đầu) → `status='archived'`
-  KHÔNG xoá, chỉ ẩn khỏi danh sách active — đã phản ánh trong schema (archived là 1 status,
-  không phải xoá record).
+| Câu hỏi | Trạng thái |
+|---|---|
+| Đặt tên "Event"/"Đợt lễ"/"Campaign"? | ✅ **Event** (A7, file 08) |
+| GĐ1 nhúng ceremony hay tách module? | ✅ Nhúng `control/`, tách schema (A8, file 13) |
+| "Nhân bản layout" (fork) — thêm vào schema? | ✅ Có, ở tầng Layout (file 12 `cloneVariant` + versioning file 21) |
+| Ai chuyển Event active — tự động hay thủ công? | ✅ **HOÀN TOÀN THỦ CÔNG** (A9) — bỏ hẳn "bán tự động" từng nêu ở đây. `active` chỉ là nhãn theo dõi (§Schema, [20](20-rasoat-2026-07-16.md) §A1) |
+| Data giữa các Event tách biệt không? | ✅ Cả 2 kiểu (pooled/consumable), file 13; re-import qua modal (file 22) |
+| Version Event archived giữ lại? | ✅ `status='archived'` không xoá, chỉ ẩn khỏi active |
+
+**Còn mở thật sự:**
+- Không còn câu hỏi mở nghiêm trọng ở tầng Event — các vấn đề vận hành mới (consume khi chạy đến,
+  re-import, layout version) đã chuyển thành quyết định ở [13](13-ceremony-mo-rong.md), [21](21-layout-versioning.md),
+  [22](22-import-modal.md).

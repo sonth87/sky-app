@@ -5,6 +5,11 @@
 > cơ chế tự động ghi `consumedIds`...) — thay vào đó **người dùng tự chịu trách nhiệm chuẩn
 > bị trước**, và hệ thống hỗ trợ bằng khả năng import/export đầy đủ để họ tự kiểm tra, tự sao
 > lưu, tự đối chiếu trước khi chạy lễ thật.
+>
+> ⚠️ **Bổ sung 2026-07-16:** (1) Import DATA (DataSource) có yêu cầu riêng chi tiết hơn — **modal
+> import với diff git + màn kết quả + khóa tự nhiên**, tách thành [22](22-import-modal.md). File
+> 15 này tập trung Export/Import **layout + Event bundle** (di chuyển giữa máy/môi trường). (2)
+> Export bundle chứa PII (SĐT/CCCD) — xem cảnh báo §"Bảo mật" cuối file.
 
 ## Vì sao cần — nối lại với các quyết định "bỏ tự động" trước đó
 
@@ -114,6 +119,18 @@ Không phải lúc nào cũng cần export cả Event. Vài export nhỏ, độc
       Library đã phác thảo (cạnh nút "Sao chép variant").
 - [ ] [13-ceremony-mo-rong.md](13-ceremony-mo-rong.md): thêm bước Export/Import vào luồng
       "Trách nhiệm 1-2" (quản lý Event, active/switch) — đây là công cụ hỗ trợ trực tiếp #16.
+
+## Bảo mật — Export bundle chứa PII (ghi thành văn, 2026-07-16)
+
+`EventExportBundle` (và export DataSource) chứa **dữ liệu cá nhân**: họ tên, SĐT, CCCD/số định
+danh của người tham dự — dạng file `.json`/`.zip` **không mã hóa**, di chuyển qua USB/email/máy
+khác. Chấp nhận được cho công cụ offline nội bộ, nhưng:
+- File 15 (và UI export) nên có **1 dòng cảnh báo** khi export kèm data: "File này chứa thông
+  tin cá nhân — bảo quản/xóa sau khi dùng đúng quy định của đơn vị."
+- Cân nhắc **tùy chọn "export không kèm cột nhạy cảm"** (bỏ SĐT/CCCD, chỉ giữ tên + thứ tự +
+  ảnh) khi mục đích export chỉ để backup layout/cấu trúc, không cần data cá nhân đầy đủ.
+- Khi có Supabase (giai đoạn cuối): dữ liệu PII lên cloud phải theo tenant RLS + cân nhắc mã
+  hóa — ghi nhận cho giai đoạn đó, không phải việc bây giờ.
 
 ## Câu hỏi mở
 

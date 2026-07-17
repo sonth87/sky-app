@@ -145,6 +145,21 @@ describe('ceremony-db round-trip', () => {
     expect(student!.ts_checkin).toBe('2026-07-16T08:00:00Z');
   });
 
+  it('getCeremonyBundle không truyền roomId đọc được bundle đã lưu với room_id bất kỳ (bug restart Electron)', () => {
+    const bundle = sampleBundle();
+    bundle.room_id = 'H1'; // seed thật của Electron dùng room nghiệp vụ, không phải 'default'
+    saveCeremonyBundle(executor, bundle);
+
+    // Đường restart: loadFromDisk đọc không lọc room — phải thấy dữ liệu
+    const loaded = getCeremonyBundle(executor);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.room_id).toBe('H1');
+    expect(loaded!.students).toHaveLength(1);
+
+    // Đọc đích danh room sai vẫn phải trả null (hành vi lọc giữ nguyên khi có tham số)
+    expect(getCeremonyBundle(executor, 'default')).toBeNull();
+  });
+
   it('runMigrations gọi lại nhiều lần là no-op an toàn', () => {
     runMigrations(executor);
     runMigrations(executor);

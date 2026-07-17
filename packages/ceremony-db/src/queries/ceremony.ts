@@ -42,13 +42,20 @@ function rowToCeremony(row: CeremonyRow): Ceremony {
   };
 }
 
-/** Đọc ceremony đầu tiên theo room_id — Giai đoạn 0 chỉ có 1 ceremony/room, giống bundle.json cũ. */
-function getCeremonyRow(executor: SqlExecutor, roomId: string): CeremonyRow | null {
-  const rows = executor.query<CeremonyRow>('SELECT * FROM ceremony WHERE room_id = ? LIMIT 1', [roomId]);
+/**
+ * Đọc ceremony theo room_id, hoặc dòng đầu tiên nếu không truyền roomId — Giai đoạn 0 chỉ có
+ * 1 ceremony/DB nên "dòng duy nhất" là ngữ nghĩa đúng cho phía đọc (Electron seed bundle với
+ * room_id nghiệp vụ như 'H1', KHÔNG phải hằng 'default' — đọc theo hằng cứng sẽ trượt dòng
+ * đã lưu, làm app restart tưởng DB rỗng).
+ */
+function getCeremonyRow(executor: SqlExecutor, roomId?: string): CeremonyRow | null {
+  const rows = roomId
+    ? executor.query<CeremonyRow>('SELECT * FROM ceremony WHERE room_id = ? LIMIT 1', [roomId])
+    : executor.query<CeremonyRow>('SELECT * FROM ceremony LIMIT 1');
   return rows[0] ?? null;
 }
 
-export function getCeremonyBundle(executor: SqlExecutor, roomId = 'default'): CeremonyBundle | null {
+export function getCeremonyBundle(executor: SqlExecutor, roomId?: string): CeremonyBundle | null {
   const row = getCeremonyRow(executor, roomId);
   if (!row) return null;
 

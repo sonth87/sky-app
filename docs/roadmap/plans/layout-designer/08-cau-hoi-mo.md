@@ -120,14 +120,24 @@ tự động, nhưng cần **"Sao chép variant" (copy-as-new)** từ BẤT KỲ
 - ✅ Toạ độ: px trên canvas chuẩn (`refW/refH`) của variant + scale-to-fit lúc render (đổi từ
   `%` sang `px` ngày 2026-07-15 — dễ hình dung hơn khi thiết kế; thử trước đo sau).
 - ✅ Multi-aspect: mỗi layout nhiều variant theo tỷ lệ, mỗi variant có bg + item riêng.
-- ✅ Storage qua port `LayoutStore`: local/file GĐ1 → Supabase GĐ2.
+- ✅ Storage qua port `LayoutStore`: **SQLite làm nền tảng ngay** (Electron + data-service +
+  WASM fallback web) → **Supabase là GIAI ĐOẠN CUỐI** (đổi 2026-07-16, xem [18](18-luu-tru-sqlite-supabase.md),
+  [20](20-rasoat-2026-07-16.md) §E). KHÔNG còn "local/file GĐ1".
 - ✅ Giao tiếp qua artifact JSON, editor không là dependency runtime của ceremony.
 - ✅ Schema + renderer đặt ở `packages/slide-shared` (dùng chung).
-- ✅ Editor import `STUDENT_TEMPLATE_VARIABLES` + `CustomVariable`, không tự định nghĩa biến.
+- ✅ **Layout TỰ DO khai token `@var`** (đổi 2026-07-16, xem [09](09-quy-dinh-variable.md) §2.5) —
+  KHÔNG phải "editor import STUDENT_TEMPLATE_VARIABLES rồi chỉ dùng biến có sẵn". Global chỉ là
+  danh sách GỢI Ý trong dropdown, layout gõ token bất kỳ. Cú pháp token: `@var` (mở, §1).
 - ✅ **Tầng Event mới** (2026-07-15, xem [10](10-quan-ly-dot-le-event.md)): quản lý nhiều đợt
   lễ song song, mỗi Event sở hữu `customVariables` riêng (KHÔNG phải ceremony sở hữu), tham
   chiếu tới layout có sẵn (tái dùng, không copy), 3 mức tái sử dụng (giống hệt/override nhẹ/
-  fork layout mới), chuyển đổi Event active theo lịch (bán tự động, cần xác nhận).
+  fork layout mới), **chuyển đổi Event active HOÀN TOÀN THỦ CÔNG** (A9 — KHÔNG bán tự động, đã
+  chốt; `active` chỉ là nhãn theo dõi/lọc, xem [20](20-rasoat-2026-07-16.md) §A1).
+- ✅ **Layout versioning** (2026-07-16, xem [21](21-layout-versioning.md)): publish/draft, lịch
+  sử version đầy đủ, switch version, Event ghim version đã chọn (không tự đổi giữa lễ).
+- ✅ **Editor-core package riêng** (2026-07-16, xem [23](23-editor-core-architecture.md)):
+  registry command/undo-redo/history/zoom/snap/helper-line/drag-drop.
+- ✅ **Cú pháp token `@var`** đồng bộ layout + TTS (2026-07-16 vòng 2, xem [09](09-quy-dinh-variable.md) §1).
 
 ## E. Việc tiếp theo (khi blueprint đủ chín)
 

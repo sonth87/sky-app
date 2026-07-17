@@ -112,12 +112,24 @@ mode='consumable' (Tiêu hao — VD sinh viên tốt nghiệp):
      nhận ở đợt 1"
 ```
 
-**Ai ghi `consumedIds`, khi nào — CHỐT 2026-07-15 (xem [14](14-rasoat-2026-07-15.md) #15):**
-KHÔNG có cơ chế tự động gắn vào việc chạy lễ (không dựa vào trạng thái `on_stage`/`returned`,
-không có trigger nào trong runtime backdrop). Người vận hành **tự mở Event trong `control/` và
-tự đánh dấu/chỉnh `consumedIds` khi họ thấy cần** — đây là thao tác quản trị thủ công, tách hẳn
-khỏi luồng trình chiếu. Chi tiết cơ chế thao tác + import/export danh sách này xem
-[15-import-export.md](15-import-export.md).
+**Ai ghi `consumedIds`, khi nào — CHỐT LẠI 2026-07-16 (thay quyết định #15 cũ, xem [20](20-rasoat-2026-07-16.md) §A3):**
+
+> Bản trước (#15, 2026-07-15) chốt "tick tay hoàn toàn, tách khỏi runtime" — nhưng trao 500
+> người mà tick tay từng người thì UX quá cực, dễ bị bỏ luôn không dùng. Sonth chốt lại:
+> **đánh dấu THEO LUỒNG VẬN HÀNH — chạy đến ai thì đánh dấu người đó là đã chạy.**
+
+Có **3 dạng vận hành** đưa 1 record lên sân khấu, dạng nào cũng ghi `consumedIds` cho record đó:
+- **Ấn tay** (người vận hành bấm "chạy" cho 1 người) → đánh dấu người đó.
+- **Chạy tự động** (auto theo danh sách) → đánh dấu mỗi người khi tới lượt.
+- **Quét QR** → đánh dấu người vừa quét.
+
+→ Đây KHÔNG mâu thuẫn "không tự động hóa": việc "chạy đến người đó" là **hành động chủ động của
+người dùng** (họ cho chạy), hệ thống chỉ ghi nhận theo đúng hành động đó — không tự suy diễn.
+Khác hẳn "tự động theo `scheduledAt`" (đã bỏ). Điểm ghi cụ thể: khi record chuyển sang trạng
+thái đã-trình-chiếu (tái dùng luồng `status` sẵn có: `on_stage`/`returned`) VÀ DataSource của
+Event là `mode='consumable'` → thêm `record.id` vào `consumedIds`. Người vận hành vẫn có thể
+**mở lại và chỉnh tay** `consumedIds` (bỏ/thêm) nếu cần sửa — thao tác quản trị bổ sung, không
+thay cho cơ chế đánh-dấu-khi-chạy. Import/export danh sách xem [15](15-import-export.md).
 
 ### Vì sao KHÔNG cần 2 schema riêng cho "Global" và "Per-event"
 
@@ -339,16 +351,37 @@ export type FieldMapSource =
       ghi rõ là bắt buộc dùng khi 1 Event có NHIỀU layoutRefs (không chỉ optional cho tình
       huống hiếm) — cập nhật mô tả field.
 
-## Câu hỏi mở mới
+## Quyết định vận hành bổ sung — CHỐT 2026-07-16 (xem [20](20-rasoat-2026-07-16.md))
 
-- **`consumedIds` cộng dồn qua nhiều Event dùng chung 1 `DataSource` mode='consumable'** — cần
-  1 nơi tổng hợp "toàn bộ id đã dùng của nguồn X, xét qua MỌI Event từng dùng X" — có nên tính
-  on-the-fly (quét tất cả EventDocument mỗi lần) hay cache lại ở `DataSource` (thêm field
-  `DataSource.globallyConsumedIds` cập nhật mỗi khi 1 Event tiêu thụ)? Đề xuất: cache ở
-  `DataSource` để tránh quét toàn bộ Event mỗi lần load — nhưng cần đảm bảo đồng bộ đúng khi
-  nhiều Event cùng sửa (hiếm khi 2 người sửa đồng thời, rủi ro thấp, ghi nhận thôi).
-- **Preview với data thật** (Trách nhiệm 6, bước 4) — cần UI cụ thể thế nào, chưa phác thảo
-  wireframe chi tiết, để sau khi các phần schema ổn định.
-- **Khi record không match layout nào** (`resolveLayout` trả `null`) — hành vi hiển thị cụ thể
-  là gì? Placeholder "chưa có layout phù hợp" hay giữ nguyên backdrop trước đó? Cần chốt để
-  không bị màn đen giữa lễ.
+### Re-import DataSource → qua MODAL rõ ràng (không chỉ hỏi "có import?")
+Re-import cập nhật DataSource đã có `consumedIds`: id record ổn định theo **khóa tự nhiên**
+(`DataSource.naturalKeyField`) → người đã consumed không xuất hiện lại. Modal import hiển thị
+diff kiểu git (thêm/ghi đè/không đổi/xóa) + màn kết quả. Chi tiết đầy đủ ở [22](22-import-modal.md).
+
+### `setActive` giữa lễ → reset session + backdrop idle
+`EventStore.setActive(id)` sang Event khác Event đang chạy → `SessionState.current_on_stage_id`/
+`pending_id` reset về null + backdrop về màn chờ (id cũ thuộc DataSource khác, vô nghĩa với
+Event mới). Tránh backdrop kẹt hiển thị người của đợt trước. (Hệ quả kỹ thuật, [20](20-rasoat-2026-07-16.md) §A5.)
+
+### Layout có version mới sau khi Event map biến → notice + check token
+Event ghim `EventLayoutRef.layoutVersion` (file 21). Layout publish version mới → Event hiện
+notice, user chủ động Update; lúc Update hệ thống check token của version mới vs `fieldMap`,
+thiếu thì hỏi sang màn Ghép biến. Runtime luôn load đúng version ghim → lễ đang chạy ổn định.
+Đầy đủ ở [21](21-layout-versioning.md) §5. Đây là lời giải cho lỗ hổng "layout đổi → lệch âm
+thầm giữa lễ".
+
+### Khi kích hoạt Event → cảnh báo mềm token chưa gán (không chặn)
+Lúc bấm Kích hoạt 1 Event, chạy 1 lượt đối chiếu token của các layout (đúng version ghim) vs
+`fieldMap` → hiện cảnh báo mềm "layout X có N token chưa gán nguồn — sẽ hiện trống khi trình
+chiếu" (không chặn kích hoạt, đúng triết lý "không tự động bảo vệ"). Ai không mở lại wizard sau
+khi layout đổi vẫn được nhắc ở bước kích hoạt.
+
+## Câu hỏi mở còn lại
+
+- **`consumedIds` cộng dồn qua nhiều Event dùng chung 1 `DataSource` mode='consumable'** — ĐÃ
+  GIẢI (không còn mở): dùng **bảng nối `event_consumed_record`** trong SQLite ([18](18-luu-tru-sqlite-supabase.md)
+  §5) — `SELECT` qua JOIN luôn đúng "toàn bộ đã dùng của nguồn X", không cần chọn cache/on-the-fly.
+- **Preview với data thật** (Trách nhiệm 6, Bước 5 wizard) — đã có bản thiết kế thật (§Wizard 5
+  bước). Chi tiết UI khi code GĐ4d.
+- **Khi record không match layout nào** (`resolveLayout` trả `null`) — CHỐT (xem [07](07-luong-hoat-dong.md)
+  §"Trường hợp biên"): màn nền trung tính + log cảnh báo, KHÔNG throw, KHÔNG chặn lúc soạn.

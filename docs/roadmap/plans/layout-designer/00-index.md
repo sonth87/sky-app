@@ -40,7 +40,11 @@ dữ liệu thật vào biến, và hiển thị — hỗ trợ cả cá nhân l
 | [16-wireframe-control.md](16-wireframe-control.md) | **Đánh giá effort:** layout-designer đã có wireframe pixel-detail, `control/` (Event/Data/Selector) thì CHƯA — 5 màn hình cần vẽ, Màn "selector kéo-thả" là rủi ro effort lớn nhất toàn blueprint |
 | [17-prompt-claude-design-control.md](17-prompt-claude-design-control.md) | **Prompt** cho Claude Design vẽ `control/` — ✅ ĐÃ CÓ BẢN THIẾT KẾ THẬT (`Ceremony Control - Event Flow.dc.html`, 2026-07-16), chốt 5 bước wizard + header chip Event |
 | [19-prompt-claude-design-mapping.md](19-prompt-claude-design-mapping.md) | **Prompt** cho màn "Ghép biến" — ✅ ĐÃ CÓ BẢN THIẾT KẾ THẬT (gộp chung file trên), khớp rất sát prompt |
-| [18-luu-tru-sqlite-supabase.md](18-luu-tru-sqlite-supabase.md) | **ĐỔI HƯỚNG LƯU TRỮ:** SQLite thay JSON/localStorage làm database local (cả ceremony bundle hiện có lẫn Event/DataSource/Layout mới); Supabase = tầng đồng bộ đa-tenant GĐ2; Electron có 3 chế độ offline/online/đồng bộ |
+| [18-luu-tru-sqlite-supabase.md](18-luu-tru-sqlite-supabase.md) | **ĐỔI HƯỚNG LƯU TRỮ:** SQLite thay JSON/localStorage làm database local (cả ceremony bundle hiện có lẫn Event/DataSource/Layout mới); web 3 tầng (data-service→WASM→Supabase); Supabase là **giai đoạn CUỐI**; multi-tab/persist WASM; thử `node:sqlite` |
+| [20-rasoat-2026-07-16.md](20-rasoat-2026-07-16.md) | **RÀ SOÁT VÒNG 2:** nguồn chân lý cho quyết định 2026-07-16 vòng 2 — lỗ hổng nghiệp vụ (active/re-import/consume/version) + kỹ thuật (multi-tab/persist/preload/node:sqlite/editor) + Supabase làm cuối cùng. Mọi file khác trỏ về đây |
+| [21-layout-versioning.md](21-layout-versioning.md) | **MỚI — Layout versioning:** publish/draft, lịch sử version đầy đủ, switch version, Event ghim `layoutVersion` (không tự đổi giữa lễ), notice + check token khi update. Nền tảng cho cả offline switch lẫn Supabase sync |
+| [22-import-modal.md](22-import-modal.md) | **MỚI — Import modal:** re-import DataSource qua modal rõ ràng (diff git thêm/ghi đè/xóa + màn kết quả), khóa tự nhiên (`naturalKeyField`) để id ổn định → người đã consumed không xuất hiện lại |
+| [23-editor-core-architecture.md](23-editor-core-architecture.md) | **MỚI — Editor-core:** package `layout-editor-core` riêng (Zustand state + command/history registry undo/redo/coalesce + tool registry + snap/helper-line + zoom/pan + item-type registry). `modules/layout-designer` chỉ ráp UI |
 
 ## Chốt chính thức (đã quyết, phần lớn KHÔNG còn là "nghiêng về")
 
@@ -69,8 +73,12 @@ dữ liệu thật vào biến, và hiển thị — hỗ trợ cả cá nhân l
   hoạt động độc lập được kể cả không có server; Export/Import (file 15) là cầu nối mang dữ liệu
   từ web (SQLite-WASM, cô lập theo từng trình duyệt) sang Electron. Qua port chung (`LayoutStore`,
   `EventStore`, `DataSource`) — chỉ đổi adapter, không đổi app. Xem [18](18-luu-tru-sqlite-supabase.md) §1a.
+- ✅ **Cú pháp token — CHỐT 2026-07-16 vòng 2:** `@var` — MỞ, không đóng đuôi (như tag Facebook),
+  `@` sau khoảng trắng/đầu dòng, tên biến `[a-zA-Z0-9_-]` bắt đầu+kết thúc bằng chữ/số. Đảo lại
+  quyết định `{{key}}` (chốt sáng cùng ngày) theo yêu cầu Sonth. **Đồng bộ với `renderTemplate`
+  TTS hiện có** (vốn đã dùng `@key`). UI hiện token dạng chip + autocomplete. Xem [09](09-quy-dinh-variable.md) §1.
 - ✅ **Ai quản lý biến — CHỐT LẠI 2026-07-16 (đổi hướng quan trọng):** layout **tự do khai token**
-  `{{key}}` bất kỳ, KHÔNG cần khớp danh sách nào, KHÔNG cần Event tồn tại trước (vì layout được
+  `@var` bất kỳ, KHÔNG cần khớp danh sách nào, KHÔNG cần Event tồn tại trước (vì layout được
   thiết kế TRƯỚC Event). Event là nơi định nghĩa biến tùy chỉnh (rule) VÀ **map token của layout
   đã chọn sang nguồn giá trị thật** (`EventLayoutRef.fieldMap`) — map lại mỗi khi đổi layout, vì
   mỗi layout có token khác nhau. Chỉ **1 chiều** layout-designer → ceremony, KHÔNG có chiều
@@ -98,14 +106,25 @@ dữ liệu thật vào biến, và hiển thị — hỗ trợ cả cá nhân l
 - ✅ **Khi thiếu variant khớp tỷ lệ màn:** KHÔNG letterbox (không viền đen). Ưu tiên quay lại
   thiết kế thêm variant đúng tỷ lệ; nếu chưa kịp, chấp nhận **stretch** (kéo giãn/co méo) variant
   gần nhất để lấp đầy màn. Xem [04](04-schema-layout-document.md).
-- ✅ **Không có cơ chế tự động bảo vệ người dùng** (không validate chặn thiếu layout mặc định,
-  không tự động ghi `consumedIds` khi "trao xong") — người dùng tự chuẩn bị/tự quản lý, đổi lại
-  hệ thống cung cấp **Import/Export đầy đủ** (layout, Event, variable, data) để họ chủ động
-  kiểm tra trước khi chạy lễ. Xem [15](15-import-export.md).
+- ✅ **Không có cơ chế tự động bảo vệ người dùng** (không validate chặn thiếu layout mặc định) —
+  người dùng tự chuẩn bị/tự quản lý, đổi lại hệ thống cung cấp **Import/Export đầy đủ** để họ
+  chủ động kiểm tra trước khi chạy lễ. Xem [15](15-import-export.md). **`consumedIds` ghi theo
+  luồng vận hành** (chạy đến ai — ấn tay/tự động/QR — thì đánh dấu người đó), KHÔNG tick tay
+  tách biệt (đổi 2026-07-16, xem [13](13-ceremony-mo-rong.md), [20](20-rasoat-2026-07-16.md) §A3).
 - ✅ **Event sống ở đâu:** nhúng UI trong `modules/ceremony/src/control/` (khu vực quản trị đã
   có sẵn, tách biệt với `src/backdrop/` = runtime trình chiếu) — KHÔNG tách module riêng.
   Schema (`EventStore`/`LayoutStore`/`DataSource`) vẫn độc lập, chỉ UI dùng chung chỗ chạy.
   Xem [13](13-ceremony-mo-rong.md).
+- ✅ **Layout versioning (MỚI 2026-07-16):** publish/draft, lịch sử version đầy đủ, switch
+  version (offline được, không cần cloud). Event **ghim `layoutVersion`** — layout đổi không tự
+  ảnh hưởng lễ đang chạy; publish version mới → notice + user chủ động update (có check token).
+  Xem [21](21-layout-versioning.md).
+- ✅ **Editor-core package riêng (MỚI 2026-07-16):** `packages/layout-editor-core` — registry
+  đầy đủ (command/undo-redo/history/zoom/snap/helper-line/drag-drop/item-type). Xem [23](23-editor-core-architecture.md).
+- ✅ **Re-import DataSource qua modal (MỚI 2026-07-16):** diff git (thêm/ghi đè/xóa) + màn kết
+  quả + khóa tự nhiên (id ổn định → người đã consumed không xuất hiện lại). Xem [22](22-import-modal.md).
+- ✅ **Supabase = GIAI ĐOẠN CUỐI CÙNG (chốt 2026-07-16):** đẩy xuống sau khi hoàn thiện SQLite +
+  layout-designer + Event + wizard + import/export + versioning. Xem [20](20-rasoat-2026-07-16.md) §E.
 
 ## Nguyên tắc xuyên suốt
 

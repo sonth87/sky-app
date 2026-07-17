@@ -34,6 +34,9 @@ apps/shell-electron/resources/
 release/
 apps/shell-electron/release-renderer/
 
-# apps/data-service — bundle.json local-dev là state runtime, không commit
+# apps/data-service — bundle.json/ceremony.db local-dev là state runtime, không commit
 # (seed lại tự động từ apps/shell-electron/sample-bundle/ khi thiếu file).
 apps/data-service/data/bundle.json
+apps/data-service/data/*.db
+apps/data-service/data/*.db-shm
+apps/data-service/data/*.db-wal

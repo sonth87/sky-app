@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^10.1.0",
+    "@sky-app/ceremony-db": "workspace:*",
     "@sky-app/slide-shared": "workspace:*",
     "fastify": "^5.2.0"
   },

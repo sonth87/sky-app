@@ -6,7 +6,8 @@
     "outDir": "dist-cjs",
     "rootDir": "src",
     "declaration": false,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src"],
   "exclude": ["dist", "dist-cjs", "node_modules", "src/**/*.test.ts"]

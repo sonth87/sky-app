@@ -4,7 +4,12 @@ import { app } from 'electron';
 import AdmZip from 'adm-zip';
 import type { CeremonyBundle, Student } from '@sky-app/slide-shared';
 import { IMPORT_WARN_SIZE, IMPORT_MAX_SIZE, formatGB } from '@sky-app/slide-shared';
-import { getCeremonyBundle as dbGetCeremonyBundle, saveCeremonyBundle as dbSaveCeremonyBundle } from '@sky-app/ceremony-db';
+import {
+  getCeremonyBundle as dbGetCeremonyBundle,
+  saveCeremonyBundle as dbSaveCeremonyBundle,
+  mapRawStudent,
+  type RawStudent,
+} from '@sky-app/ceremony-db/node';
 import { ceremonyDataDir, bundleJsonPath, sampleDataDir, PHOTO_DIR_NAMES, ttsPregenDir } from './paths';
 import { ceremonyStore } from './store';
 import { sessionStore } from '../session-store';
@@ -457,51 +462,10 @@ function readBundleFromDir(dataDir: string): CeremonyBundle | null {
 }
 
 
-/** Shape thô của students.json từ hệ thống portal */
-interface RawStudent {
-  id: string;
-  graduation_batch_id: string;
-  batch_name: string;
-  display_order: number;
-  student_code: string;
-  full_name: string;
-  gender: string;
-  date_of_birth: string;
-  major_name: string;
-  faculty_name: string;
-  class_code: string;
-  course_code: string;
-  phone_number: string;
-  identity_number: string;
-  email: string;
-  gpa: number;
-  classification: string;
-  classification_type: number;
-  achievement_title: string;
-  award_type: string;
-  award_type_code: string | null;
-  award_content: string;
-  quote: string | null;
-  image_file_name: string;
-  image_relative_path: string;
-  presentation_template_type: string;
-  presentation_template_type_code: string | null;
-  registration_status: string;
-  degree_award_status: string;
-}
-
-/** Map registration_status từ portal sang StudentStatus nội bộ */
-function mapStatus(raw: string): Student['status'] {
-  switch (raw) {
-    case 'on_stage': return 'on_stage';
-    case 'returned':
-    case 'received_hardcopy': return 'returned';
-    case 'checked_in': return 'checked_in';
-    case 'called': return 'called';
-    case 'absent': return 'absent';
-    default: return 'registered';
-  }
-}
+// RawStudent + mapStatus + phần map từng record GOM VỀ @sky-app/ceremony-db (seed.ts,
+// 2026-07-16) — import `RawStudent`/`mapRawStudent` ở đầu file. buildBundleFromStudentsJson
+// dưới đây GIỮ logic riêng của Electron (kế thừa ceremony/config/room từ existingBundle) —
+// chỉ phần map từng record dùng chung mapRawStudent.
 
 // Tên file config layout đã đổi (V?) — bundle cũ có thể còn trỏ tên cũ đã không tồn tại trên đĩa.
 const LEGACY_BACKDROPS_CONFIG_NAMES = new Set(['assets/2026/backdrops.json']);
@@ -532,51 +496,7 @@ function buildBundleFromStudentsJson(raw: RawStudent[], _dataDir: string): Cerem
     ceremony.backdrops_config = CURRENT_BACKDROPS_CONFIG;
   }
 
-  const students: Student[] = raw.map((r, idx) => {
-    if (idx === 0) {
-      console.log('[Sync] First student raw:', {
-        phone_number: r.phone_number,
-        identity_number: r.identity_number,
-      });
-    }
-    return {
-      id: r.id,
-      student_code: r.student_code,
-      display_order: r.display_order,
-      full_name: r.full_name,
-      gender: r.gender || 'Nam',
-      date_of_birth: r.date_of_birth,
-      major_name: r.major_name,
-      faculty_name: r.faculty_name,
-      class_code: r.class_code,
-      course_code: r.course_code,
-      phone_number: r.phone_number ?? '',
-      identity_number: r.identity_number ?? '',
-      email: r.email,
-      gpa: r.gpa,
-      classification: r.classification,
-      classification_type: r.classification_type,
-      achievement_title: r.achievement_title,
-      award_type: r.award_type,
-      award_type_code: r.award_type_code,
-      award_content: r.award_content,
-      presentation_template_type: r.presentation_template_type,
-      presentation_template_type_code: r.presentation_template_type_code,
-      quote: r.quote,
-      image_file_name: r.image_file_name,
-      image_relative_path: r.image_relative_path ?? '',
-      graduation_batch_id: r.graduation_batch_id,
-      batch_name: r.batch_name,
-      degree_award_status: r.degree_award_status,
-      status: mapStatus(r.registration_status),
-      ts_checkin: null,
-      ts_called: null,
-      ts_on_stage: null,
-      ts_returned: null,
-      src_on_stage: null,
-      staff_presenter: null,
-    };
-  });
+  const students: Student[] = raw.map(mapRawStudent);
 
   return {
     room_id: existingBundle?.room_id ?? 'H1',
@@ -616,7 +536,8 @@ function offlineResult(message: string): SyncResult {
  * cùng 1 file .db). */
 function readConfigFromDisk(): CeremonyBundle['config'] | null {
   try {
-    const loaded = dbGetCeremonyBundle(ceremonyStore.getExecutor(), 'default');
+    // Không lọc room_id — DB local chỉ có 1 ceremony, room_id do nguồn seed đặt (VD 'H1').
+    const loaded = dbGetCeremonyBundle(ceremonyStore.getExecutor());
     return loaded?.config ?? null;
   } catch {
     return null;
@@ -680,14 +601,7 @@ function applyMerge(newBundle: CeremonyBundle, onProgress?: (pct: number) => voi
   newBundle._synced_at = new Date().toISOString();
   // Ghi trong 1 transaction SQL (ceremony+config+students) — thay writeFileSync toàn file
   // cũ, giải quyết rủi ro "không rollback nếu crash giữa chừng" (xem file 18 §2 blueprint).
-  console.log('[DEBUG applyMerge] before save, students:', newBundle.students.length, 'ceremony.id:', newBundle.ceremony?.id);
-  try {
-    dbSaveCeremonyBundle(ceremonyStore.getExecutor(), newBundle);
-    console.log('[DEBUG applyMerge] save OK');
-  } catch (e) {
-    console.error('[DEBUG applyMerge] save FAILED:', e);
-    throw e;
-  }
+  dbSaveCeremonyBundle(ceremonyStore.getExecutor(), newBundle);
   ceremonyStore.load(newBundle);
 
   return {

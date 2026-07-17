@@ -47,9 +47,10 @@ export interface LayoutSummary {
 
 | Adapter | Môi trường | Giai đoạn | Ghi chú |
 |---|---|---|---|
-| `SqliteLayoutStore` | web qua `data-service` (Node, `better-sqlite3`) | **Bây giờ** | Query SQL vào file `.db` local trên máy chạy `data-service` |
-| `SqliteLayoutStore` | electron (`better-sqlite3` native) | **Bây giờ** | Cùng logic, file `.db` trong `ceremony-data/` |
-| `SupabaseLayoutStore` | web (định hướng dài hạn) + electron (chế độ online/đồng bộ) | GĐ2 | Cột `tenant_id` + RLS, xem [18](18-luu-tru-sqlite-supabase.md) §6 |
+| `SqliteLayoutStore` (server-side) | web qua `data-service` (Node, `better-sqlite3`/`node:sqlite`) | **Bây giờ** | Query SQL vào file `.db` local trên máy chạy `data-service` |
+| `SqliteLayoutStore` (Electron) | electron main process (native) | **Bây giờ** | Cùng logic, file `.db` trong `ceremony-data/` |
+| `SqliteWasmLayoutStore` | web fallback khi KHÔNG có `data-service` (VD serverless) | **Bây giờ** | `sql.js` (WASM) trong trình duyệt, persist IndexedDB — mỗi trình duyệt 1 đảo dữ liệu, xem [18](18-luu-tru-sqlite-supabase.md) §1a |
+| `SupabaseLayoutStore` | web (dài hạn) + electron (chế độ online/đồng bộ) | **Giai đoạn CUỐI** | Cột `tenant_id` + RLS, đồng bộ 2 chiều + version (file 21), xem [18](18-luu-tru-sqlite-supabase.md) §6. Đẩy xuống làm SAU CÙNG (chốt 2026-07-16, xem [20](20-rasoat-2026-07-16.md) §E) |
 
 → SQLite làm nền tảng ngay từ đầu (không phải localStorage/file JSON tạm) — vì bản thân
 Event/DataSource/Layout là dữ liệu quan hệ, SQL biểu diễn tự nhiên hơn, và tránh việc phải
@@ -61,13 +62,25 @@ viết lại lần 2 khi thêm Supabase. Xem phân tích đầy đủ ở [18](1
 - Adapter electron → `packages/platform-electron/adapters/layout.ts`.
 - Đăng ký service `'layout'` trong `create-web-platform` / `create-electron-platform`.
 
-## Ảnh nền & asset — chú ý riêng
+## Ảnh nền & asset — 3 tầng lưu trữ (cập nhật 2026-07-16, khớp file 18)
 
-Layout có background image + ring + ảnh trang trí. Ảnh cần đi kèm layout:
-- **GĐ1 local:** ảnh lưu cạnh document (file) hoặc base64 (localStorage — cân nhắc dung lượng).
-- **GĐ2 Supabase:** ảnh lên Supabase Storage, document lưu URL/path.
-- **Ceremony resolve asset:** đã có `resolveAsset(relativePath)` — layout nên lưu **đường dẫn
-  tương đối**, để `resolveAsset` xử lý cả web (URL) lẫn electron (file://). GIỮ cơ chế này.
+> ⚠️ Bản trước ("GĐ1 local file/base64 → GĐ2 Supabase Storage") viết TRƯỚC quyết định SQLite/
+> WASM — **đã lỗi thời**. Ảnh nền/ring/trang trí của layout lưu khác nhau theo từng tầng:
+
+| Tầng | Ảnh lưu ở đâu | Layout lưu gì |
+|---|---|---|
+| **Electron** | file trong `ceremony-data/` (thư mục assets, như hiện tại) | đường dẫn tương đối |
+| **Web + data-service** | thêm route `POST /api/layout/asset` upload → lưu file cạnh `.db` server | đường dẫn tương đối |
+| **Web WASM (fallback)** | **blob trong IndexedDB** (không có filesystem) → tạo `object URL` lúc render | key blob (không phải path file) |
+| **Supabase (cuối)** | Supabase Storage | URL/path |
+
+- **`resolveAsset(relativePath)`** đã có — GIỮ cơ chế, nhưng cần mở rộng để xử lý cả trường hợp
+  WASM (key blob → object URL) bên cạnh path file/URL. Đây là 1 điểm PHẢI thiết kế trước khi làm
+  editor web (GĐ2), không phải để mở.
+- **Export/Import (file 15/22)** phải gánh việc mang ảnh theo (base64 trong JSON hoặc thư mục
+  `assets/` trong zip) — vì WASM mode không có path file bền, ảnh chỉ sống trong IndexedDB của
+  đúng trình duyệt đó; muốn mang sang máy khác/Electron thì phải qua Export.
+- Chi tiết + việc phải làm ở [18](18-luu-tru-sqlite-supabase.md) §1a (giới hạn WASM) + plan GĐ2.
 
 ## Điều kiện chọn layout — thuộc về Event, KHÔNG thuộc về layout-designer
 

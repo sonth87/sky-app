@@ -9,6 +9,13 @@
 
 ## 1. Quyết định phạm vi (đã chốt, không phải đề xuất)
 
+> ⚠️ **Lưu ý thuật ngữ (2026-07-16):** trong file này "GĐ2" nghĩa là **"giai đoạn Supabase"**
+> (đối lập với "GĐ hiện tại = SQLite") — KHÔNG phải "Giai đoạn 2" trong roadmap triển khai (GĐ2
+> roadmap là editor layout-designer). Và Supabase đã được chốt **ĐẨY XUỐNG LÀM GIAI ĐOẠN CUỐI
+> CÙNG** của roadmap (sau khi hoàn thiện SQLite + layout-designer + Event + wizard + import/export
+> + versioning), xem [20](20-rasoat-2026-07-16.md) §E. Mọi chỗ ghi "Supabase GĐ2" bên dưới đọc
+> là "Supabase — giai đoạn cuối".
+
 | | Quyết định |
 |---|---|
 | SQLite áp dụng cho | **Toàn bộ** — cả ceremony bundle hiện tại (student/config/session, đang là `bundle.json`) LẪN mọi thứ blueprint này đang thiết kế (Event, DataSource, LayoutDocument, FieldMappingProfile) |
@@ -53,6 +60,29 @@ duyệt, `SupabaseDataStore` sau này) cùng implement được — `shell-web` 
 không biết/không quan tâm đang chạy adapter nào. Đây là lý do interface `DataStore` được thiết
 kế ngay từ Giai đoạn 0 dù chỉ 1 trong 3 adapter được code thật ở giai đoạn này (xem checklist
 Giai đoạn 0 trong plan triển khai).
+
+### 1a-bis. Giới hạn KỸ THUẬT của WASM mode — việc PHẢI làm khi web dùng thật (chốt 2026-07-16)
+
+Phát hiện khi rà soát vòng 2 (xem [20](20-rasoat-2026-07-16.md) §B1, §B2) — SqliteWasmAdapter
+có 2 giới hạn nghiêm trọng phải xử lý trước khi web mode dùng thật (KHÔNG chặn GĐ0, vì GĐ0 chưa
+có editor web đa-tab):
+
+- **Đa tab đè dữ liệu:** mỗi tab có 1 bản DB trong memory; save = ghi đè TOÀN BỘ IndexedDB → tab
+  sau đè tab trước không cảnh báo. Web mode chắc chắn mở nhiều tab (control + backdrop là 2 tab!).
+  → Bắt buộc: **Web Locks API** giữ quyền ghi cho 1 tab, tab còn lại read-only + hiện cảnh báo
+  "đang mở ở tab/cửa sổ khác". Việc phải làm khi bắt đầu web editor thật (GĐ2).
+- **IndexedDB bị evict:** trình duyệt được quyền xóa IndexedDB khi thiếu dung lượng → mất dữ
+  liệu (thiết kế layout cả tuần rồi mất trắng). → Gọi **`navigator.storage.persist()`** xin quyền
+  lưu bền + **nhắc export định kỳ**. Việc nhỏ, làm cùng SqliteWasmAdapter.
+
+### 1a-ter. `node:sqlite` — cơ hội bỏ ABI dance (thử đầu GĐ1)
+
+`better-sqlite3` là native addon → phải rebuild theo ABI mỗi khi đổi giữa Electron/Node (đã gặp
+thật ở GĐ0, ghi trong plan). **Node ≥22.5 có `node:sqlite` builtin** — KHÔNG phải native addon,
+không rebuild ABI. Kiến trúc `SqlExecutor` cho phép đổi driver không đụng query nào. → **Thử
+nghiệm đầu GĐ1** (chốt 2026-07-16): kiểm chứng Electron 43 có bundle Node ≥22.5 + API `node:sqlite`
+(exec/prepare/transaction) đủ dùng không. Ổn → viết `NodeSqliteExecutor` thay `better-sqlite3`,
+bỏ hẳn ABI dance. Không ổn → giữ `better-sqlite3` (không mất gì). Ghi vào plan GĐ1.
 
 ## 2. Vì sao đổi từ JSON/localStorage sang SQLite — đánh giá thẳng
 

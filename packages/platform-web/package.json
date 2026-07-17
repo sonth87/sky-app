@@ -17,9 +17,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@sky-app/ceremony-db": "workspace:*",
     "@sky-app/kernel": "workspace:*",
     "@sky-app/licensing": "workspace:*",
-    "@sky-app/service-contracts": "workspace:*"
+    "@sky-app/service-contracts": "workspace:*",
+    "@sky-app/slide-shared": "workspace:*"
   },
   "devDependencies": {
     "@sky-app/tsconfig": "workspace:*",

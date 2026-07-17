@@ -101,7 +101,7 @@ interface BaseItem {
 
 export interface TextItem extends BaseItem {
   type: 'text';
-  content: string;    // "Xin chúc mừng @full_name@" — token @var@ nhúng trong text
+  content: string;    // "Xin chúc mừng @full_name" — token @var nhúng trong text
   fontFamily?: string;
   fontSize: number;   // px trên canvas chuẩn — nhân với scale lúc render, như Box
   fontWeight?: number;
@@ -141,7 +141,7 @@ export interface ShapeItem extends BaseItem {
 
 export interface RibbonItem extends BaseItem {
   type: 'ribbon';
-  content: string;      // có thể chứa @var@
+  content: string;      // có thể chứa @var
   bg?: string;
   color?: string;
   fontSize: number;     // px trên canvas chuẩn
@@ -280,7 +280,7 @@ function toRenderBox(box: Box, scaleX: number, scaleY: number) {
       "background": { "kind": "image", "src": "assets/2026/bg-16x9.jpg" },
       "items": [
         { "id": "name", "type": "text", "box": {"x":384,"y":594,"w":1152,"h":130},
-          "content": "@full_name@", "fontSize": 64, "fontWeight": 800,
+          "content": "@full_name", "fontSize": 64, "fontWeight": 800,
           "color": "#fff", "align": "center", "shadow": true },
         { "id": "avatar", "type": "image", "box": {"x":806,"y":194,"w":307,"h":302},
           "varKey": "anh_dai_dien", "shape": "circle", "ring": "assets/2026/ring.png" }
@@ -292,7 +292,7 @@ function toRenderBox(box: Box, scaleX: number, scaleY: number) {
       "background": { "kind": "image", "src": "assets/2026/bg-25x9.jpg" },
       "items": [
         { "id": "name", "type": "text", "box": {"x":896,"y":460,"w":768,"h":129},
-          "content": "@full_name@", "fontSize": 72, "fontWeight": 800,
+          "content": "@full_name", "fontSize": 72, "fontWeight": 800,
           "color": "#fff", "align": "center", "shadow": true },
         { "id": "avatar", "type": "image", "box": {"x":256,"y":184,"w":256,"h":460},
           "varKey": "anh_dai_dien", "shape": "circle" }
@@ -311,7 +311,7 @@ và 25:9 → đúng YC6. Mỗi variant tự chọn `refW/refH` hợp lý cho t�
 |---|---|
 | `items[].x,y,w` (px, canvas 1920×1080 ngầm định) | `box.x/y/w/h` (px) trên `variant.refW/refH` khai báo tường minh — gần như 1-1, chỉ thêm refW/refH |
 | `type: text/ribbon/image/shape` | `TextItem/RibbonItem/ImageItem/ShapeItem` |
-| `content: "@ho_ten@"` | `content` (giữ nguyên token) |
+| `content: "@ho_ten"` | `content` (giữ nguyên token) |
 | `varKey` (image) | `ImageItem.varKey` |
 | `samples{}` | KHÔNG lưu vào layout — chỉ để preview (lấy từ FieldMappingProfile/record mẫu) |
 | `varDefs[]` | thay bằng import `STUDENT_TEMPLATE_VARIABLES` + `CustomVariable` (xem 05) |

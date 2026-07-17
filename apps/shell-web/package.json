@@ -17,7 +17,8 @@
     "@sky-app/platform-web": "workspace:*",
     "@sonth87/device-layout": "github:sonth87/device-layout#v0.1.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "sql.js": "1.14.1"
   },
   "devDependencies": {
     "@sky-app/tsconfig": "workspace:*",

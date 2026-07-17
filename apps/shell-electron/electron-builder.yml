@@ -31,6 +31,19 @@ files:
   - dist-electron/**/*
   - dist/**/*
   - package.json
+  # @sonth87/device-layout (GitHub dep, UI shell) khai next/next-pwa/sharp/nuqs làm
+  # dependency thật trong package.json của chính nó (dùng cho demo/dev app nội bộ của nó,
+  # không phải runtime của sky-app) — pnpm hoist các package này lên node_modules gốc, và
+  # electron-builder tự asarUnpack vì @img/sharp-* có .node native binding, kéo app bundle
+  # phình thêm ~130MB không cần thiết. Loại trừ tường minh — không package nào trong
+  # apps/shell-electron hay modules/* import next/sharp/nuqs lúc runtime. Xác nhận lại
+  # (đếm bytes app.asar.unpacked) nếu build lỗi thiếu module sau khi thêm dòng này.
+  - "!**/node_modules/next/**"
+  - "!**/node_modules/@next/**"
+  - "!**/node_modules/sharp/**"
+  - "!**/node_modules/@img/**"
+  - "!**/node_modules/@ducanh2912/**"
+  - "!**/node_modules/nuqs/**"
 
 # TTS bundled resources — sinh ra bởi `pnpm --filter @sky-app/tts-service
 # build:mac`/`build:win` (chạy TRƯỚC electron-builder, xem package.json's

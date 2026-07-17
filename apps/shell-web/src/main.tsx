@@ -6,6 +6,7 @@ import { mockAppModule } from '@sky-app/module-mock-app';
 import { ceremonyModule } from '@sky-app/module-ceremony';
 import { ttsStudioModule } from '@sky-app/module-tts-studio';
 import { DEV_LICENSE_PUBLIC_KEY_HEX } from '@sky-app/licensing';
+import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 import { WALLPAPERS } from './wallpapers.js';
 import './tailwind-layer-order.css';
 import '@sonth87/device-layout/style.css';
@@ -20,6 +21,10 @@ async function main() {
     // KHÔNG khớp, nên phải truyền tường minh. Web không tự spawn server (khác
     // Electron) — cần tự chạy `apps/tts-service` trước khi test.
     ttsBaseUrl: 'http://localhost:8089',
+    // Fallback SqliteWasmAdapter's sync({useSample:true}) khi data-service không khả dụng —
+    // xem createWebPlatform's resolveDataPort (health-check data-service → fallback WASM).
+    sampleStudentsUrl: '/sample-data/students.json',
+    sqlWasmUrl,
   });
 
   createRoot(document.getElementById('root')!).render(
