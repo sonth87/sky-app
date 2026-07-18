@@ -1,4 +1,6 @@
 import { SQL_001_CEREMONY_CORE } from './001_ceremony_core.js';
+import { SQL_002_LAYOUT_VERSIONING } from './002_layout_versioning.js';
+import { SQL_003_VARIABLE_REGISTRY } from './003_variable_registry.js';
 
 export interface Migration {
   version: number;
@@ -14,4 +16,6 @@ export interface Migration {
  */
 export const MIGRATIONS: Migration[] = [
   { version: 1, name: 'ceremony_core', sql: SQL_001_CEREMONY_CORE },
+  { version: 2, name: 'layout_versioning', sql: SQL_002_LAYOUT_VERSIONING },
+  { version: 3, name: 'variable_registry', sql: SQL_003_VARIABLE_REGISTRY },
 ];

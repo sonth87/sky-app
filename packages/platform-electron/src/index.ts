@@ -4,4 +4,6 @@ export { createElectronTtsPort } from './adapters/tts.js';
 export { createElectronDisplayPort } from './adapters/display.js';
 export { createElectronLicensePort } from './adapters/license.js';
 export type { CreateElectronLicensePortOptions } from './adapters/license.js';
+export { createElectronLayoutPort } from './adapters/layout.js';
+export { createElectronAssetPort } from './adapters/asset.js';
 export type { SkyBridge } from './bridge-types.js';

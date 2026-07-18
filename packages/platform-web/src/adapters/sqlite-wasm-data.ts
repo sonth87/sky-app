@@ -1,16 +1,8 @@
 import type { DataPort } from '@sky-app/service-contracts';
-import {
-  SqlJsExecutor,
-  loadDbBytes,
-  saveDbBytes,
-  runMigrations,
-  getCeremonyBundle,
-  saveCeremonyBundle,
-  mapRawStudent,
-  defaultCeremony,
-  type RawStudent,
-} from '@sky-app/ceremony-db/browser';
+import { getCeremonyBundle, saveCeremonyBundle, mapRawStudent, defaultCeremony, type RawStudent } from '@sky-app/ceremony-db/browser';
 import type { CeremonyBundle, AppConfig } from '@sky-app/slide-shared';
+import { getSharedWasmExecutor, persistSharedWasmExecutor } from '../wasm-executor.js';
+import type { SqlJsExecutor } from '@sky-app/ceremony-db/browser';
 
 const ROOM_ID = 'default';
 
@@ -51,24 +43,6 @@ function emptyBundle(): CeremonyBundle {
   };
 }
 
-let executorPromise: Promise<SqlJsExecutor> | null = null;
-
-async function getExecutor(wasmUrl?: string): Promise<SqlJsExecutor> {
-  if (!executorPromise) {
-    executorPromise = (async () => {
-      const bytes = await loadDbBytes();
-      const executor = await SqlJsExecutor.create(bytes, wasmUrl);
-      runMigrations(executor);
-      return executor;
-    })();
-  }
-  return executorPromise;
-}
-
-async function persist(executor: SqlJsExecutor): Promise<void> {
-  await saveDbBytes(executor.export());
-}
-
 /**
  * DataPort chạy hoàn toàn trong trình duyệt (sql.js + IndexedDB) — dùng khi `data-service`
  * không khả dụng (VD deploy serverless như Vercel, chưa có server riêng). Dữ liệu chỉ tồn tại
@@ -88,7 +62,7 @@ export function createSqliteWasmDataPort(opts: SqliteWasmDataPortOptions = {}): 
   const { sampleStudentsUrl, wasmUrl } = opts;
   return {
     async getMeta() {
-      const executor = await getExecutor(wasmUrl);
+      const executor = await getSharedWasmExecutor(wasmUrl);
       const bundle = getCeremonyBundle(executor, ROOM_ID) ?? emptyBundle();
       return {
         ceremony: bundle.ceremony,
@@ -101,7 +75,7 @@ export function createSqliteWasmDataPort(opts: SqliteWasmDataPortOptions = {}): 
     },
 
     async sync(opts) {
-      const executor = await getExecutor(wasmUrl);
+      const executor = await getSharedWasmExecutor(wasmUrl);
       if (opts?.useSample) {
         if (!sampleStudentsUrl) {
           throw new Error('SqliteWasmAdapter.sync({useSample:true}) cần sampleStudentsUrl');
@@ -113,14 +87,14 @@ export function createSqliteWasmDataPort(opts: SqliteWasmDataPortOptions = {}): 
         bundle.students = raw.map(mapRawStudent);
         bundle._synced_at = new Date().toISOString();
         saveCeremonyBundle(executor, bundle);
-        await persist(executor);
+        await persistSharedWasmExecutor(executor);
         return;
       }
       throw new Error('SqliteWasmAdapter.sync() chỉ hỗ trợ useSample — import ZIP là Electron-only.');
     },
 
     async exportData() {
-      const executor = await getExecutor(wasmUrl);
+      const executor = await getSharedWasmExecutor(wasmUrl);
       const bundle = getCeremonyBundle(executor, ROOM_ID) ?? emptyBundle();
       return bundle.students;
     },

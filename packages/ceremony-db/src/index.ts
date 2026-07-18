@@ -20,3 +20,15 @@ export {
   clearStudents,
   patchStudent,
 } from './queries/student.js';
+export {
+  getLayoutDocument,
+  listLayoutDocuments,
+  createLayoutDocument,
+  saveDraft,
+  publish,
+  listVersions,
+  getVersion,
+  restoreVersion,
+} from './queries/layout.js';
+export { recordTokenUsage, listTopVariables } from './queries/variable-registry.js';
+export type { VariableRegistryEntry } from './queries/variable-registry.js';

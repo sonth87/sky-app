@@ -6,6 +6,7 @@ import type { ImportWallpaperFn } from '@sonth87/device-layout';
 import { mockAppModule } from '@sky-app/module-mock-app';
 import { ceremonyModule } from '@sky-app/module-ceremony';
 import { ttsStudioModule } from '@sky-app/module-tts-studio';
+import { layoutDesignerModule } from '@sky-app/module-layout-designer';
 import { DEV_LICENSE_PUBLIC_KEY_HEX } from '@sky-app/licensing';
 import { WALLPAPERS } from './wallpapers.js';
 import { updateActions } from './updates.js';
@@ -26,7 +27,7 @@ async function main() {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <SkyDeviceLayout
-        apps={[ceremonyModule, ttsStudioModule, mockAppModule]}
+        apps={[ceremonyModule, ttsStudioModule, layoutDesignerModule, mockAppModule]}
         platform={platform}
         onImportWallpaper={importWallpaper}
         wallpapers={WALLPAPERS}

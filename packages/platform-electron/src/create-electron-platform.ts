@@ -3,6 +3,8 @@ import { resolveEntitlementsFromPort } from '@sky-app/licensing';
 import { createElectronTtsPort } from './adapters/tts.js';
 import { createElectronDisplayPort } from './adapters/display.js';
 import { createElectronLicensePort } from './adapters/license.js';
+import { createElectronLayoutPort } from './adapters/layout.js';
+import { createElectronAssetPort } from './adapters/asset.js';
 
 export interface CreateElectronPlatformOptions {
   assetUrl?: (path: string) => string;
@@ -44,6 +46,8 @@ export async function createElectronPlatform(
 
   platform.services.register('tts', createElectronTtsPort());
   platform.services.register('display', createElectronDisplayPort());
+  platform.services.register('layout', createElectronLayoutPort());
+  platform.services.register('asset', createElectronAssetPort());
 
   return platform;
 }

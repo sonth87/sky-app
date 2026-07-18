@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { CeremonyBundle } from '@sky-app/slide-shared';
 import { BetterSqlite3Executor } from './drivers/better-sqlite3-executor.js';
 import { runMigrations } from './migrate.js';
+import { MIGRATIONS } from './migrations/index.js';
 import { getCeremonyBundle, saveCeremonyBundle } from './queries/ceremony.js';
 import { patchStudent, findStudentByCode } from './queries/student.js';
 
@@ -164,6 +165,8 @@ describe('ceremony-db round-trip', () => {
     runMigrations(executor);
     runMigrations(executor);
     const versions = executor.query('SELECT version FROM schema_version');
-    expect(versions).toHaveLength(1);
+    // Không hardcode "1" — số dòng schema_version phải khớp đúng số migration đã đăng ký
+    // (MIGRATIONS.length), không phụ thuộc migration nào được thêm sau này.
+    expect(versions).toHaveLength(MIGRATIONS.length);
   });
 });

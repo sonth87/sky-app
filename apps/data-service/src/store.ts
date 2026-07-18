@@ -63,7 +63,8 @@ function seedFromSample(): CeremonyBundle {
 
 let executor: BetterSqlite3Executor | null = null;
 
-function getExecutor(): BetterSqlite3Executor {
+/** Dùng chung bởi routes/layout.ts — cùng 1 file DB, tránh mở 2 kết nối SQLite song song. */
+export function getExecutor(): BetterSqlite3Executor {
   if (!executor) {
     mkdirSync(DATA_DIR, { recursive: true });
     executor = new BetterSqlite3Executor(DB_PATH);

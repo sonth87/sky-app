@@ -29,6 +29,12 @@ export function assetsDir(): string {
   return join(ceremonyDataDir(), 'assets');
 }
 
+/** Ảnh do layout-designer chọn (nền/avatar tĩnh) — thư mục con riêng trong assets/, tránh trộn
+ * lẫn với ảnh sinh viên nhập qua ZIP (image/, assets/ gốc — xem resolveLocalAsset dưới). */
+export function layoutAssetsDir(): string {
+  return join(assetsDir(), 'layout');
+}
+
 export function autoPlayJsonPath(): string {
   return join(ceremonyDataDir(), 'autoplay.json');
 }

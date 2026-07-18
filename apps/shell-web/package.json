@@ -12,10 +12,11 @@
     "@sky-app/device-shell": "workspace:*",
     "@sky-app/licensing": "workspace:*",
     "@sky-app/module-ceremony": "workspace:*",
+    "@sky-app/module-layout-designer": "workspace:*",
     "@sky-app/module-mock-app": "workspace:*",
     "@sky-app/module-tts-studio": "workspace:*",
     "@sky-app/platform-web": "workspace:*",
-    "@sonth87/device-layout": "github:sonth87/device-layout#v0.1.0",
+    "@sonth87/device-layout": "github:sonth87/device-layout#v0.2.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "sql.js": "1.14.1"

@@ -1,0 +1,14 @@
+{
+  "extends": "@sky-app/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "outDir": "dist",
+    "rootDir": "src",
+    // DOM cần cho tool registry (PointerEvent) ở sub-bước 2.2/2.3 — state/command/history
+    // (2.1) không đụng API DOM nào, nhưng cả package dùng chung 1 tsconfig cho đơn giản.
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules", "src/**/*.test.ts"]
+}

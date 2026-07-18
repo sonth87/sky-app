@@ -1,10 +1,14 @@
 import { createPlatformContext, createAllowAllEntitlementSet, type PlatformContext } from '@sky-app/kernel';
 import { resolveEntitlementsFromPort } from '@sky-app/licensing';
-import type { DataPort } from '@sky-app/service-contracts';
+import type { AssetPort, DataPort, LayoutPort } from '@sky-app/service-contracts';
 import { createWebTtsPort } from './adapters/tts.js';
 import { createWebLicensePort } from './adapters/license.js';
 import { createWebDataPort } from './adapters/data.js';
 import { createSqliteWasmDataPort } from './adapters/sqlite-wasm-data.js';
+import { createWebLayoutPort } from './adapters/layout.js';
+import { createSqliteWasmLayoutPort } from './adapters/sqlite-wasm-layout.js';
+import { createWebAssetPort } from './adapters/asset.js';
+import { createWasmAssetPort } from './adapters/wasm-asset.js';
 
 export interface CreateWebPlatformOptions {
   ttsBaseUrl?: string;
@@ -28,24 +32,39 @@ export interface CreateWebPlatformOptions {
   deviceId?: string;
 }
 
-/**
- * Health-check `data-service` (timeout ngắn) → fallback SqliteWasmAdapter nếu không phản hồi.
- * Đây là "3 tầng ưu tiên" của Web đã chốt (data-service → SqliteWasmAdapter → Supabase GĐ2) —
- * xem docs/roadmap/plans/layout-designer/18-luu-tru-sqlite-supabase.md §1a.
- */
-async function resolveDataPort(opts: CreateWebPlatformOptions): Promise<DataPort> {
-  const baseUrl = opts.dataBaseUrl ?? 'http://localhost:8094';
+/** Health-check `data-service` (timeout ngắn) — dùng chung cho cả DataPort lẫn LayoutPort, vì
+ * cả 2 đều nằm trên cùng 1 server (apps/data-service) và cùng tiêu chí "khả dụng hay không". */
+async function isDataServiceAvailable(baseUrl: string): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 1500);
     const res = await fetch(`${baseUrl}/health`, { signal: controller.signal });
     clearTimeout(timeout);
-    if (res.ok) return createWebDataPort(baseUrl);
+    return res.ok;
   } catch {
     // data-service không khả dụng (chưa chạy / offline / serverless không có server) —
-    // fallback SqliteWasmAdapter bên dưới, không phải lỗi cần báo người dùng.
+    // fallback SqliteWasmAdapter, không phải lỗi cần báo người dùng.
+    return false;
   }
+}
+
+/**
+ * "3 tầng ưu tiên" của Web đã chốt (data-service → SqliteWasmAdapter → Supabase GĐ2) — xem
+ * docs/roadmap/plans/layout-designer/18-luu-tru-sqlite-supabase.md §1a.
+ */
+async function resolveDataPort(opts: CreateWebPlatformOptions, baseUrl: string, available: boolean): Promise<DataPort> {
+  if (available) return createWebDataPort(baseUrl);
   return createSqliteWasmDataPort({ sampleStudentsUrl: opts.sampleStudentsUrl, wasmUrl: opts.sqlWasmUrl });
+}
+
+async function resolveLayoutPort(opts: CreateWebPlatformOptions, baseUrl: string, available: boolean): Promise<LayoutPort> {
+  if (available) return createWebLayoutPort(baseUrl);
+  return createSqliteWasmLayoutPort({ wasmUrl: opts.sqlWasmUrl });
+}
+
+function resolveAssetPort(baseUrl: string, available: boolean): AssetPort {
+  if (available) return createWebAssetPort(baseUrl);
+  return createWasmAssetPort();
 }
 
 /**
@@ -73,8 +92,13 @@ export async function createWebPlatform(opts: CreateWebPlatformOptions = {}): Pr
     assetUrl: opts.assetUrl,
   });
 
+  const dataBaseUrl = opts.dataBaseUrl ?? 'http://localhost:8094';
+  const dataServiceAvailable = await isDataServiceAvailable(dataBaseUrl);
+
   platform.services.register('tts', createWebTtsPort(opts.ttsBaseUrl));
-  platform.services.register('data', await resolveDataPort(opts));
+  platform.services.register('data', await resolveDataPort(opts, dataBaseUrl, dataServiceAvailable));
+  platform.services.register('layout', await resolveLayoutPort(opts, dataBaseUrl, dataServiceAvailable));
+  platform.services.register('asset', resolveAssetPort(dataBaseUrl, dataServiceAvailable));
 
   return platform;
 }

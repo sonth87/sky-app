@@ -1,0 +1,46 @@
+{
+  "name": "@sky-app/module-layout-designer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@sky-app/kernel": "workspace:*",
+    "@sky-app/layout-editor-core": "workspace:*",
+    "@sky-app/service-contracts": "workspace:*",
+    "@sky-app/slide-shared": "workspace:*",
+    "@uiw/color-convert": "^2.10.3",
+    "@uiw/react-color-colorful": "^2.10.3",
+    "lucide-react": "^1.24.0",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@sky-app/tsconfig": "workspace:*",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

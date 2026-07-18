@@ -32,12 +32,35 @@ export interface TextShadow {
   offsetY?: number;
 }
 
+/** 3 nhóm field LỚN dùng cho per-field-group dirty tracking khi copy/đồng bộ item giữa các
+ * variant (xem `sync.ts` ở layout-editor-core) — KHÔNG chia nhỏ hơn (VD sửa riêng `box.x` thì
+ * CẢ CỤM 'box' ngừng nhận auto-sync, không chỉ riêng x) — đúng quyết định 2026-07-18: "nếu đã
+ * thay đổi box thì riêng box không nên sync tự động nữa". */
+export type SyncFieldGroup = 'box' | 'content' | 'style';
+
 interface BaseItem {
   id: string;
   box: Box;
   opacity?: number; // 0..100
   locked?: boolean; // khoá không cho di chuyển trong editor
   name?: string; // nhãn hiện ở panel Layers
+
+  // ─── Đồng bộ item copy giữa các variant (12-thu-vien-layout.md mở rộng 2026-07-18) ──────────
+  /** Khoá đồng bộ ổn định, sinh 1 LẦN DUY NHẤT lúc item được TẠO MỚI (xem addItemCommand ở
+   * layout-editor-core), KHÔNG đổi theo vòng đời item — KHÁC `id` (định danh kỹ thuật). Là
+   * "danh tính nội dung" để item COPY tìm lại item GỐC nó bắt nguồn. */
+  syncKey?: string;
+  /** Trỏ `syncKey` của item NGUỒN TRỰC TIẾP mà item này được copy ra — CHỈ CÓ ở item COPY (item
+   * gốc chưa từng bị copy thì không có field này). Quan hệ CHA-CON TRỰC TIẾP: B copy từ A thì
+   * B.syncRef=A.syncKey; C copy tiếp từ B thì C.syncRef=B.syncKey (KHÔNG PHẢI A.syncKey) —
+   * không flatten về gốc tối thượng, giống mô hình "git parent-commit". */
+  syncRef?: string;
+  /** Nhóm field mà item COPY này đã bị user tự sửa tay — nhóm nào có mặt ở đây thì auto-sync
+   * KHÔNG còn ghi đè nhóm đó nữa. Chỉ có ý nghĩa khi có `syncRef`. */
+  syncOverrides?: SyncFieldGroup[];
+  /** true = TÁCH HẲN khỏi item cha — không còn nhận auto-sync cho BẤT KỲ field nào, kể cả field
+   * chưa từng sửa tay. Không xoá `syncRef`/`syncKey` (giữ để biết lịch sử xuất xứ). */
+  syncLocked?: boolean;
 }
 
 export interface TextItem extends BaseItem {
