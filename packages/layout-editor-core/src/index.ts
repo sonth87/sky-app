@@ -4,6 +4,7 @@ export * from './commands.js';
 export * from './doc-helpers.js';
 export * from './snap.js';
 export * from './viewport.js';
+export * from './rotation.js';
 export * from './tool.js';
 export * from './item-type.js';
 export * from './editor.js';

@@ -2602,4 +2602,18 @@
   body {
     letter-spacing: var(--tracking-normal);
   }
+  /* .ceremony-root (không phải body) — --foreground/--background chỉ được định nghĩa scope theo
+     .ceremony-root + biến thể theme/dark (xem :root/.dark ở trên), vì Ceremony là app con nhúng
+     trong device-layout shell (không sở hữu toàn bộ <body>). Trước đây KHÔNG có color mặc định
+     nào ở đây — mọi input/select/textarea không tự set text-foreground tường minh kế thừa màu
+     đen mặc định trình duyệt, không đổi theo dark mode (bug thật phát hiện qua review UI, phần
+     "Tạo đợt lễ", 2026-07-19). color-scheme cho input/select native tự đổi phần UI hệ điều hành
+     (nền datepicker, mũi tên select...) theo đúng theme luôn, không chỉ riêng text color. */
+  .ceremony-root {
+    color: var(--foreground);
+    color-scheme: light;
+  }
+  .ceremony-root.dark {
+    color-scheme: dark;
+  }
 }

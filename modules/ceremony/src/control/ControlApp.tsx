@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Toaster } from 'sonner';
+import { X } from 'lucide-react';
 import { useStore as useDeviceLayoutStore, useMenuAction } from '@sonth87/device-layout';
 import type { PlatformContext } from '@sky-app/kernel';
 import type { DataPort } from '@sky-app/service-contracts';
+import type { EventPort, DataSourcePort } from '@sky-app/service-contracts';
 import { useControlStore } from './store';
+import { useEventStore } from './eventStore';
+import { EventGate } from './EventGate';
 import { useSocket } from './hooks/useSocket';
 import { useGlobalCardReader } from './hooks/useGlobalCardReader';
 import { playErrorBeep } from './lib/sound';
@@ -68,7 +72,7 @@ export interface ControlAppProps {
 export function ControlApp({ appId, platform, isActive = true }: ControlAppProps = {}) {
   const { t } = useTranslation();
   const {
-    ceremony, setMeta, students, setPythonStatus, logsDrawerOpen,
+    setMeta, students, setPythonStatus, logsDrawerOpen,
     language, aboutModalOpen, setAboutModalOpen, openSettingsModal,
     resetConfirmOpen, setResetConfirmOpen, deleteModalOpen, setDeleteModalOpen,
     themeMode, themePalette, appFont, letterSpacing, appSpacing, shadowLevel,
@@ -78,6 +82,29 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
   const [resetting, setResetting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const ceremonyRootRef = useRef<HTMLDivElement>(null);
+
+  // Gate (Giai đoạn 3 kế hoạch Event) — thay việc đi thẳng vào dashboard, xem
+  // docs/roadmap/plans/layout-designer/13-ceremony-mo-rong.md §"Cập nhật luồng tổng". Chỉ chạy
+  // khi có EventPort đăng ký (Electron/web đã hoàn thiện adapter) — môi trường test/Storybook
+  // (platform=undefined) bỏ qua Gate, activeEvent giữ null nhưng loading cũng false ngay từ đầu
+  // (initial state), tránh treo màn hình "đang tải" vô thời hạn.
+  const { activeEvent, loading: eventLoading, checkGate, exitToGate } = useEventStore();
+  const [confirmExitEvent, setConfirmExitEvent] = useState(false);
+  const eventPort = platform?.services.get<EventPort>('event');
+  const dataSourcePortForGate = platform?.services.get<DataSourcePort>('dataSource');
+  useEffect(() => {
+    if (eventPort) {
+      // checkGate() rethrow nếu getCurrentActive()/loadStudentsForEvent() lỗi (mất kết nối IPC/
+      // network) — bắt lại đây để báo toast, tránh unhandled rejection im lặng khiến user thấy
+      // Gate mà không hiểu vì sao (bug phát hiện qua review lại code, 2026-07-19; activateEvent()
+      // đã có try/catch+toast ở caller EventGate.tsx, checkGate() lúc mount thì chưa).
+      checkGate(eventPort, dataSourcePortForGate).catch((err: unknown) => {
+        showErrorToast(t('eventGate.activateError', { message: err instanceof Error ? err.message : String(err) }));
+      });
+    } else {
+      useEventStore.setState({ loading: false });
+    }
+  }, [eventPort, dataSourcePortForGate, checkGate, t]);
 
   // mode === 'system' kế thừa theme từ shell (device-layout) thay vì OS trực
   // tiếp — đúng trong ngữ cảnh app con chạy trong desktop-shell ảo. Không dùng
@@ -324,8 +351,15 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
       case 'develop:apiTest':
         openSettingsModal('api');
         break;
+      case 'event:exitToGate':
+        // No-op nếu đang ở Gate (chưa có Event active) — MenuBarItem không tự ẩn theo runtime
+        // state (xem comment ở index.ts's menuBarMenus), nên item LUÔN hiện trong menu bar dù
+        // không phải lúc nào cũng có tác dụng. Giữ đúng hành vi nút X trong header: luôn hỏi
+        // xác nhận trước khi rời, KHÔNG gọi thẳng exitToGate().
+        if (activeEvent) setConfirmExitEvent(true);
+        break;
     }
-  }, [isActive, handleImportZip, handleExportZip, openSettingsModal, setAboutModalOpen, setDeleteModalOpen, slideForMenu]);
+  }, [isActive, activeEvent, handleImportZip, handleExportZip, openSettingsModal, setAboutModalOpen, setDeleteModalOpen, slideForMenu]);
 
   useEffect(() => {
     const unsub = slideForMenu?.onMenuAction(handleMenuAction);
@@ -365,43 +399,90 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
         style={themeStyle.style}
       >
         <Toaster position="top-center" richColors closeButton />
-        {/* Header */}
-        <header className="flex items-center gap-4 border-b border-border bg-card px-5 py-3">
-          <h1 className="text-base font-bold">{ceremony?.name ?? t('controlApp.title')}</h1>
-          <ModeSwitch />
-          <HallSelector />
-          <div className="ml-auto flex items-center gap-4">
-            <BackdropToggleCompact />
-          </div>
-        </header>
+        {/* Gate (Giai đoạn 3 kế hoạch Event) — activeEvent null → Gate thay vì dashboard. Khi
+           eventPort chưa có (test/Storybook, platform=undefined) hoặc chưa từng kích hoạt Event
+           nào, activeEvent giữ null vĩnh viễn và Gate hiện thay vì treo màn hình. */}
+        {!activeEvent ? (
+          eventLoading ? (
+            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+              {t('common.loading')}
+            </div>
+          ) : (
+            <EventGate />
+          )
+        ) : (
+          <>
+            {/* Header */}
+            <header className="flex items-center gap-4 border-b border-border bg-card px-5 py-3">
+              {/* Tiêu đề = tên Event đang chạy (Giai đoạn 4b) — TRƯỚC ĐÓ hiện `ceremony?.name`
+                 (config Ceremony cũ, mặc định "Lễ Trao Bằng Tốt Nghiệp", KHÔNG liên quan Event
+                 nào đang chọn) gây trùng lặp/nhầm lẫn với chip tên Event bên cạnh (phát hiện qua
+                 review UI thật, 2026-07-19) — bỏ hẳn `ceremony?.name` khỏi header, chỉ còn 1 nơi
+                 hiện tên duy nhất. Nút X (câu hỏi mở 17-prompt-claude-design-control.md §5 chốt
+                 qua AskUserQuestion 2026-07-19) quay lại màn Danh sách Event — CHỈ điều hướng UI
+                 cục bộ (exitToGate KHÔNG đổi status DB), luôn hỏi xác nhận trước vì rời dashboard
+                 dễ khiến người vận hành quên đang có lễ chạy dở. */}
+              <button
+                type="button"
+                onClick={() => setConfirmExitEvent(true)}
+                className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                aria-label={t('controlApp.exitEventButton') as string}
+                title={t('controlApp.exitEventButton') as string}
+              >
+                <X size={16} />
+              </button>
+              <h1 className="max-w-xs truncate text-lg font-bold text-foreground" title={activeEvent.name}>
+                {activeEvent.name}
+              </h1>
+              <div className="h-6 w-px shrink-0 bg-border" />
+              <ModeSwitch />
+              <HallSelector />
+              <div className="ml-auto flex items-center gap-4">
+                <BackdropToggleCompact />
+              </div>
+            </header>
 
-        {/* Body: 2 cột */}
-        <div className="grid flex-1 grid-cols-[1fr_360px] gap-4 overflow-hidden p-4">
-          {/* Trái: 2 bảng SV song song (tất cả + đã quét) — min-w-0 để không đẩy cột phải ra ngoài */}
-          <div className="min-w-0">
-            <StudentPanels
-              onCardScan={handleCardScan}
-              togglePlay={togglePlay}
-              replayCode={replayCode}
-              countdown={countdown}
-              progress={progress}
-            />
-          </div>
+            {/* Body: 2 cột */}
+            <div className="grid flex-1 grid-cols-[1fr_360px] gap-4 overflow-hidden p-4">
+              {/* Trái: 2 bảng SV song song (tất cả + đã quét) — min-w-0 để không đẩy cột phải ra ngoài */}
+              <div className="min-w-0">
+                <StudentPanels
+                  onCardScan={handleCardScan}
+                  togglePlay={togglePlay}
+                  replayCode={replayCode}
+                  countdown={countdown}
+                  progress={progress}
+                />
+              </div>
 
-          {/* Phải: hộp quét + xem trước + on stage + idle + sync + display */}
-          <div className="flex flex-col gap-4 overflow-auto">
-            <ScanInbox />
-            <NowOnStage progress={smoothProgress} />
-            <PreviewPanel />
-            <IdlePanel />
-            <SyncPanel />
-            <DisplayPicker />
-          </div>
-        </div>
+              {/* Phải: hộp quét + xem trước + on stage + idle + sync + display */}
+              <div className="flex flex-col gap-4 overflow-auto">
+                <ScanInbox />
+                <NowOnStage progress={smoothProgress} />
+                <PreviewPanel />
+                <IdlePanel />
+                <SyncPanel />
+                <DisplayPicker />
+              </div>
+            </div>
+          </>
+        )}
         {logsDrawerOpen && <LogsDrawer />}
         <StatusBar />
         <AboutModal open={aboutModalOpen} onClose={() => setAboutModalOpen(false)} />
         <SettingsModal />
+        <ConfirmModal
+          open={confirmExitEvent}
+          title={t('controlApp.exitEventConfirmTitle')}
+          message={t('controlApp.exitEventConfirmMessage')}
+          danger={false}
+          confirmLabel={t('controlApp.exitEventButton') as string}
+          onCancel={() => setConfirmExitEvent(false)}
+          onConfirm={() => {
+            setConfirmExitEvent(false);
+            exitToGate();
+          }}
+        />
         <ConfirmModal
           open={resetConfirmOpen}
           title={t('debugMenu.confirmResetTitle')}

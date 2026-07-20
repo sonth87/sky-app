@@ -35,6 +35,11 @@ export function CopyVariantPopover({ variants, targetVariantId, onClose, onConfi
   const sources = variants.filter((v) => v.aspect.id !== targetVariantId);
   const target = variants.find((v) => v.aspect.id === targetVariantId);
   const targetHasLocked = target?.items.some((i) => i.syncLocked) ?? false;
+  // Đích TRỐNG HOÀN TOÀN (chưa có item nào — chốt 2026-07-18: "nếu tỷ lệ A chưa có comp nào...
+  // thì cho copy tất cả từ B mà không cần hỏi") — bỏ qua CẢ 2 lớp confirm của chế độ (a), vì
+  // không có gì để "mất" khi ghi đè lên 1 variant rỗng. Chỉ áp dụng cho chế độ (a) — chế độ (b)/
+  // (c) vốn đã không hỏi từ trước (add-missing/overwrite-existing không có luồng confirm nào).
+  const targetIsEmpty = (target?.items.length ?? 0) === 0;
 
   const [sourceId, setSourceId] = useState<string>(sources[0]?.aspect.id ?? '');
   const [mode, setMode] = useState<CopyVariantMode>('add-missing');
@@ -44,6 +49,11 @@ export function CopyVariantPopover({ variants, targetVariantId, onClose, onConfi
 
   function handleCopyClick() {
     if (!sourceId) return;
+    if (mode === 'overwrite-all' && targetIsEmpty) {
+      // Đích trống hoàn toàn → không thể có item nào bị khoá, bỏ qua cả 2 lớp confirm luôn.
+      onConfirm(sourceId, 'overwrite-all', 'skip-locked');
+      return;
+    }
     if (mode !== 'overwrite-all') {
       onConfirm(sourceId, mode);
       return;

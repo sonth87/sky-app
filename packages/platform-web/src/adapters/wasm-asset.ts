@@ -1,5 +1,5 @@
 import type { AssetPort } from '@sky-app/service-contracts';
-import { saveAssetBlob, loadAssetBlob } from '../asset-blob-store.js';
+import { saveAssetBlob, loadAssetBlob, saveAssetMeta, listAssetMeta } from '../asset-blob-store.js';
 
 /** Mở `<input type="file">` ẩn — đối xứng adapters/asset.ts's pickFile (Web HTTP adapter),
  * trùng lặp có chủ đích: 2 adapter độc lập, không tạo phụ thuộc chéo chỉ vì 1 hàm nhỏ. */
@@ -51,6 +51,10 @@ export function createWasmAssetPort(): AssetPort {
       if (!file) return null;
       const key = `blob:${crypto.randomUUID()}`;
       await saveAssetBlob(key, file);
+      // Metadata (Bước 11 kế hoạch resize/rotate, 2026-07-18 — Media Library) — object store PHỤ,
+      // KHÔNG ảnh hưởng blob store hiện có (out of scope: "không bao giờ revoke object URL" giữ
+      // nguyên, xem objectUrlCache bên dưới, đây là trade-off có chủ đích, không phải bug).
+      await saveAssetMeta({ relativePath: key, name: file.name, sizeBytes: file.size, uploadedAt: new Date().toISOString() });
       return { relativePath: key };
     },
 
@@ -63,6 +67,10 @@ export function createWasmAssetPort(): AssetPort {
       const url = URL.createObjectURL(blob);
       objectUrlCache.set(relativePath, url);
       return url;
+    },
+
+    async listAssets() {
+      return listAssetMeta();
     },
   };
 }

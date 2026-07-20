@@ -17,15 +17,19 @@
 // thêm handle chọn/kéo, nên có view riêng đơn giản hoá theo prototype (chưa đủ style như
 // LayoutRenderer, xem TODO "hợp nhất render text/image/shape" khi làm Preview mode ở sub-bước sau).
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
 import { MousePointer2, Hand, Undo2, Redo2, Minus, Plus, Maximize } from 'lucide-react';
-import type { Box, LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
-import { computeSnap, moveItemCommand, zoomAt, MIN_ZOOM, MAX_ZOOM } from '@sky-app/layout-editor-core';
+import type { Box, LayoutItem, LayoutVariant, TextItem } from '@sky-app/slide-shared';
+import { accumulateRotation, angleFromCenter, computeSnap, moveItemCommand, patchItemCommand, resizeItemCommand, resolveEditingItems, rotateItemCommand, zoomAt, MIN_ZOOM, MAX_ZOOM } from '@sky-app/layout-editor-core';
 import type { Editor, Guide } from '@sky-app/layout-editor-core';
 import { useEditorState } from './useEditor.js';
 import { useResolvedAssetUrl } from './useResolvedAssetUrl.js';
 import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts.js';
 import { SyncBadge } from './SyncBadge.js';
+import { ItemToolbar } from './ItemToolbar.js';
+import { Minimap, shouldShowMinimap } from './Minimap.js';
+import { TiptapTextEditor } from './TiptapTextEditor.js';
+import { collectUsedTokenKeys } from './Flyout.js';
 
 /** Cạnh DÀI NHẤT của khung hiển thị "logic" (trước khi fit-to-container/zoom) — cạnh còn lại tự
  * tính theo đúng tỷ lệ `variant.aspect.w/h` (xem designSize()) — KHÔNG còn cố định 760×428 như
@@ -56,11 +60,14 @@ function designSize(aspect: { w: number; h: number }): { w: number; h: number } 
  * trên slide thật vì nằm ngoài Frame. Đọc `artEl` TẠI THỜI ĐIỂM GỌI (không cache) — dùng ở
  * pointerup lúc thả item mới (xem LayoutDesignerApp). Luôn trả giá trị (không còn `| null`) trừ
  * khi `artEl` chưa layout xong (rect rỗng) — case biên gần như không xảy ra trong thực tế. */
-export function screenPointToCanvas(artEl: HTMLElement, variant: LayoutVariant, clientX: number, clientY: number): { x: number; y: number } | null {
+/** Nhận `refW`/`refH` (KHÔNG phải `variant` trực tiếp) — Bước 10 kế hoạch resize/rotate,
+ * 2026-07-18: khi đang ở chế độ sửa mẫu LoopItem, artEl hiển thị theo `itemBox.w/h`, không phải
+ * `variant.refW/refH` — caller (Flyout.tsx) tự chọn giá trị đúng theo ngữ cảnh hiện tại. */
+export function screenPointToCanvas(artEl: HTMLElement, refW: number, refH: number, clientX: number, clientY: number): { x: number; y: number } | null {
   const rect = artEl.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) return null;
-  const scaleX = rect.width / variant.refW;
-  const scaleY = rect.height / variant.refH;
+  const scaleX = rect.width / refW;
+  const scaleY = rect.height / refH;
   return { x: (clientX - rect.left) / scaleX, y: (clientY - rect.top) / scaleY };
 }
 
@@ -84,12 +91,21 @@ export interface CanvasProps {
    * layout.md) — đặt trong Canvas thay vì LayoutDesignerApp vì cần cùng containing block
    * (position:relative) với FloatingToolbar, tránh lệch vị trí. */
   topLeftOverlay?: React.ReactNode;
+  /** Gọi khi user CHỌN 1 token từ dropdown mention-suggestion trong TiptapTextEditor (Bước 12) —
+   * chuyển tiếp lên LayoutDesignerAppModule để ghi nhận variable_registry, giống PropertyPanel. */
+  onTokenInserted?: (key: string) => void;
 }
 
-export function Canvas({ editor, variant, artRef, resolveAssetUrl, onTogglePanels, canUndo, canRedo, onUndo, onRedo, topLeftOverlay }: CanvasProps) {
+export function Canvas({ editor, variant, artRef, resolveAssetUrl, onTogglePanels, canUndo, canRedo, onUndo, onRedo, topLeftOverlay, onTokenInserted }: CanvasProps) {
   const selection = useEditorState(editor, (s) => s.selection);
   const viewport = useEditorState(editor, (s) => s.viewport);
   const doc = useEditorState(editor, (s) => s.doc);
+  // Bước 10 kế hoạch resize/rotate (2026-07-18) — chế độ "sửa mẫu" LoopItem, vào qua double-click.
+  // CHỈ 1 CẤP (chặn tường minh double-click vào LoopItem lồng trong LoopItem khác khi đang edit).
+  const editingLoopId = useEditorState(editor, (s) => s.editingLoopId);
+  const editingLoopItem = editingLoopId ? variant.items.find((i) => i.id === editingLoopId) : undefined;
+  const isEditingLoop = Boolean(editingLoopItem && editingLoopItem.type === 'loop');
+  const effectiveItems = resolveEditingItems(variant, isEditingLoop ? editingLoopId : undefined);
   // Ảnh nền Frame (nếu background.kind === 'image') — resolve qua AssetPort giống ảnh của item,
   // xem PropertyPanel.tsx's FrameBackgroundControls (review 2026-07-18, thêm thuộc tính Frame).
   const backgroundImageSrc = variant.background?.kind === 'image' ? variant.background.src : undefined;
@@ -105,10 +121,20 @@ export function Canvas({ editor, variant, artRef, resolveAssetUrl, onTogglePanel
   }
   // Khung hiển thị "logic" đúng tỷ lệ variant.aspect (KHÔNG còn cố định 760×428 — xem
   // designSize()) — đổi theo variant.aspect.w/h mỗi khi chuyển tab sang variant tỷ lệ khác.
-  const { w: designW, h: designH } = designSize(variant.aspect);
+  // Khi đang edit-mode (Bước 10): đổi sang tỷ lệ itemBox (kích thước 1 "ô" của LoopItem) — item
+  // trong itemTemplate có toạ độ TƯƠNG ĐỐI trong itemBox, không phải refW/refH của variant.
+  const effectiveItemBox = isEditingLoop && editingLoopItem?.type === 'loop' ? editingLoopItem.itemBox : undefined;
+  const { w: designW, h: designH } = designSize(effectiveItemBox ?? variant.aspect);
+  const effectiveRefW = effectiveItemBox?.w ?? variant.refW;
+  const effectiveRefH = effectiveItemBox?.h ?? variant.refH;
   const containerRef = useRef<HTMLDivElement>(null);
   const [fitScale, setFitScale] = useState(1);
   const [guides, setGuides] = useState<Guide[]>([]);
+  // editingTextItemId (Bước 12 kế hoạch resize/rotate, 2026-07-18) — id TextItem đang mở
+  // TiptapTextEditor overlay qua double-click. State CỤC BỘ (KHÔNG đưa vào editor store như
+  // editingLoopId) — đây là UI overlay tạm thời, undo/redo chỉ áp dụng cho patch THẬT lúc gõ
+  // (patchItemCommand mỗi lần onUpdate), không cần track "đang mở editor" qua history.
+  const [editingTextItemId, setEditingTextItemId] = useState<string | undefined>(undefined);
   // Giữ Space (kiểu Figma) → hand-tool TẠM THỜI, con trỏ đổi thành "grab" báo hiệu có thể kéo để
   // pan bằng chuột trái. Chỉ active khi canvas có focus (đồng nhất scope với các shortcut khác).
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -155,8 +181,8 @@ export function Canvas({ editor, variant, artRef, resolveAssetUrl, onTogglePanel
   // đơn vị refW×refH thật của variant → khung 760×428 hiển thị "logic" (trước khi artEl tự scale
   // toàn bộ nội dung con của nó), dùng cho MỌI style CSS (left/top/width/height/fontSize/guide).
   const totalScale = fitScale * viewport.zoom;
-  const layoutScaleX = designW / variant.refW;
-  const layoutScaleY = designH / variant.refH;
+  const layoutScaleX = designW / effectiveRefW;
+  const layoutScaleY = designH / effectiveRefH;
 
   // QUAN TRỌNG — mô hình toạ độ PHẢI khớp chính xác công thức zoomAt()/canvasToScreen()
   // (packages/layout-editor-core/viewport.ts) giả định: screenPoint = u*viewport.zoom +
@@ -266,6 +292,14 @@ export function Canvas({ editor, variant, artRef, resolveAssetUrl, onTogglePanel
       onPointerUp={handlePanPointerUp}
       onWheel={handleWheel}
       onKeyDown={(e) => {
+        // Esc thoát chế độ sửa mẫu LoopItem (Bước 10) — kiểm tra TRƯỚC handleKeyDown (shortcut
+        // thường) vì Esc không nằm trong bộ shortcut đó, tránh phải sửa hook dùng chung cho case
+        // riêng này.
+        if (e.key === 'Escape' && isEditingLoop) {
+          e.preventDefault();
+          editor.store.getState().setEditingLoop(undefined);
+          return;
+        }
         handleSpaceKeyDown(e);
         handleKeyDown(e);
       }}
@@ -312,21 +346,28 @@ export function Canvas({ editor, variant, artRef, resolveAssetUrl, onTogglePanel
           transformOrigin: 'top left',
         }}
       >
-        <FrameSurface variant={variant} resolvedBackgroundUrl={resolvedBackgroundUrl} />
-        {variant.items.map((item) => (
+        {isEditingLoop ? <LoopEditFrameSurface /> : <FrameSurface variant={variant} resolvedBackgroundUrl={resolvedBackgroundUrl} />}
+        {effectiveItems.map((item) => (
           <CanvasItemView
             key={item.id}
             item={item}
             editor={editor}
             variant={variant}
+            items={effectiveItems}
+            refW={effectiveRefW}
+            refH={effectiveRefH}
+            loopItemId={isEditingLoop ? editingLoopId : undefined}
             selected={selection.includes(item.id)}
-            isSyncParent={Boolean(item.syncKey && parentSyncKeys.has(item.syncKey))}
+            isSyncParent={!isEditingLoop && Boolean(item.syncKey && parentSyncKeys.has(item.syncKey))}
             scaleX={layoutScaleX}
             scaleY={layoutScaleY}
             pointerScaleX={layoutScaleX * totalScale}
             pointerScaleY={layoutScaleY * totalScale}
             onGuidesChange={setGuides}
             resolveAssetUrl={resolveAssetUrl}
+            onEnterLoopEdit={isEditingLoop ? undefined : (loopId) => editor.store.getState().setEditingLoop(loopId)}
+            onEnterTextEdit={(textItemId) => setEditingTextItemId(textItemId)}
+            hiddenWhileEditing={item.id === editingTextItemId}
           />
         ))}
         {guides.map((g, i) => (
@@ -334,6 +375,56 @@ export function Canvas({ editor, variant, artRef, resolveAssetUrl, onTogglePanel
         ))}
       </div>
       {topLeftOverlay}
+      {isEditingLoop && editingLoopItem && (
+        <LoopEditBreadcrumb label={editingLoopItem.name ?? 'Khung lặp'} onDone={() => editor.store.getState().setEditingLoop(undefined)} />
+      )}
+      {editingTextItemId &&
+        (() => {
+          const textItem = effectiveItems.find((i) => i.id === editingTextItemId);
+          if (!textItem || textItem.type !== 'text') return null;
+          // screenBox ở đây KHÔNG nhân totalScale (khác pointerScaleX/Y dùng cho kéo/resize) —
+          // phần zoom được xử lý RIÊNG bằng CSS transform: scale() trong TiptapTextEditor, cùng
+          // pattern my-builder's InlineTextEditor (khảo sát 2026-07-19): tránh nhân zoom 2 lần
+          // vào cả kích thước lẫn font-size, vốn là nguyên nhân "text quá to" của bug cũ.
+          const screenBox = {
+            left: originX + textItem.box.x * layoutScaleX * totalScale,
+            top: originY + textItem.box.y * layoutScaleY * totalScale,
+            width: textItem.box.w * layoutScaleX,
+            height: textItem.box.h * layoutScaleY,
+          };
+          const targetLoopItemId = isEditingLoop ? editingLoopId : undefined;
+          return (
+            <TiptapTextEditor
+              item={textItem}
+              screenBox={screenBox}
+              fScale={Math.min(layoutScaleX, layoutScaleY)}
+              zoomScale={totalScale}
+              tokenSuggestions={[...collectUsedTokenKeys(variant)]}
+              onTokenInserted={onTokenInserted}
+              onSave={(content) =>
+                editor.store.getState().dispatch(patchItemCommand<typeof textItem>(variant.aspect.id, textItem.id, textItem, { content }, targetLoopItemId))
+              }
+              onClose={() => setEditingTextItemId(undefined)}
+            />
+          );
+        })()}
+      {selection.length === 1 &&
+        (() => {
+          const selectedItem = effectiveItems.find((i) => i.id === selection[0]);
+          if (!selectedItem) return null;
+          return (
+            <ItemToolbar
+              item={selectedItem}
+              editor={editor}
+              variant={variant}
+              loopItemId={isEditingLoop ? editingLoopId : undefined}
+              originX={originX}
+              originY={originY}
+              pointerScaleX={layoutScaleX * totalScale}
+              pointerScaleY={layoutScaleY * totalScale}
+            />
+          );
+        })()}
       <FloatingToolbar
         toolMode={toolMode}
         onToolModeChange={setToolMode}
@@ -345,6 +436,18 @@ export function Canvas({ editor, variant, artRef, resolveAssetUrl, onTogglePanel
         onZoomChange={(zoom) => editor.store.getState().setViewport({ ...viewport, zoom })}
         containerEl={containerRef.current}
       />
+      {!isEditingLoop && shouldShowMinimap(designW, designH, originX, originY, totalScale, containerSize) && (
+        <Minimap
+          variant={variant}
+          designW={designW}
+          designH={designH}
+          originX={originX}
+          originY={originY}
+          totalScale={totalScale}
+          containerSize={containerSize}
+          onPan={(newOriginX, newOriginY) => editor.store.getState().setViewport({ ...viewport, panX: newOriginX - baseOffsetX, panY: newOriginY - baseOffsetY })}
+        />
+      )}
     </div>
   );
 }
@@ -385,6 +488,68 @@ function FrameSurface({ variant, resolvedBackgroundUrl }: { variant: LayoutVaria
         boxShadow: '0 20px 60px -20px rgba(20,10,50,.6)',
       }}
     />
+  );
+}
+
+/** Nền khung "ô mẫu" khi đang ở chế độ sửa mẫu LoopItem (Bước 10) — trung tính, KHÁC FrameSurface
+ * (không dùng background thật của variant, vì đây không phải render Frame chính). */
+function LoopEditFrameSurface() {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        borderRadius: 10,
+        overflow: 'hidden',
+        pointerEvents: 'none',
+        border: '1.5px dashed var(--accent-color, #4b57e6)',
+        background: '#f4f5f9',
+      }}
+    />
+  );
+}
+
+/** Breadcrumb nổi góc trên-trái báo hiệu đang ở chế độ sửa mẫu LoopItem (Bước 10) — nút "Xong"
+ * thoát về variant.items bình thường. */
+function LoopEditBreadcrumb({ label, onDone }: { label: string; onDone: () => void }) {
+  return (
+    <div
+      data-testid="loop-edit-breadcrumb"
+      style={{
+        position: 'absolute',
+        top: 16,
+        left: 16,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '7px 8px 7px 14px',
+        background: '#fff',
+        border: '1px solid #e6e6ee',
+        borderRadius: 9,
+        boxShadow: '0 6px 20px -8px rgba(20,10,50,.35)',
+        fontSize: 12,
+        fontWeight: 600,
+        color: '#5c5d6e',
+        zIndex: 1001,
+      }}
+    >
+      <span>Đang sửa mẫu của {label}</span>
+      <button
+        onClick={onDone}
+        style={{
+          padding: '5px 12px',
+          background: 'var(--accent-color, #4b57e6)',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 7,
+          fontWeight: 700,
+          fontSize: 11.5,
+          cursor: 'pointer',
+        }}
+      >
+        Xong
+      </button>
+    </div>
   );
 }
 
@@ -504,13 +669,23 @@ function GuideLine({ guide, scaleX, scaleY }: { guide: Guide; scaleX: number; sc
     guide.axis === 'x'
       ? { position: 'absolute' as const, left: guide.position * scaleX, top: 0, bottom: 0, width: 1, background: 'var(--accent-color, #4b57e6)', pointerEvents: 'none' as const }
       : { position: 'absolute' as const, top: guide.position * scaleY, left: 0, right: 0, height: 1, background: 'var(--accent-color, #4b57e6)', pointerEvents: 'none' as const };
-  return <div style={style} />;
+  return <div data-testid="snap-guide" style={style} />;
 }
 
 interface CanvasItemViewProps {
   item: LayoutItem;
   editor: Editor;
   variant: LayoutVariant;
+  /** Danh sách item ĐANG THAO TÁC — variant.items (bình thường) hoặc itemTemplate của 1 LoopItem
+   * (đang edit-mode, Bước 10) — dùng để tính otherBoxes cho snap. KHÁC variant.items khi
+   * loopItemId có giá trị. */
+  items: LayoutItem[];
+  /** refW/refH ĐANG THAO TÁC — variant.refW/refH (bình thường) hoặc itemBox.w/h (edit-mode). */
+  refW: number;
+  refH: number;
+  /** Có giá trị khi đang ở chế độ sửa mẫu LoopItem (Bước 10) — mọi command dispatch (move/resize/
+   * rotate/patch) PHẢI truyền tham số này để thao tác đúng vào itemTemplate thay vì variant.items. */
+  loopItemId?: string;
   selected: boolean;
   /** Quy đổi refW×refH → khung 760×428 "logic" — dùng cho CSS (left/top/width/height/fontSize),
    * KHÔNG nhân totalScale vì artEl cha đã tự transform:scale(totalScale) cho toàn bộ nội dung con. */
@@ -524,9 +699,18 @@ interface CanvasItemViewProps {
   resolveAssetUrl?: (path: string) => Promise<string>;
   /** true nếu item này đang LÀ CHA của ít nhất 1 item khác (tính sẵn ở Canvas — xem parentSyncKeys). */
   isSyncParent: boolean;
+  /** Gọi khi double-click vào item type='loop' — undefined khi ĐANG Ở edit-mode rồi (chặn nested
+   * loop, quyết định phạm vi "chỉ hỗ trợ edit-mode 1 CẤP" của Bước 10). */
+  onEnterLoopEdit?: (loopId: string) => void;
+  /** Gọi khi double-click vào item type='text' — mở TiptapTextEditor overlay (Bước 12). */
+  onEnterTextEdit?: (textItemId: string) => void;
+  /** true khi TiptapTextEditor overlay đang mở CHO ĐÚNG item này — ẩn (visibility:hidden, giữ
+   * nguyên layout box, KHÔNG display:none) item gốc để tránh 2 lớp text chồng nhau lúc sửa
+   * (pattern my-builder's InlineTextEditor, khảo sát 2026-07-19). */
+  hiddenWhileEditing?: boolean;
 }
 
-function CanvasItemView({ item, editor, variant, selected, scaleX, scaleY, pointerScaleX, pointerScaleY, onGuidesChange, resolveAssetUrl, isSyncParent }: CanvasItemViewProps) {
+function CanvasItemView({ item, editor, variant, items, refW, refH, loopItemId, selected, scaleX, scaleY, pointerScaleX, pointerScaleY, onGuidesChange, resolveAssetUrl, isSyncParent, onEnterLoopEdit, onEnterTextEdit, hiddenWhileEditing }: CanvasItemViewProps) {
   const dragRef = useRef<{ startX: number; startY: number; from: Box; lastTo: Box } | null>(null);
 
   const onPointerDown = useCallback(
@@ -536,11 +720,16 @@ function CanvasItemView({ item, editor, variant, selected, scaleX, scaleY, point
       // — phải tự focus lại đây, nếu không thì chọn item bằng chuột sẽ không kích hoạt được
       // shortcut (Delete/mũi tên...) cho tới khi người dùng bấm thêm vào nền canvas.
       (e.currentTarget.closest('[tabindex]') as HTMLElement | null)?.focus();
+      // item.locked (Bước 2 kế hoạch resize/rotate, 2026-07-18) — KHÁC syncLocked (khoá đồng bộ
+      // giữa variant). setSelection() PHẢI VẪN CHẠY dù locked — nếu khoá cả việc CHỌN, PropertyPanel
+      // sẽ không bao giờ hiện được nút mở khoá cho item đó nữa (deadlock UX). Chỉ chặn phần KÉO
+      // (không khởi tạo dragRef) — onPointerMove tự no-op vì dragRef.current vẫn null.
       editor.store.getState().setSelection([item.id]);
+      if (item.locked) return;
       dragRef.current = { startX: e.clientX, startY: e.clientY, from: item.box, lastTo: item.box };
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [editor, item.id, item.box],
+    [editor, item.id, item.box, item.locked],
   );
 
   const onPointerMove = useCallback(
@@ -551,14 +740,14 @@ function CanvasItemView({ item, editor, variant, selected, scaleX, scaleY, point
       const dy = (e.clientY - drag.startY) / pointerScaleY;
       const rawTo: Box = { ...drag.from, x: drag.from.x + dx, y: drag.from.y + dy };
 
-      const otherBoxes = variant.items.filter((i) => i.id !== item.id).map((i) => i.box);
-      const { snappedBox, guides } = computeSnap(rawTo, otherBoxes, { w: variant.refW, h: variant.refH }, SNAP_THRESHOLD);
+      const otherBoxes = items.filter((i) => i.id !== item.id).map((i) => i.box);
+      const { snappedBox, guides } = computeSnap(rawTo, otherBoxes, { w: refW, h: refH }, SNAP_THRESHOLD);
       onGuidesChange(guides);
 
-      editor.store.getState().dispatch(moveItemCommand(variant.aspect.id, item.id, drag.lastTo, snappedBox));
+      editor.store.getState().dispatch(moveItemCommand(variant.aspect.id, item.id, drag.lastTo, snappedBox, loopItemId));
       drag.lastTo = snappedBox;
     },
-    [editor, item.id, variant, pointerScaleX, pointerScaleY, onGuidesChange],
+    [editor, item.id, variant.aspect.id, items, refW, refH, loopItemId, pointerScaleX, pointerScaleY, onGuidesChange],
   );
 
   const onPointerUp = useCallback(
@@ -576,17 +765,56 @@ function CanvasItemView({ item, editor, variant, selected, scaleX, scaleY, point
     top: item.box.y * scaleY,
     width: item.box.w * scaleX,
     height: item.box.h * scaleY,
-    cursor: 'move',
+    // locked (Bước 2) — cursor 'default' báo hiệu không kéo được, khác 'move' bình thường.
+    cursor: item.locked ? 'default' : 'move',
     opacity: item.opacity != null ? item.opacity / 100 : 1,
     outline: selected ? '2px solid var(--accent-color, #4b57e6)' : 'none',
     outlineOffset: 2,
     userSelect: 'none' as const,
+    // Xoay quanh TÂM box (transformOrigin mặc định 50% 50% đúng ý muốn) — SelectionHandles là
+    // con TRỰC TIẾP của div này nên tự động xoay theo, không cần xử lý riêng (review 2026-07-18,
+    // Bước 1/12 kế hoạch resize/rotate). Snap (computeSnap, dùng cho move/resize) vẫn tính theo
+    // AABB chưa xoay — item đã xoay kéo/resize có thể lệch trực quan so với đường guide, CHẤP
+    // NHẬN ĐƯỢC ở giai đoạn này (xử lý snap-theo-trục-đã-xoay là việc riêng, phức tạp hơn).
+    transform: item.box.rotation ? `rotate(${item.box.rotation}deg)` : undefined,
+    // z-index tuỳ chỉnh (Bước 2, Box.z) — khi bằng nhau (mặc định mọi item z=undefined→0), DOM
+    // order (thứ tự variant.items[]) vẫn là tie-breaker tự nhiên, giữ nguyên hành vi cũ.
+    zIndex: item.box.z,
+    visibility: hiddenWhileEditing ? ('hidden' as const) : undefined,
   };
 
+  // Double-click dispatch theo item.type (Bước 10 kế hoạch resize/rotate, 2026-07-18) — CHỈ
+  // 'loop' xử lý ở bước này ('text' để dành Bước 12 Rich-text, DÙNG CHUNG cơ chế dispatch này,
+  // không viết double-click logic riêng lần 2). onEnterLoopEdit undefined khi ĐANG edit-mode rồi
+  // → double-click vào LoopItem lồng trong LoopItem khác KHÔNG có tác dụng (chặn nested loop).
+  const onDoubleClick = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      if (item.type === 'loop' && onEnterLoopEdit) onEnterLoopEdit(item.id);
+      if (item.type === 'text' && onEnterTextEdit) onEnterTextEdit(item.id);
+    },
+    [item.type, item.id, onEnterLoopEdit, onEnterTextEdit],
+  );
+
   return (
-    <div onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} style={wrapStyle}>
+    <div onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onDoubleClick={onDoubleClick} style={wrapStyle}>
       <ItemContent item={item} scaleX={scaleX} scaleY={scaleY} resolveAssetUrl={resolveAssetUrl} />
-      {selected && <SelectionHandles />}
+      {selected && !item.locked && (
+        <SelectionHandles
+          box={item.box}
+          editor={editor}
+          variant={variant}
+          itemId={item.id}
+          loopItemId={loopItemId}
+          items={items}
+          refW={refW}
+          refH={refH}
+          pointerScaleX={pointerScaleX}
+          pointerScaleY={pointerScaleY}
+          onGuidesChange={onGuidesChange}
+        />
+      )}
+      {selected && item.locked && <SelectionHandlesStatic />}
       <div style={{ position: 'absolute', top: -3, right: -3, background: '#fff', borderRadius: '50%', padding: 1, lineHeight: 0, pointerEvents: 'none' }}>
         <SyncBadge item={item} isParent={isSyncParent} size={10} />
       </div>
@@ -607,22 +835,27 @@ function ItemContent({
 }) {
   const fScale = Math.min(scaleX, scaleY);
   switch (item.type) {
-    case 'text':
+    case 'text': {
+      // vAlign dùng flexbox trên WRAPPER ngoài (item.box đã là 100% width/height của div này) —
+      // textAlign (align) là CSS riêng biệt cho căn NGANG dòng chữ, vAlign căn theo trục DỌC.
+      const justify = item.vAlign === 'top' ? 'flex-start' : item.vAlign === 'bottom' ? 'flex-end' : 'center';
+      const textStyle = computeTextStyle(item, fScale);
       return (
-        <div
-          style={{
-            fontSize: item.fontSize * fScale,
-            fontWeight: item.fontWeight,
-            color: item.color,
-            textAlign: item.align,
-            lineHeight: 1.18,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-          }}
-        >
-          {item.content}
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: justify, overflow: item.overflow === 'clip' ? 'hidden' : undefined }}>
+          {/* content string (layout cũ/chưa qua rich-text editor) → render trực tiếp qua
+             children. RichTextContent (Bước 12) → dùng THẲNG content.html (đã sinh sẵn lúc soạn
+             qua editor.getHTML(), KHÔNG gọi generateHTML() ở đây — sửa lại 2026-07-19: bỏ hẳn
+             @tiptap/html khỏi cả slide-shared lẫn module này, tránh vỡ build Electron main
+             process khi bundle, xem RichTextContent's comment ở slide-shared/types.ts), read-only
+             preview khi KHÔNG đang double-click sửa trực tiếp (xem TiptapTextEditor.tsx). */}
+          {typeof item.content === 'string' ? (
+            <div style={textStyle}>{item.content}</div>
+          ) : (
+            <div style={textStyle} dangerouslySetInnerHTML={{ __html: item.content.html }} />
+          )}
         </div>
       );
+    }
     case 'ribbon':
       return (
         <div
@@ -643,7 +876,7 @@ function ItemContent({
     case 'image':
       return <ImageItemContent item={item} fScale={fScale} resolveAssetUrl={resolveAssetUrl} />;
     case 'shape':
-      return <div style={{ width: '100%', height: '100%', background: item.fill, borderRadius: item.shape === 'circle' ? '50%' : item.shape === 'rect' ? item.radius : undefined }} />;
+      return <ShapeItemContent item={item} fScale={fScale} />;
     case 'loop':
       return (
         <div style={{ width: '100%', height: '100%', border: '1px dashed #9a9bab', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9a9bab', fontSize: 11 }}>
@@ -673,7 +906,7 @@ function ImageItemContent({
         width: '100%',
         height: '100%',
         borderRadius: item.shape === 'circle' ? '50%' : item.shape === 'round' ? 16 : 2,
-        background: resolvedUrl ? `center/cover url(${resolvedUrl})` : 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
+        background: resolvedUrl ? `center/${item.fit ?? 'cover'} url(${resolvedUrl})` : 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
         border: item.borderW ? `${item.borderW * fScale}px solid ${item.borderColor ?? '#000'}` : undefined,
         overflow: 'hidden',
         display: 'flex',
@@ -684,12 +917,69 @@ function ImageItemContent({
         fontSize: 11,
       }}
     >
-      {!resolvedUrl && (item.varKey ? `@${item.varKey}` : 'ẢNH')}
+      {/* fallbackText ưu tiên cao nhất khi có — sau đó mới tới @varKey (bind biến ảnh, hiện tên
+          biến khi preview không có data thật) rồi tới chuỗi 'ẢNH' mặc định (Bước 5 kế hoạch). */}
+      {!resolvedUrl && (item.fallbackText || (item.varKey ? `@${item.varKey}` : 'ẢNH'))}
     </div>
   );
 }
 
-function SelectionHandles() {
+/** Style CSS đầy đủ của 1 TextItem theo layout-scale (fScale, KHÔNG gồm zoom) — dùng chung giữa
+ * ItemContent (hiển thị bình thường) và TiptapTextEditor (overlay lúc sửa), để text trong editor
+ * trông Y HỆT lúc không sửa thay vì lệch màu/size/font (bug thật, 2026-07-19 — overlay cũ hard-
+ * code fontSize/color/background riêng, không khớp style thật của item). */
+export function computeTextStyle(item: TextItem, fScale: number): React.CSSProperties {
+  return {
+    fontSize: item.fontSize * fScale,
+    fontFamily: item.fontFamily,
+    fontWeight: item.fontWeight,
+    fontStyle: item.italic ? 'italic' : undefined,
+    textTransform: item.uppercase ? 'uppercase' : undefined,
+    color: item.color,
+    textAlign: item.align,
+    lineHeight: item.lineHeight ?? 1.18,
+    textShadow: textShadowCss(item.shadow, fScale),
+    whiteSpace: item.overflow === 'wrap' || item.overflow === 'clip' ? 'pre-wrap' : 'pre',
+    wordBreak: 'break-word',
+  };
+}
+
+/** CSS text-shadow từ TextShadow — item.shadow có thể là boolean (true = mặc định nhẹ, theo kiểu
+ * prototype cũ) hoặc object đủ field (Bước 5 kế hoạch, patch qua ShadowControl). */
+function textShadowCss(shadow: TextItem['shadow'], fScale: number): string | undefined {
+  if (!shadow) return undefined;
+  if (shadow === true) return '0 2px 4px rgba(0,0,0,0.35)';
+  const { color = 'rgba(0,0,0,0.35)', blur = 4, offsetX = 0, offsetY = 2 } = shadow;
+  return `${offsetX * fScale}px ${offsetY * fScale}px ${blur * fScale}px ${color}`;
+}
+
+/** Bước 5 kế hoạch — thêm stroke/strokeW (mọi shape) + 2 dạng mới 'frame' (viền rỗng, không
+ * fill giữa) / 'line' (1 đường kẻ mảnh ngang giữa box) — 'triangle'/'diamond' GIỮ NGUYÊN như cũ
+ * (chưa có style đặc trưng riêng, CHỦ ĐỘNG ngoài phạm vi bước này theo đúng plan). */
+function ShapeItemContent({ item, fScale }: { item: Extract<LayoutItem, { type: 'shape' }>; fScale: number }) {
+  const border = item.strokeW ? `${item.strokeW * fScale}px solid ${item.stroke ?? '#000'}` : undefined;
+  if (item.shape === 'line') {
+    return <div style={{ width: '100%', height: item.strokeW ? item.strokeW * fScale : 2, background: item.stroke ?? item.fill ?? '#000', marginTop: '50%' }} />;
+  }
+  if (item.shape === 'frame') {
+    return <div style={{ width: '100%', height: '100%', background: 'transparent', border: border ?? `${2 * fScale}px solid ${item.stroke ?? item.fill ?? '#000'}` }} />;
+  }
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        background: item.fill,
+        border,
+        borderRadius: item.shape === 'circle' ? '50%' : item.shape === 'rect' ? item.radius : undefined,
+      }}
+    />
+  );
+}
+
+/** Item khoá (item.locked) — chỉ hiện chấm trang trí, không bắt sự kiện gì (khác SelectionHandles
+ * bên dưới, dùng cho item bình thường). */
+function SelectionHandlesStatic() {
   const dot = { position: 'absolute' as const, width: 8, height: 8, background: '#fff', border: '1.5px solid var(--accent-color, #4b57e6)', borderRadius: 2 };
   return (
     <>
@@ -697,6 +987,211 @@ function SelectionHandles() {
       <div style={{ ...dot, right: -4, top: -4 }} />
       <div style={{ ...dot, left: -4, bottom: -4 }} />
       <div style={{ ...dot, right: -4, bottom: -4 }} />
+    </>
+  );
+}
+
+const MIN_ITEM_SIZE = 20;
+
+/** 8 hướng resize — mỗi hướng khai rõ trục nào bị ảnh hưởng (x/w theo ngang, y/h theo dọc) để
+ * tính box mới từ 1 công thức chung, tránh 8 nhánh if/else copy-paste dễ sai dấu +/-. */
+type HandleDir = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
+const HANDLE_POS: Record<HandleDir, { top?: number; bottom?: number; left?: number; right?: number; cursor: string }> = {
+  nw: { top: -4, left: -4, cursor: 'nwse-resize' },
+  n: { top: -4, left: 0, cursor: 'ns-resize' },
+  ne: { top: -4, right: -4, cursor: 'nesw-resize' },
+  e: { top: 0, right: -4, cursor: 'ew-resize' },
+  se: { bottom: -4, right: -4, cursor: 'nwse-resize' },
+  s: { bottom: -4, left: 0, cursor: 'ns-resize' },
+  sw: { bottom: -4, left: -4, cursor: 'nesw-resize' },
+  w: { top: 0, left: -4, cursor: 'ew-resize' },
+};
+
+/** Áp dụng delta (đơn vị canvas-logic, đã quy đổi qua pointerScaleX/Y) vào box theo hướng handle
+ * — mỗi hướng chỉ đụng đúng field liên quan (VD 'e' chỉ đổi w, không đụng x/y/h). */
+function applyResizeDelta(from: Box, dir: HandleDir, dx: number, dy: number): Box {
+  let { x, y, w, h } = from;
+  if (dir.includes('w')) {
+    x = from.x + dx;
+    w = from.w - dx;
+  }
+  if (dir.includes('e')) {
+    w = from.w + dx;
+  }
+  if (dir.includes('n')) {
+    y = from.y + dy;
+    h = from.h - dy;
+  }
+  if (dir.includes('s')) {
+    h = from.h + dy;
+  }
+  // Min-size clamp — nếu w/h dưới ngưỡng, giữ cạnh ĐỐI DIỆN cố định (không cho x/y "vượt qua"
+  // cạnh kia, tránh box lật ngược dấu w/h âm).
+  if (w < MIN_ITEM_SIZE) {
+    if (dir.includes('w')) x = from.x + from.w - MIN_ITEM_SIZE;
+    w = MIN_ITEM_SIZE;
+  }
+  if (h < MIN_ITEM_SIZE) {
+    if (dir.includes('n')) y = from.y + from.h - MIN_ITEM_SIZE;
+    h = MIN_ITEM_SIZE;
+  }
+  return { ...from, x, y, w, h };
+}
+
+interface SelectionHandlesProps {
+  box: Box;
+  editor: Editor;
+  variant: LayoutVariant;
+  itemId: string;
+  /** Có giá trị khi item nằm trong itemTemplate của 1 LoopItem (Bước 10) — truyền xuống
+   * resizeItemCommand/rotateItemCommand để thao tác đúng ngữ cảnh. */
+  loopItemId?: string;
+  items: LayoutItem[];
+  refW: number;
+  refH: number;
+  pointerScaleX: number;
+  pointerScaleY: number;
+  onGuidesChange: (guides: Guide[]) => void;
+}
+
+/** v0.3.0 — resize CHỈ đúng khi rotation===0 (kéo theo trục world, không theo trục cục bộ đã
+ * xoay). Item đã xoay vẫn kéo được nhưng có thể lệch trực quan — chấp nhận được ở bước này, xem
+ * comment tương tự ở wrapStyle (snap cũng theo AABB chưa xoay). */
+function SelectionHandles({ box, editor, variant, itemId, loopItemId, items, refW, refH, pointerScaleX, pointerScaleY, onGuidesChange }: SelectionHandlesProps) {
+  const dragRef = useRef<{ dir: HandleDir; startX: number; startY: number; from: Box; lastTo: Box } | null>(null);
+
+  const onHandlePointerDown = useCallback(
+    (dir: HandleDir) => (e: ReactPointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      dragRef.current = { dir, startX: e.clientX, startY: e.clientY, from: box, lastTo: box };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [box],
+  );
+
+  const onHandlePointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const dx = (e.clientX - drag.startX) / pointerScaleX;
+      const dy = (e.clientY - drag.startY) / pointerScaleY;
+      const rawTo = applyResizeDelta(drag.from, drag.dir, dx, dy);
+
+      const otherBoxes = items.filter((i) => i.id !== itemId).map((i) => i.box);
+      const { snappedBox, guides } = computeSnap(rawTo, otherBoxes, { w: refW, h: refH }, SNAP_THRESHOLD);
+      onGuidesChange(guides);
+
+      editor.store.getState().dispatch(resizeItemCommand(variant.aspect.id, itemId, drag.lastTo, snappedBox, loopItemId));
+      drag.lastTo = snappedBox;
+    },
+    [editor, itemId, variant.aspect.id, items, refW, refH, loopItemId, pointerScaleX, pointerScaleY, onGuidesChange],
+  );
+
+  const onHandlePointerUp = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      dragRef.current = null;
+      onGuidesChange([]);
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    },
+    [onGuidesChange],
+  );
+
+  // Handle xoay — dragRef riêng (KHÁC dragRef ở trên, dùng cho 8 handle resize) vì cần lưu thêm
+  // `lastAngle` (góc màn hình lần đo trước) để accumulateRotation() tính delta, không phải góc
+  // tuyệt đối (tránh giật khi qua biên 180°/-180°, xem rotation.ts).
+  const rotateDragRef = useRef<{ fromBox: Box; lastTo: Box; lastAngle: number } | null>(null);
+
+  const onRotatePointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      // Tâm HÌNH HỌC của bounding rect đã xoay TRÙNG tâm xoay thật (transformOrigin 50% 50% —
+      // xoay đối xứng qua tâm không đổi vị trí tâm) — dùng cách này thay vì tự tính originX/Y +
+      // pointerScaleX/Y từ Canvas cha, đơn giản hơn nhiều mà vẫn chính xác.
+      const itemRect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+      const cx = itemRect.left + itemRect.width / 2;
+      const cy = itemRect.top + itemRect.height / 2;
+      const angle = angleFromCenter(cx, cy, e.clientX, e.clientY);
+      rotateDragRef.current = { fromBox: box, lastTo: box, lastAngle: angle };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [box],
+  );
+
+  const onRotatePointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = rotateDragRef.current;
+      if (!drag) return;
+      const itemRect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+      const cx = itemRect.left + itemRect.width / 2;
+      const cy = itemRect.top + itemRect.height / 2;
+      const angle = angleFromCenter(cx, cy, e.clientX, e.clientY);
+      const newRotation = accumulateRotation(drag.lastTo.rotation ?? 0, drag.lastAngle, angle);
+      const to: Box = { ...drag.lastTo, rotation: newRotation };
+
+      editor.store.getState().dispatch(rotateItemCommand(variant.aspect.id, itemId, drag.lastTo, to, loopItemId));
+      drag.lastTo = to;
+      drag.lastAngle = angle;
+    },
+    [editor, itemId, variant.aspect.id, loopItemId],
+  );
+
+  const onRotatePointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    rotateDragRef.current = null;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  }, []);
+
+  return (
+    <>
+      {(Object.keys(HANDLE_POS) as HandleDir[]).map((dir) => {
+        const pos = HANDLE_POS[dir];
+        return (
+          <div
+            key={dir}
+            aria-label={`Đổi kích thước — ${dir}`}
+            onPointerDown={onHandlePointerDown(dir)}
+            onPointerMove={onHandlePointerMove}
+            onPointerUp={onHandlePointerUp}
+            style={{
+              position: 'absolute',
+              width: 8,
+              height: 8,
+              background: '#fff',
+              border: '1.5px solid var(--accent-color, #4b57e6)',
+              borderRadius: 2,
+              cursor: pos.cursor,
+              top: pos.top,
+              bottom: pos.bottom,
+              left: pos.left === 0 ? '50%' : pos.left,
+              right: pos.right,
+              transform: pos.left === 0 ? 'translateX(-50%)' : undefined,
+              touchAction: 'none',
+            }}
+          />
+        );
+      })}
+      {/* Đường nối + handle xoay tròn — đặt phía TRÊN box (cách 20px), xoay theo item vì là con
+          trực tiếp của div đã transform:rotate() (xem wrapStyle ở CanvasItemView). */}
+      <div style={{ position: 'absolute', left: '50%', top: -20, width: 1, height: 20, background: 'var(--accent-color, #4b57e6)', transform: 'translateX(-50%)', pointerEvents: 'none' }} />
+      <div
+        aria-label="Xoay"
+        onPointerDown={onRotatePointerDown}
+        onPointerMove={onRotatePointerMove}
+        onPointerUp={onRotatePointerUp}
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: -28,
+          width: 10,
+          height: 10,
+          background: '#fff',
+          border: '1.5px solid var(--accent-color, #4b57e6)',
+          borderRadius: '50%',
+          cursor: 'grab',
+          transform: 'translateX(-50%)',
+          touchAction: 'none',
+        }}
+      />
     </>
   );
 }

@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type { AspectRatio, LayoutContent, LayoutVersion } from '@sky-app/slide-shared';
+import type { AssetMeta } from '@sky-app/service-contracts';
 import {
   addVariantCommand,
   changeVariantAspectCommand,
@@ -29,9 +30,21 @@ const DEFAULT_RIGHT_PANEL_WIDTH = 340;
 const MIN_RIGHT_PANEL_WIDTH = 280;
 const MAX_RIGHT_PANEL_WIDTH = 560;
 
-/** refW/refH mặc định khi tạo variant TRỐNG mới (12-thu-vien-layout.md "Tạo trống") — nhân
- * aspect.w/h theo hệ số 120 (khớp mô tả file 04: "16:9 thành 1920×1080, 21:9 thành 2520×1080"). */
-const REF_UNIT = 120;
+/** refW/refH mặc định khi tạo variant TRỐNG mới (12-thu-vien-layout.md "Tạo trống") — cạnh DÀI
+ * NHẤT cố định 3840 (4K), cạnh còn lại tự tính theo đúng tỷ lệ (cùng nguyên tắc designSize() ở
+ * Canvas.tsx). Đổi 2026-07-18 từ REF_UNIT=120 nhân trực tiếp aspect.w/h (VD 4:3 → 480×360, 1:1 →
+ * 120×120 — QUÁ THẤP, không đủ độ chính xác px khi thiết kế chi tiết) — vì render LUÔN scale-to-
+ * fit theo khung LED/màn hình thật lúc chạy (refW/refH không ảnh hưởng chất lượng hiển thị cuối,
+ * chỉ là "lưới thiết kế"), nên cứ đặt to hẳn, không có chi phí gì, chỉ giúp thiết kế chính xác
+ * hơn. Sau khi tạo, `changeVariantAspectCommand` (đổi tỷ lệ tại chỗ) GIỮ NGUYÊN refW này khi đổi
+ * sang tỷ lệ khác — không cần sửa gì thêm ở đó. */
+const DESIGN_LONG_EDGE_REF = 3840;
+function defaultRefSize(aspect: AspectRatio): { refW: number; refH: number } {
+  if (aspect.w >= aspect.h) {
+    return { refW: DESIGN_LONG_EDGE_REF, refH: Math.round((DESIGN_LONG_EDGE_REF * aspect.h) / aspect.w) };
+  }
+  return { refW: Math.round((DESIGN_LONG_EDGE_REF * aspect.w) / aspect.h), refH: DESIGN_LONG_EDGE_REF };
+}
 
 export interface LayoutDesignerAppProps {
   content: LayoutContent;
@@ -63,6 +76,10 @@ export interface LayoutDesignerAppProps {
    * dùng thẳng được (fail-soft, xem useResolvedAssetUrl). */
   pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
   resolveAssetUrl?: (path: string) => Promise<string>;
+  /** Media Library (Bước 11 kế hoạch resize/rotate, 2026-07-18) — liệt kê ảnh đã lưu để hiện
+   * lưới thumbnail trong Flyout's panel "Ảnh". Bỏ trống = panel hiện thông báo chưa khả dụng
+   * (hành vi cũ). */
+  listAssets?: () => Promise<AssetMeta[]>;
 }
 
 export function LayoutDesignerApp({
@@ -74,10 +91,13 @@ export function LayoutDesignerApp({
   onTokenInserted,
   pickAndSaveImage,
   resolveAssetUrl,
+  listAssets,
 }: LayoutDesignerAppProps) {
   const editor = useCreateEditor({ doc: content });
   const activeVariantId = useEditorState(editor, (s) => s.activeVariantId);
   const doc = useEditorState(editor, (s) => s.doc);
+  // editingLoopId (Bước 10 kế hoạch resize/rotate, 2026-07-18) — chế độ sửa mẫu LoopItem.
+  const editingLoopId = useEditorState(editor, (s) => s.editingLoopId);
   // historySnapshot() trả object MỚI mỗi lần gọi — không thể dùng trực tiếp làm selector
   // useStore (Object.is luôn "khác" → vòng lặp vô hạn). doc đổi tham chiếu mỗi khi
   // execute/undo/redo chạy, nên derive theo doc bằng useMemo là đủ để đồng bộ đúng lúc.
@@ -95,6 +115,8 @@ export function LayoutDesignerApp({
   }, [doc]);
 
   const variant = useMemo(() => doc.variants.find((v) => v.aspect.id === activeVariantId), [doc, activeVariantId]);
+  const editingLoopItem = editingLoopId ? variant?.items.find((i) => i.id === editingLoopId) : undefined;
+  const editingItemBox = editingLoopItem?.type === 'loop' ? editingLoopItem.itemBox : undefined;
 
   const [railGroup, setRailGroup] = useState<RailGroup>('comp');
   const artElRef = useRef<HTMLDivElement | null>(null);
@@ -145,12 +167,13 @@ export function LayoutDesignerApp({
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   }, []);
 
-  // Thêm/xoá tỷ lệ (variant) — 12-thu-vien-layout.md "Tạo trống". refW/refH mới nhân aspect.w/h
-  // theo REF_UNIT. "Sao chép từ layout KHÁC" (không phải variant trong CÙNG layout) vẫn hoãn GĐ5
-  // cùng Layout Library đầy đủ — xem handleCopyFromVariant bên dưới cho copy giữa variant CÙNG layout.
+  // Thêm/xoá tỷ lệ (variant) — 12-thu-vien-layout.md "Tạo trống". refW/refH mới theo
+  // defaultRefSize() (cạnh dài 3840). "Sao chép từ layout KHÁC" (không phải variant trong CÙNG
+  // layout) vẫn hoãn GĐ5 cùng Layout Library đầy đủ — xem handleCopyFromVariant bên dưới cho copy
+  // giữa variant CÙNG layout.
   function handleAddVariant(aspect: AspectRatio) {
     editor.store.getState().dispatch(
-      addVariantCommand({ aspect, refW: aspect.w * REF_UNIT, refH: aspect.h * REF_UNIT, items: [] }, activeVariantId),
+      addVariantCommand({ aspect, ...defaultRefSize(aspect), items: [] }, activeVariantId),
     );
   }
   function handleRemoveVariant(variantId: string) {
@@ -193,7 +216,18 @@ export function LayoutDesignerApp({
             {leftPanelVisible ? (
               <>
                 <Rail active={railGroup} onChange={setRailGroup} onToggleVisible={() => setLeftPanelVisible(false)} />
-                <Flyout editor={editor} variant={variant} group={railGroup} getArtEl={() => artElRef.current} getRootEl={() => rootElRef.current} />
+                <Flyout
+                  editor={editor}
+                  variant={variant}
+                  group={railGroup}
+                  getArtEl={() => artElRef.current}
+                  getRootEl={() => rootElRef.current}
+                  editingLoopId={editingLoopItem?.type === 'loop' ? editingLoopId : undefined}
+                  editingRefW={editingItemBox?.w}
+                  editingRefH={editingItemBox?.h}
+                  listAssets={listAssets}
+                  resolveAssetUrl={resolveAssetUrl}
+                />
               </>
             ) : (
               <PanelEdgeToggle side="left" onClick={() => setLeftPanelVisible(true)} />
@@ -208,6 +242,7 @@ export function LayoutDesignerApp({
               canRedo={history.canRedo}
               onUndo={() => editor.store.getState().undo()}
               onRedo={() => editor.store.getState().redo()}
+              onTokenInserted={onTokenInserted}
               topLeftOverlay={
                 <VariantTabs
                   variants={doc.variants}

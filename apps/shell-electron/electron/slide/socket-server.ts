@@ -11,6 +11,7 @@ import type {
   ApiIntegration,
   BackdropAspectRatio,
   ClientToServerEvents,
+  CustomVariable,
   FullStatePayload,
   OperatingMode,
   ServerToClientEvents,
@@ -424,6 +425,38 @@ function clearStage() {
   if (wasOnStage) {
     apiLogger.triggerPauseApiCall();
   }
+}
+
+/**
+ * Reset session + backdrop về Idle khi đổi Event active (Giai đoạn 3 kế hoạch Event,
+ * docs/roadmap/plans/layout-designer/13-ceremony-mo-rong.md §"setActive giữa lễ"). KHÁC
+ * clearStage() — KHÔNG gọi retireOnStage/ceremonyStore.patchStudent, vì student đang on_stage
+ * thuộc Event/DataSource CŨ, "trả về" nó trong context Event MỚI vô nghĩa (nó có thể không còn
+ * tồn tại trong danh sách của Event mới). Chỉ xoá con trỏ session + báo Control/Backdrop qua
+ * socket, không đụng trạng thái vận hành của student cũ.
+ */
+export function resetSessionForNewEvent(eventId: string): void {
+  if (!io) return;
+  clearAutoShow();
+  clearIdleTimer();
+  sessionStore.update({ current_on_stage_msv: null, pending_msv: null });
+  io.emit('state:onStage', { student: null });
+  io.emit('state:pending', { student: null });
+  io.emit('state:activeEventChanged', { eventId });
+}
+
+/**
+ * Đổi nguồn `customVariables` sang bộ biến của Event VỪA active (Giai đoạn 4c mở rộng,
+ * 2026-07-20) — gọi ngay sau `resetSessionForNewEvent` mỗi khi setActive() thành công. CHỈ update
+ * biến module-level + broadcast — KHÔNG gọi `saveAppConfig()` (khác `cmd:setCustomVariables`
+ * handler ở trên, dùng khi user sửa qua Settings cũ): nguồn chân lý của customVariables giờ là
+ * `EventDocument.customVariables` (SQLite), ghi ngược vào `app_config.json` sẽ tạo 2 nguồn dữ
+ * liệu đá nhau. `pregen-queue.ts`'s `getTtsPregenConfig()` đọc biến module-level này (không đổi
+ * gì ở đó) — chỉ đổi CÁCH biến này được set.
+ */
+export function setCustomVariablesFromEvent(variables: CustomVariable[]): void {
+  customVariables = variables;
+  io?.emit('event:customVariables', { variables });
 }
 
 function setPending(msv: string) {

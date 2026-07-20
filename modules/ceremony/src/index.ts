@@ -74,6 +74,18 @@ export const ceremonyModule: AppModule = {
         ],
       },
     ],
+    // Phần GIỮA menu tên app "Ceremony" (cột đậm đầu tiên bên trái menu bar,
+    // giữa "About Ceremony" và "Quit Ceremony" — cả 2 mục đó CỐ ĐỊNH, không
+    // khai báo được). Thay khối placeholder mặc định (Services/Hide/Hide
+    // Others/Show All, đều disabled, không có ý nghĩa gì với Ceremony) —
+    // @sonth87/device-layout ≥0.2.4 (2026-07-19).
+    appNameMenuExtraItems: [
+      // Chỉ có tác dụng khi ĐANG ở dashboard 1 Event — MenuBarItem không hỗ trợ ẩn/hiện động
+      // theo state runtime (chỉ có `disabled` boolean TĨNH, khai báo 1 lần lúc module load),
+      // nên item này LUÔN hiện trong menu — handleMenuAction's case 'event:exitToGate' tự
+      // no-op nếu bấm lúc đang ở Gate (activeEvent === null).
+      { key: 'event-exit-to-gate', label: 'Thoát ra danh sách đợt lễ', action: 'event:exitToGate' },
+    ],
   },
 
   // window.slide (backend port GĐ4) là bridge Electron-only — chưa có adapter

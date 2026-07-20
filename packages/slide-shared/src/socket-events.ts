@@ -100,6 +100,10 @@ export interface ServerToClientEvents {
   'state:onStage': (payload: { student: Student | null }) => void;
   /** SV đang chờ ở hộp quét thay đổi (Control hiển thị) */
   'state:pending': (payload: { student: Student | null }) => void;
+  /** Event (đợt lễ) active vừa đổi qua EventPort.setActive() — Control tự nạp lại data theo
+   * Event mới, Backdrop tự về Idle (id cũ thuộc DataSource khác, vô nghĩa với Event mới —
+   * docs/roadmap/plans/layout-designer/13-ceremony-mo-rong.md §"setActive giữa lễ"). */
+  'state:activeEventChanged': (payload: { eventId: string }) => void;
   /** Có QR vừa được quét (Control bật âm thanh / nhấp nháy hộp quét) */
   'event:scanned': (payload: { student: Student; ts: string }) => void;
   /** Mode thay đổi */

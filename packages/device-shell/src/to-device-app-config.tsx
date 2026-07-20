@@ -22,6 +22,10 @@ import type {} from 'zustand/middleware/persist';
  * AppModule's `render` so the resulting component receives `platform` +
  * `isActive` (derived from device-layout's own activeAppId store), while
  * satisfying device-layout's AppContentProps shape.
+ *
+ * Crash isolation lives in device-layout's own AppContent (AppErrorBoundary,
+ * v0.2.3+) — it wraps this render function from the outside, so there's no
+ * need to duplicate a boundary here.
  */
 export function toDeviceAppConfig(app: AppModule, platform: PlatformContext): AppConfig {
   function Bridged({ appId, windowId }: DeviceAppContentProps) {
@@ -50,6 +54,7 @@ export function toDeviceAppConfig(app: AppModule, platform: PlatformContext): Ap
     hasStatusBar: app.window?.hasStatusBar,
     mobileFullscreen: app.window?.mobileFullscreen,
     menuBarMenus: app.window?.menuBarMenus,
+    appNameMenuExtraItems: app.window?.appNameMenuExtraItems,
     render: Bridged,
   };
 }

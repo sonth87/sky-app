@@ -92,7 +92,11 @@ export function copyVariantOverwriteAllCommand(sourceVariantId: string, targetVa
         doc = replaceVariantItems(doc, sourceVariantId, source.items.map((s) => sourceUpdated.find((u) => u.id === s.id) ?? s));
       }
       doc = replaceVariantItems(doc, targetVariantId, nextItems);
-      doc = setVariantBackground(doc, targetVariantId, undefined);
+      // Copy TOÀN BỘ background (kể cả ảnh) từ nguồn (chốt 2026-07-18 — TRƯỚC ĐÓ xoá hẳn background
+      // đích, lý do cũ "ảnh không copy được qua tỷ lệ khác" không còn đúng: ảnh dùng background-
+      // size:cover nên tự cắt/giãn theo tỷ lệ mới, không lỗi hiển thị — nhất quán với định nghĩa
+      // "copy = clone toàn bộ layout" mà user mong đợi).
+      doc = setVariantBackground(doc, targetVariantId, source.background);
 
       return { ...state, doc };
     },
@@ -106,11 +110,16 @@ export function copyVariantOverwriteAllCommand(sourceVariantId: string, targetVa
 
 /**
  * Chế độ (b) "Chỉ copy cái CHƯA CÓ" — CHỈ THÊM item nguồn chưa khớp key nào ở đích (dùng
- * `diffMissingItems`), KHÔNG đụng item cũ. Snapshot items CŨ để invert khôi phục đúng nguyên vẹn.
+ * `diffMissingItems`), KHÔNG đụng item cũ. Background CŨNG theo nguyên tắc "chỉ thêm cái chưa
+ * có" (chốt 2026-07-18) — CHỈ copy background nguồn sang đích nếu đích CHƯA có background nào
+ * (`undefined`); nếu đích đã có background riêng, giữ nguyên (không ghi đè, khớp tinh thần "add-
+ * missing" chỉ bổ sung phần thiếu, không thay phần đã có). Snapshot items+background CŨ để invert
+ * khôi phục đúng nguyên vẹn.
  */
 export function copyVariantAddMissingCommand(sourceVariantId: string, targetVariantId: string): EditorCommand {
   let prevTargetItems: LayoutItem[] = [];
   let prevSourceItems: LayoutItem[] = [];
+  let prevBackground: LayoutVariant['background'];
 
   return {
     type: 'copy-variant-add-missing',
@@ -121,6 +130,7 @@ export function copyVariantAddMissingCommand(sourceVariantId: string, targetVari
 
       prevTargetItems = target.items;
       prevSourceItems = source.items;
+      prevBackground = target.background;
       const { missing, updatedSourceItems } = diffMissingItems(source, target, nextCopyId);
 
       let doc = state.doc;
@@ -130,11 +140,15 @@ export function copyVariantAddMissingCommand(sourceVariantId: string, targetVari
         doc = replaceVariantItems(doc, sourceVariantId, source.items.map((s) => updatedSourceItems.find((u) => u.id === s.id) ?? s));
       }
       doc = replaceVariantItems(doc, targetVariantId, [...target.items, ...missing]);
+      if (target.background === undefined && source.background !== undefined) {
+        doc = setVariantBackground(doc, targetVariantId, source.background);
+      }
       return { ...state, doc };
     },
     invert: (state) => {
       let doc = replaceVariantItems(state.doc, targetVariantId, prevTargetItems);
       doc = replaceVariantItems(doc, sourceVariantId, prevSourceItems);
+      doc = setVariantBackground(doc, targetVariantId, prevBackground);
       return { ...state, doc };
     },
   };
@@ -144,10 +158,13 @@ export function copyVariantAddMissingCommand(sourceVariantId: string, targetVari
  * Chế độ (c) "Ghi đè nội dung cho cái đã có" — patch N item đích đã khớp key (dùng
  * `diffOverwriteExisting`, TÔN TRỌNG syncOverrides/syncLocked — KHÁC chế độ (a)) trong 1 command
  * duy nhất, dùng `patchItem`-style merge trực tiếp (KHÔNG gọi lồng patchItemCommand — mỗi
- * EditorCommand phải tự đứng độc lập trong HistoryStack.past).
+ * EditorCommand phải tự đứng độc lập trong HistoryStack.past). Background theo ĐÚNG tinh thần
+ * "cập nhật cái ĐÃ CÓ" (chốt 2026-07-18) — chỉ ghi đè nếu đích ĐÃ có background từ trước (không
+ * tự tạo mới nếu đích chưa từng set, đó là việc của add-missing).
  */
 export function copyVariantOverwriteExistingCommand(sourceVariantId: string, targetVariantId: string): EditorCommand {
   let prevItems: LayoutItem[] = [];
+  let prevBackground: LayoutVariant['background'];
 
   return {
     type: 'copy-variant-overwrite-existing',
@@ -157,6 +174,7 @@ export function copyVariantOverwriteExistingCommand(sourceVariantId: string, tar
       if (!source || !target) return state;
 
       prevItems = target.items;
+      prevBackground = target.background;
       const diffs = diffOverwriteExisting(source, target);
       const diffMap = new Map(diffs.map((d) => [d.itemId, d.patch]));
       const nextItems = target.items.map((item) => {
@@ -164,10 +182,17 @@ export function copyVariantOverwriteExistingCommand(sourceVariantId: string, tar
         return patch ? ({ ...item, ...patch } as LayoutItem) : item;
       });
 
-      const doc = replaceVariantItems(state.doc, targetVariantId, nextItems);
+      let doc = replaceVariantItems(state.doc, targetVariantId, nextItems);
+      if (target.background !== undefined) {
+        doc = setVariantBackground(doc, targetVariantId, source.background);
+      }
       return { ...state, doc };
     },
-    invert: (state) => ({ ...state, doc: replaceVariantItems(state.doc, targetVariantId, prevItems) }),
+    invert: (state) => {
+      let doc = replaceVariantItems(state.doc, targetVariantId, prevItems);
+      doc = setVariantBackground(doc, targetVariantId, prevBackground);
+      return { ...state, doc };
+    },
   };
 }
 

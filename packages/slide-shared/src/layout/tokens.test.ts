@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { extractTokenKeys, resolveTokens } from './tokens.js';
+import { extractTokenKeys, resolveTokens, extractTokenKeysFromContent, resolveContentTokens } from './tokens.js';
+import type { RichTextContent, TiptapJSONDoc } from './types.js';
 
 describe('resolveTokens', () => {
   it('thay token đứng đầu dòng', () => {
@@ -53,5 +54,81 @@ describe('extractTokenKeys', () => {
 
   it('chuỗi không có token trả mảng rỗng', () => {
     expect(extractTokenKeys('không có gì cả')).toEqual([]);
+  });
+});
+
+// Bước 12 kế hoạch resize/rotate (2026-07-18, sửa lại 2026-07-19) — TextItem.content đổi union
+// string | RichTextContent ({json, html} — KHÔNG còn TiptapJSONDoc trần, xem types.ts's
+// RichTextContent comment: bỏ generateHTML khỏi slide-shared để tránh kéo happy-dom/ws vỡ build
+// Electron main). Backward-compat với layout CŨ (content luôn string) là DoD bắt buộc.
+describe('extractTokenKeysFromContent — tổng quát cho string | RichTextContent', () => {
+  it('content là string (layout cũ) → hoạt động Y HỆT extractTokenKeys', () => {
+    expect(extractTokenKeysFromContent('Xin chào @full_name và @chuc_vu')).toEqual(['full_name', 'chuc_vu']);
+  });
+
+  function docWithTokens(): TiptapJSONDoc {
+    return {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Xin chào ' },
+            { type: 'text', text: '@full_name', marks: [{ type: 'bold' }] },
+          ],
+        },
+        { type: 'paragraph', content: [{ type: 'text', text: 'Chức vụ: @chuc_vu' }] },
+      ],
+    };
+  }
+
+  it('content là RichTextContent → duyệt MỌI text node lồng nhau trong .json, gộp key duy nhất', () => {
+    const rich: RichTextContent = { json: docWithTokens(), html: '<p>Xin chào <strong>@full_name</strong></p><p>Chức vụ: @chuc_vu</p>' };
+    expect(extractTokenKeysFromContent(rich)).toEqual(['full_name', 'chuc_vu']);
+  });
+
+  it('json không có text node nào (rỗng) → mảng rỗng, không throw', () => {
+    const rich: RichTextContent = { json: { type: 'doc', content: [{ type: 'paragraph' }] }, html: '<p></p>' };
+    expect(extractTokenKeysFromContent(rich)).toEqual([]);
+  });
+});
+
+describe('resolveContentTokens — trả ĐÚNG CÙNG KIỂU với input', () => {
+  it('content là string → trả string đã resolve (giống resolveTokens)', () => {
+    const result = resolveContentTokens('Xin chào @full_name', () => 'Nguyễn Văn A');
+    expect(result).toBe('Xin chào Nguyễn Văn A');
+  });
+
+  it('content là RichTextContent → resolve CẢ .json (mọi text node, giữ nguyên marks) LẪN .html', () => {
+    const rich: RichTextContent = {
+      json: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Chào @full_name', marks: [{ type: 'bold' }] }] }] },
+      html: '<p>Chào <strong>@full_name</strong></p>',
+    };
+    const result = resolveContentTokens(rich, () => 'An') as RichTextContent;
+
+    expect(result.json.type).toBe('doc');
+    const textNode = result.json.content![0]!.content![0]!;
+    expect(textNode.text).toBe('Chào An');
+    expect(textNode.marks).toEqual([{ type: 'bold' }]);
+    expect(result.html).toBe('<p>Chào <strong>An</strong></p>');
+  });
+
+  it('resolveContentTokens KHÔNG mutate input .json gốc (deep-clone trước khi sửa)', () => {
+    const rich: RichTextContent = { json: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '@x' }] }] }, html: '<p>@x</p>' };
+    resolveContentTokens(rich, () => 'VALUE');
+
+    expect(rich.json.content![0]!.content![0]!.text).toBe('@x');
+    expect(rich.html).toBe('<p>@x</p>');
+  });
+
+  it('fail-soft giữ nguyên trong RichTextContent — resolve trả undefined → token bị xoá khỏi CẢ json LẪN html', () => {
+    const rich: RichTextContent = {
+      json: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Xin chào @missing!' }] }] },
+      html: '<p>Xin chào @missing!</p>',
+    };
+    const result = resolveContentTokens(rich, () => undefined) as RichTextContent;
+
+    expect(result.json.content![0]!.content![0]!.text).toBe('Xin chào !');
+    expect(result.html).toBe('<p>Xin chào !</p>');
   });
 });

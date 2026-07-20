@@ -16,10 +16,16 @@ export interface Viewport {
 export interface EditorState {
   doc: LayoutContent;
   activeVariantId: string;
-  /** id các item đang chọn (đa chọn) — luôn tương đối activeVariantId hiện tại. */
+  /** id các item đang chọn (đa chọn) — luôn tương đối activeVariantId hiện tại, hoặc tương đối
+   * `editingLoopId` (itemTemplate) khi đang ở chế độ sửa mẫu — xem editingLoopId. */
   selection: string[];
   viewport: Viewport;
   tool: ToolId;
+  /** id của LoopItem đang ở "chế độ sửa mẫu" (Bước 10 kế hoạch resize/rotate, 2026-07-18) —
+   * undefined = đang ở chế độ bình thường (thao tác trên variant.items). Có giá trị = mọi thao
+   * tác spawn/move/resize/rotate/patch phải nhắm vào `itemTemplate` của LoopItem này thay vì
+   * variant.items top-level (xem resolveEditingItems, doc-helpers.ts). */
+  editingLoopId?: string;
 }
 
 export const DEFAULT_VIEWPORT: Viewport = { zoom: 1, panX: 0, panY: 0 };

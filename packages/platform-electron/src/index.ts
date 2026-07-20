@@ -6,4 +6,6 @@ export { createElectronLicensePort } from './adapters/license.js';
 export type { CreateElectronLicensePortOptions } from './adapters/license.js';
 export { createElectronLayoutPort } from './adapters/layout.js';
 export { createElectronAssetPort } from './adapters/asset.js';
+export { createElectronEventPort } from './adapters/event.js';
+export { createElectronDataSourcePort } from './adapters/data-source.js';
 export type { SkyBridge } from './bridge-types.js';

@@ -1,14 +1,27 @@
 import { ipcMain, app, dialog, type BrowserWindow } from 'electron';
-import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
-import { dirname, join, extname } from 'node:path';
+import { readFile, writeFile, mkdir, copyFile, stat } from 'node:fs/promises';
+import { dirname, join, extname, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isUpdateReadyToInstall, getPendingNativeUpdateInfo } from './update-checker';
 import { layoutAssetsDir } from './slide/data/paths';
-import type { LayoutContent } from '@sky-app/slide-shared';
+import type { CanonicalGroup, CanonicalSubject, EventDocument, FieldMappingProfile, LayoutContent } from '@sky-app/slide-shared';
+import type { DataSource } from '@sky-app/slide-shared';
 import {
+  createEvent,
   createLayoutDocument,
+  getCurrentActiveEvent,
+  getDataSource,
+  getDataSourceRecords,
+  getEvent,
   getLayoutDocument,
   getVersion,
+  insertAsset,
+  insertDataSource,
+  insertDataSourceRecords,
+  listAssets,
+  listDataSources,
+  listEvents,
+  listFieldMappingProfiles,
   listLayoutDocuments,
   listTopVariables,
   listVersions,
@@ -16,8 +29,12 @@ import {
   recordTokenUsage,
   restoreVersion,
   saveDraft,
+  saveEvent,
+  saveFieldMappingProfile,
+  setActiveEvent,
 } from '@sky-app/ceremony-db/node';
 import { ceremonyStore } from './slide/data/store';
+import { resetSessionForNewEvent, setCustomVariablesFromEvent } from './slide/socket-server';
 
 /**
  * IPC router — the main-process counterpart to platform-electron's preload
@@ -128,6 +145,75 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     return listTopVariables(ceremonyStore.getExecutor(), limit);
   });
 
+  // EventPort/DataSourcePort (packages/service-contracts/src/event.ts, data-source.ts) —
+  // Giai đoạn 3 kế hoạch Event (docs/roadmap/plans/layout-designer/10-quan-ly-dot-le-event.md).
+  // Dùng chung ceremonyStore.getExecutor() (cùng file ceremony.db).
+  ipcMain.handle('kernel:event:list', async () => {
+    return listEvents(ceremonyStore.getExecutor());
+  });
+
+  ipcMain.handle('kernel:event:get', async (_event, id: string) => {
+    return getEvent(ceremonyStore.getExecutor(), id);
+  });
+
+  ipcMain.handle('kernel:event:create', async (_event, doc: Omit<EventDocument, 'createdAt' | 'updatedAt'>) => {
+    createEvent(ceremonyStore.getExecutor(), doc);
+  });
+
+  ipcMain.handle('kernel:event:save', async (_event, doc: EventDocument) => {
+    saveEvent(ceremonyStore.getExecutor(), doc);
+    // Giai đoạn 4c mở rộng (2026-07-20) — Sửa Event ĐANG active (VD đổi customVariables qua màn
+    // Sửa Event) phải cập nhật socket-server NGAY, không chờ setActive() lần sau — backdrop đang
+    // chạy thật cần thấy công thức mới lập tức, không phải sau khi thoát/kích hoạt lại.
+    if (doc.status === 'active') setCustomVariablesFromEvent(doc.customVariables);
+  });
+
+  ipcMain.handle('kernel:event:getCurrentActive', async () => {
+    return getCurrentActiveEvent(ceremonyStore.getExecutor());
+  });
+
+  // setActive → reset session (SessionState) + backdrop về Idle + báo Control qua socket
+  // (13-ceremony-mo-rong.md §"setActive giữa lễ") — id cũ thuộc Event/DataSource khác, tránh
+  // backdrop kẹt hiển thị người của đợt trước.
+  ipcMain.handle('kernel:event:setActive', async (_event, id: string) => {
+    setActiveEvent(ceremonyStore.getExecutor(), id);
+    resetSessionForNewEvent(id);
+    // Giai đoạn 4c mở rộng (2026-07-20) — đổi nguồn customVariables sang bộ biến của Event vừa
+    // active (đọc lại từ DB, không tin dữ liệu client gửi trước đó). Event không có
+    // customVariables (mảng rỗng mặc định) → an toàn, resolveCustomVariables trả {} cho mọi field.
+    const active = getEvent(ceremonyStore.getExecutor(), id);
+    setCustomVariablesFromEvent(active?.customVariables ?? []);
+  });
+
+  ipcMain.handle('kernel:dataSource:list', async () => {
+    return listDataSources(ceremonyStore.getExecutor());
+  });
+
+  ipcMain.handle('kernel:dataSource:get', async (_event, id: string) => {
+    return getDataSource(ceremonyStore.getExecutor(), id);
+  });
+
+  ipcMain.handle('kernel:dataSource:getRecords', async (_event, id: string, opts?: { excludeConsumedForEvent?: string }) => {
+    return getDataSourceRecords(ceremonyStore.getExecutor(), id, opts);
+  });
+
+  // Giai đoạn 4a — ghi (create/importRecords/FieldMappingProfile), dùng chung executor.
+  ipcMain.handle('kernel:dataSource:create', async (_event, doc: Omit<DataSource, 'records'>) => {
+    insertDataSource(ceremonyStore.getExecutor(), doc);
+  });
+
+  ipcMain.handle('kernel:dataSource:importRecords', async (_event, dataSourceId: string, records: Array<CanonicalSubject | CanonicalGroup>) => {
+    return insertDataSourceRecords(ceremonyStore.getExecutor(), dataSourceId, records);
+  });
+
+  ipcMain.handle('kernel:dataSource:listFieldMappingProfiles', async () => {
+    return listFieldMappingProfiles(ceremonyStore.getExecutor());
+  });
+
+  ipcMain.handle('kernel:dataSource:saveFieldMappingProfile', async (_event, profile: FieldMappingProfile) => {
+    saveFieldMappingProfile(ceremonyStore.getExecutor(), profile);
+  });
+
   // AssetPort (packages/service-contracts/src/asset.ts) — chọn ảnh cho layout-designer, lưu
   // trong ceremony-data/assets/layout/ (thư mục con riêng, tránh trộn ảnh sinh viên nhập qua
   // ZIP). Tái dùng protocol "ceremony-asset://" đã đăng ký sẵn (main.ts) — KHÔNG tạo protocol
@@ -146,14 +232,30 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     const destDir = layoutAssetsDir();
     await mkdir(destDir, { recursive: true });
     const destName = `${randomUUID()}${extname(sourcePath)}`;
-    await copyFile(sourcePath, join(destDir, destName));
+    const destPath = join(destDir, destName);
+    await copyFile(sourcePath, destPath);
 
     // resolveLocalAsset() (paths.ts) map "assets/..." → ceremony-data/assets/... — path tương
     // đối lưu vào LayoutItem.src PHẢI khớp đúng định dạng này.
-    return { relativePath: `assets/layout/${destName}` };
+    const relativePath = `assets/layout/${destName}`;
+    // Ghi metadata vào ceremony-db (Bước 11 kế hoạch resize/rotate, 2026-07-18 — Media Library) —
+    // dùng CHUNG executor với các query khác (ceremonyStore.getExecutor()), cùng 1 file ceremony.db.
+    const { size } = await stat(destPath);
+    insertAsset(ceremonyStore.getExecutor(), {
+      relativePath,
+      name: basename(sourcePath),
+      sizeBytes: size,
+      uploadedAt: new Date().toISOString(),
+    });
+
+    return { relativePath };
   });
 
   ipcMain.handle('kernel:layoutAsset:resolve', async (_event, relativePath: string) => {
     return relativePath ? `ceremony-asset://local/${relativePath}` : '';
+  });
+
+  ipcMain.handle('kernel:layoutAsset:list', async () => {
+    return listAssets(ceremonyStore.getExecutor());
   });
 }

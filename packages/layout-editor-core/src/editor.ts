@@ -18,6 +18,10 @@ export interface EditorStoreState extends EditorState {
   setSelection(ids: string[]): void;
   setActiveVariant(variantId: string): void;
   setViewport(viewport: Viewport): void;
+  /** Vào/thoát chế độ "sửa mẫu" LoopItem (Bước 10) — undefined để thoát. Luôn CLEAR selection
+   * (cả lúc vào lẫn ra) — item chọn từ ngữ cảnh cũ (variant.items hoặc itemTemplate khác) không
+   * còn hợp lệ ở ngữ cảnh mới, giữ lại sẽ khiến PropertyPanel hiện nhầm/tìm không thấy gì. */
+  setEditingLoop(loopId: string | undefined): void;
 }
 
 export interface CreateEditorOptions {
@@ -70,6 +74,9 @@ export function createEditor(options: CreateEditorOptions): Editor {
     },
     setViewport(viewport) {
       set({ viewport });
+    },
+    setEditingLoop(loopId) {
+      set({ editingLoopId: loopId, selection: [] });
     },
   }));
 

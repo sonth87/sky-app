@@ -3,6 +3,8 @@ import cors from '@fastify/cors';
 import { dataRoutes } from './routes/data.js';
 import { layoutRoutes } from './routes/layout.js';
 import { assetRoutes } from './routes/asset.js';
+import { eventRoutes } from './routes/event.js';
+import { dataSourceRoutes } from './routes/data-source.js';
 
 const PORT = Number(process.env.DATA_SERVICE_PORT ?? 8094);
 
@@ -14,6 +16,8 @@ async function main() {
   await app.register(dataRoutes);
   await app.register(layoutRoutes);
   await app.register(assetRoutes);
+  await app.register(eventRoutes);
+  await app.register(dataSourceRoutes);
 
   app.get('/health', async () => ({ ok: true }));
 

@@ -215,6 +215,10 @@ export interface SyncPatchStep {
   itemId: string;
   from: Partial<LayoutItem>;
   to: Partial<LayoutItem>;
+  /** Có giá trị khi step này patch item BÊN TRONG itemTemplate của 1 LoopItem (Bước 9 kế hoạch
+   * resize/rotate, 2026-07-18) — item lồng KHÔNG tham gia sync-giữa-variant, nên step loại này
+   * LUÔN đứng 1 mình (không kèm step lan truyền nào khác), xem computePatchSteps. */
+  loopItemId?: string;
 }
 
 /** Hàm TRUNG TÂM — tính TOÀN BỘ steps cần áp khi user patch 1 item (`itemId` ở `variantId`) từ
@@ -233,7 +237,15 @@ export interface SyncPatchStep {
  * `invert()` — mỗi lần gọi tự tính đúng theo state HIỆN TẠI, KHÔNG đảo `to`/`from` cho nhau giữa
  * 2 lần gọi (invert() PHẢI gọi với ĐÚNG from/to gốc như lúc apply(), rồi tự đảo bằng cách patch
  * step.from thay vì step.to — xem commands.ts's patchItemCommand/makeBoxCommand). */
-export function computePatchSteps(doc: LayoutContent, variantId: string, itemId: string, from: Partial<LayoutItem>, to: Partial<LayoutItem>): SyncPatchStep[] {
+/**
+ * Truyền `loopItemId` để tính step cho item BÊN TRONG itemTemplate của 1 LoopItem — item lồng
+ * KHÔNG tham gia cơ chế đồng bộ sync-giữa-variant (mỗi LoopItem's template độc lập theo từng
+ * variant, đúng thiết kế "mỗi variant có items[] riêng" vốn có, xem plan Bước 9) nên LUÔN trả
+ * đúng 1 step duy nhất kèm `loopItemId`, KHÔNG tìm/lan truyền sang item nào khác.
+ */
+export function computePatchSteps(doc: LayoutContent, variantId: string, itemId: string, from: Partial<LayoutItem>, to: Partial<LayoutItem>, loopItemId?: string): SyncPatchStep[] {
+  if (loopItemId) return [{ variantId, itemId, from, to, loopItemId }];
+
   const variant = doc.variants.find((v) => v.aspect.id === variantId);
   const item = variant?.items.find((i) => i.id === itemId);
   if (!item) return [{ variantId, itemId, from, to }];

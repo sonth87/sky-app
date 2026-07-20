@@ -1,6 +1,6 @@
 import { createPlatformContext, createAllowAllEntitlementSet, type PlatformContext } from '@sky-app/kernel';
 import { resolveEntitlementsFromPort } from '@sky-app/licensing';
-import type { AssetPort, DataPort, LayoutPort } from '@sky-app/service-contracts';
+import type { AssetPort, DataPort, DataSourcePort, EventPort, LayoutPort } from '@sky-app/service-contracts';
 import { createWebTtsPort } from './adapters/tts.js';
 import { createWebLicensePort } from './adapters/license.js';
 import { createWebDataPort } from './adapters/data.js';
@@ -9,6 +9,8 @@ import { createWebLayoutPort } from './adapters/layout.js';
 import { createSqliteWasmLayoutPort } from './adapters/sqlite-wasm-layout.js';
 import { createWebAssetPort } from './adapters/asset.js';
 import { createWasmAssetPort } from './adapters/wasm-asset.js';
+import { createWebEventPort } from './adapters/event.js';
+import { createWebDataSourcePort } from './adapters/data-source.js';
 
 export interface CreateWebPlatformOptions {
   ttsBaseUrl?: string;
@@ -68,6 +70,33 @@ function resolveAssetPort(baseUrl: string, available: boolean): AssetPort {
 }
 
 /**
+ * EventPort/DataSourcePort — Giai đoạn 3, CHƯA có nhánh SqliteWasm fallback (quyết định phạm vi
+ * đã chốt lúc lập kế hoạch: hoãn WASM cho Event/DataSource, không chặn DoD chính là Electron dev
+ * chạy được — xem PHỤ LỤC Giai đoạn 3 trong plan). Khi data-service không khả dụng, mọi lời gọi
+ * qua Port này throw ngay lúc dùng thay vì im lặng dùng dữ liệu rỗng.
+ */
+function resolveEventPort(baseUrl: string, available: boolean): EventPort {
+  if (available) return createWebEventPort(baseUrl);
+  const unavailable = () => Promise.reject(new Error('EventPort: data-service không khả dụng, WASM fallback chưa implement (Giai đoạn 3)'));
+  return { list: unavailable, get: unavailable, create: unavailable, save: unavailable, getCurrentActive: unavailable, setActive: unavailable };
+}
+
+function resolveDataSourcePort(baseUrl: string, available: boolean): DataSourcePort {
+  if (available) return createWebDataSourcePort(baseUrl);
+  const unavailable = () =>
+    Promise.reject(new Error('DataSourcePort: data-service không khả dụng, WASM fallback chưa implement (Giai đoạn 3/4a)'));
+  return {
+    list: unavailable,
+    get: unavailable,
+    getRecords: unavailable,
+    create: unavailable,
+    importRecords: unavailable,
+    listFieldMappingProfiles: unavailable,
+    saveFieldMappingProfile: unavailable,
+  };
+}
+
+/**
  * Builds the PlatformContext for apps/shell-web.
  *
  * Async vì entitlements cần đọc + verify license (localStorage) trước khi
@@ -99,6 +128,8 @@ export async function createWebPlatform(opts: CreateWebPlatformOptions = {}): Pr
   platform.services.register('data', await resolveDataPort(opts, dataBaseUrl, dataServiceAvailable));
   platform.services.register('layout', await resolveLayoutPort(opts, dataBaseUrl, dataServiceAvailable));
   platform.services.register('asset', resolveAssetPort(dataBaseUrl, dataServiceAvailable));
+  platform.services.register('event', resolveEventPort(dataBaseUrl, dataServiceAvailable));
+  platform.services.register('dataSource', resolveDataSourcePort(dataBaseUrl, dataServiceAvailable));
 
   return platform;
 }

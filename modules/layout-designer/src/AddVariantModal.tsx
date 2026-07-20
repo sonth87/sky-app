@@ -31,6 +31,11 @@ export interface AddVariantModalProps {
 export function AddVariantModal({ usedAspectIds, onClose, onConfirm, title = 'Thêm tỷ lệ màn hình', confirmLabel = 'Thêm' }: AddVariantModalProps) {
   const [customW, setCustomW] = useState('');
   const [customH, setCustomH] = useState('');
+  // Trạng thái hover cho từng preset (review 2026-07-18: "khi bật phần chọn thay đổi tỷ lệ màn
+  // hình thì cho trạng thái hover đi" — trước đó background luôn 'transparent' cố định, không có
+  // phản hồi thị giác khi rê chuột qua, khác các danh sách khác trong module đã có hover — VD
+  // VariantTabs.tsx's hoveredVariantId).
+  const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
 
   const customWNum = Number(customW);
   const customHNum = Number(customH);
@@ -80,6 +85,7 @@ export function AddVariantModal({ usedAspectIds, onClose, onConfirm, title = 'Th
         <div style={{ maxHeight: 260, overflowY: 'auto', padding: '2px 6px' }}>
           {PRESETS.map((p) => {
             const disabled = usedAspectIds.has(p.id);
+            const hovered = !disabled && hoveredPresetId === p.id;
             return (
               <button
                 key={p.id}
@@ -89,6 +95,8 @@ export function AddVariantModal({ usedAspectIds, onClose, onConfirm, title = 'Th
                 // (chính aspect.id, "16:9") để tab không bị dài quá khổ. Bỏ trống label → tab
                 // fallback hiện aspect.id (xem VariantTabs.tsx: v.aspect.label ?? v.aspect.id).
                 onClick={() => onConfirm({ id: p.id, w: p.w, h: p.h })}
+                onMouseEnter={() => setHoveredPresetId(p.id)}
+                onMouseLeave={() => setHoveredPresetId((cur) => (cur === p.id ? null : cur))}
                 style={{
                   display: 'block',
                   width: '100%',
@@ -96,11 +104,12 @@ export function AddVariantModal({ usedAspectIds, onClose, onConfirm, title = 'Th
                   padding: '8px 8px',
                   borderRadius: 7,
                   border: 'none',
-                  background: 'transparent',
+                  background: hovered ? '#f4f5f9' : 'transparent',
                   color: disabled ? '#c9c9d3' : '#26262e',
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: disabled ? 'default' : 'pointer',
+                  transition: 'background 0.1s ease',
                 }}
               >
                 {p.label}

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { LayoutRenderer, computeScale, resolveVariant } from './renderer.js';
 import { sampleLayoutContent, sampleSubject, sampleGroup, sampleNamedGroup, makeGroupMembers } from './fixtures.js';
-import type { LayoutContent } from './types.js';
+import type { LayoutContent, RichTextContent } from './types.js';
 
 describe('resolveVariant', () => {
   it('chọn variant khớp tỷ lệ màn 16:9', () => {
@@ -88,6 +88,66 @@ describe('LayoutRenderer — cá nhân', () => {
   it('resolveVariant null (không có variant nào) → nền trung tính, không throw', () => {
     const empty: LayoutContent = { variants: [] };
     expect(() => render(<LayoutRenderer content={empty} screen={{ w: 1920, h: 1080 }} record={sampleSubject} />)).not.toThrow();
+  });
+});
+
+// Bước 12 kế hoạch resize/rotate (2026-07-18, sửa lại 2026-07-19) — TextItem.content có thể là
+// RichTextContent {json, html} (đã sửa qua rich-text editor). LayoutRenderer render THẲNG
+// content.html (đã sinh sẵn lúc soạn qua editor.getHTML(), KHÔNG gọi generateHTML() ở render
+// time — xem types.ts's RichTextContent comment: bỏ generateHTML/happy-dom khỏi slide-shared vì
+// vỡ build Electron main process khi bundle). Đây vẫn là điều kiện "WYSIWYG" đã chốt — chỉ khác
+// HTML được sinh lúc soạn thay vì lúc render.
+describe('LayoutRenderer — TextItem.content dạng RichTextContent (Bước 12)', () => {
+  function contentWithRichText(rich: RichTextContent): LayoutContent {
+    return {
+      variants: [
+        {
+          aspect: { id: '16:9', w: 16, h: 9 },
+          refW: 1920,
+          refH: 1080,
+          items: [{ id: 'rich', type: 'text', box: { x: 0, y: 0, w: 400, h: 100 }, content: rich, fontSize: 24 }],
+        },
+      ],
+    };
+  }
+
+  it('render đúng content.html có sẵn (bold giữ nguyên), không phải text thô', () => {
+    const rich: RichTextContent = {
+      json: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Xin chào ' }, { type: 'text', text: 'thế giới', marks: [{ type: 'bold' }] }] }],
+      },
+      html: '<p>Xin chào <strong>thế giới</strong></p>',
+    };
+    const { container } = render(<LayoutRenderer content={contentWithRichText(rich)} screen={{ w: 1920, h: 1080 }} record={sampleSubject} />);
+
+    const strong = container.querySelector('strong');
+    expect(strong).toBeTruthy();
+    expect(strong!.textContent).toBe('thế giới');
+    expect(container.textContent).toContain('Xin chào thế giới');
+  });
+
+  it('token @var TRONG content.html được resolve đúng giá trị record, giữ nguyên tag <strong>', () => {
+    const rich: RichTextContent = {
+      json: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Xin chúc mừng @full_name', marks: [{ type: 'bold' }] }] }] },
+      html: '<p><strong>Xin chúc mừng @full_name</strong></p>',
+    };
+    const { container } = render(<LayoutRenderer content={contentWithRichText(rich)} screen={{ w: 1920, h: 1080 }} record={sampleSubject} />);
+
+    const strong = container.querySelector('strong');
+    expect(strong!.textContent).toBe('Xin chúc mừng NGUYỄN VĂN A');
+  });
+
+  it('layout CŨ (content vẫn string, chưa qua rich-text editor) → hiển thị đúng, KHÔNG lỗi/mất dữ liệu (backward-compat bắt buộc)', () => {
+    expect(() =>
+      render(<LayoutRenderer content={sampleLayoutContent} screen={{ w: 1920, h: 1080 }} record={sampleSubject} />),
+    ).not.toThrow();
+    expect(screen.getByText('Xin chúc mừng NGUYỄN VĂN A')).toBeTruthy();
+  });
+
+  it('content.html rỗng → không throw, không crash', () => {
+    const rich: RichTextContent = { json: { type: 'doc', content: [{ type: 'paragraph' }] }, html: '<p></p>' };
+    expect(() => render(<LayoutRenderer content={contentWithRichText(rich)} screen={{ w: 1920, h: 1080 }} record={sampleSubject} />)).not.toThrow();
   });
 });
 

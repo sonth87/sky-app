@@ -7,7 +7,14 @@ import type { EditorCommand } from './history.js';
 import { addItem, addVariant, findItem, findVariant, patchItem, removeItem, removeVariant, replaceVariant } from './doc-helpers.js';
 import { computePatchSteps, generateSyncKey, type SyncPatchStep } from './sync.js';
 
-export function addItemCommand(variantId: string, item: LayoutItem): EditorCommand {
+/**
+ * Truyền `loopItemId` để thêm item vào `itemTemplate` của 1 LoopItem (Bước 10 kế hoạch
+ * resize/rotate, 2026-07-18 — chế độ sửa mẫu) thay vì `variant.items` top-level. Item trong
+ * itemTemplate CŨNG được sinh `syncKey` như item top-level (nhất quán, dù hiện tại KHÔNG dùng
+ * tới — item lồng không tham gia sync-giữa-variant, xem Bước 9) — tránh 2 loại item khác nhau
+ * ngầm về schema, chỉ đơn giản là field không được đọc tới trong ngữ cảnh này.
+ */
+export function addItemCommand(variantId: string, item: LayoutItem, loopItemId?: string): EditorCommand {
   // Mọi item MỚI (dù tạo tay hay copy — xem sync-commands.ts) cần syncKey ổn định để về sau CÓ
   // THỂ làm nguồn cho 1 lượt copy khác — sinh ở ĐÂY (điểm duy nhất mọi item đi qua trước khi vào
   // doc), không rải rác ở tầng UI. Item TRUYỀN VÀO đã có sẵn syncKey (case copy, đã gán syncRef
@@ -15,8 +22,8 @@ export function addItemCommand(variantId: string, item: LayoutItem): EditorComma
   const withSyncKey = item.syncKey ? item : { ...item, syncKey: generateSyncKey() };
   return {
     type: 'add-item',
-    apply: (state) => ({ ...state, doc: addItem(state.doc, variantId, withSyncKey), selection: [withSyncKey.id] }),
-    invert: (state) => ({ ...state, doc: removeItem(state.doc, variantId, withSyncKey.id), selection: [] }),
+    apply: (state) => ({ ...state, doc: addItem(state.doc, variantId, withSyncKey, loopItemId), selection: [withSyncKey.id] }),
+    invert: (state) => ({ ...state, doc: removeItem(state.doc, variantId, withSyncKey.id, loopItemId), selection: [] }),
   };
 }
 
@@ -128,18 +135,19 @@ export function patchVariantBackgroundCommand(variantId: string, from: Backgroun
   };
 }
 
-export function removeItemCommand(variantId: string, itemId: string): EditorCommand {
+/** Truyền `loopItemId` để xoá item trong `itemTemplate` của 1 LoopItem (Bước 10). */
+export function removeItemCommand(variantId: string, itemId: string, loopItemId?: string): EditorCommand {
   // Cần snapshot item TRƯỚC khi xoá để invert (thêm lại) đúng nguyên trạng — chụp ở apply().
   let removedItem: LayoutItem | undefined;
   return {
     type: 'remove-item',
     apply: (state) => {
-      removedItem = findItem(state.doc, variantId, itemId);
-      return { ...state, doc: removeItem(state.doc, variantId, itemId), selection: [] };
+      removedItem = findItem(state.doc, variantId, itemId, loopItemId);
+      return { ...state, doc: removeItem(state.doc, variantId, itemId, loopItemId), selection: [] };
     },
     invert: (state) => {
       if (!removedItem) return state;
-      return { ...state, doc: addItem(state.doc, variantId, removedItem), selection: [itemId] };
+      return { ...state, doc: addItem(state.doc, variantId, removedItem, loopItemId), selection: [itemId] };
     },
   };
 }
@@ -180,7 +188,15 @@ interface StepsHolder {
   steps: SyncPatchStep[];
 }
 
-function makeBoxCommand(type: 'move-item' | 'resize-item', variantId: string, itemId: string, from: Box, to: Box, holder: StepsHolder = { steps: [] }): BoxCommand {
+function makeBoxCommand(
+  type: 'move-item' | 'resize-item' | 'rotate-item',
+  variantId: string,
+  itemId: string,
+  from: Box,
+  to: Box,
+  holder: StepsHolder = { steps: [] },
+  loopItemId?: string,
+): BoxCommand {
   const cmd: BoxCommand = {
     type,
     variantId,
@@ -189,14 +205,14 @@ function makeBoxCommand(type: 'move-item' | 'resize-item', variantId: string, it
     to,
     _stepsHolder: holder,
     apply: (state) => {
-      holder.steps = computePatchSteps(state.doc, variantId, itemId, { box: from }, { box: to });
+      holder.steps = computePatchSteps(state.doc, variantId, itemId, { box: from }, { box: to }, loopItemId);
       let doc = state.doc;
-      for (const s of holder.steps) doc = patchItem(doc, s.variantId, s.itemId, s.to);
+      for (const s of holder.steps) doc = patchItem(doc, s.variantId, s.itemId, s.to, s.loopItemId);
       return { ...state, doc };
     },
     invert: (state) => {
       let doc = state.doc;
-      for (const s of [...holder.steps].reverse()) doc = patchItem(doc, s.variantId, s.itemId, s.from);
+      for (const s of [...holder.steps].reverse()) doc = patchItem(doc, s.variantId, s.itemId, s.from, s.loopItemId);
       return { ...state, doc };
     },
     coalesceWith(prev) {
@@ -209,7 +225,7 @@ function makeBoxCommand(type: 'move-item' | 'resize-item', variantId: string, it
       // holder của `cmd` (command MỚI vừa tạo, chưa từng apply()) — đây chính là chỗ sửa quyết
       // định: nếu dùng nhầm `holder` (closure của cmd hiện tại) thay vì `prevBox._stepsHolder`,
       // steps cache sẽ RỖNG vì cmd hiện tại chưa từng apply() (chỉ prevBox mới từng apply()).
-      return makeBoxCommand(type, variantId, itemId, prevBox.from, to, prevBox._stepsHolder);
+      return makeBoxCommand(type, variantId, itemId, prevBox.from, to, prevBox._stepsHolder, loopItemId);
     },
   };
   return cmd;
@@ -217,14 +233,24 @@ function makeBoxCommand(type: 'move-item' | 'resize-item', variantId: string, it
 
 /**
  * Kéo item (move) — coalescable: nhiều lần move liên tiếp CÙNG item trong 1 thao tác kéo chuột
- * gộp thành 1 undo (23 §2.2 "kéo item nhiều frame → 1 undo, không phải N undo").
+ * gộp thành 1 undo (23 §2.2 "kéo item nhiều frame → 1 undo, không phải N undo"). Truyền
+ * `loopItemId` khi item nằm trong `itemTemplate` của 1 LoopItem (Bước 9 — chế độ sửa mẫu).
  */
-export function moveItemCommand(variantId: string, itemId: string, from: Box, to: Box): EditorCommand {
-  return makeBoxCommand('move-item', variantId, itemId, from, to);
+export function moveItemCommand(variantId: string, itemId: string, from: Box, to: Box, loopItemId?: string): EditorCommand {
+  return makeBoxCommand('move-item', variantId, itemId, from, to, undefined, loopItemId);
 }
 
-export function resizeItemCommand(variantId: string, itemId: string, from: Box, to: Box): EditorCommand {
-  return makeBoxCommand('resize-item', variantId, itemId, from, to);
+export function resizeItemCommand(variantId: string, itemId: string, from: Box, to: Box, loopItemId?: string): EditorCommand {
+  return makeBoxCommand('resize-item', variantId, itemId, from, to, undefined, loopItemId);
+}
+
+/**
+ * Xoay item (rotation) — coalescable, cùng pattern move/resize: nhiều lần đổi rotation liên tiếp
+ * TRONG 1 THAO TÁC KÉO chuột gộp thành 1 undo. `from`/`to` là toàn bộ Box (giống move/resize),
+ * chỉ field `rotation` thực sự đổi — tái dùng `makeBoxCommand` nguyên vẹn, không cần logic riêng.
+ */
+export function rotateItemCommand(variantId: string, itemId: string, from: Box, to: Box, loopItemId?: string): EditorCommand {
+  return makeBoxCommand('rotate-item', variantId, itemId, from, to, undefined, loopItemId);
 }
 
 /**
@@ -235,31 +261,34 @@ export function resizeItemCommand(variantId: string, itemId: string, from: Box, 
  * sync.ts); invert() dùng LẠI ĐÚNG steps đã lưu, patch theo `step.from` (đã chứa snapshot
  * ĐÚNG `syncOverrides` TRƯỚC patch) — KHÔNG tính lại từ state hiện tại (state lúc invert đã ở
  * trạng thái SAU apply, tính lại sẽ sai — xem giải thích đầy đủ ở `makeBoxCommand` phía trên).
+ * Truyền `loopItemId` khi item nằm trong `itemTemplate` của 1 LoopItem (Bước 9).
  */
-export function patchItemCommand<T extends LayoutItem>(variantId: string, itemId: string, from: Partial<T>, to: Partial<T>): EditorCommand {
+export function patchItemCommand<T extends LayoutItem>(variantId: string, itemId: string, from: Partial<T>, to: Partial<T>, loopItemId?: string): EditorCommand {
   let steps: SyncPatchStep[] = [];
   return {
     type: 'patch-item',
     apply: (state) => {
-      steps = computePatchSteps(state.doc, variantId, itemId, from, to);
+      steps = computePatchSteps(state.doc, variantId, itemId, from, to, loopItemId);
       let doc = state.doc;
-      for (const s of steps) doc = patchItem(doc, s.variantId, s.itemId, s.to);
+      for (const s of steps) doc = patchItem(doc, s.variantId, s.itemId, s.to, s.loopItemId);
       return { ...state, doc };
     },
     invert: (state) => {
       let doc = state.doc;
-      for (const s of [...steps].reverse()) doc = patchItem(doc, s.variantId, s.itemId, s.from);
+      for (const s of [...steps].reverse()) doc = patchItem(doc, s.variantId, s.itemId, s.from, s.loopItemId);
       return { ...state, doc };
     },
   };
 }
 
 /** Bấm nút khoá trên toolbar/PropertyPanel khi đang chọn item có `syncRef` — item đó TÁCH HẲN
- * khỏi cha, không còn nhận auto-sync cho bất kỳ field nào. Đảo ngược được (mở khoá lại). */
-export function toggleSyncLockCommand(variantId: string, itemId: string, locked: boolean): EditorCommand {
+ * khỏi cha, không còn nhận auto-sync cho bất kỳ field nào. Đảo ngược được (mở khoá lại). Item
+ * trong itemTemplate KHÔNG có syncRef (không tham gia sync) — `loopItemId` vẫn nhận cho đủ bộ
+ * tham số nhất quán với các command khác, dù thực tế nút này sẽ không hiện trong edit-mode. */
+export function toggleSyncLockCommand(variantId: string, itemId: string, locked: boolean, loopItemId?: string): EditorCommand {
   return {
     type: 'toggle-sync-lock',
-    apply: (state) => ({ ...state, doc: patchItem(state.doc, variantId, itemId, { syncLocked: locked }) }),
-    invert: (state) => ({ ...state, doc: patchItem(state.doc, variantId, itemId, { syncLocked: !locked }) }),
+    apply: (state) => ({ ...state, doc: patchItem(state.doc, variantId, itemId, { syncLocked: locked }, loopItemId) }),
+    invert: (state) => ({ ...state, doc: patchItem(state.doc, variantId, itemId, { syncLocked: !locked }, loopItemId) }),
   };
 }

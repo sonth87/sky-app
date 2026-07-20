@@ -3,11 +3,14 @@
 // thả trong vùng canvas → addItemCommand tại đúng vị trí thả (quy đổi qua screenPointToCanvas).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
-import type { LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
-import { addItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
+import { ChevronDown, ChevronRight, Pin, PinOff, X } from 'lucide-react';
+import type { LayoutItem, LayoutVariant, RichTextContent, TiptapJSONDoc } from '@sky-app/slide-shared';
+import { extractTokenKeysFromContent } from '@sky-app/slide-shared';
+import type { AssetMeta } from '@sky-app/service-contracts';
+import { addItemCommand, patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor, ItemTypeDefinition } from '@sky-app/layout-editor-core';
 import { useEditorState } from './useEditor.js';
+import { useResolvedAssetUrl } from './useResolvedAssetUrl.js';
 import { screenPointToCanvas } from './Canvas.js';
 import type { RailGroup } from './Rail.js';
 
@@ -22,10 +25,21 @@ export interface FlyoutProps {
    * lúc nghỉ) — transform ≠ none trên ancestor biến nó thành containing block cho fixed, khiến
    * ghost hiện lệch xa khỏi con trỏ chuột thật (bug thật, xác nhận qua ảnh chụp 2026-07-17). */
   getRootEl: () => HTMLDivElement | null;
+  /** Có giá trị khi đang ở chế độ sửa mẫu LoopItem (Bước 10 kế hoạch resize/rotate, 2026-07-18) —
+   * spawn item MỚI vào itemTemplate của LoopItem này thay vì variant.items top-level.
+   * `editingRefW/H` = kích thước "ô" (itemBox.w/h) dùng để quy đổi toạ độ thả thay cho
+   * variant.refW/refH khi đang edit-mode (artEl hiển thị theo kích thước ô, không phải variant). */
+  editingLoopId?: string;
+  editingRefW?: number;
+  editingRefH?: number;
+  /** Media Library (Bước 11 kế hoạch resize/rotate, 2026-07-18) — bỏ trống = panel "Ảnh" hiện
+   * thông báo chưa khả dụng (hành vi cũ, VD preview độc lập không có AssetPort). */
+  listAssets?: () => Promise<AssetMeta[]>;
+  resolveAssetUrl?: (path: string) => Promise<string>;
 }
 
-export function Flyout({ editor, variant, group, getArtEl, getRootEl }: FlyoutProps) {
-  const spawn = useSpawnDrag(editor, variant, getArtEl, getRootEl);
+export function Flyout({ editor, variant, group, getArtEl, getRootEl, editingLoopId, editingRefW, editingRefH, listAssets, resolveAssetUrl }: FlyoutProps) {
+  const spawn = useSpawnDrag(editor, variant, getArtEl, getRootEl, editingLoopId, editingRefW, editingRefH);
 
   return (
     <div style={{ width: 242, flex: 'none', borderRight: '1px solid #e6e6ee', background: '#fff', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -33,7 +47,15 @@ export function Flyout({ editor, variant, group, getArtEl, getRootEl }: FlyoutPr
       {group === 'tpl' && <TemplatesPanel />}
       {group === 'coll' && <CollectionsPanel />}
       {group === 'var' && <VariablesPanel variant={variant} onSpawnDown={spawn.onDown} />}
-      {group === 'img' && <ImagePanel />}
+      {group === 'img' && (
+        <ImagePanel
+          editor={editor}
+          variant={variant}
+          loopItemId={editingLoopId}
+          listAssets={listAssets}
+          resolveAssetUrl={resolveAssetUrl}
+        />
+      )}
       {group === 'layers' && <LayersPanel editor={editor} variant={variant} />}
       {spawn.ghost && (
         <div
@@ -62,8 +84,18 @@ export function Flyout({ editor, variant, group, getArtEl, getRootEl }: FlyoutPr
 
 type SpawnKind = { kind: 'itemType'; type: LayoutItem['type']; label: string } | { kind: 'var'; key: string; label: string };
 
-/** Hook quản lý kéo-thả spawn: mousedown trên tile palette → theo dõi con trỏ → thả vào canvas. */
-function useSpawnDrag(editor: Editor, variant: LayoutVariant, getArtEl: () => HTMLDivElement | null, getRootEl: () => HTMLDivElement | null) {
+/** Hook quản lý kéo-thả spawn: mousedown trên tile palette → theo dõi con trỏ → thả vào canvas.
+ * `editingLoopId`/`editingRefW`/`editingRefH` (Bước 10) — khi có, spawn vào itemTemplate của
+ * LoopItem đó, quy đổi toạ độ thả theo kích thước "ô" thay vì variant.refW/refH. */
+function useSpawnDrag(
+  editor: Editor,
+  variant: LayoutVariant,
+  getArtEl: () => HTMLDivElement | null,
+  getRootEl: () => HTMLDivElement | null,
+  editingLoopId?: string,
+  editingRefW?: number,
+  editingRefH?: number,
+) {
   const [ghost, setGhost] = useState<{ x: number; y: number; label: string } | null>(null);
   const dragRef = useRef<SpawnKind | null>(null);
 
@@ -92,13 +124,15 @@ function useSpawnDrag(editor: Editor, variant: LayoutVariant, getArtEl: () => HT
       if (!spawnKind) return;
       const artEl = getArtEl();
       if (!artEl) return;
-      const point = screenPointToCanvas(artEl, variant, e.clientX, e.clientY);
+      const refW = editingLoopId ? (editingRefW ?? variant.refW) : variant.refW;
+      const refH = editingLoopId ? (editingRefH ?? variant.refH) : variant.refH;
+      const point = screenPointToCanvas(artEl, refW, refH, e.clientX, e.clientY);
       if (!point) return;
 
       const registry = editor.itemTypes;
       const newItem = createSpawnedItem(spawnKind, point, registry);
       if (!newItem) return;
-      editor.store.getState().dispatch(addItemCommand(variant.aspect.id, newItem));
+      editor.store.getState().dispatch(addItemCommand(variant.aspect.id, newItem, editingLoopId));
     }
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -106,7 +140,7 @@ function useSpawnDrag(editor: Editor, variant: LayoutVariant, getArtEl: () => HT
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [editor, variant, getArtEl, getRootEl]);
+  }, [editor, variant, getArtEl, getRootEl, editingLoopId, editingRefW, editingRefH]);
 
   return { ghost, onDown };
 }
@@ -242,11 +276,13 @@ function VariablesPanel({ variant, onSpawnDown }: { variant: LayoutVariant; onSp
 
 export function collectUsedTokenKeys(variant: LayoutVariant): Set<string> {
   const keys = new Set<string>();
-  const re = /@([a-zA-Z0-9_-]+)/g;
   const scan = (items: LayoutItem[]) => {
     for (const item of items) {
+      // extractTokenKeysFromContent (slide-shared/tokens.ts) — nguồn chân lý DUY NHẤT cho regex
+      // @var, xử lý CẢ content string LẪN Tiptap JSON (Bước 12 kế hoạch resize/rotate,
+      // 2026-07-18). KHÔNG tự viết lại regex ở đây (từng có, đã bỏ — tránh lệch quy định file 09).
       if (item.type === 'text' || item.type === 'ribbon') {
-        for (const m of item.content.matchAll(re)) keys.add(m[1]!);
+        for (const key of extractTokenKeysFromContent(item.content)) keys.add(key);
       }
       if (item.type === 'image' && item.varKey) keys.add(item.varKey);
       if (item.type === 'loop') scan(item.itemTemplate);
@@ -258,65 +294,269 @@ export function collectUsedTokenKeys(variant: LayoutVariant): Set<string> {
 
 // ─── Panel: Ảnh (upload — asset 3 tầng thật thuộc phạm vi riêng trong GĐ2) ─
 
-function ImagePanel() {
+/**
+ * Media Library (Bước 11 kế hoạch resize/rotate, 2026-07-18) — lưới thumbnail ảnh đã lưu qua
+ * AssetPort.listAssets(). Click 1 ảnh → gán vào ImageItem.src của item đang chọn NẾU đó là
+ * ImageItem (patchItemCommand); ngược lại (không chọn gì / chọn item khác loại) → spawn 1
+ * ImageItem MỚI tại giữa canvas với src đó (tái dùng item-type registry's createDefault, cùng
+ * cách ComponentsPanel spawn item mới, chỉ khác src gán sẵn thay vì rỗng).
+ */
+function ImagePanel({
+  editor,
+  variant,
+  loopItemId,
+  listAssets,
+  resolveAssetUrl,
+}: {
+  editor: Editor;
+  variant: LayoutVariant;
+  loopItemId?: string;
+  listAssets?: () => Promise<AssetMeta[]>;
+  resolveAssetUrl?: (path: string) => Promise<string>;
+}) {
+  const selection = useEditorState(editor, (s) => s.selection);
+  const [assets, setAssets] = useState<AssetMeta[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    if (!listAssets) return;
+    let cancelled = false;
+    listAssets()
+      .then((list) => {
+        if (!cancelled) setAssets(list);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listAssets]);
+
+  if (!listAssets) {
+    return (
+      <>
+        <div style={{ padding: '15px 15px 10px', fontWeight: 700, fontSize: 13 }}>Ảnh</div>
+        <div style={{ padding: '0 14px', fontSize: 11, color: '#9a9bab', lineHeight: 1.45 }}>
+          Tải ảnh — nối tầng lưu trữ thật (Electron file / data-service upload / WASM blob) ở phần asset ảnh 3 tầng.
+        </div>
+      </>
+    );
+  }
+
+  const handlePick = (asset: AssetMeta) => {
+    const items = editingItemsOf(variant, loopItemId);
+    const selected = items.find((i) => i.id === selection[0]);
+    if (selected && selected.type === 'image') {
+      editor.store.getState().dispatch(patchItemCommand(variant.aspect.id, selected.id, selected, { src: asset.relativePath }, loopItemId));
+      return;
+    }
+    const newItem: LayoutItem = {
+      id: nextSpawnId('img'),
+      type: 'image',
+      box: { x: 100, y: 100, w: 200, h: 200 },
+      src: asset.relativePath,
+    };
+    editor.store.getState().dispatch(addItemCommand(variant.aspect.id, newItem, loopItemId));
+  };
+
   return (
     <>
       <div style={{ padding: '15px 15px 10px', fontWeight: 700, fontSize: 13 }}>Ảnh</div>
-      <div style={{ padding: '0 14px', fontSize: 11, color: '#9a9bab', lineHeight: 1.45 }}>
-        Tải ảnh — nối tầng lưu trữ thật (Electron file / data-service upload / WASM blob) ở phần asset ảnh 3 tầng.
+      <div style={{ padding: '0 14px 8px', fontSize: 11, color: '#9a9bab', lineHeight: 1.45 }}>Nhấp để gán vào ảnh đang chọn, hoặc thêm ảnh mới.</div>
+      {loadError && <div style={{ padding: '0 14px', fontSize: 11, color: '#c0521e' }}>Không tải được danh sách ảnh.</div>}
+      {assets && assets.length === 0 && !loadError && (
+        <div style={{ padding: '0 14px', fontSize: 11, color: '#9a9bab' }}>Chưa có ảnh nào — dùng nút &quot;Đổi ảnh&quot; ở panel thuộc tính để tải lên.</div>
+      )}
+      <div style={{ padding: '4px 14px 14px', overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {(assets ?? []).map((asset) => (
+          <AssetThumbnail key={asset.relativePath} asset={asset} resolveAssetUrl={resolveAssetUrl} onClick={() => handlePick(asset)} />
+        ))}
       </div>
     </>
   );
 }
 
+function editingItemsOf(variant: LayoutVariant, loopItemId?: string): LayoutItem[] {
+  if (!loopItemId) return variant.items;
+  const loop = variant.items.find((i) => i.id === loopItemId);
+  return loop && loop.type === 'loop' ? loop.itemTemplate : [];
+}
+
+function AssetThumbnail({ asset, resolveAssetUrl, onClick }: { asset: AssetMeta; resolveAssetUrl?: (path: string) => Promise<string>; onClick: () => void }) {
+  const url = useResolvedAssetUrl(asset.relativePath, resolveAssetUrl);
+  return (
+    <button
+      onClick={onClick}
+      title={asset.name}
+      style={{
+        aspectRatio: '1',
+        border: '1px solid #e6e6ee',
+        borderRadius: 8,
+        padding: 0,
+        overflow: 'hidden',
+        cursor: 'pointer',
+        background: url ? `center/cover url(${url})` : 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
+      }}
+    />
+  );
+}
+
 // ─── Panel: Lớp ───────────────────────────────────────────────────
+
+function iconOf(t: LayoutItem['type']) {
+  return t === 'text' ? 'T' : t === 'image' ? '▦' : t === 'ribbon' ? '⚑' : t === 'loop' ? '⟲' : '◆';
+}
+
+/** Text thô nối từ mọi text node trong content.json — dùng cho nhãn Layers panel (chỉ cần
+ * preview ngắn, KHÔNG cần giữ định dạng bold/italic như content.html dùng cho canvas/backdrop,
+ * Bước 12). */
+function plainTextOf(content: string | RichTextContent): string {
+  if (typeof content === 'string') return content;
+  const parts: string[] = [];
+  const walk = (node: TiptapJSONDoc) => {
+    if (typeof node.text === 'string') parts.push(node.text);
+    if (node.content) for (const child of node.content) walk(child);
+  };
+  walk(content.json);
+  return parts.join('');
+}
+
+function labelOf(it: LayoutItem): string {
+  // name tuỳ chỉnh (Bước 2, PropertyPanel's PanelHeader) ưu tiên hơn nhãn tự sinh theo type.
+  if (it.name) return it.name;
+  if (it.type === 'image') return it.varKey ? `Ảnh · @${it.varKey}` : 'Ảnh';
+  if (it.type === 'shape') return 'Shape';
+  if (it.type === 'loop') return 'Khung lặp';
+  return plainTextOf(it.content) || '—';
+}
+
+interface LayerNode {
+  item: LayoutItem;
+  /** Path đầy đủ (loopId.loopId....itemId) — dùng làm React key, tránh key collision vì id
+   * trong itemTemplate KHÔNG cách biệt namespace với id top-level (Bước 6, rủi ro đã ghi trong
+   * plan). CŨNG dùng để phân biệt "item lồng" (path.length>1) — chỉ item TOP-LEVEL (path.length
+   * === 1) mới setSelection được ở bước này (đợi Bước 9 mới chọn được node lồng). */
+  path: string[];
+  depth: number;
+  children: LayerNode[];
+}
+
+function buildLayerTree(items: LayoutItem[], parentPath: string[] = []): LayerNode[] {
+  // Đảo ngược thứ tự hiển thị (item vẽ sau/z cao hơn hiện ở TRÊN cùng danh sách, quy ước layer
+  // panel thông thường) — CHỈ đảo ở cấp hiện tại, giữ nguyên thứ tự bên trong itemTemplate.
+  return [...items].reverse().map((item) => {
+    const path = [...parentPath, item.id];
+    const children = item.type === 'loop' ? buildLayerTree(item.itemTemplate, path) : [];
+    return { item, path, depth: parentPath.length, children };
+  });
+}
+
+function flattenVisible(nodes: LayerNode[], expanded: Set<string>): LayerNode[] {
+  const result: LayerNode[] = [];
+  for (const node of nodes) {
+    result.push(node);
+    const key = node.path.join('.');
+    if (node.children.length > 0 && expanded.has(key)) {
+      result.push(...flattenVisible(node.children, expanded));
+    }
+  }
+  return result;
+}
 
 function LayersPanel({ editor, variant }: { editor: Editor; variant: LayoutVariant }) {
   const selection = useEditorState(editor, (s) => s.selection);
-  const layers = [...variant.items].reverse();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const iconOf = (t: LayoutItem['type']) => (t === 'text' ? 'T' : t === 'image' ? '▦' : t === 'ribbon' ? '⚑' : t === 'loop' ? '⟲' : '◆');
-  const labelOf = (it: LayoutItem) => {
-    if (it.type === 'image') return it.varKey ? `Ảnh · @${it.varKey}` : 'Ảnh';
-    if (it.type === 'shape') return 'Shape';
-    if (it.type === 'loop') return 'Khung lặp';
-    return it.content || '—';
+  const tree = buildLayerTree(variant.items);
+  const visible = flattenVisible(tree, expanded);
+
+  const toggleExpand = (key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
 
   return (
     <>
       <div style={{ padding: '15px 15px 10px', fontWeight: 700, fontSize: 13 }}>Lớp</div>
       <div style={{ padding: '6px 14px 14px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
-        {layers.map((it) => {
-          const on = selection.includes(it.id);
+        {visible.map((node) => {
+          const { item: it, path, depth } = node;
+          const key = path.join('.');
+          const isTopLevel = path.length === 1;
+          const on = isTopLevel && selection.includes(it.id);
+          const isExpanded = expanded.has(key);
           return (
             <div
-              key={it.id}
-              onClick={() => editor.store.getState().setSelection([it.id])}
+              key={key}
+              onClick={() => {
+                if (isTopLevel) editor.store.getState().setSelection([it.id]);
+                // Node lồng trong itemTemplate: KHÔNG setSelection (id không tồn tại trong
+                // variant.items → PropertyPanel/Canvas sẽ âm thầm không tìm thấy gì, bug im lặng
+                // đã ghi trong plan) — đợi Bước 9 (cầu nối dữ liệu loopItemId) mới chọn được.
+              }}
+              title={isTopLevel ? undefined : 'Nhấp đúp vào khung lặp trên canvas để sửa mẫu'}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
                 padding: '7px 9px',
+                paddingLeft: 9 + depth * 18,
                 borderRadius: 8,
-                cursor: 'pointer',
+                cursor: isTopLevel ? 'pointer' : 'default',
+                opacity: isTopLevel ? 1 : 0.55,
                 background: on ? 'color-mix(in srgb, var(--accent-color, #4b57e6) 10%, transparent)' : 'transparent',
                 color: on ? 'var(--accent-color, #4b57e6)' : '#5c5d6e',
                 border: `1px solid ${on ? 'color-mix(in srgb, var(--accent-color, #4b57e6) 30%, transparent)' : 'transparent'}`,
               }}
             >
+              {node.children.length > 0 ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleExpand(key);
+                  }}
+                  aria-label={isExpanded ? `Thu gọn ${labelOf(it)}` : `Mở rộng ${labelOf(it)}`}
+                  style={{ display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', color: '#9a9bab', cursor: 'pointer', padding: 0, width: 14 }}
+                >
+                  {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </button>
+              ) : (
+                <span style={{ width: 14 }} />
+              )}
               <span style={{ width: 22, textAlign: 'center' }}>{iconOf(it.type)}</span>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 11.5 }}>{labelOf(it)}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  editor.store.getState().dispatch(removeItemCommand(variant.aspect.id, it.id));
-                }}
-                aria-label={`Xoá ${labelOf(it)}`}
-                style={{ display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', color: '#c9c9d3', cursor: 'pointer', padding: '0 2px' }}
-              >
-                <X size={13} />
-              </button>
+              {isTopLevel && (
+                <>
+                  {/* locked (Bước 2) — toggle nhanh ngay trong Layers, cùng ý nghĩa với nút Pin/
+                     PinOff ở PropertyPanel's PanelHeader (khoá DI CHUYỂN, khác syncLocked). CHỈ
+                     top-level (item lồng chưa có cầu nối patchItem, đợi Bước 9). */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      editor.store.getState().dispatch(patchItemCommand(variant.aspect.id, it.id, it, { locked: !it.locked }));
+                    }}
+                    aria-label={it.locked ? `Mở khoá ${labelOf(it)}` : `Khoá ${labelOf(it)}`}
+                    style={{ display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', color: it.locked ? 'var(--accent-color, #4b57e6)' : '#c9c9d3', cursor: 'pointer', padding: '0 2px' }}
+                  >
+                    {it.locked ? <PinOff size={13} /> : <Pin size={13} />}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      editor.store.getState().dispatch(removeItemCommand(variant.aspect.id, it.id));
+                    }}
+                    aria-label={`Xoá ${labelOf(it)}`}
+                    style={{ display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', color: '#c9c9d3', cursor: 'pointer', padding: '0 2px' }}
+                  >
+                    <X size={13} />
+                  </button>
+                </>
+              )}
             </div>
           );
         })}

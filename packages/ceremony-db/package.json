@@ -27,6 +27,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@sky-app/service-contracts": "workspace:*",
     "@sky-app/slide-shared": "workspace:*",
     "better-sqlite3": "^12.11.1",
     "sql.js": "1.14.1"

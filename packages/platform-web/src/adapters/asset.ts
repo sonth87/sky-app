@@ -1,4 +1,4 @@
-import type { AssetPort } from '@sky-app/service-contracts';
+import type { AssetMeta, AssetPort } from '@sky-app/service-contracts';
 
 /** Mở `<input type="file">` ẩn, trả File đã chọn hoặc null nếu huỷ (không có cancel event
  * chuẩn trên input file — dùng timeout dựa trên window focus để phát hiện huỷ chọn). */
@@ -69,6 +69,12 @@ export function createWebAssetPort(baseUrl = 'http://localhost:8094'): AssetPort
 
     async resolveAssetUrl(relativePath) {
       return `${baseUrl}/api/${relativePath}`;
+    },
+
+    async listAssets() {
+      const res = await fetch(`${baseUrl}/api/layout-assets`);
+      if (!res.ok) throw new Error(`AssetPort listAssets failed: ${res.status}`);
+      return (await res.json()) as AssetMeta[];
     },
   };
 }

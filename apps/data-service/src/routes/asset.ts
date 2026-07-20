@@ -3,6 +3,8 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
+import { insertAsset, listAssets } from '@sky-app/ceremony-db/node';
+import { getExecutor } from '../store.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const ASSETS_DIR = join(__dirname, '..', '..', 'data', 'layout-assets');
@@ -18,9 +20,15 @@ const EXT_TO_MIME: Record<string, string> = {
 /**
  * AssetPort (packages/service-contracts/src/asset.ts) — Web adapter Local-dev upload qua JSON
  * base64 (không thêm dependency @fastify/multipart cho 1 route nhỏ) — chấp nhận overhead ~33%
- * kích thước cho phạm vi local-dev hiện tại của data-service.
+ * kích thước cho phạm vi local-dev hiện tại của data-service. `listAssets` (Bước 11 kế hoạch
+ * resize/rotate, 2026-07-18 — Media Library) query metadata từ ceremony-db, dùng CHUNG executor
+ * với layoutRoutes (getExecutor() từ store.ts, cùng 1 file ceremony.db).
  */
 export async function assetRoutes(app: FastifyInstance) {
+  // Đặt TRƯỚC route ':filename' cho rõ ràng (Fastify tự định tuyến đúng theo path cụ thể trước
+  // path có tham số nên không thực sự xung đột, nhưng thứ tự này tường minh hơn khi đọc code).
+  app.get('/api/layout-assets', async () => listAssets(getExecutor()));
+
   app.post<{ Body: { filename: string; dataBase64: string } }>('/api/layout-assets', async (req, reply) => {
     const { filename, dataBase64 } = req.body;
     const ext = extname(filename).toLowerCase();
@@ -28,9 +36,13 @@ export async function assetRoutes(app: FastifyInstance) {
 
     mkdirSync(ASSETS_DIR, { recursive: true });
     const destName = `${randomUUID()}${ext}`;
-    writeFileSync(join(ASSETS_DIR, destName), Buffer.from(dataBase64, 'base64'));
+    const buffer = Buffer.from(dataBase64, 'base64');
+    writeFileSync(join(ASSETS_DIR, destName), buffer);
 
-    return { relativePath: `layout-assets/${destName}` };
+    const relativePath = `layout-assets/${destName}`;
+    insertAsset(getExecutor(), { relativePath, name: filename, sizeBytes: buffer.byteLength, uploadedAt: new Date().toISOString() });
+
+    return { relativePath };
   });
 
   app.get<{ Params: { filename: string } }>('/api/layout-assets/:filename', async (req, reply) => {

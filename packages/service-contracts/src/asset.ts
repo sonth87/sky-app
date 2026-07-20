@@ -11,10 +11,25 @@
  * WASM cần tạo object URL (bất đồng bộ, cần giải phóng sau khi dùng qua revoke), khác hẳn
  * Electron/data-service chỉ cần build URL đồng bộ từ path.
  */
+/** Metadata 1 ảnh đã lưu qua `pickAndSaveImage` — dùng bởi Media Library (Bước 11 kế hoạch
+ * resize/rotate, 2026-07-18) để hiện lưới ảnh đã có, không cần mở file picker lại mỗi lần.
+ * `relativePath` khớp giá trị dùng trong `LayoutItem.src`/`Background.src`. */
+export interface AssetMeta {
+  relativePath: string;
+  name: string;
+  sizeBytes: number;
+  /** ISO 8601 string. */
+  uploadedAt: string;
+}
+
 export interface AssetPort {
   /** Mở file picker, copy/upload ảnh đã chọn, trả về relativePath để lưu vào LayoutItem/Background.
    * `null` nếu user huỷ chọn file. */
   pickAndSaveImage(): Promise<{ relativePath: string } | null>;
   /** Chuyển `relativePath` (đã lưu trong layout) thành URL hiển thị được (`<img src>`). */
   resolveAssetUrl(relativePath: string): Promise<string>;
+  /** Danh sách ảnh đã lưu qua `pickAndSaveImage`, mới nhất trước (Media Library, Bước 11).
+   * Ảnh upload TRƯỚC khi tính năng này tồn tại KHÔNG bắt buộc xuất hiện (không backfill/quét
+   * file mồ côi — giới hạn đã ghi trong plan). */
+  listAssets(): Promise<AssetMeta[]>;
 }

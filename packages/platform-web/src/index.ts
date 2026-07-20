@@ -11,3 +11,5 @@ export { createSqliteWasmLayoutPort } from './adapters/sqlite-wasm-layout.js';
 export type { SqliteWasmLayoutPortOptions } from './adapters/sqlite-wasm-layout.js';
 export { createWebAssetPort } from './adapters/asset.js';
 export { createWasmAssetPort } from './adapters/wasm-asset.js';
+export { createWebEventPort } from './adapters/event.js';
+export { createWebDataSourcePort } from './adapters/data-source.js';

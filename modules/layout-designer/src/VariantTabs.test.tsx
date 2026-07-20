@@ -124,6 +124,29 @@ describe('AddVariantModal — thêm tỷ lệ mới qua nút +', () => {
     expect(available.disabled).toBe(false);
   });
 
+  it('hover vào 1 preset khả dụng → hover highlight (background đổi khác transparent), rời chuột → hết highlight (review 2026-07-18: "khi bật phần chọn thay đổi tỷ lệ màn hình thì cho trạng thái hover đi")', () => {
+    render(<LayoutDesignerApp content={oneVariantContent()} />);
+    fireEvent.click(screen.getByLabelText('Thêm tỷ lệ'));
+
+    const available = screen.getByText('4:3 — Tiêu chuẩn').closest('button') as HTMLButtonElement;
+    expect(available.style.background).toBe('transparent'); // chưa hover
+
+    fireEvent.mouseEnter(available);
+    expect(available.style.background).not.toBe('transparent'); // đã hover, có highlight
+
+    fireEvent.mouseLeave(available);
+    expect(available.style.background).toBe('transparent'); // rời chuột, hết highlight
+  });
+
+  it('hover vào preset ĐÃ DÙNG (disabled) → KHÔNG hiện highlight', () => {
+    render(<LayoutDesignerApp content={oneVariantContent()} />);
+    fireEvent.click(screen.getByLabelText('Thêm tỷ lệ'));
+
+    const used = screen.getByText('16:9 — Màn hình rộng').closest('button') as HTMLButtonElement;
+    fireEvent.mouseEnter(used);
+    expect(used.style.background).toBe('transparent');
+  });
+
   it('chọn preset 4:3 từ modal → thêm variant mới, tab hiện gọn "4:3" (không phải label dài trong modal)', () => {
     render(<LayoutDesignerApp content={oneVariantContent()} />);
     fireEvent.click(screen.getByLabelText('Thêm tỷ lệ'));

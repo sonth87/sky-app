@@ -15,9 +15,11 @@ import {
   autoLoadFirstIfConfigured,
   getUseSampleData,
   setBackdropAspectRatioListener,
+  setCustomVariablesFromEvent,
   startSocketServer,
   stopSocketServer,
 } from './slide/socket-server.js';
+import { getCurrentActiveEvent } from '@sky-app/ceremony-db/node';
 import { startHttpServer, stopHttpServer } from './slide/http-server.js';
 import { startPythonServer, stopPythonServer } from './slide/python-server.js';
 import { apiLogger } from './slide/api-logger.js';
@@ -100,6 +102,17 @@ async function bootstrapSlideBackend() {
   const httpPort = config?.http_port ?? DEFAULT_HTTP_PORT;
 
   await startSocketServer(wsPort);
+  // Giai đoạn 4c mở rộng (2026-07-20) — đồng bộ customVariables với Event đang active SẴN trong
+  // DB lúc khởi động app (không qua setActive()/save() trong phiên này, VD app tắt/mở lại giữa
+  // lễ) — nếu không, socket-server giữ giá trị cũ từ app_config.json (loadAppConfig(), dòng
+  // module-level phía trên), lệch với Event thật đang chạy. Fail-soft: lỗi đọc DB không chặn
+  // khởi động app, chỉ log — customVariables giữ nguyên giá trị cũ trong trường hợp đó.
+  try {
+    const active = getCurrentActiveEvent(ceremonyStore.getExecutor());
+    if (active) setCustomVariablesFromEvent(active.customVariables);
+  } catch (err) {
+    console.error('[shell-electron] Failed to sync customVariables from active event on startup:', err);
+  }
   await startHttpServer(httpPort);
   startPythonServer(vieneuDir()); // non-blocking: warmup chạy nền
 

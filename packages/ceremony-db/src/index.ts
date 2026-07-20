@@ -32,3 +32,20 @@ export {
 } from './queries/layout.js';
 export { recordTokenUsage, listTopVariables } from './queries/variable-registry.js';
 export type { VariableRegistryEntry } from './queries/variable-registry.js';
+export { insertAsset, listAssets } from './queries/asset.js';
+export {
+  getEvent,
+  listEvents,
+  createEvent,
+  saveEvent,
+  getCurrentActiveEvent,
+  setActiveEvent,
+} from './queries/event.js';
+export {
+  getDataSource,
+  listDataSources,
+  getDataSourceRecords,
+  insertDataSource,
+  insertDataSourceRecords,
+} from './queries/data-source.js';
+export { listFieldMappingProfiles, saveFieldMappingProfile } from './queries/field-mapping-profile.js';

@@ -5,6 +5,8 @@ import { createElectronDisplayPort } from './adapters/display.js';
 import { createElectronLicensePort } from './adapters/license.js';
 import { createElectronLayoutPort } from './adapters/layout.js';
 import { createElectronAssetPort } from './adapters/asset.js';
+import { createElectronEventPort } from './adapters/event.js';
+import { createElectronDataSourcePort } from './adapters/data-source.js';
 
 export interface CreateElectronPlatformOptions {
   assetUrl?: (path: string) => string;
@@ -48,6 +50,8 @@ export async function createElectronPlatform(
   platform.services.register('display', createElectronDisplayPort());
   platform.services.register('layout', createElectronLayoutPort());
   platform.services.register('asset', createElectronAssetPort());
+  platform.services.register('event', createElectronEventPort());
+  platform.services.register('dataSource', createElectronDataSourcePort());
 
   return platform;
 }

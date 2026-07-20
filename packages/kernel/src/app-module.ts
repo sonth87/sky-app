@@ -41,6 +41,17 @@ export interface AppWindowConfig {
   mobileFullscreen?: boolean;
   /** Khai menu app-aware — xem docs guide tích hợp menu của device-layout. */
   menuBarMenus?: AppMenuBarMenu[];
+  /**
+   * Item tuỳ chỉnh cho phần GIỮA menu tên app (cột đậm đầu tiên, kiểu macOS
+   * app menu — VD "Ceremony"). Menu đó vốn CỐ ĐỊNH: "About {app}" (trên
+   * cùng) rồi "Quit {app}" (dưới cùng) không đổi được — phần giữa mặc định
+   * là placeholder macOS bị disable (Services/Hide/Hide Others/Show All),
+   * không có ý nghĩa gì với hầu hết app. Khai field này THAY THẾ HOÀN TOÀN
+   * khối placeholder đó bằng danh sách item của app (device-layout
+   * `AppNameDropdown.tsx`, package `@sonth87/device-layout` ≥0.2.4).
+   * Dispatch qua CustomEvent 'app:menu:action' giống `menuBarMenus`.
+   */
+  appNameMenuExtraItems?: AppMenuBarItem[];
 }
 
 export interface PlatformContext {

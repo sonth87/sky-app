@@ -23,7 +23,7 @@
     "@sky-app/module-tts-studio": "workspace:*",
     "@sky-app/platform-electron": "workspace:*",
     "@sky-app/slide-shared": "workspace:*",
-    "@sonth87/device-layout": "github:sonth87/device-layout#v0.2.1",
+    "@sonth87/device-layout": "github:sonth87/device-layout#v0.2.4",
     "adm-zip": "^0.6.0",
     "archiver": "^8.0.0",
     "dotenv": "^17.4.2",

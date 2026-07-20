@@ -198,6 +198,7 @@ export function LayoutDesignerAppModule({ platform }: AppContentProps) {
       onTokenInserted={handleTokenInserted}
       pickAndSaveImage={assetPort ? () => assetPort.pickAndSaveImage() : undefined}
       resolveAssetUrl={assetPort ? (path: string) => assetPort.resolveAssetUrl(path) : undefined}
+      listAssets={assetPort ? () => assetPort.listAssets() : undefined}
     />
   );
 }

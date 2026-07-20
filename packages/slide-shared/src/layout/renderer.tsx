@@ -4,11 +4,11 @@
 // (render LoopItem theo CanonicalGroup.members).
 
 import { useMemo, type CSSProperties } from 'react';
-import type { Background, Box, LayoutContent, LayoutItem, LayoutVariant } from './types.js';
+import type { Background, Box, LayoutContent, LayoutItem, LayoutVariant, RichTextContent } from './types.js';
 import type { CanonicalGroup, CanonicalRecord, CanonicalSubject } from './canonical.js';
 import { isCanonicalGroup, resolveCanonicalField } from './canonical.js';
 import { computeLoopLayout, renderOverflowMoreText } from './loop.js';
-import { resolveTokens } from './tokens.js';
+import { resolveTokens, resolveContentTokens } from './tokens.js';
 
 /** Chọn variant khớp tỷ lệ màn hình gần nhất (04-schema-layout-document.md). */
 export function resolveVariant(content: LayoutContent, screen: { w: number; h: number }): LayoutVariant | null {
@@ -130,9 +130,11 @@ function ItemRenderer({ item, scaleX, scaleY, record, resolveAsset }: ItemRender
   }
 }
 
-/** ctx: subject hiện tại để resolve token — record gốc (ngoài loop) hoặc 1 member (trong loop). */
-function resolveContent(content: string, ctx: CanonicalSubject | CanonicalGroup): string {
-  return resolveTokens(content, (key) => resolveCanonicalField(ctx, key));
+/** ctx: subject hiện tại để resolve token — record gốc (ngoài loop) hoặc 1 member (trong loop).
+ * `content` có thể là string (RibbonItem LUÔN, TextItem layout cũ) hoặc RichTextContent (TextItem
+ * đã qua rich-text editor, Bước 12) — resolveContentTokens trả ĐÚNG CÙNG KIỂU với input. */
+function resolveContent<T extends string | RichTextContent>(content: T, ctx: CanonicalSubject | CanonicalGroup): T {
+  return resolveContentTokens(content, (key) => resolveCanonicalField(ctx, key)) as T;
 }
 
 function TextItemView({
@@ -147,7 +149,7 @@ function TextItemView({
   record: CanonicalRecord;
 }) {
   const fScale = fontScale(scaleX, scaleY);
-  const text = resolveContent(item.content, record);
+  const resolved = resolveContent(item.content, record);
   const style: CSSProperties = {
     ...toRenderBox(item.box, scaleX, scaleY),
     opacity: item.opacity != null ? item.opacity / 100 : undefined,
@@ -170,7 +172,18 @@ function TextItemView({
         : `${item.shadow.offsetX ?? 0}px ${item.shadow.offsetY ?? 0}px ${item.shadow.blur ?? 0}px ${item.shadow.color ?? 'rgba(0,0,0,0.4)'}`
       : undefined,
   };
-  return <div style={style}>{text}</div>;
+  // string (layout cũ hoặc TextItem chưa qua rich-text editor) → render nguyên văn qua children,
+  // KHÔNG dùng dangerouslySetInnerHTML (không cần thiết, tránh rủi ro XSS không đáng có).
+  // RichTextContent → dùng THẲNG content.html (đã sinh sẵn lúc soạn qua editor.getHTML(), KHÔNG
+  // gọi generateHTML() ở đây — quyết định sửa lại 2026-07-19: generateHTML cần @tiptap/html +
+  // happy-dom, kéo theo `ws`, vỡ build Electron main process khi bundle slide-shared, xem
+  // RichTextContent's comment ở types.ts). Nguồn content luôn xuất phát từ chính editor nội bộ
+  // (không phải input người dùng ngoài từ internet), rủi ro XSS ở mức chấp nhận được tương tự
+  // mọi editor rich-text khác.
+  if (typeof resolved === 'string') {
+    return <div style={style}>{resolved}</div>;
+  }
+  return <div style={style} dangerouslySetInnerHTML={{ __html: resolved.html }} />;
 }
 
 function RibbonItemView({

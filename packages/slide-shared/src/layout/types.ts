@@ -32,6 +32,39 @@ export interface TextShadow {
   offsetY?: number;
 }
 
+/**
+ * Cấu trúc JSON document tối giản của Tiptap/ProseMirror — CHỈ khai đủ field mà slide-shared
+ * cần DUYỆT (tìm text node, tìm token @var), KHÔNG phải toàn bộ schema Tiptap thật (Bước 12 kế
+ * hoạch resize/rotate, 2026-07-18). slide-shared KHÔNG phụ thuộc @tiptap/core (package thấp
+ * tầng, dùng chung cho cả runtime backdrop lẫn editor — thêm dependency Tiptap vào đây là sai
+ * hướng phụ thuộc). `type`/`marks` giữ nguyên `unknown`/`Record` vì slide-shared không cần hiểu
+ * ý nghĩa (bold/italic/heading...) — chỉ cần biết "đây có phải text node" (có field `text`) và
+ * đệ quy vào `content[]`.
+ */
+export interface TiptapJSONDoc {
+  type: string;
+  content?: TiptapJSONDoc[];
+  text?: string;
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+  attrs?: Record<string, unknown>;
+}
+
+/**
+ * Nội dung rich-text ĐÃ SOẠN qua Tiptap editor — mang CẢ 2: `json` (để mở lại editor sửa tiếp/
+ * dò token @var qua walkTextNodes) và `html` (để HIỂN THỊ trực tiếp qua dangerouslySetInnerHTML,
+ * KHÔNG cần generateHTML() lúc render). `html` được Tiptap's `editor.getHTML()` sinh sẵn NGAY
+ * LÚC soạn (chạy trong browser thật, có DOM) — quyết định 2026-07-19 (sửa lại thiết kế Bước 12
+ * ban đầu): generateHTML() từ package `@tiptap/html` cần peerDependency `happy-dom` (DOM giả lập
+ * cho môi trường không có browser) → kéo theo `ws` → Rollup không bundle nổi optional
+ * `require('bufferutil')` của `ws`, VỠ BUILD Electron main process (main process import
+ * slide-shared cho resolveTokens, bị kéo theo cả nhánh renderer/Tiptap không cần dùng tới).
+ * Bỏ hẳn generateHTML/happy-dom khỏi slide-shared, chuyển việc sinh HTML sang lúc SOẠN (browser
+ * thật, không cần thư viện ngoài) thay vì lúc RENDER (có thể chạy ở môi trường không-DOM). */
+export interface RichTextContent {
+  json: TiptapJSONDoc;
+  html: string;
+}
+
 /** 3 nhóm field LỚN dùng cho per-field-group dirty tracking khi copy/đồng bộ item giữa các
  * variant (xem `sync.ts` ở layout-editor-core) — KHÔNG chia nhỏ hơn (VD sửa riêng `box.x` thì
  * CẢ CỤM 'box' ngừng nhận auto-sync, không chỉ riêng x) — đúng quyết định 2026-07-18: "nếu đã
@@ -65,7 +98,11 @@ interface BaseItem {
 
 export interface TextItem extends BaseItem {
   type: 'text';
-  content: string; // "Xin chúc mừng @full_name" — token @var mở (xem 09-quy-dinh-variable.md §1)
+  // "Xin chúc mừng @full_name" — token @var mở (xem 09-quy-dinh-variable.md §1). string = layout
+  // CŨ (trước Bước 12) hoặc chưa qua rich-text editor; RichTextContent = đã sửa qua Tiptap editor
+  // (modules/layout-designer's TiptapTextEditor.tsx). MỌI nơi dùng content PHẢI type-guard tường
+  // minh (`typeof content === 'string'`) — KHÔNG ép buộc 1 dạng, backward-compat là bắt buộc.
+  content: string | RichTextContent;
   fontFamily?: string;
   fontSize: number; // px trên canvas chuẩn — nhân với scale lúc render, như Box
   fontWeight?: number;

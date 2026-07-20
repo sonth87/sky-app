@@ -52,10 +52,10 @@ describe('Canvas — snap khi kéo item', () => {
     fireEvent.pointerDown(movingEl, { clientX: 500, clientY: 200 });
     fireEvent.pointerMove(movingEl, { clientX: 303, clientY: 200 });
 
-    // Guide dọc (axis x) phải xuất hiện tại đúng vị trí anchor.right = 300 — lọc theo màu guide
-    // (var(--accent-color, #4b57e6) — accent hệ thống, xem Canvas.tsx) để KHÔNG match nhầm
-    // Divider trong FloatingToolbar (cũng "width: 1px" nhưng màu xám cố định #e6e6ee).
-    const verticalGuide = container.querySelector('[style*="width: 1px"][style*="var(--accent-color"]') as HTMLElement | null;
+    // Guide dọc (axis x) phải xuất hiện tại đúng vị trí anchor.right = 300 — data-testid riêng
+    // (GuideLine, Canvas.tsx) để KHÔNG match nhầm Divider trong FloatingToolbar hay đường nối
+    // của handle xoay (Bước 4, cũng "width: 1px" nhưng khác mục đích hoàn toàn).
+    const verticalGuide = container.querySelector('[data-testid="snap-guide"]') as HTMLElement | null;
     expect(verticalGuide).toBeTruthy();
     expect(verticalGuide!.style.left).toBe('300px');
 
@@ -66,7 +66,7 @@ describe('Canvas — snap khi kéo item', () => {
     fireEvent.pointerUp(movingEl, { clientX: 303, clientY: 200 });
 
     // Sau khi thả chuột, guide phải biến mất.
-    expect(container.querySelector('[style*="width: 1px"][style*="var(--accent-color"]')).toBeNull();
+    expect(container.querySelector('[data-testid="snap-guide"]')).toBeNull();
   });
 
   it('kéo ra xa (ngoài threshold) → không snap, không vẽ guide', () => {
@@ -78,8 +78,7 @@ describe('Canvas — snap khi kéo item', () => {
     fireEvent.pointerDown(movingEl, { clientX: 500, clientY: 200 });
     fireEvent.pointerMove(movingEl, { clientX: 450, clientY: 350 });
 
-    expect(container.querySelector('[style*="width: 1px"][style*="var(--accent-color"]')).toBeNull();
-    expect(container.querySelector('[style*="height: 1px"][style*="rgb(75, 87, 230)"]')).toBeNull();
+    expect(container.querySelector('[data-testid="snap-guide"]')).toBeNull();
   });
 
   it('không throw khi kéo item không có item khác nào để snap (canvas 1 item)', () => {

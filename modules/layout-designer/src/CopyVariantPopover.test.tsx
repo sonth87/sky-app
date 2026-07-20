@@ -39,9 +39,10 @@ describe('CopyVariantPopover — chọn nguồn + chế độ copy', () => {
     expect(onConfirm).toHaveBeenCalledWith('16:9', 'overwrite-existing');
   });
 
-  it('chế độ "ghi đè toàn bộ", đích KHÔNG có item khoá → chỉ cần confirm 1 lớp', () => {
+  it('chế độ "ghi đè toàn bộ", đích CÓ item (không rỗng) và KHÔNG khoá → chỉ cần confirm 1 lớp', () => {
     const onConfirm = vi.fn();
-    render(<CopyVariantPopover variants={[variant('16:9', 16, 9), variant('4:3', 4, 3, [])]} targetVariantId="4:3" onClose={() => {}} onConfirm={onConfirm} />);
+    const targetWithItem = variant('4:3', 4, 3, [{ id: 't1', type: 'text', box: { x: 0, y: 0, w: 10, h: 10 }, content: 'A', fontSize: 12 }]);
+    render(<CopyVariantPopover variants={[variant('16:9', 16, 9), targetWithItem]} targetVariantId="4:3" onClose={() => {}} onConfirm={onConfirm} />);
 
     fireEvent.click(screen.getByText('Ghi đè toàn bộ'));
     fireEvent.click(screen.getByText('Copy'));
@@ -50,6 +51,18 @@ describe('CopyVariantPopover — chọn nguồn + chế độ copy', () => {
     fireEvent.click(screen.getByText('Ghi đè'));
     expect(onConfirm).toHaveBeenCalledWith('16:9', 'overwrite-all', 'skip-locked');
     expect(screen.queryByText('Có phần tử đang khoá')).toBeNull(); // KHÔNG có confirm lớp 2
+  });
+
+  it('chế độ "ghi đè toàn bộ", đích TRỐNG HOÀN TOÀN (chưa có item nào) → BỎ QUA confirm, gọi onConfirm NGAY (chốt 2026-07-18: "nếu tỷ lệ A chưa có comp nào... thì cho copy tất cả từ B mà không cần hỏi")', () => {
+    const onConfirm = vi.fn();
+    render(<CopyVariantPopover variants={[variant('16:9', 16, 9), variant('4:3', 4, 3, [])]} targetVariantId="4:3" onClose={() => {}} onConfirm={onConfirm} />);
+
+    fireEvent.click(screen.getByText('Ghi đè toàn bộ'));
+    fireEvent.click(screen.getByText('Copy'));
+
+    // KHÔNG hiện bất kỳ bước confirm nào — gọi onConfirm ngay lập tức.
+    expect(screen.queryByText('Ghi đè toàn bộ tỷ lệ này?')).toBeNull();
+    expect(onConfirm).toHaveBeenCalledWith('16:9', 'overwrite-all', 'skip-locked');
   });
 
   it('chế độ "ghi đè toàn bộ", đích CÓ item khoá → cần confirm 2 lớp, hỏi chiến lược khoá', () => {
