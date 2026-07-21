@@ -48,7 +48,7 @@ export interface AppWindowConfig {
    * là placeholder macOS bị disable (Services/Hide/Hide Others/Show All),
    * không có ý nghĩa gì với hầu hết app. Khai field này THAY THẾ HOÀN TOÀN
    * khối placeholder đó bằng danh sách item của app (device-layout
-   * `AppNameDropdown.tsx`, package `@sonth87/device-layout` ≥0.2.4).
+   * `AppNameDropdown.tsx`, package `@sonth87/device-layout` ≥0.2.6.
    * Dispatch qua CustomEvent 'app:menu:action' giống `menuBarMenus`.
    */
   appNameMenuExtraItems?: AppMenuBarItem[];

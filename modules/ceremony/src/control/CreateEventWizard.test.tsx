@@ -1,7 +1,7 @@
 // CreateEventWizard — Giai đoạn 4a kế hoạch Event.
 
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import type { EventPort, DataSourcePort, LayoutPort } from '@sky-app/service-contracts';
 import type { EventDocument } from '@sky-app/slide-shared';
 import { CreateEventWizard } from './CreateEventWizard.js';
@@ -268,7 +268,9 @@ describe('CreateEventWizard — Bước 3: layout theo điều kiện (GĐ4b)', 
     await waitFor(() => expect(screen.getAllByText('Chọn layout').length).toBeGreaterThan(0));
     fireEvent.click(screen.getAllByText('Chọn layout')[0]);
     await waitFor(() => screen.getByText('Layout A'));
+    // Click chỉ tích chọn (UX mới, 2026-07-20) — phải bấm nút xác nhận mới thực sự chọn.
     fireEvent.click(screen.getByText('Layout A').closest('button')!);
+    fireEvent.click(screen.getByText('Chọn layout này'));
 
     // Bước 3 giờ dẫn sang Bước 4 (Ghép biến, GĐ4c) trước khi tạo Event.
     fireEvent.click(screen.getByText('Tiếp tục'));
@@ -364,5 +366,185 @@ describe('CreateEventWizard — chế độ Sửa (initialEvent, Giai đoạn 4c
     expect(saved.layoutRefs).toHaveLength(2);
     expect(saved.layoutRefs.find((r) => r.layoutId === 'layout-a')).toBeTruthy();
     expect(saved.layoutRefs.find((r) => r.layoutId === 'layout-default')).toBeTruthy();
+  });
+
+  it('có nút "Xem thông tin cơ bản" ở Bước 3 → bấm vào thấy đúng tên/ngày đã lưu, KHÔNG rỗng', async () => {
+    const eventPort = mockEventPort();
+    const original = eventDoc({ name: 'Lễ trao bằng đợt 5', scheduledAt: '2026-08-15' });
+    render(
+      <CreateEventWizard
+        open
+        eventPort={eventPort}
+        dataSourcePort={undefined}
+        layoutPort={undefined}
+        assetPort={undefined}
+        dataSources={[]}
+        onClose={() => {}}
+        onCreated={() => {}}
+        initialEvent={original}
+      />,
+    );
+
+    await waitFor(() => screen.getByText('Xem thông tin cơ bản'));
+    fireEvent.click(screen.getByText('Xem thông tin cơ bản'));
+
+    // Bước 1 giờ hiện — input tên phải có giá trị ĐÚNG đã lưu, không rỗng.
+    const nameInput = screen.getByPlaceholderText(/Lễ trao bằng/) as HTMLInputElement;
+    expect(nameInput.value).toBe('Lễ trao bằng đợt 5');
+  });
+
+  it('từ Bước 1 (xem lại) bấm nút quay lại → về đúng Bước 3, KHÔNG mất layoutRefs đã cấu hình', async () => {
+    const eventPort = mockEventPort();
+    const ruleRef = { layoutId: 'layout-a', layoutVersion: 1, selector: { groups: [{ rules: [] }], priority: 1 }, fieldMap: {} };
+    const original = eventDoc({ layoutRefs: [ruleRef] });
+    render(
+      <CreateEventWizard
+        open
+        eventPort={eventPort}
+        dataSourcePort={undefined}
+        layoutPort={undefined}
+        assetPort={undefined}
+        dataSources={[]}
+        onClose={() => {}}
+        onCreated={() => {}}
+        initialEvent={original}
+      />,
+    );
+
+    await waitFor(() => screen.getByText('Xem thông tin cơ bản'));
+    fireEvent.click(screen.getByText('Xem thông tin cơ bản'));
+    await waitFor(() => screen.getByPlaceholderText(/Lễ trao bằng/));
+
+    fireEvent.click(screen.getByText('Xem cấu hình layout/biến'));
+
+    // Về Bước 3 (không có layoutPort → hiện layoutPortUnavailable + nút Lưu) — bấm Lưu vẫn giữ
+    // đúng layoutRefs đã có từ trước (không bị reset khi qua lại Bước 1).
+    await waitFor(() => screen.getByText('Lưu'));
+    fireEvent.click(screen.getByText('Lưu'));
+
+    await waitFor(() => expect(eventPort.save).toHaveBeenCalled());
+    const saved = (eventPort.save as ReturnType<typeof vi.fn>).mock.calls[0][0] as EventDocument;
+    expect(saved.layoutRefs).toHaveLength(1);
+    expect(saved.layoutRefs[0].layoutId).toBe('layout-a');
+  });
+
+  it('dataSourceChoice="existing" hiện ĐÚNG label DataSource, KHÔNG hiện radio chọn nguồn', async () => {
+    const eventPort = mockEventPort();
+    const original = eventDoc({ dataSourceId: 'ds-1' });
+    render(
+      <CreateEventWizard
+        open
+        eventPort={eventPort}
+        dataSourcePort={undefined}
+        layoutPort={undefined}
+        assetPort={undefined}
+        dataSources={[{ id: 'ds-1', label: 'SV khoá 2026', mode: 'consumable', recordCount: 10 }]}
+        onClose={() => {}}
+        onCreated={() => {}}
+        initialEvent={original}
+      />,
+    );
+
+    await waitFor(() => screen.getByText('Xem thông tin cơ bản'));
+    fireEvent.click(screen.getByText('Xem thông tin cơ bản'));
+
+    await waitFor(() => expect(screen.getByText('SV khoá 2026')).toBeTruthy());
+    // Không còn radio "Tạo nguồn dữ liệu mới" trong chế độ Sửa (readonly).
+    expect(screen.queryByText('Tạo nguồn dữ liệu mới')).toBeNull();
+  });
+});
+
+describe('CreateEventWizard — xác nhận huỷ thay đổi khi thoát qua Esc/nút X (2026-07-20)', () => {
+  it('Esc khi CHƯA có thay đổi gì → đóng thẳng, KHÔNG hiện confirm', async () => {
+    const onClose = vi.fn();
+    render(
+      <CreateEventWizard open eventPort={mockEventPort()} dataSourcePort={undefined} layoutPort={undefined} assetPort={undefined} dataSources={[]} onClose={onClose} onCreated={() => {}} />,
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Huỷ bỏ thay đổi?')).toBeNull();
+  });
+
+  it('Esc SAU KHI đã gõ tên → hiện confirm, KHÔNG đóng ngay', async () => {
+    const onClose = vi.fn();
+    render(
+      <CreateEventWizard open eventPort={mockEventPort()} dataSourcePort={undefined} layoutPort={undefined} assetPort={undefined} dataSources={[]} onClose={onClose} onCreated={() => {}} />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(/Lễ trao bằng/), { target: { value: 'Đợt thay đổi' } });
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText('Huỷ bỏ thay đổi?')).toBeTruthy();
+  });
+
+  it('confirm "Huỷ thay đổi" trong popup → đóng thật, gọi onClose', async () => {
+    const onClose = vi.fn();
+    render(
+      <CreateEventWizard open eventPort={mockEventPort()} dataSourcePort={undefined} layoutPort={undefined} assetPort={undefined} dataSources={[]} onClose={onClose} onCreated={() => {}} />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(/Lễ trao bằng/), { target: { value: 'Đợt thay đổi' } });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByText('Huỷ thay đổi'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('huỷ popup confirm (giữ lại) → KHÔNG gọi onClose, dữ liệu đã gõ vẫn còn', async () => {
+    const onClose = vi.fn();
+    render(
+      <CreateEventWizard open eventPort={mockEventPort()} dataSourcePort={undefined} layoutPort={undefined} assetPort={undefined} dataSources={[]} onClose={onClose} onCreated={() => {}} />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(/Lễ trao bằng/), { target: { value: 'Đợt thay đổi' } });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    // Popup ConfirmModal có nút "Hủy" RIÊNG (đóng popup, GIỮ LẠI thay đổi) — trùng text với nút
+    // "Hủy" ở Bước 1 phía dưới (vẫn còn trong DOM, chỉ bị ConfirmModal che). Scope query vào
+    // đúng popup qua tiêu đề "Huỷ bỏ thay đổi?" để tránh khớp nhầm.
+    const dialogTitle = screen.getByText('Huỷ bỏ thay đổi?');
+    const dialog = dialogTitle.closest('div')!.parentElement!;
+    fireEvent.click(within(dialog).getByText('Hủy'));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByText('Huỷ bỏ thay đổi?')).toBeNull();
+    expect(screen.getByDisplayValue('Đợt thay đổi')).toBeTruthy();
+  });
+
+  it('click ra ngoài backdrop KHÔNG đóng modal (closeOnBackdrop=false)', async () => {
+    const onClose = vi.fn();
+    const { container } = render(
+      <CreateEventWizard open eventPort={mockEventPort()} dataSourcePort={undefined} layoutPort={undefined} assetPort={undefined} dataSources={[]} onClose={onClose} onCreated={() => {}} />,
+    );
+
+    const backdrop = container.querySelector('.fixed.inset-0');
+    expect(backdrop).toBeTruthy();
+    fireEvent.click(backdrop!);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('chế độ Sửa: đổi customVariables rồi Esc → hiện confirm', async () => {
+    const onClose = vi.fn();
+    const original = eventDoc({ id: 'ev1', layoutRefs: [] });
+    render(
+      <CreateEventWizard
+        open
+        eventPort={mockEventPort()}
+        dataSourcePort={undefined}
+        layoutPort={{ listDocuments: vi.fn().mockResolvedValue([]) } as unknown as LayoutPort}
+        assetPort={undefined}
+        dataSources={[]}
+        onClose={onClose}
+        onCreated={() => {}}
+        initialEvent={original}
+      />,
+    );
+
+    // Chế độ Sửa nhảy thẳng Bước 3 — layoutPort tồn tại nên hiện LayoutRuleTable, chưa đổi gì.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

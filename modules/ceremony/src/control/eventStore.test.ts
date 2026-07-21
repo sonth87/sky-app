@@ -131,16 +131,23 @@ describe('useEventStore — checkGate', () => {
     expect(useEventStore.getState().activeEvent?.id).toBe('ev2');
   });
 
-  it('cờ "đã thoát Gate" chỉ áp dụng ĐÚNG 1 LẦN — xoá ngay sau khi đọc, lần checkGate() kế tiếp trở lại hành vi bình thường', async () => {
+  it('cờ "đã thoát Gate" GIỮ NGUYÊN qua nhiều lần gọi checkGate() liên tiếp khi Event active không đổi — tránh bug StrictMode double-invoke (2026-07-20)', async () => {
+    // Bug thật phát hiện qua sử dụng thật: React StrictMode (dev mode) cố tình gọi effect 2 lần
+    // lúc mount để bắt side-effect không an toàn — nếu checkGate() xoá cờ NGAY sau lần đọc đầu
+    // tiên, lần gọi thứ 2 trong CÙNG 1 lượt khởi động sẽ không còn thấy cờ, tự động thoát khỏi
+    // Gate dù user vừa chủ động thoát ra trước khi tắt app. Cờ chỉ được xoá khi KHÔNG còn áp
+    // dụng (activateEvent() gọi vào Event khác, hoặc Event active trong DB đã đổi).
     localStorage.setItem('ceremony-event-exited-gate', 'ev1');
     const active = eventDoc({ id: 'ev1' });
     const port = mockEventPort({ getCurrentActive: vi.fn().mockResolvedValue(active) });
 
     await useEventStore.getState().checkGate(port, undefined);
     expect(useEventStore.getState().activeEvent).toBeNull();
+    expect(localStorage.getItem('ceremony-event-exited-gate')).toBe('ev1');
 
     await useEventStore.getState().checkGate(port, undefined);
-    expect(useEventStore.getState().activeEvent?.id).toBe('ev1');
+    expect(useEventStore.getState().activeEvent).toBeNull();
+    expect(localStorage.getItem('ceremony-event-exited-gate')).toBe('ev1');
   });
 });
 

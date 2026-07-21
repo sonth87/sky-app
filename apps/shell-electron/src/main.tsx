@@ -28,10 +28,12 @@ async function main() {
     <StrictMode>
       <SkyDeviceLayout
         apps={[ceremonyModule, ttsStudioModule, layoutDesignerModule, mockAppModule]}
+        builtInApps={false}
         platform={platform}
         onImportWallpaper={importWallpaper}
         wallpapers={WALLPAPERS}
         updateActions={updateActions}
+        isSimpleMode={true}
       />
     </StrictMode>,
   );

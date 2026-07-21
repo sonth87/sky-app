@@ -10,7 +10,7 @@
 // "sửa toàn bộ Event như tạo lại từ đầu". `finishWizard` gọi eventPort.save() thay vì create(),
 // giữ nguyên id/status/dataSourceId/createdAt của Event gốc.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload } from 'lucide-react';
 import type { AssetPort, DataSourcePort, EventPort, LayoutPort } from '@sky-app/service-contracts';
@@ -29,10 +29,12 @@ import { useEventStore } from './eventStore.js';
 import { EventFieldMapEditor } from './EventFieldMapEditor.js';
 import { parseSpreadsheet, type ParsedSpreadsheet } from './lib/parseSpreadsheet.js';
 import { Modal } from './components/ui/Modal.js';
+import { ConfirmModal } from './components/ui/ConfirmModal.js';
 import { Button } from './components/ui/Button.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.js';
 import { showErrorToast, showSuccessToast } from './lib/toast.js';
 import { LayoutRuleTable, type LayoutRuleRow } from './LayoutRuleTable.js';
+import { WizardStepIndicator } from './WizardStepIndicator.js';
 
 function newId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID()}`;
@@ -79,8 +81,10 @@ export function CreateEventWizard({ open, onClose, eventPort, dataSourcePort, la
   const [step, setStep] = useState<1 | 2 | 3 | 4>(isEditMode ? 3 : 1);
   const [name, setName] = useState(initialEvent?.name ?? '');
   const [scheduledAt, setScheduledAt] = useState(initialEvent?.scheduledAt ?? '');
-  const [dataSourceChoice, setDataSourceChoice] = useState<DataSourceChoice>('later');
-  const [existingDataSourceId, setExistingDataSourceId] = useState<string>('');
+  // Chế độ Sửa: phản ánh ĐÚNG trạng thái dataSource hiện có của Event (readonly, không đổi được
+  // sau khi tạo — xem Step1BasicInfo's readOnlyDataSource) thay vì luôn hard-code 'later'.
+  const [dataSourceChoice, setDataSourceChoice] = useState<DataSourceChoice>(initialEvent?.dataSourceId ? 'existing' : 'later');
+  const [existingDataSourceId, setExistingDataSourceId] = useState<string>(initialEvent?.dataSourceId ?? '');
   const [submitting, setSubmitting] = useState(false);
 
   // Bước 2 — import
@@ -104,12 +108,22 @@ export function CreateEventWizard({ open, onClose, eventPort, dataSourcePort, la
   // Bước 4 — ghép biến (fieldMap), Giai đoạn 4c
   const [customVariables, setCustomVariables] = useState<CustomVariable[]>(initialEvent?.customVariables ?? []);
 
+  // Xác nhận trước khi thoát nếu đã có thay đổi (Esc/nút X — click ra ngoài backdrop đã bị chặn
+  // hẳn qua closeOnBackdrop=false, xem <Modal> bên dưới). So JSON snapshot lúc mở với state hiện
+  // tại — đơn giản hơn so từng field, đủ chính xác vì mọi field liên quan đều là dữ liệu thuần
+  // (string/array/object), không có hàm/Date/class instance nào lẫn vào. Snapshot chụp 1 LẦN lúc
+  // mount (mỗi phiên mở modal là 1 component instance mới, xem EventGate.tsx's key={editingEvent.id}
+  // cho chế độ Sửa, hoặc unmount/mount lại cho chế độ Tạo) — không phụ thuộc `open` đổi giá trị.
+  const dirtyFieldsSnapshot = () => JSON.stringify({ name, scheduledAt, dataSourceChoice, existingDataSourceId, layoutRuleRows, defaultLayoutRef, customVariables });
+  const initialSnapshotRef = useRef(dirtyFieldsSnapshot());
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+
   const resetAll = () => {
     setStep(isEditMode ? 3 : 1);
     setName(initialEvent?.name ?? '');
     setScheduledAt(initialEvent?.scheduledAt ?? '');
-    setDataSourceChoice('later');
-    setExistingDataSourceId('');
+    setDataSourceChoice(initialEvent?.dataSourceId ? 'existing' : 'later');
+    setExistingDataSourceId(initialEvent?.dataSourceId ?? '');
     setParsed(null);
     setFileName('');
     setDsLabel('');
@@ -127,7 +141,19 @@ export function CreateEventWizard({ open, onClose, eventPort, dataSourcePort, la
 
   const handleClose = () => {
     resetAll();
+    initialSnapshotRef.current = dirtyFieldsSnapshot();
     onClose();
+  };
+
+  /** Đóng qua Esc/nút X — hỏi xác nhận trước nếu đã có thay đổi chưa lưu (phản hồi thật,
+   * 2026-07-20). Nút "Huỷ bỏ"/"Lưu"/"Hoàn tất" thành công vẫn gọi thẳng handleClose() (không đi
+   * qua đây) — huỷ bỏ đã là hành động xác nhận rõ ràng của người dùng, không cần hỏi 2 lần. */
+  const requestClose = () => {
+    if (dirtyFieldsSnapshot() !== initialSnapshotRef.current) {
+      setConfirmDiscardOpen(true);
+      return;
+    }
+    handleClose();
   };
 
   const buildProfile = (): FieldMappingProfile => {
@@ -309,30 +335,66 @@ export function CreateEventWizard({ open, onClose, eventPort, dataSourcePort, la
   const totalSteps = dataSourceChoice === 'new' ? 4 : 3;
   const step3Ordinal = dataSourceChoice === 'new' ? 3 : 2;
 
+  // Thanh tiến trình trực quan (WizardStepIndicator, 2026-07-20) — phát hiện qua phản hồi thật:
+  // chỉ có text "Bước X/Y" trong title KHÔNG đủ để thấy TOÀN CẢNH các bước còn lại (Layout/Ghép
+  // biến), user tưởng nhầm chúng biến mất. Nhãn ngắn theo đúng thứ tự hiệu quả (bỏ qua Bước 2 nếu
+  // không chọn "new"). Chế độ Sửa CŨNG hiện thanh này (đồng nhất trải nghiệm với lúc Tạo, phản hồi
+  // thật 2026-07-20) — không cần tuyến tính tuyệt đối, nút "Xem thông tin cơ bản"/"Xem cấu hình
+  // layout" đã cho phép nhảy qua lại giữa các bước đã đi qua.
+  const stepLabels = dataSourceChoice === 'new'
+    ? [t('createEventWizard.stepLabelBasicInfo'), t('createEventWizard.stepLabelImport'), t('createEventWizard.stepLabelLayout'), t('createEventWizard.stepLabelFieldMap')]
+    : [t('createEventWizard.stepLabelBasicInfo'), t('createEventWizard.stepLabelLayout'), t('createEventWizard.stepLabelFieldMap')];
+  const stepOrdinal = step === 1 ? 1 : step === 2 ? 2 : step3Ordinal + (step === 4 ? 1 : 0);
+
+  // Popup xác nhận huỷ thay đổi (Esc/nút X, xem requestClose ở trên) — dùng chung ở cả 4 nhánh
+  // return theo step, đặt cạnh <Modal> chính trong 1 Fragment vì đây là 4 early-return riêng
+  // biệt (không có 1 JSX gốc chung để chèn 1 lần duy nhất).
+  const discardConfirmModal = (
+    <ConfirmModal
+      open={confirmDiscardOpen}
+      title={t('createEventWizard.discardConfirmTitle')}
+      message={t('createEventWizard.discardConfirmMessage')}
+      danger={false}
+      confirmLabel={t('createEventWizard.discardConfirmButton') as string}
+      onCancel={() => setConfirmDiscardOpen(false)}
+      onConfirm={() => {
+        setConfirmDiscardOpen(false);
+        handleClose();
+      }}
+    />
+  );
+
   if (step === 1) {
     return (
-      <Modal open={open} onClose={handleClose} title={t('createEventWizard.step1Title')} size="md">
-        <Step1BasicInfo
-          name={name}
-          setName={setName}
-          scheduledAt={scheduledAt}
-          setScheduledAt={setScheduledAt}
-          dataSourceChoice={dataSourceChoice}
-          setDataSourceChoice={setDataSourceChoice}
-          existingDataSourceId={existingDataSourceId}
-          setExistingDataSourceId={setExistingDataSourceId}
-          dataSources={dataSources}
-          submitting={submitting}
-          onCancel={handleClose}
-          onNext={handleStep1Next}
-        />
-      </Modal>
+      <>
+        <Modal open={open} onClose={requestClose} title={isEditMode ? t('createEventWizard.editTitle', { name }) : t('createEventWizard.step1Title')} size="md" closeOnBackdrop={false}>
+          <WizardStepIndicator labels={stepLabels} currentOrdinal={stepOrdinal} />
+          <Step1BasicInfo
+            name={name}
+            setName={setName}
+            scheduledAt={scheduledAt}
+            setScheduledAt={setScheduledAt}
+            dataSourceChoice={dataSourceChoice}
+            setDataSourceChoice={setDataSourceChoice}
+            existingDataSourceId={existingDataSourceId}
+            setExistingDataSourceId={setExistingDataSourceId}
+            dataSources={dataSources}
+            submitting={submitting}
+            onCancel={handleClose}
+            onNext={handleStep1Next}
+            isEditMode={isEditMode}
+          />
+        </Modal>
+        {discardConfirmModal}
+      </>
     );
   }
 
   if (step === 2) {
     return (
-      <Modal open={open} onClose={handleClose} title={t('createEventWizard.step2Title')} size="xl">
+      <>
+      <Modal open={open} onClose={requestClose} title={t('createEventWizard.step2Title')} size="xl" closeOnBackdrop={false}>
+        <WizardStepIndicator labels={stepLabels} currentOrdinal={stepOrdinal} />
         <Step2ImportData
           fileName={fileName}
           parsed={parsed}
@@ -357,17 +419,22 @@ export function CreateEventWizard({ open, onClose, eventPort, dataSourcePort, la
           onImport={handleImport}
         />
       </Modal>
+      {discardConfirmModal}
+      </>
     );
   }
 
   if (step === 3) {
     return (
+      <>
       <Modal
         open={open}
-        onClose={handleClose}
+        onClose={requestClose}
         title={isEditMode ? t('createEventWizard.editTitle', { name }) : t('createEventWizard.step3Title', { ordinal: step3Ordinal, total: totalSteps })}
         size="xl"
+        closeOnBackdrop={false}
       >
+        <WizardStepIndicator labels={stepLabels} currentOrdinal={stepOrdinal} />
         {layoutPort ? (
           <div className="flex max-h-[70vh] flex-col gap-3 overflow-auto">
             <LayoutRuleTable
@@ -379,15 +446,24 @@ export function CreateEventWizard({ open, onClose, eventPort, dataSourcePort, la
               assetPort={assetPort}
               attrSuggestions={attrSuggestions}
             />
-            <div className="mt-2 flex justify-end gap-2">
-              {!isEditMode && (
-                <Button variant="secondary" onClick={() => setStep(dataSourceChoice === 'new' ? 2 : 1)}>
-                  {t('createEventWizard.backButton')}
+            <div className="mt-2 flex items-center justify-between gap-2">
+              {isEditMode ? (
+                <Button variant="secondary-outline" size="sm" onClick={() => setStep(1)}>
+                  {t('createEventWizard.viewBasicInfoButton')}
                 </Button>
+              ) : (
+                <span />
               )}
-              <Button variant="primary" onClick={() => setStep(4)}>
-                {t('createEventWizard.nextButton')}
-              </Button>
+              <div className="flex gap-2">
+                {!isEditMode && (
+                  <Button variant="secondary" onClick={() => setStep(dataSourceChoice === 'new' ? 2 : 1)}>
+                    {t('createEventWizard.backButton')}
+                  </Button>
+                )}
+                <Button variant="primary" onClick={() => setStep(4)}>
+                  {t('createEventWizard.nextButton')}
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
@@ -395,32 +471,46 @@ export function CreateEventWizard({ open, onClose, eventPort, dataSourcePort, la
             <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               {t('createEventWizard.layoutPortUnavailable')}
             </div>
-            <div className="mt-2 flex justify-end gap-2">
-              {!isEditMode && (
-                <Button variant="secondary" onClick={() => setStep(dataSourceChoice === 'new' ? 2 : 1)}>
-                  {t('createEventWizard.backButton')}
+            <div className="mt-2 flex items-center justify-between gap-2">
+              {isEditMode ? (
+                <Button variant="secondary-outline" size="sm" onClick={() => setStep(1)}>
+                  {t('createEventWizard.viewBasicInfoButton')}
                 </Button>
+              ) : (
+                <span />
               )}
-              <Button variant="primary" loading={submitting} onClick={() => void finishWizard(pendingDataSourceId)}>
-                {isEditMode ? t('createEventWizard.saveButton') : t('createEventWizard.finishButton')}
-              </Button>
+              <div className="flex gap-2">
+                {!isEditMode && (
+                  <Button variant="secondary" onClick={() => setStep(dataSourceChoice === 'new' ? 2 : 1)}>
+                    {t('createEventWizard.backButton')}
+                  </Button>
+                )}
+                <Button variant="primary" loading={submitting} onClick={() => void finishWizard(pendingDataSourceId)}>
+                  {isEditMode ? t('createEventWizard.saveButton') : t('createEventWizard.finishButton')}
+                </Button>
+              </div>
             </div>
           </div>
         )}
       </Modal>
+      {discardConfirmModal}
+      </>
     );
   }
 
   // Bước 4 — Ghép biến (fieldMap), Giai đoạn 4c. Chỉ tới được đây khi layoutPort tồn tại (nhánh
   // layoutPort undefined ở Bước 3 đã finishWizard thẳng, không có cách trích token).
   return (
+    <>
     <Modal
       open={open}
-      onClose={handleClose}
+      onClose={requestClose}
       title={isEditMode ? t('createEventWizard.editTitle', { name }) : t('createEventWizard.step4Title', { total: totalSteps })}
       size="xl"
+      closeOnBackdrop={false}
     >
       <div className="flex max-h-[70vh] flex-col gap-3 overflow-auto">
+        <WizardStepIndicator labels={stepLabels} currentOrdinal={stepOrdinal} />
         {layoutPort && (
           <EventFieldMapEditor
             rows={layoutRuleRows}
@@ -433,16 +523,27 @@ export function CreateEventWizard({ open, onClose, eventPort, dataSourcePort, la
             onChangeCustomVariables={setCustomVariables}
           />
         )}
-        <div className="mt-2 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setStep(3)}>
-            {t('createEventWizard.backButton')}
-          </Button>
-          <Button variant="primary" loading={submitting} onClick={() => void finishWizard(pendingDataSourceId)}>
-            {isEditMode ? t('createEventWizard.saveButton') : t('createEventWizard.finishButton')}
-          </Button>
+        <div className="mt-2 flex items-center justify-between gap-2">
+          {isEditMode ? (
+            <Button variant="secondary-outline" size="sm" onClick={() => setStep(1)}>
+              {t('createEventWizard.viewBasicInfoButton')}
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setStep(3)}>
+              {t('createEventWizard.backButton')}
+            </Button>
+            <Button variant="primary" loading={submitting} onClick={() => void finishWizard(pendingDataSourceId)}>
+              {isEditMode ? t('createEventWizard.saveButton') : t('createEventWizard.finishButton')}
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>
+    {discardConfirmModal}
+    </>
   );
 }
 
@@ -459,6 +560,11 @@ interface Step1Props {
   submitting: boolean;
   onCancel: () => void;
   onNext: () => void;
+  /** Chế độ Sửa — ẨN phần chọn nguồn dữ liệu (radio new/existing/later), chỉ hiện READONLY tên
+   * DataSource hiện tại (không đổi được sau khi Event đã tạo, ngoài phạm vi đã chốt Giai đoạn
+   * 4c). Nút cuối đổi nhãn "Xem cấu hình layout/biến" thay vì "Tiếp tục", quay lại Bước 3 (đã
+   * cấu hình sẵn) thay vì đi Bước 2. */
+  isEditMode?: boolean;
 }
 
 function Step1BasicInfo({
@@ -474,9 +580,11 @@ function Step1BasicInfo({
   submitting,
   onCancel,
   onNext,
+  isEditMode = false,
 }: Step1Props) {
   const { t } = useTranslation();
   const canNext = name.trim() !== '' && (dataSourceChoice !== 'existing' || existingDataSourceId !== '');
+  const currentDataSourceLabel = dataSources.find((ds) => ds.id === existingDataSourceId)?.label;
 
   return (
     <div className="flex flex-col gap-4">
@@ -501,36 +609,46 @@ function Step1BasicInfo({
         <span className="text-xs text-muted-foreground">{t('createEventWizard.scheduledAtHint')}</span>
       </label>
 
-      <div className="flex flex-col gap-2">
-        <span className="text-sm text-muted-foreground">{t('createEventWizard.dataSourceLabel')}</span>
-        {(['new', 'existing', 'later'] as const).map((choice) => (
-          <label key={choice} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
-            <input type="radio" name="dataSourceChoice" checked={dataSourceChoice === choice} onChange={() => setDataSourceChoice(choice)} />
-            {t(`createEventWizard.dataSourceOption${choice === 'new' ? 'New' : choice === 'existing' ? 'Existing' : 'Later'}`)}
-          </label>
-        ))}
-        {dataSourceChoice === 'existing' && (
-          <Select value={existingDataSourceId} onValueChange={setExistingDataSourceId}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={t('createEventWizard.existingDataSourcePlaceholder') as string} />
-            </SelectTrigger>
-            <SelectContent>
-              {dataSources.map((ds) => (
-                <SelectItem key={ds.id} value={ds.id}>
-                  {ds.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      </div>
+      {isEditMode ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-muted-foreground">{t('createEventWizard.dataSourceLabel')}</span>
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-foreground">
+            {dataSourceChoice === 'existing' ? (currentDataSourceLabel ?? existingDataSourceId) : t('createEventWizard.dataSourceOptionLater')}
+          </div>
+          <span className="text-xs text-muted-foreground">{t('createEventWizard.dataSourceReadOnlyHint')}</span>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <span className="text-sm text-muted-foreground">{t('createEventWizard.dataSourceLabel')}</span>
+          {(['new', 'existing', 'later'] as const).map((choice) => (
+            <label key={choice} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+              <input type="radio" name="dataSourceChoice" checked={dataSourceChoice === choice} onChange={() => setDataSourceChoice(choice)} />
+              {t(`createEventWizard.dataSourceOption${choice === 'new' ? 'New' : choice === 'existing' ? 'Existing' : 'Later'}`)}
+            </label>
+          ))}
+          {dataSourceChoice === 'existing' && (
+            <Select value={existingDataSourceId} onValueChange={setExistingDataSourceId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={t('createEventWizard.existingDataSourcePlaceholder') as string} />
+              </SelectTrigger>
+              <SelectContent>
+                {dataSources.map((ds) => (
+                  <SelectItem key={ds.id} value={ds.id}>
+                    {ds.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      )}
 
       <div className="mt-2 flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
         <Button variant="primary" disabled={!canNext} loading={submitting} onClick={onNext}>
-          {t('createEventWizard.nextButton')}
+          {isEditMode ? t('createEventWizard.viewLayoutConfigButton') : t('createEventWizard.nextButton')}
         </Button>
       </div>
     </div>

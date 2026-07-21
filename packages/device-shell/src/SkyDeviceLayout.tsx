@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { AppModule, PlatformContext } from '@sky-app/kernel';
-import { APPS_CONFIG, DeviceLayout, type AppConfig, type ImportWallpaperFn, type WallpaperConfig, type UpdateActions } from '@sonth87/device-layout';
+import { APPS_CONFIG, DeviceLayout, type AppConfig, type ImportWallpaperFn, type WallpaperConfig, type UpdateActions, type SimpleModeProp } from '@sonth87/device-layout';
 import { toDeviceAppConfigs } from './to-device-app-config.js';
 import { type BuiltInAppId } from './built-in-apps.js';
 
@@ -38,6 +38,11 @@ export interface SkyDeviceLayoutProps {
    * as-is to DeviceLayout.
    */
   updateActions?: UpdateActions;
+  /**
+   * If true, hides the desktop wallpaper and dock, leaving only the app
+   * window(s) visible. Forwarded as-is to DeviceLayout.
+   */
+  isSimpleMode?: SimpleModeProp;
 }
 
 function resolveBuiltInApps(option: SkyDeviceLayoutProps['builtInApps']): AppConfig[] {
@@ -52,7 +57,7 @@ function resolveBuiltInApps(option: SkyDeviceLayoutProps['builtInApps']): AppCon
  * AppModule[] + PlatformContext and mounts them inside device-layout's
  * desktop-OS chrome (window manager, dock, menu bar).
  */
-export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps, onImportWallpaper, wallpapers, updateActions }: SkyDeviceLayoutProps) {
+export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps, onImportWallpaper, wallpapers, updateActions, isSimpleMode }: SkyDeviceLayoutProps) {
   const deviceApps = useMemo(() => {
     const builtIn = resolveBuiltInApps(builtInApps);
     return [...builtIn, ...toDeviceAppConfigs(apps, platform)];
@@ -65,6 +70,7 @@ export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps, onI
       onImportWallpaper={onImportWallpaper}
       wallpapers={wallpapers}
       updateActions={updateActions}
+      isSimpleMode={isSimpleMode}
     />
   );
 }

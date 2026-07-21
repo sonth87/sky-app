@@ -56,7 +56,7 @@ describe('LayoutPickerModal', () => {
     expect(screen.queryByText('Chưa publish')).toBeNull();
   });
 
-  it('click 1 layout trả đúng {layoutId, layoutVersion} đã ghim', async () => {
+  it('click 1 layout CHỈ tích chọn (viền+dấu tick), KHÔNG gọi onPick ngay', async () => {
     const layoutPort = mockLayoutPort();
     const onPick = vi.fn();
     render(<LayoutPickerModal open layoutPort={layoutPort} assetPort={mockAssetPort()} onClose={() => {}} onPick={onPick} />);
@@ -64,7 +64,97 @@ describe('LayoutPickerModal', () => {
     await waitFor(() => screen.getByText('Layout A'));
     fireEvent.click(screen.getByText('Layout A').closest('button')!);
 
+    expect(onPick).not.toHaveBeenCalled();
+    expect(screen.getByText('Đã chọn: Layout A')).toBeTruthy();
+  });
+
+  it('click tích chọn rồi bấm "Chọn layout này" → gọi đúng onPick({layoutId, layoutVersion})', async () => {
+    const layoutPort = mockLayoutPort();
+    const onPick = vi.fn();
+    render(<LayoutPickerModal open layoutPort={layoutPort} assetPort={mockAssetPort()} onClose={() => {}} onPick={onPick} />);
+
+    await waitFor(() => screen.getByText('Layout A'));
+    fireEvent.click(screen.getByText('Layout A').closest('button')!);
+    await waitFor(() => expect(screen.getByText('Chọn layout này').closest('button')).not.toBeDisabled());
+    fireEvent.click(screen.getByText('Chọn layout này'));
+
     expect(onPick).toHaveBeenCalledWith({ layoutId: 'layout-a', layoutVersion: 2 });
+  });
+
+  it('nút "Chọn layout này" bị disable khi CHƯA tích chọn layout nào', async () => {
+    const layoutPort = mockLayoutPort();
+    render(<LayoutPickerModal open layoutPort={layoutPort} assetPort={mockAssetPort()} onClose={() => {}} onPick={() => {}} />);
+
+    await waitFor(() => screen.getByText('Layout A'));
+    expect(screen.getByText('Chọn layout này').closest('button')).toBeDisabled();
+  });
+
+  it('double-click 1 layout → chọn ngay lập tức, không cần bấm nút xác nhận', async () => {
+    const layoutPort = mockLayoutPort();
+    const onPick = vi.fn();
+    render(<LayoutPickerModal open layoutPort={layoutPort} assetPort={mockAssetPort()} onClose={() => {}} onPick={onPick} />);
+
+    await waitFor(() => screen.getByText('Layout A'));
+    fireEvent.doubleClick(screen.getByText('Layout A').closest('button')!);
+
+    expect(onPick).toHaveBeenCalledWith({ layoutId: 'layout-a', layoutVersion: 2 });
+  });
+
+  it('gõ tìm kiếm không khớp tên → lọc mất layout, hiện thông báo không tìm thấy', async () => {
+    const layoutPort = mockLayoutPort();
+    render(<LayoutPickerModal open layoutPort={layoutPort} assetPort={mockAssetPort()} onClose={() => {}} onPick={() => {}} />);
+
+    await waitFor(() => screen.getByText('Layout A'));
+    fireEvent.change(screen.getByPlaceholderText('Tìm theo tên layout...'), { target: { value: 'không tồn tại' } });
+
+    await waitFor(() => expect(screen.getByText('Không tìm thấy layout phù hợp.')).toBeTruthy());
+    expect(screen.queryByText('Layout A')).toBeNull();
+  });
+
+  it('gõ tìm kiếm khớp 1 phần tên (không phân biệt hoa/thường) → vẫn hiện layout đó', async () => {
+    const layoutPort = mockLayoutPort();
+    render(<LayoutPickerModal open layoutPort={layoutPort} assetPort={mockAssetPort()} onClose={() => {}} onPick={() => {}} />);
+
+    await waitFor(() => screen.getByText('Layout A'));
+    fireEvent.change(screen.getByPlaceholderText('Tìm theo tên layout...'), { target: { value: 'layout a' } });
+
+    expect(screen.getByText('Layout A')).toBeTruthy();
+  });
+
+  it('chỉ 1 tỷ lệ khung hình xuất hiện trong dữ liệu → KHÔNG hiện dropdown lọc tỷ lệ (không có gì để lọc)', async () => {
+    const layoutPort = mockLayoutPort();
+    render(<LayoutPickerModal open layoutPort={layoutPort} assetPort={mockAssetPort()} onClose={() => {}} onPick={() => {}} />);
+
+    await waitFor(() => screen.getByText('Layout A'));
+    expect(screen.queryByLabelText('Lọc theo tỷ lệ khung hình')).toBeNull();
+  });
+
+  it('lọc theo tỷ lệ khung hình → chỉ hiện layout có variant khớp tỷ lệ đã chọn', async () => {
+    const contentPortrait: LayoutContent = {
+      variants: [{ aspect: { id: '9:16', w: 9, h: 16 }, refW: 1080, refH: 1920, background: { kind: 'color', color: '#000' }, items: [] }],
+    };
+    const layoutPort = mockLayoutPort({
+      listDocuments: vi.fn().mockResolvedValue([
+        { id: 'layout-a', name: 'Layout A', description: undefined, latestPublishedVersion: 2 },
+        { id: 'layout-b', name: 'Layout B dọc', description: undefined, latestPublishedVersion: 1 },
+      ]),
+      getVersion: vi.fn().mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'layout-b'
+            ? { version: 1, content: contentPortrait, publishedAt: '2026-07-19T00:00:00.000Z' }
+            : { version: 2, content: SAMPLE_CONTENT, publishedAt: '2026-07-19T00:00:00.000Z' },
+        ),
+      ),
+    });
+    render(<LayoutPickerModal open layoutPort={layoutPort} assetPort={mockAssetPort()} onClose={() => {}} onPick={() => {}} />);
+
+    await waitFor(() => screen.getByText('Layout A'));
+    expect(screen.getByText('Layout B dọc')).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Lọc theo tỷ lệ khung hình'), { target: { value: '9:16' } });
+
+    expect(screen.queryByText('Layout A')).toBeNull();
+    expect(screen.getByText('Layout B dọc')).toBeTruthy();
   });
 
   it('không có layout nào đã publish → hiện empty state', async () => {

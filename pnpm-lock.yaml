@@ -4,6 +4,12 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@sonth87/device-layout':
+      specifier: github:sonth87/device-layout#v0.2.7
+      version: 0.2.7
+
 overrides:
   react: ^19.2.7
   react-dom: ^19.2.7
@@ -83,8 +89,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/slide-shared
       '@sonth87/device-layout':
-        specifier: github:sonth87/device-layout#v0.2.4
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/ac776383189cb6d3c69b6eda44bef0e69c91bdb9(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
+        specifier: 'catalog:'
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/0610ad900eada9b6bc08176a3cd1afa1e2512091(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
       adm-zip:
         specifier: ^0.6.0
         version: 0.6.0
@@ -180,8 +186,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/platform-web
       '@sonth87/device-layout':
-        specifier: github:sonth87/device-layout#v0.2.4
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/ac776383189cb6d3c69b6eda44bef0e69c91bdb9(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.32.0))
+        specifier: 'catalog:'
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/0610ad900eada9b6bc08176a3cd1afa1e2512091(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.32.0))
       react:
         specifier: ^19.2.7
         version: 19.2.7
@@ -243,8 +249,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/slide-shared
       '@sonth87/device-layout':
-        specifier: github:sonth87/device-layout#v0.2.4
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/ac776383189cb6d3c69b6eda44bef0e69c91bdb9(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
+        specifier: 'catalog:'
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/0610ad900eada9b6bc08176a3cd1afa1e2512091(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
       '@tanstack/react-virtual':
         specifier: ^3.14.5
         version: 3.14.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -533,8 +539,8 @@ importers:
         specifier: workspace:*
         version: link:../kernel
       '@sonth87/device-layout':
-        specifier: github:sonth87/device-layout#v0.2.4
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/ac776383189cb6d3c69b6eda44bef0e69c91bdb9(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
+        specifier: 'catalog:'
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/0610ad900eada9b6bc08176a3cd1afa1e2512091(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
     devDependencies:
       '@sky-app/module-mock-app':
         specifier: workspace:*
@@ -3083,9 +3089,9 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
-  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/ac776383189cb6d3c69b6eda44bef0e69c91bdb9':
-    resolution: {tarball: https://codeload.github.com/sonth87/device-layout/tar.gz/ac776383189cb6d3c69b6eda44bef0e69c91bdb9}
-    version: 0.2.4
+  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/0610ad900eada9b6bc08176a3cd1afa1e2512091':
+    resolution: {tarball: https://codeload.github.com/sonth87/device-layout/tar.gz/0610ad900eada9b6bc08176a3cd1afa1e2512091}
+    version: 0.2.7
 
   '@standard-schema/spec@1.0.0':
     resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
@@ -8106,7 +8112,7 @@ snapshots:
       - '@types/babel__core'
       - supports-color
 
-  '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))':
+  '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))':
     dependencies:
       fast-glob: 3.3.2
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -9620,7 +9626,7 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/ac776383189cb6d3c69b6eda44bef0e69c91bdb9(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.32.0))':
+  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/0610ad900eada9b6bc08176a3cd1afa1e2512091(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.32.0))':
     dependencies:
       '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.32.0))
       '@radix-ui/react-context-menu': 2.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -9654,7 +9660,7 @@ snapshots:
       motion: 12.42.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       nanoid: 5.1.16
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      nuqs: 2.9.0(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      nuqs: 2.9.0(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       tailwind-merge: 3.6.0
@@ -9684,9 +9690,9 @@ snapshots:
       - use-sync-external-store
       - webpack
 
-  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/ac776383189cb6d3c69b6eda44bef0e69c91bdb9(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))':
+  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/0610ad900eada9b6bc08176a3cd1afa1e2512091(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))':
     dependencies:
-      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
+      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(webpack@5.108.4(lightningcss@1.32.0))
       '@radix-ui/react-context-menu': 2.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@radix-ui/react-dialog': 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@radix-ui/react-dropdown-menu': 2.1.20(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -9718,7 +9724,7 @@ snapshots:
       motion: 12.42.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       nanoid: 5.1.16
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      nuqs: 2.9.0(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      nuqs: 2.9.0(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       tailwind-merge: 3.6.0
@@ -12583,7 +12589,7 @@ snapshots:
 
   normalize-url@6.1.0: {}
 
-  nuqs@2.9.0(next@16.2.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7):
+  nuqs@2.9.0(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7):
     dependencies:
       '@standard-schema/spec': 1.0.0
       react: 19.2.7

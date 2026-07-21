@@ -1,12 +1,17 @@
 // LayoutRuleTable — Giai đoạn 4b kế hoạch Event.
 
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { AssetPort, LayoutPort } from '@sky-app/service-contracts';
+import type { LayoutContent, LayoutDocument, LayoutVersion } from '@sky-app/slide-shared';
 import './i18n.js';
 import { LayoutRuleTable, type LayoutRuleRow } from './LayoutRuleTable.js';
 
-function mockLayoutPort(): LayoutPort {
+const SAMPLE_CONTENT: LayoutContent = {
+  variants: [{ aspect: { id: '16:9', w: 16, h: 9 }, refW: 1920, refH: 1080, background: { kind: 'color', color: '#000' }, items: [] }],
+};
+
+function mockLayoutPort(overrides: Partial<LayoutPort> = {}): LayoutPort {
   return {
     listDocuments: vi.fn().mockResolvedValue([]),
     getDocument: vi.fn().mockResolvedValue(null),
@@ -18,6 +23,7 @@ function mockLayoutPort(): LayoutPort {
     restoreVersion: vi.fn().mockResolvedValue(undefined),
     recordTokenUsage: vi.fn().mockResolvedValue(undefined),
     listTopVariables: vi.fn().mockResolvedValue([]),
+    ...overrides,
   };
 }
 
@@ -114,5 +120,33 @@ describe('LayoutRuleTable', () => {
 
     expect(screen.getByText('Mặc định (áp dụng khi không quy tắc nào khớp)')).toBeTruthy();
     expect(screen.queryByLabelText('Kéo để đổi thứ tự')).toBeNull();
+  });
+
+  it('hàng đã có layoutId → hiện thumbnail+tên layout đã chọn thay vì nút "Chọn layout" (bug UX thật, 2026-07-20)', async () => {
+    const row: LayoutRuleRow = {
+      id: 'a',
+      label: 'Rule a',
+      ref: { layoutId: 'layout-a', layoutVersion: 3, selector: { groups: [{ rules: [] }], priority: 1 }, fieldMap: {} },
+    };
+    const layoutPort = mockLayoutPort({
+      getDocument: vi.fn().mockResolvedValue({ id: 'layout-a', name: 'Layout A', currentDraft: SAMPLE_CONTENT, publishedVersions: [], createdAt: '', updatedAt: '' } satisfies LayoutDocument),
+      getVersion: vi.fn().mockResolvedValue({ version: 3, content: SAMPLE_CONTENT, publishedAt: '2026-07-19T00:00:00.000Z' } satisfies LayoutVersion),
+    });
+    render(
+      <LayoutRuleTable
+        rows={[row]}
+        onChange={() => {}}
+        defaultRef={undefined}
+        onChangeDefaultRef={() => {}}
+        layoutPort={layoutPort}
+        assetPort={undefined}
+        attrSuggestions={[]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('Layout A')).toBeTruthy());
+    // Không còn nút text "Chọn layout" cho hàng đã có layoutId — chỉ còn nút cho dòng Mặc định
+    // (chưa chọn gì) nếu có, ở đây defaultRef=undefined nên nút "Chọn layout" vẫn còn 1 lần.
+    expect(screen.getAllByText('Chọn layout')).toHaveLength(1);
   });
 });

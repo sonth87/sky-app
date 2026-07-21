@@ -3,6 +3,18 @@ packages:
   - packages/*
   - modules/*
 
+catalog:
+  # Khai báo 1 lần duy nhất — 4 package.json (device-shell, module-ceremony, shell-electron,
+  # shell-web) tham chiếu qua "catalog:" thay vì ghi version cụ thể, tránh phải sửa 4 chỗ mỗi
+  # lần cập nhật device-layout (phát hiện qua bất tiện thật, 2026-07-21).
+  #
+  # v0.2.7 — 4 package.json trước đó ghi "v0.2.6", một tag CHƯA TỪNG TỒN TẠI trên remote (chỉ
+  # "chạy được" vì pnpm-lock.yaml cache sẵn resolve của v0.2.4). Đã tạo + push tag v0.2.7 thật
+  # (repo gốc /Users/skyline/PROJECTS/device-layout, khớp package.json's version đã bump sẵn +
+  # dist-lib/ đã build) cho 4 commit tính năng tồn đọng (colorScheme prop, Simple Mode config,
+  # full-screen exit fix, menu bar customization) — xem CHANGELOG/git log repo đó để chi tiết.
+  "@sonth87/device-layout": "github:sonth87/device-layout#v0.2.7"
+
 onlyBuiltDependencies:
   - electron
   - esbuild

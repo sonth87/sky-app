@@ -1203,7 +1203,7 @@
     "editButton": "Edit"
   },
   "createEventWizard": {
-    "step1Title": "Step 1/2 · Basic information",
+    "step1Title": "Basic information",
     "step1Of1Title": "Basic information",
     "step2Title": "Step 2/2 · Import data",
     "nameLabel": "Event name",
@@ -1255,11 +1255,29 @@
     "layoutPortUnavailable": "Layout configuration is unavailable right now — the Layout service is not ready. You can still finish and configure it later.",
     "editTitle": "Edit: {{name}}",
     "saveButton": "Save",
-    "step4Title": "Step {{total}}/{{total}} · Field mapping"
+    "step4Title": "Step {{total}}/{{total}} · Field mapping",
+    "viewBasicInfoButton": "View basic info",
+    "viewLayoutConfigButton": "View layout/variable config",
+    "dataSourceReadOnlyHint": "The data source cannot be changed after the event is created.",
+    "stepLabelBasicInfo": "Info",
+    "stepLabelImport": "Data",
+    "stepLabelLayout": "Layout",
+    "stepLabelFieldMap": "Field map",
+    "stepIndicatorAriaLabel": "Event creation progress",
+    "discardConfirmTitle": "Discard changes?",
+    "discardConfirmMessage": "You have unsaved changes. Closing now will discard them.",
+    "discardConfirmButton": "Discard changes"
   },
   "layoutPicker": {
     "title": "Choose a layout",
-    "emptyState": "No published layouts yet. Create and publish one in Layout Designer first."
+    "emptyState": "No published layouts yet. Create and publish one in Layout Designer first.",
+    "searchPlaceholder": "Search by layout name...",
+    "allAspectRatios": "All aspect ratios",
+    "aspectFilterLabel": "Filter by aspect ratio",
+    "noMatchState": "No matching layout found.",
+    "selectedHint": "Selected: {{name}}",
+    "noneSelectedHint": "No layout selected yet.",
+    "confirmButton": "Choose this layout"
   },
   "ruleBuilder": {
     "and": "AND",

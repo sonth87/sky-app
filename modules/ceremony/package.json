@@ -25,7 +25,7 @@
     "@sky-app/kernel": "workspace:*",
     "@sky-app/service-contracts": "workspace:*",
     "@sky-app/slide-shared": "workspace:*",
-    "@sonth87/device-layout": "github:sonth87/device-layout#v0.2.4",
+    "@sonth87/device-layout": "catalog:",
     "@tanstack/react-virtual": "^3.14.5",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",

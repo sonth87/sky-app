@@ -4,17 +4,19 @@
 // (hàng đầu = priority cao nhất) để khớp resolveLayout's sort giảm dần. Dòng "Mặc định" render
 // CỐ ĐỊNH cuối bảng, KHÔNG nằm trong SortableContext — không kéo/xoá được.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GripVertical, Plus, Trash2 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { EventLayoutRef, LayoutSelector } from '@sky-app/slide-shared';
+import { LayoutRenderer, type LayoutContent } from '@sky-app/slide-shared';
 import type { AssetPort, DataSourcePort, LayoutPort } from '@sky-app/service-contracts';
 import { Button } from './components/ui/Button.js';
 import { RuleBuilder } from './RuleBuilder.js';
 import { LayoutPickerModal } from './LayoutPickerModal.js';
+import { demoCanonicalSubject } from './lib/demoCanonicalSubject.js';
 
 export interface LayoutRuleRow {
   id: string;
@@ -172,6 +174,12 @@ function DefaultRuleRow({
   );
 }
 
+const THUMB_SIZE = { w: 56, h: 32 };
+const DEMO_RECORD = demoCanonicalSubject();
+
+/** Hiện thumbnail+tên layout ĐÃ chọn thay vì nút text vô nghĩa (bug UX thật, 2026-07-20 — sau
+ * khi chọn xong không có dấu hiệu gì cho biết đã chọn cái gì, trông ra sao). Bấm vào chính
+ * thumbnail để mở lại picker đổi layout khác — không cần nút riêng nữa. */
 function LayoutPickerButton({
   layoutId,
   layoutVersion,
@@ -187,11 +195,61 @@ function LayoutPickerButton({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<{ name: string; content: LayoutContent } | null>(null);
+  const [assetUrlCache, setAssetUrlCache] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!layoutId) {
+      setPreview(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const [doc, version] = await Promise.all([layoutPort.getDocument(layoutId), layoutPort.getVersion(layoutId, layoutVersion)]);
+      if (!cancelled && doc && version) setPreview({ name: doc.name, content: version.content });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [layoutId, layoutVersion, layoutPort]);
+
+  useEffect(() => {
+    if (!preview || !assetPort) return;
+    let cancelled = false;
+    const paths = new Set<string>();
+    for (const variant of preview.content.variants) {
+      if (variant.background?.kind === 'image' && variant.background.src) paths.add(variant.background.src);
+    }
+    void (async () => {
+      const entries = await Promise.all([...paths].map(async (p) => [p, await assetPort.resolveAssetUrl(p)] as const));
+      if (!cancelled) setAssetUrlCache(Object.fromEntries(entries));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [preview, assetPort]);
+
+  const resolveAsset = (relativePath: string) => assetUrlCache[relativePath] ?? relativePath;
+
   return (
     <>
-      <Button variant="secondary-outline" size="sm" onClick={() => setOpen(true)}>
-        {layoutId ? t('layoutRuleTable.changeLayoutButton') : t('layoutRuleTable.chooseLayoutButton')}
-      </Button>
+      {preview ? (
+        <button
+          type="button"
+          className="flex items-center gap-2 rounded-md border border-border p-1 pr-2 text-left hover:border-primary"
+          onClick={() => setOpen(true)}
+          title={t('layoutRuleTable.changeLayoutButton') as string}
+        >
+          <div style={{ width: THUMB_SIZE.w, height: THUMB_SIZE.h }} className="shrink-0 overflow-hidden rounded bg-black">
+            <LayoutRenderer content={preview.content} screen={THUMB_SIZE} record={DEMO_RECORD} resolveAsset={resolveAsset} />
+          </div>
+          <span className="max-w-[140px] truncate text-xs font-medium text-foreground">{preview.name}</span>
+        </button>
+      ) : (
+        <Button variant="secondary-outline" size="sm" onClick={() => setOpen(true)}>
+          {t('layoutRuleTable.chooseLayoutButton')}
+        </Button>
+      )}
       <LayoutPickerModal
         open={open}
         onClose={() => setOpen(false)}

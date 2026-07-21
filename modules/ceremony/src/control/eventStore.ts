@@ -128,8 +128,15 @@ export const useEventStore = create<EventState>((set, get) => ({
       // active đã đổi (thiết bị/phiên khác kích hoạt Event mới trong lúc app tắt) → bỏ qua cờ,
       // vào thẳng Event mới bình thường — không phải "khoá ở Gate" bất kể Event nào đang chạy.
       const exitedEventId = readExitedGateEventId();
-      writeExitedGateEventId(null); // luôn xoá — chỉ áp dụng đúng 1 lần khởi động này.
-      if (active && exitedEventId === active.id) {
+      const matches = active !== null && exitedEventId === active.id;
+      // CHỈ xoá cờ khi KHÔNG áp dụng (cờ thuộc Event khác/đã hết hạn dùng) — nếu xoá vô điều
+      // kiện ngay khi đọc (bug thật phát hiện qua sử dụng thật, 2026-07-20), lần gọi checkGate()
+      // THỨ HAI trong CÙNG 1 lượt khởi động (React StrictMode dev cố tình mount/unmount/mount
+      // lại để bắt side-effect không an toàn — xem apps/shell-electron/src/main.tsx) sẽ đọc thấy
+      // cờ đã bị lần đầu xoá mất, không còn khớp `active.id` nữa, và tự động vào lại dashboard —
+      // ngược lại hoàn toàn quyết định đúng của lần gọi đầu tiên.
+      if (!matches) writeExitedGateEventId(null);
+      if (matches) {
         set({ activeEvent: null });
         return;
       }
