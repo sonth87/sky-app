@@ -233,6 +233,9 @@ export interface LayoutDocument {
   id: string; // "vinh-danh-xuat-sac"
   name: string; // "Vinh danh — Xuất sắc"
   description?: string;
+  /** Màu tag phân biệt layout (badge ở danh sách Event, module-ceremony) — 1 layout luôn cùng
+   * 1 màu ở mọi nơi được chọn/hiển thị. Optional — layout cũ chưa có màu fallback màu trung tính. */
+  color?: string;
   currentDraft: LayoutContent; // bản đang sửa (chỉ 1), CHƯA công bố
   publishedVersions: LayoutVersion[]; // lịch sử đã publish, mới nhất ở cuối
   createdAt: string;

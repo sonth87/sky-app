@@ -35,7 +35,7 @@ interface Props {
 export function PreGenPopover({ status }: Props) {
   const { t } = useTranslation();
   const slide = useSlide('pregen');
-  const students = useControlStore((s) => s.students);
+  const records = useControlStore((s) => s.records);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'done' | 'failed' | 'pending' | 'suspect'>('all');
   const [playingCode, setPlayingCode] = useState<string | null>(null);
@@ -43,33 +43,33 @@ export function PreGenPopover({ status }: Props) {
 
   const quality = status.quality ?? {};
 
-  const filtered = students.filter((s) => {
-    const pgSt = status.students[s.student_code];
+  const filtered = records.filter((s) => {
+    const pgSt = status.records[s.id];
     if (filterStatus === 'suspect') {
-      if (!quality[s.student_code]) return false;
+      if (!quality[s.id]) return false;
     } else if (filterStatus !== 'all') {
       if (filterStatus === 'pending' && pgSt !== 'pending' && pgSt !== 'processing') return false;
       if (filterStatus !== 'pending' && pgSt !== filterStatus) return false;
     }
     if (search) {
       const q = removeDiacritics(search);
-      return s.student_code.includes(q) || removeDiacritics(s.full_name).includes(q);
+      return s.id.includes(q) || removeDiacritics(s.full_name).includes(q);
     }
     return true;
   });
 
   const selectableFiltered = filtered.filter((s) => {
-    const pgSt = status.students[s.student_code];
+    const pgSt = status.records[s.id];
     return pgSt === 'done' || pgSt === 'failed' || !pgSt;
   });
-  const allChecked = selectableFiltered.length > 0 && selectableFiltered.every((s) => selected.has(s.student_code));
-  const someChecked = selectableFiltered.some((s) => selected.has(s.student_code));
+  const allChecked = selectableFiltered.length > 0 && selectableFiltered.every((s) => selected.has(s.id));
+  const someChecked = selectableFiltered.some((s) => selected.has(s.id));
 
   function toggleAll() {
     if (allChecked) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(selectableFiltered.map((s) => s.student_code)));
+      setSelected(new Set(selectableFiltered.map((s) => s.id)));
     }
   }
 
@@ -228,34 +228,34 @@ export function PreGenPopover({ status }: Props) {
             </thead>
             <tbody>
               {filtered.map((s) => {
-                const pgSt = status.students[s.student_code] ?? 'pending';
+                const pgSt = status.records[s.id] ?? 'pending';
                 const badge = STATUS_LABEL_KEYS[pgSt] ?? STATUS_LABEL_KEYS.pending;
-                const isChecked = selected.has(s.student_code);
+                const isChecked = selected.has(s.id);
                 const canSelect = pgSt === 'done' || pgSt === 'failed' || pgSt === 'pending';
                 return (
                   <tr
-                    key={s.student_code}
+                    key={s.id}
                     className={`border-b border-border last:border-0 ${isChecked ? 'bg-primary/10' : 'hover:bg-muted'}`}
                   >
                     <td className="py-1.5 pl-2 pr-1">
                       {canSelect && (
-                        <button onClick={() => toggleOne(s.student_code)} className="flex items-center text-muted-foreground hover:text-primary">
+                        <button onClick={() => toggleOne(s.id)} className="flex items-center text-muted-foreground hover:text-primary">
                           {isChecked ? <CheckSquare size={13} className="text-primary" /> : <Square size={13} />}
                         </button>
                       )}
                     </td>
                     <td className="py-1.5 pr-1">
                       <div className="font-medium text-foreground leading-tight">{s.full_name}</div>
-                      <div className="text-muted-foreground">{s.student_code}</div>
+                      <div className="text-muted-foreground">{s.id}</div>
                     </td>
                     <td className="px-1">
                       <div className="flex items-center gap-1">
                         <span className={`rounded px-1.5 py-0.5 text-2xs font-medium ${badge.cls}`}>
                           {t(badge.labelKey)}
                         </span>
-                        {quality[s.student_code] && (
+                        {quality[s.id] && (
                           <span
-                            title={t('preGenPopover.suspectQualityTitle', { flags: describeFlags(quality[s.student_code]) })}
+                            title={t('preGenPopover.suspectQualityTitle', { flags: describeFlags(quality[s.id]) })}
                             className="flex items-center rounded bg-warning/15 px-1 py-0.5 text-warning-foreground"
                           >
                             <AlertTriangle size={11} />
@@ -268,8 +268,8 @@ export function PreGenPopover({ status }: Props) {
                         {pgSt === 'done' && (
                           <button
                             title={t('preGenPopover.playTitle')}
-                            disabled={playingCode === s.student_code}
-                            onClick={() => handlePlay(s.student_code)}
+                            disabled={playingCode === s.id}
+                            onClick={() => handlePlay(s.id)}
                             className="rounded p-1 text-success hover:bg-success/15 disabled:opacity-40"
                           >
                             <Volume2 size={13} />
@@ -278,7 +278,7 @@ export function PreGenPopover({ status }: Props) {
                         {(pgSt === 'failed' || pgSt === 'done') && (
                           <button
                             title={t('preGenPopover.requeueTitle')}
-                            onClick={() => slide?.pregenRequeue(s.student_code)}
+                            onClick={() => slide?.pregenRequeue(s.id)}
                             className="rounded p-1 text-muted-foreground hover:bg-muted"
                           >
                             <RefreshCw size={13} />

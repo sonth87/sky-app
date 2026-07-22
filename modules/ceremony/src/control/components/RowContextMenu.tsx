@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info, Volume2, RefreshCw, UserX, Play } from 'lucide-react';
-import type { Student } from '@sky-app/slide-shared';
+import type { CanonicalRecord, RecordRuntimeState } from '@sky-app/slide-shared';
 import type { PreGenStudentStatus } from '../store';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from './ui/dropdown-menu';
 
 interface Props {
-  student: Student;
+  record: CanonicalRecord;
+  status: RecordRuntimeState['status'];
   pgSt: PreGenStudentStatus | undefined;
   x: number;
   y: number;
@@ -20,7 +21,7 @@ interface Props {
 
 /** Menu chuột phải tại vị trí click — dùng Radix DropdownMenu với anchor ảo tại toạ độ (x, y). */
 export function RowContextMenu({
-  student, pgSt, x, y, onClose,
+  record, status, pgSt, x, y, onClose,
   onViewDetail, onPlayAudio, onRegenAudio, onToggleAbsent, onPlay,
 }: Props) {
   const { t } = useTranslation();
@@ -50,8 +51,8 @@ export function RowContextMenu({
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <DropdownMenuLabel className="font-semibold">
-          {student.full_name}
-          <div className="text-2xs font-normal text-muted-foreground">{student.student_code}</div>
+          {record.full_name}
+          <div className="text-2xs font-normal text-muted-foreground">{record.identifierCode ?? record.id}</div>
         </DropdownMenuLabel>
 
         <DropdownMenuSeparator />
@@ -75,11 +76,11 @@ export function RowContextMenu({
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          variant={student.status !== 'absent' ? 'destructive' : 'default'}
+          variant={status !== 'absent' ? 'destructive' : 'default'}
           onSelect={() => runAndClose(onToggleAbsent)}
         >
           <UserX size={14} />
-          {student.status === 'absent' ? t('rowContextMenu.markPresent') : t('rowContextMenu.markAbsent')}
+          {status === 'absent' ? t('rowContextMenu.markPresent') : t('rowContextMenu.markAbsent')}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => runAndClose(onPlay)}>
           <Play size={14} />

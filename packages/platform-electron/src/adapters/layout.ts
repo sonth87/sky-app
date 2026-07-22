@@ -16,6 +16,9 @@ export function createElectronLayoutPort(): LayoutPort {
     async createDocument(id, name, initialContent, description) {
       await window.sky.invoke('kernel:layout:createDocument', id, name, initialContent, description);
     },
+    async updateDocumentMeta(id, patch) {
+      await window.sky.invoke('kernel:layout:updateDocumentMeta', id, patch);
+    },
     async saveDraft(id, content) {
       await window.sky.invoke('kernel:layout:saveDraft', id, content);
     },

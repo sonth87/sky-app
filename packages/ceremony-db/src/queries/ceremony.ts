@@ -1,8 +1,6 @@
 import type { SqlExecutor } from '../sql-executor.js';
-import type { Ceremony, CeremonyBundle } from '@sky-app/slide-shared';
+import type { AppConfig, Ceremony } from '@sky-app/slide-shared';
 import { getAppConfig, upsertAppConfig } from './config.js';
-import { getCustomVariables, replaceCustomVariables } from './custom-variable.js';
-import { getStudents, replaceStudents } from './student.js';
 
 interface CeremonyRow {
   id: number;
@@ -43,10 +41,9 @@ function rowToCeremony(row: CeremonyRow): Ceremony {
 }
 
 /**
- * Đọc ceremony theo room_id, hoặc dòng đầu tiên nếu không truyền roomId — Giai đoạn 0 chỉ có
- * 1 ceremony/DB nên "dòng duy nhất" là ngữ nghĩa đúng cho phía đọc (Electron seed bundle với
- * room_id nghiệp vụ như 'H1', KHÔNG phải hằng 'default' — đọc theo hằng cứng sẽ trượt dòng
- * đã lưu, làm app restart tưởng DB rỗng).
+ * Đọc ceremony theo room_id, hoặc dòng đầu tiên nếu không truyền roomId — DB local chỉ có 1
+ * ceremony nên "dòng duy nhất" là ngữ nghĩa đúng cho phía đọc (Electron seed bundle với room_id
+ * nghiệp vụ như 'H1', KHÔNG phải hằng 'default' — đọc theo hằng cứng sẽ trượt dòng đã lưu).
  */
 function getCeremonyRow(executor: SqlExecutor, roomId?: string): CeremonyRow | null {
   const rows = roomId
@@ -55,41 +52,42 @@ function getCeremonyRow(executor: SqlExecutor, roomId?: string): CeremonyRow | n
   return rows[0] ?? null;
 }
 
-export function getCeremonyBundle(executor: SqlExecutor, roomId?: string): CeremonyBundle | null {
+/**
+ * Đọc riêng `ceremony`+`app_config` — TÁCH KHỎI `students`/`custom_variables` (giai đoạn "bỏ
+ * Student", 2026-07-22). Trước đây gộp chung qua `getCeremonyBundle`/`CeremonyBundle`, nhưng
+ * đó là khái niệm gắn với luồng Import ZIP legacy (bundle ceremony+config+students) đang bị loại
+ * bỏ — ceremony/config là cấu hình TĨNH của buổi lễ, không còn lý do gộp cùng danh sách người
+ * tham dự (giờ sống ở data_source_record, đọc riêng qua getDataSourceRecords).
+ */
+export function getCeremonyWithConfig(executor: SqlExecutor, roomId?: string): { ceremony: Ceremony; config: AppConfig } | null {
   const row = getCeremonyRow(executor, roomId);
   if (!row) return null;
-
   const config = getAppConfig(executor, row.id);
   if (!config) return null;
-
-  return {
-    room_id: row.room_id,
-    room_name: row.room_name,
-    ceremony: rowToCeremony(row),
-    config: { ...config, custom_variables: getCustomVariables(executor, row.id) },
-    students: getStudents(executor, row.id),
-    // session_state không nằm trong phạm vi Giai đoạn 0 (vẫn quản lý bởi session-store.ts
-    // riêng, file JSON atomic write) — trả placeholder rỗng, caller (CeremonyStore) tự lấy
-    // session thật từ session-store, không dùng field này.
-    session_state: {
-      current_on_stage_msv: null,
-      pending_msv: null,
-      mode: config.mode,
-      last_scan_msv: null,
-      last_scan_ts: null,
-      broadcast_count: 0,
-      sync_queue: [],
-    },
-    _synced_at: row.synced_at ?? undefined,
-    _bundle_version: row.bundle_version ?? undefined,
-  };
+  return { ceremony: rowToCeremony(row), config };
 }
 
-/** Ghi toàn bộ bundle vào 5 bảng trong 1 transaction — thay writeFileSync toàn file cũ. */
-export function saveCeremonyBundle(executor: SqlExecutor, bundle: CeremonyBundle): void {
-  executor.transaction(() => {
-    const existing = getCeremonyRow(executor, bundle.room_id);
-    const c = bundle.ceremony;
+export function getCeremonyRowRaw(executor: SqlExecutor, roomId?: string): { id: number; roomId: string; roomName: string } | null {
+  const row = getCeremonyRow(executor, roomId);
+  if (!row) return null;
+  return { id: row.id, roomId: row.room_id, roomName: row.room_name };
+}
+
+interface SaveCeremonyInput {
+  roomId: string;
+  roomName: string;
+  ceremony: Ceremony;
+  config: AppConfig;
+  syncedAt?: string;
+  bundleVersion?: string;
+}
+
+/** Ghi `ceremony`+`app_config` trong 1 transaction — KHÔNG còn ghi students/custom_variables
+ * (xem getCeremonyWithConfig). Trả `ceremonyId` (số) để caller dùng cho các bảng khác nếu cần. */
+export function saveCeremonyWithConfig(executor: SqlExecutor, input: SaveCeremonyInput): number {
+  return executor.transaction(() => {
+    const existing = getCeremonyRow(executor, input.roomId);
+    const c = input.ceremony;
     const idleVariantsJson = c.idle_image_variants ? JSON.stringify(c.idle_image_variants) : null;
 
     let ceremonyId: number;
@@ -101,36 +99,34 @@ export function saveCeremonyBundle(executor: SqlExecutor, bundle: CeremonyBundle
          backdrops_config=?, idle_image=?, idle_image_variants=?, synced_at=?, bundle_version=?
          WHERE id=?`,
         [
-          bundle.room_name, c.name, c.graduation_year, c.date, c.venue, c.university_name,
+          input.roomName, c.name, c.graduation_year, c.date, c.venue, c.university_name,
           c.ministry_name, c.title_line1, c.title_line2, c.logo, c.backdrops_config,
-          c.idle_image ?? null, idleVariantsJson, bundle._synced_at ?? null,
-          bundle._bundle_version ?? null, ceremonyId,
+          c.idle_image ?? null, idleVariantsJson, input.syncedAt ?? null,
+          input.bundleVersion ?? null, ceremonyId,
         ],
       );
     } else {
-      const result = executor.run(
+      executor.run(
         `INSERT INTO ceremony (
           room_id, room_name, name, graduation_year, date, venue, university_name,
           ministry_name, title_line1, title_line2, logo, backdrops_config, idle_image,
           idle_image_variants, synced_at, bundle_version
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          bundle.room_id, bundle.room_name, c.name, c.graduation_year, c.date, c.venue,
+          input.roomId, input.roomName, c.name, c.graduation_year, c.date, c.venue,
           c.university_name, c.ministry_name, c.title_line1, c.title_line2, c.logo,
-          c.backdrops_config, c.idle_image ?? null, idleVariantsJson, bundle._synced_at ?? null,
-          bundle._bundle_version ?? null,
+          c.backdrops_config, c.idle_image ?? null, idleVariantsJson, input.syncedAt ?? null,
+          input.bundleVersion ?? null,
         ],
       );
       // better-sqlite3 run() không trả lastInsertRowid qua interface SqlExecutor tối giản —
       // đọc lại theo room_id để lấy id vừa tạo (đơn giản hơn mở rộng interface cho 1 trường hợp).
-      const created = getCeremonyRow(executor, bundle.room_id);
-      if (!created) throw new Error(`saveCeremonyBundle: không đọc lại được ceremony vừa tạo (room_id=${bundle.room_id})`);
+      const created = getCeremonyRow(executor, input.roomId);
+      if (!created) throw new Error(`saveCeremonyWithConfig: không đọc lại được ceremony vừa tạo (room_id=${input.roomId})`);
       ceremonyId = created.id;
-      void result;
     }
 
-    upsertAppConfig(executor, ceremonyId, bundle.config);
-    replaceCustomVariables(executor, ceremonyId, bundle.config.custom_variables ?? []);
-    replaceStudents(executor, ceremonyId, bundle.students);
+    upsertAppConfig(executor, ceremonyId, input.config);
+    return ceremonyId;
   });
 }

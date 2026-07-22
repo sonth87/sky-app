@@ -91,10 +91,10 @@ function freeDiskGb(): number | null {
   }
 }
 
-/** Đang có SV trên sân khấu? (nhường lễ — không tải lúc này). */
+/** Đang có người trên sân khấu? (nhường lễ — không tải lúc này). */
 export function isOnStage(): boolean {
   try {
-    return !!sessionStore.get().current_on_stage_msv;
+    return !!sessionStore.get().current_on_stage_id;
   } catch {
     return false;
   }

@@ -4,16 +4,17 @@ import { useSocketRef } from '../SocketContext';
 import { resolveAsset } from '../../lib/assets';
 import { useScrollContext } from '../ScrollContext';
 import { RainbowBorder } from './RainbowBorder';
+import { flattenCanonicalRecord } from '@sky-app/slide-shared';
 
 function useSiblings() {
-  const students = useControlStore((s) => s.students);
+  const records = useControlStore((s) => s.records);
   const onStage = useControlStore((s) => s.onStage);
   if (!onStage) return { prev: null, next: null };
-  const idx = students.findIndex((s) => s.student_code === onStage.student_code);
+  const idx = records.findIndex((r) => r.id === onStage.record.id);
   if (idx === -1) return { prev: null, next: null };
   return {
-    prev: idx > 0 ? students[idx - 1] : null,
-    next: idx < students.length - 1 ? students[idx + 1] : null,
+    prev: idx > 0 ? records[idx - 1] : null,
+    next: idx < records.length - 1 ? records[idx + 1] : null,
   };
 }
 
@@ -31,6 +32,8 @@ export function NowOnStage({ progress }: NowOnStageProps) {
   const { scrollAllTo } = useScrollContext();
 
   const { isPlaying } = autoPlay;
+  const record = onStage?.record ?? null;
+  const flat = record ? flattenCanonicalRecord(record) : null;
 
   return (
     <RainbowBorder active={isPlaying} progress={progress} className="p-4">
@@ -38,16 +41,16 @@ export function NowOnStage({ progress }: NowOnStageProps) {
         {t('nowOnStage.onStage')}
       </span>
 
-      {onStage ? (
+      {record ? (
         <div
           className="flex cursor-pointer items-start gap-3 rounded-md p-1 -m-1 hover:bg-muted transition-colors"
-          onClick={() => scrollAllTo(onStage.student_code)}
+          onClick={() => scrollAllTo(record.id)}
           title={t('nowOnStage.scrollToStudent')}
         >
-          {onStage.image_relative_path ? (
+          {record.image_relative_path ? (
             <img
-              src={resolveAsset(onStage.image_relative_path)}
-              alt={onStage.full_name}
+              src={resolveAsset(record.image_relative_path)}
+              alt={record.full_name}
               className="h-20 w-14 flex-shrink-0 rounded-md bg-muted object-cover shadow-sm"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
@@ -57,13 +60,13 @@ export function NowOnStage({ progress }: NowOnStageProps) {
             <div className="h-20 w-14 flex-shrink-0 rounded-md bg-muted" />
           )}
           <div className="min-w-0 pt-0.5">
-            <div className="text-base font-bold text-foreground leading-snug">{onStage.full_name}</div>
-            <div className="font-mono text-xs font-medium text-muted-foreground mt-0.5">{onStage.student_code}</div>
-            {onStage.major_name && (
-              <div className="mt-1.5 text-sm text-foreground leading-tight">{onStage.major_name}</div>
+            <div className="text-base font-bold text-foreground leading-snug">{record.full_name}</div>
+            <div className="font-mono text-xs font-medium text-muted-foreground mt-0.5">{record.identifierCode ?? record.id}</div>
+            {flat?.major_name && (
+              <div className="mt-1.5 text-sm text-foreground leading-tight">{flat.major_name}</div>
             )}
-            {onStage.class_code && (
-              <div className="mt-0.5 text-xs text-muted-foreground">{onStage.class_code}</div>
+            {flat?.class_code && (
+              <div className="mt-0.5 text-xs text-muted-foreground">{flat.class_code}</div>
             )}
           </div>
         </div>
@@ -76,10 +79,10 @@ export function NowOnStage({ progress }: NowOnStageProps) {
           onClick={() => {
             if (!prev) return;
             socket.current?.emit('cmd:show', {
-              student_code: prev.student_code,
+              id: prev.id,
               source: 'manual',
             });
-            scrollAllTo(prev.student_code);
+            scrollAllTo(prev.id);
           }}
           disabled={!prev}
           className="flex flex-col items-start rounded-lg border border-primary/30 bg-primary/10 px-3 py-2.5 text-left transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:opacity-50"
@@ -97,10 +100,10 @@ export function NowOnStage({ progress }: NowOnStageProps) {
           onClick={() => {
             if (!next) return;
             socket.current?.emit('cmd:show', {
-              student_code: next.student_code,
+              id: next.id,
               source: 'manual',
             });
-            scrollAllTo(next.student_code);
+            scrollAllTo(next.id);
           }}
           disabled={!next}
           className="flex flex-col items-end rounded-lg border border-accent bg-accent px-3 py-2.5 text-right transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:opacity-50"

@@ -8,7 +8,8 @@
     "edit": "Edit",
     "add": "Add",
     "error": "Error",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "or": "or"
   },
   "statusBar": {
     "switchLanguage": "Switch language",
@@ -1200,7 +1201,10 @@
     "archivedActivateConfirmTitle": "Reactivate archived event?",
     "archivedActivateConfirmMessage": "Event \"{{name}}\" has been archived. Are you sure you want to activate it again?",
     "updateSuccess": "Saved changes for \"{{name}}\"",
-    "editButton": "Edit"
+    "editButton": "Edit",
+    "recordCountBadge": "{{count}} people",
+    "noDataBadge": "No data yet",
+    "noLayoutBadge": "No layout yet"
   },
   "createEventWizard": {
     "step1Title": "Basic information",
@@ -1266,7 +1270,48 @@
     "stepIndicatorAriaLabel": "Event creation progress",
     "discardConfirmTitle": "Discard changes?",
     "discardConfirmMessage": "You have unsaved changes. Closing now will discard them.",
-    "discardConfirmButton": "Discard changes"
+    "discardConfirmButton": "Discard changes",
+    "idleLayoutLabel": "Idle screen (when no one is on stage)"
+  },
+  "layoutConfigPanel": {
+    "tabRules": "Layout rules",
+    "tabFieldMap": "Field mapping",
+    "saveButton": "Save layout configuration",
+    "saveSuccess": "Layout configuration saved",
+    "saveError": "Couldn't save: {{message}}"
+  },
+  "eventHub": {
+    "createTitle": "Create a new event",
+    "createButton": "Create",
+    "importTitle": "Import data — {{name}}",
+    "layoutTitle": "Layout configuration — {{name}}",
+    "scheduledAtSummary": "Scheduled for: {{date}}",
+    "noScheduledAt": "No scheduled date yet",
+    "importCardTitle": "Import data",
+    "importCardNoData": "No data yet",
+    "importCardHasData": "Data already imported",
+    "layoutCardTitle": "Choose layout",
+    "layoutCardNoLayout": "No layout yet",
+    "layoutCardHasLayout": "{{count}} layout rules"
+  },
+  "importDataPanel": {
+    "uploadPrompt": "Drag a file here or click to browse — Excel (.xlsx), CSV supported",
+    "zipUploadPrompt": "Choose a ZIP file (optionally includes photos/voice)",
+    "zipUnsupportedHint": "ZIP import isn't supported on this platform — use CSV/Excel instead.",
+    "zipFileLabel": "ZIP file",
+    "zipDefaultLabel": "Data from ZIP",
+    "zipHasImages": "ZIP includes photos",
+    "zipHasVoices": "ZIP includes pre-generated voice",
+    "parseError": "Couldn't read the file: {{message}}",
+    "importSuccess": "Imported {{count}} people into \"{{label}}\"",
+    "importError": "Import failed: {{message}}",
+    "errorMissingKey": "Missing natural key value",
+    "errorMissingFullName": "Missing full name",
+    "progressLabel": "Processed {{done}}/{{total}}",
+    "rowErrorsTitle": "{{count}} rows with errors",
+    "rowErrorRow": "Row",
+    "rowErrorField": "Field",
+    "rowErrorMessage": "Error"
   },
   "layoutPicker": {
     "title": "Choose a layout",
@@ -1317,6 +1362,7 @@
     "sourceRaw": "Data column",
     "sourceComputed": "Conditional variable",
     "noVariableYet": "— No variable yet —",
-    "suggestionTooltip": "Suggestion: use column \"{{column}}\""
+    "suggestionTooltip": "Suggestion: use column \"{{column}}\"",
+    "idleTabLabel": "Idle screen"
   }
 }

@@ -14,7 +14,6 @@ import { create } from 'zustand';
 import type { CanonicalGroup, CanonicalSubject, DataSource, EventDocument, EventSummary, FieldMappingProfile } from '@sky-app/slide-shared';
 import type { EventPort, DataSourcePort } from '@sky-app/service-contracts';
 import { useControlStore } from './store.js';
-import { canonicalRecordsToStudents } from './canonicalToStudent.js';
 
 /**
  * Cờ "đã tự thoát Gate lần trước" — KHÔNG dùng zustand/persist (khác useControlStore's
@@ -79,27 +78,31 @@ interface EventState {
 }
 
 /**
- * Nạp `students` từ DataSource của 1 Event rồi ghi vào `useControlStore` — dùng CHUNG bởi
+ * Nạp `records` từ DataSource của 1 Event rồi ghi vào `useControlStore` — dùng CHUNG bởi
  * `activateEvent` (user chủ động bấm Kích hoạt) VÀ `checkGate` (mount thấy sẵn Event active).
  * Trước đây `checkGate()` chỉ `set({ activeEvent })` suông, KHÔNG gọi hàm này — khiến dashboard
- * hiện thẳng lên với `students` là bất cứ gì còn sót lại trong `useControlStore` từ luồng
+ * hiện thẳng lên với `records` là bất cứ gì còn sót lại trong `useControlStore` từ luồng
  * `getMeta()` cũ (đọc `ceremony.db`/bundle pre-Event, KHÔNG liên quan DataSource của Event nào),
  * không phải data thật (bug thật phát hiện qua sử dụng thật, 2026-07-19 — user báo "thoát ra
  * danh sách rồi vào lại thì không thấy data, hình như lấy cả data cũ").
+ *
+ * Giai đoạn "bỏ Student" (2026-07-22) — KHÔNG còn convert qua canonicalRecordsToStudents, ghi
+ * thẳng CanonicalRecord[] vào store (đối xứng với syncCeremonyStoreForEvent phía server-side,
+ * apps/shell-electron/electron/ipc.ts).
  */
-async function loadStudentsForEvent(event: EventDocument, dataSourcePort: DataSourcePort | undefined): Promise<void> {
+async function loadRecordsForEvent(event: EventDocument, dataSourcePort: DataSourcePort | undefined): Promise<void> {
   // Giữ nguyên field VẬN HÀNH hiện có trong useControlStore (wsPort/mode/delaySeconds/
   // idleTimeout*/apiEnvironment) — chúng thuộc AppConfig chung, KHÔNG phải per-Event, đã được
   // nạp từ getMeta() TRƯỚC KHI Gate mount (xem ControlApp.tsx's useEffect). setMeta yêu cầu đủ
   // mọi field (không phải Partial) nên đọc lại state hiện tại thay vì hard-code default.
   const current = useControlStore.getState();
-  const students = event.dataSourceId && dataSourcePort
-    ? canonicalRecordsToStudents(await dataSourcePort.getRecords(event.dataSourceId, { excludeConsumedForEvent: event.id }))
+  const records = event.dataSourceId && dataSourcePort
+    ? await dataSourcePort.getRecords(event.dataSourceId, { excludeConsumedForEvent: event.id })
     : [];
 
   useControlStore.getState().setMeta({
     ceremony: current.ceremony,
-    students,
+    records,
     syncedAt: new Date().toISOString(),
     wsPort: current.wsPort,
     mode: current.mode,
@@ -144,7 +147,7 @@ export const useEventStore = create<EventState>((set, get) => ({
       // "fail trước khi hiện sai" đã áp dụng cho activateEvent (nếu getRecords() throw,
       // activeEvent KHÔNG được set, ControlApp.tsx vẫn đứng ở Gate thay vì hiện dashboard với
       // students cũ/sai mà không báo lỗi gì).
-      if (active) await loadStudentsForEvent(active, dataSourcePort);
+      if (active) await loadRecordsForEvent(active, dataSourcePort);
       set({ activeEvent: active });
     } finally {
       set({ loading: false });
@@ -173,7 +176,7 @@ export const useEventStore = create<EventState>((set, get) => ({
     // phát hiện qua review, 2026-07-19), activeEvent KHÔNG được set, ControlApp.tsx vẫn đứng ở
     // Gate thay vì hiện dashboard với students cũ/sai mà không báo lỗi gì. Exception tự
     // propagate lên caller (EventGate.tsx) để hiện toast.
-    await loadStudentsForEvent(event, dataSourcePort);
+    await loadRecordsForEvent(event, dataSourcePort);
     set({ activeEvent: event });
   },
 

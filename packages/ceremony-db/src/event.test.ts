@@ -123,6 +123,61 @@ describe('EventStore — CRUD + setActive (chỉ 1 active tại 1 thời điểm
     expect(() => setActiveEvent(executor, 'khong-ton-tai')).toThrow();
     expect(getEvent(executor, 'ev1')!.status).toBe('active');
   });
+
+  it('layoutRef không set role → mặc định đọc lại là "award" (tương thích ref cũ trước khi có màn chờ, 2026-07-21)', () => {
+    insertLayoutDocument(executor, 'l1');
+    createEvent(executor, draftEvent({ layoutRefs: [{ layoutId: 'l1', layoutVersion: 1, fieldMap: {} }] }));
+    const ev = getEvent(executor, 'ev1')!;
+    expect(ev.layoutRefs[0]!.role).toBe('award');
+  });
+
+  it('layoutRef role="idle" (màn chờ) lưu/đọc đúng, KHÔNG lẫn với role="award" cùng Event', () => {
+    insertLayoutDocument(executor, 'award-layout');
+    insertLayoutDocument(executor, 'idle-layout');
+    createEvent(
+      executor,
+      draftEvent({
+        layoutRefs: [
+          { layoutId: 'award-layout', layoutVersion: 1, fieldMap: {} },
+          { layoutId: 'idle-layout', layoutVersion: 1, fieldMap: { ten_su_kien: { kind: 'raw', sourceKey: 'name' } }, role: 'idle' },
+        ],
+      }),
+    );
+    const ev = getEvent(executor, 'ev1')!;
+    expect(ev.layoutRefs).toHaveLength(2);
+    const award = ev.layoutRefs.find((r) => r.layoutId === 'award-layout')!;
+    const idle = ev.layoutRefs.find((r) => r.layoutId === 'idle-layout')!;
+    expect(award.role).toBe('award');
+    expect(idle.role).toBe('idle');
+    expect(idle.fieldMap.ten_su_kien).toEqual({ kind: 'raw', sourceKey: 'name' });
+  });
+
+  it('award VÀ idle CÙNG trỏ layoutId+layoutVersion giống nhau → không đụng PRIMARY KEY, lưu/đọc đúng cả 2', () => {
+    insertLayoutDocument(executor, 'shared-layout');
+    createEvent(
+      executor,
+      draftEvent({
+        layoutRefs: [
+          { layoutId: 'shared-layout', layoutVersion: 1, fieldMap: {} },
+          { layoutId: 'shared-layout', layoutVersion: 1, fieldMap: {}, role: 'idle' },
+        ],
+      }),
+    );
+    const ev = getEvent(executor, 'ev1')!;
+    expect(ev.layoutRefs).toHaveLength(2);
+    expect(ev.layoutRefs.map((r) => r.role).sort()).toEqual(['award', 'idle']);
+  });
+
+  it('saveEvent thay layoutRefs mới có role="idle" → khôi phục đúng, không bị rơi rụng role', () => {
+    insertLayoutDocument(executor, 'l1');
+    insertLayoutDocument(executor, 'idle1');
+    createEvent(executor, draftEvent({ layoutRefs: [{ layoutId: 'l1', layoutVersion: 1, fieldMap: {} }] }));
+    const ev = getEvent(executor, 'ev1')!;
+    saveEvent(executor, { ...ev, layoutRefs: [{ layoutId: 'idle1', layoutVersion: 1, fieldMap: {}, role: 'idle' }] });
+    const updated = getEvent(executor, 'ev1')!;
+    expect(updated.layoutRefs).toHaveLength(1);
+    expect(updated.layoutRefs[0]!.role).toBe('idle');
+  });
 });
 
 describe('DataSourceStore — đọc DataSource + record (CanonicalSubject/CanonicalGroup)', () => {

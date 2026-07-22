@@ -13,17 +13,18 @@ import { ceremonyStore } from './slide/data/store.js';
 import { sessionStore } from './slide/session-store.js';
 import {
   autoLoadFirstIfConfigured,
-  getUseSampleData,
   setBackdropAspectRatioListener,
   setCustomVariablesFromEvent,
   startSocketServer,
   stopSocketServer,
 } from './slide/socket-server.js';
-import { getCurrentActiveEvent } from '@sky-app/ceremony-db/node';
+import { getCurrentActiveEvent, defaultCeremony } from '@sky-app/ceremony-db/node';
+import type { AppConfig } from '@sky-app/slide-shared';
 import { startHttpServer, stopHttpServer } from './slide/http-server.js';
 import { startPythonServer, stopPythonServer } from './slide/python-server.js';
 import { apiLogger } from './slide/api-logger.js';
 import { notifyBackdropState, registerIpcHandlers as registerSlideIpcHandlers } from './slide/ipc.js';
+import { syncCeremonyStoreForEvent } from './ipc.js';
 import {
   closeBackdropWindow,
   resizeBackdropForAspectRatio,
@@ -77,25 +78,30 @@ function ensureDefaultAssets() {
  * Backdrop vẫn là BrowserWindow riêng ngoài device-layout (kiosk, màn phụ) —
  * mở qua windows.ts's openBackdropWindow(), gọi từ IPC 'backdrop:toggle'.
  */
+const DEFAULT_APP_CONFIG: AppConfig = {
+  ws_port: 8765,
+  http_port: 8080,
+  mode: 'auto',
+  delay_seconds: 0,
+  auto_open_browser: true,
+  kiosk_mode: true,
+  auto_load_first: true,
+  slide_display_seconds: 20,
+  idle_timeout_enabled: false,
+  idle_timeout_seconds: 60,
+};
+
 async function bootstrapSlideBackend() {
   apiLogger.init();
   ensureDefaultAssets();
-  const { cleanupImportStaging } = await import('./slide/data/sync.js');
-  cleanupImportStaging();
-  if (getUseSampleData()) {
-    const { syncBundle } = await import('./slide/data/sync.js');
-    const result = await syncBundle({ useSample: true });
-    // Sample data thất bại (vd sample-bundle/ thiếu trong bản build) không được để
-    // Ceremony trắng trơn nếu đĩa đã có bundle.json thật từ lần import trước — nếu
-    // không fallback, ceremonyStore rỗng và Backdrop kẹt "Đang tải…" vĩnh viễn dù dữ
-    // liệu thật vẫn còn nguyên (GĐ7.5 audit runtime, không phải bug port).
-    if (!result.ok && !ceremonyStore.hasData()) {
-      ceremonyStore.loadFromDisk();
-    }
-  } else {
-    ceremonyStore.loadFromDisk();
+  // Giai đoạn "bỏ Student" (2026-07-22) — không còn luồng Import ZIP legacy/sample data ở
+  // bootstrap. Đọc ceremony/config đã lưu; nếu chưa có (lần đầu chạy app), tạo mặc định.
+  // Danh sách người tham dự (records) KHÔNG nạp ở đây — chỉ nạp khi Event active đổi, qua
+  // syncCeremonyStoreForEvent() (electron/ipc.ts), gọi lúc setActiveEvent()/khởi động (dưới).
+  if (!ceremonyStore.loadFromDisk()) {
+    ceremonyStore.saveCeremony(defaultCeremony(), DEFAULT_APP_CONFIG);
   }
-  sessionStore.init(ceremonyStore.getInitialSession());
+  sessionStore.init();
 
   const config = ceremonyStore.getConfig();
   const wsPort = config?.ws_port ?? DEFAULT_WS_PORT;
@@ -109,9 +115,12 @@ async function bootstrapSlideBackend() {
   // khởi động app, chỉ log — customVariables giữ nguyên giá trị cũ trong trường hợp đó.
   try {
     const active = getCurrentActiveEvent(ceremonyStore.getExecutor());
-    if (active) setCustomVariablesFromEvent(active.customVariables);
+    if (active) {
+      setCustomVariablesFromEvent(active.customVariables);
+      syncCeremonyStoreForEvent(active);
+    }
   } catch (err) {
-    console.error('[shell-electron] Failed to sync customVariables from active event on startup:', err);
+    console.error('[shell-electron] Failed to sync customVariables/records from active event on startup:', err);
   }
   await startHttpServer(httpPort);
   startPythonServer(vieneuDir()); // non-blocking: warmup chạy nền

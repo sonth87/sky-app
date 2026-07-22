@@ -1,6 +1,6 @@
 import { Trans, useTranslation } from 'react-i18next';
 import { CheckSquare, Square, MinusSquare, RefreshCw, Plus, AlertTriangle } from 'lucide-react';
-import { type Student, type TtsCondition } from '@sky-app/slide-shared';
+import { type CanonicalRecord, type TtsCondition, flattenCanonicalRecord } from '@sky-app/slide-shared';
 import { translateStyle, type VoiceInfo } from '../VoicePickerPopover';
 import type { PreGenStatus } from '../../store';
 import { VoiceConditionRules } from './VoiceConditionRules';
@@ -24,7 +24,7 @@ interface PregenColumnProps {
   onRemoveVoiceFromPool: (voiceId: string) => void;
 
   localConditions: TtsCondition[];
-  students: Student[];
+  records: CanonicalRecord[];
   onUpdateCondition: (id: string | number, patch: Partial<TtsCondition>) => void;
   onRemoveCondition: (id: string | number) => void;
   onMoveCondition: (index: number, direction: 'up' | 'down') => void;
@@ -48,7 +48,7 @@ interface PregenColumnProps {
   selectedCodes: Set<string>;
   setSelectedCodes: React.Dispatch<React.SetStateAction<Set<string>>>;
   onRequeueSelected: () => void;
-  getVoiceForStudent: (student: Student, conditions: TtsCondition[], fallbackVoice: string) => string;
+  getVoiceForStudent: (record: CanonicalRecord, conditions: TtsCondition[], fallbackVoice: string) => string;
 }
 
 export function PregenColumn({
@@ -61,7 +61,7 @@ export function PregenColumn({
   onAddVoiceToPool,
   onRemoveVoiceFromPool,
   localConditions,
-  students,
+  records,
   onUpdateCondition,
   onRemoveCondition,
   onMoveCondition,
@@ -84,8 +84,8 @@ export function PregenColumn({
 }: PregenColumnProps) {
   const { t } = useTranslation();
   const slide = useSlide('pregen');
-  const renderStudentVoiceTag = (student: Student) => {
-    const vId = getVoiceForStudent(student, localConditions, localModel);
+  const renderStudentVoiceTag = (record: CanonicalRecord) => {
+    const vId = getVoiceForStudent(record, localConditions, localModel);
     const voiceInfo = voiceCatalog.find((v) => v.id === vId);
     const isFemale = voiceInfo?.gender === 'female';
     return (
@@ -101,7 +101,7 @@ export function PregenColumn({
   };
 
   const getStudentStatusBadge = (code: string) => {
-    const st = pregenStatus?.students[code] || 'pending';
+    const st = pregenStatus?.records[code] || 'pending';
     if (isStale && st === 'done') {
       return (
         <span className="bg-warning/10 text-warning-foreground border border-warning/30 font-semibold text-2xs px-1.5 py-0.5 rounded">
@@ -195,7 +195,8 @@ export function PregenColumn({
         conditions={localConditions}
         voicePool={localVoicePool}
         voiceCatalog={voiceCatalog}
-        students={students}
+        records={records}
+        attrSuggestions={[]}
         onUpdateCondition={onUpdateCondition}
         onRemoveCondition={onRemoveCondition}
         onMoveCondition={onMoveCondition}
@@ -248,7 +249,7 @@ export function PregenColumn({
           <div className="flex-1">
             <Trans
               i18nKey="ttsModal.pregen.staleWarning"
-              values={{ count: students.length }}
+              values={{ count: records.length }}
               components={{ b: <b className="font-bold" /> }}
             />
           </div>
@@ -293,7 +294,7 @@ export function PregenColumn({
               size="md"
               fullWidth
               className="rounded-xl"
-              disabled={pregenRunning || students.length === 0}
+              disabled={pregenRunning || records.length === 0}
               onClick={() => onStartPregen(false)}
             >
               {pregenStatus ? t('ttsModal.pregen.continueGenerate') : t('ttsModal.pregen.generateAll')}
@@ -347,18 +348,18 @@ export function PregenColumn({
 
         {/* Table Body */}
         <div className="overflow-y-auto flex-1 max-h-[260px]">
-          {students.length === 0 ? (
+          {records.length === 0 ? (
             <p className="text-xs text-muted-foreground italic text-center py-8">
               {t('ttsModal.pregen.noStudentData')}
             </p>
           ) : (
             (() => {
-              const selectableCodes = students
+              const selectableCodes = records
                 .filter((sv) => {
-                  const st = pregenStatus?.students[sv.student_code] || 'pending';
+                  const st = pregenStatus?.records[sv.id] || 'pending';
                   return st === 'done' || st === 'failed' || st === 'pending';
                 })
-                .map((sv) => sv.student_code);
+                .map((sv) => sv.id);
               const allChecked = selectableCodes.length > 0 && selectableCodes.every((code) => selectedCodes.has(code));
               const someChecked = selectableCodes.some((code) => selectedCodes.has(code));
 
@@ -390,10 +391,10 @@ export function PregenColumn({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {students.map((sv) => {
-                      const code = sv.student_code;
+                    {records.map((sv) => {
+                      const code = sv.id;
                       const isChecked = selectedCodes.has(code);
-                      const st = pregenStatus?.students[code] || 'pending';
+                      const st = pregenStatus?.records[code] || 'pending';
                       const canSelect = st === 'done' || st === 'failed' || st === 'pending';
 
                       return (
@@ -418,7 +419,7 @@ export function PregenColumn({
                           <td className="py-2 pr-2">
                             <div className="font-bold text-foreground leading-snug">{sv.full_name}</div>
                             <div className="text-2xs text-muted-foreground mt-0.5">
-                              {code} · {sv.classification} · {sv.major_name}
+                              {code} · {flattenCanonicalRecord(sv).classification} · {flattenCanonicalRecord(sv).major_name}
                             </div>
                           </td>
                           <td className="py-2 pr-2">

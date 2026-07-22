@@ -14,7 +14,7 @@ export function ApiTestModal({ open, onClose }: ApiTestModalProps) {
   const { t } = useTranslation();
   const slide = useSlide('api-integrations');
   const awardLocationCode = useControlStore((s) => s.awardLocationCode ?? 0);
-  const students = useControlStore((s) => s.students || []);
+  const records = useControlStore((s) => s.records || []);
 
   const [url, setUrl] = useState('https://openapi.dainam.edu.vn/api/v1/graduation-batch-student/update-registration-status');
   const [apiKey, setApiKey] = useState('');
@@ -30,11 +30,11 @@ export function ApiTestModal({ open, onClose }: ApiTestModalProps) {
   useEffect(() => {
     if (open) {
       setLocationCode(awardLocationCode);
-      if (students.length > 0 && !studentKeyword) {
-        setStudentKeyword(students[0].student_code);
+      if (records.length > 0 && !studentKeyword) {
+        setStudentKeyword(records[0].identifierCode ?? records[0].id);
       }
     }
-  }, [open, awardLocationCode, students]);
+  }, [open, awardLocationCode, records]);
 
   // Sinh payload JSON thời gian thực
   const payload = {
@@ -85,9 +85,9 @@ export function ApiTestModal({ open, onClose }: ApiTestModalProps) {
   };
 
   const loadRandomStudent = () => {
-    if (students.length === 0) return;
-    const rand = students[Math.floor(Math.random() * students.length)];
-    setStudentKeyword(rand.student_code);
+    if (records.length === 0) return;
+    const rand = records[Math.floor(Math.random() * records.length)];
+    setStudentKeyword(rand.identifierCode ?? rand.id);
     showSuccessToast(t('apiTestModal.loadedStudent', { name: rand.full_name }));
   };
 

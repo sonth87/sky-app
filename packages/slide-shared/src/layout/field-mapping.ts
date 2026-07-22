@@ -30,6 +30,17 @@ export type MappingRule =
 
 export type ComputedTransform = 'trim' | 'upper' | 'lower' | 'titlecase';
 
+/** 1 lỗi ở 1 dòng dữ liệu khi import (CSV/Excel/ZIP) — dùng để hiện bảng lỗi chi tiết trong
+ * wizard (Bước 2, nâng cấp 2026-07-22). `rowIndex` là index trong mảng rows đã parse (0-based),
+ * KHÔNG phải số dòng file gốc (không tính dòng header) — UI tự +2 khi hiển thị nếu cần khớp số
+ * dòng Excel thật. */
+export interface ImportRowError {
+  rowIndex: number;
+  /** Tên field liên quan (VD naturalKeyField) — rỗng nếu lỗi không gắn với field cụ thể nào. */
+  field?: string;
+  message: string;
+}
+
 function applyTransform(value: string, transform: ComputedTransform): string {
   switch (transform) {
     case 'trim':

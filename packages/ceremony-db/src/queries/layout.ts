@@ -9,6 +9,7 @@ interface LayoutDocumentRow {
   id: string;
   name: string;
   description: string | null;
+  color: string | null;
   latest_published_version: number | null;
   created_at: string;
   updated_at: string;
@@ -58,6 +59,7 @@ export function getLayoutDocument(executor: SqlExecutor, id: string): LayoutDocu
     id: docRow.id,
     name: docRow.name,
     description: docRow.description ?? undefined,
+    color: docRow.color ?? undefined,
     currentDraft: JSON.parse(draftRow.content_json) as LayoutContent,
     publishedVersions: versionRows.map(rowToVersion),
     createdAt: docRow.created_at,
@@ -65,12 +67,13 @@ export function getLayoutDocument(executor: SqlExecutor, id: string): LayoutDocu
   };
 }
 
-export function listLayoutDocuments(executor: SqlExecutor): Array<{ id: string; name: string; description?: string; latestPublishedVersion: number | null }> {
+export function listLayoutDocuments(executor: SqlExecutor): Array<{ id: string; name: string; description?: string; color?: string; latestPublishedVersion: number | null }> {
   const rows = executor.query<LayoutDocumentRow>('SELECT * FROM layout_document ORDER BY updated_at DESC');
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
     description: r.description ?? undefined,
+    color: r.color ?? undefined,
     latestPublishedVersion: r.latest_published_version,
   }));
 }
@@ -80,7 +83,7 @@ export function createLayoutDocument(executor: SqlExecutor, id: string, name: st
   const now = new Date().toISOString();
   executor.transaction(() => {
     executor.run(
-      'INSERT INTO layout_document (id, name, description, latest_published_version, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?)',
+      'INSERT INTO layout_document (id, name, description, color, latest_published_version, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, ?, ?)',
       [id, name, description ?? null, now, now],
     );
     executor.run('INSERT INTO layout_draft (layout_document_id, content_json, updated_at) VALUES (?, ?, ?)', [
@@ -89,6 +92,13 @@ export function createLayoutDocument(executor: SqlExecutor, id: string, name: st
       now,
     ]);
   });
+}
+
+/** Cập nhật metadata layout (hiện chỉ `color` — PHỤ LỤC "Event Hub", 2026-07-22). Mở rộng thêm
+ * `name`/`description` sau nếu cần, KHÔNG đổi `currentDraft`/`publishedVersions`. */
+export function updateLayoutDocumentMeta(executor: SqlExecutor, id: string, patch: { color?: string }): void {
+  const now = new Date().toISOString();
+  executor.run('UPDATE layout_document SET color = ?, updated_at = ? WHERE id = ?', [patch.color ?? null, now, id]);
 }
 
 /**

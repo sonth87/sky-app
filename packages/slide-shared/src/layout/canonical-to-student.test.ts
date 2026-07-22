@@ -2,8 +2,8 @@
 // 13-ceremony-mo-rong.md §"Hệ quả kỹ thuật". Bridge CanonicalSubject → Student, fail-soft.
 
 import { describe, expect, it } from 'vitest';
-import type { CanonicalSubject } from '@sky-app/slide-shared';
-import { canonicalRecordsToStudents, canonicalToStudent } from './canonicalToStudent.js';
+import type { CanonicalSubject } from './canonical.js';
+import { canonicalRecordsToStudents, canonicalToStudent } from './canonical-to-student.js';
 
 function subject(overrides: Partial<CanonicalSubject> = {}): CanonicalSubject {
   return {

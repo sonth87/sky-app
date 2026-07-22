@@ -43,6 +43,7 @@ export function LayoutDesignerAppModule({ platform }: AppContentProps) {
   const [versions, setVersions] = useState<LayoutVersion[]>([]);
   const [latestPublishedVersion, setLatestPublishedVersion] = useState<number | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [documentColor, setDocumentColor] = useState<string | undefined>(undefined);
   // variable_registry (file 09 §2.6) — gợi ý toàn cục, tải 1 lần lúc mount + refresh sau mỗi
   // lần user chèn token mới (recordTokenUsage đổi usage_count/thứ tự gợi ý).
   const [globalSuggestions, setGlobalSuggestions] = useState<string[]>([]);
@@ -78,6 +79,7 @@ export function LayoutDesignerAppModule({ platform }: AppContentProps) {
           setState({ status: 'ready', content: doc.currentDraft });
           setVersions(doc.publishedVersions);
           setLatestPublishedVersion(doc.publishedVersions.length > 0 ? doc.publishedVersions[doc.publishedVersions.length - 1]!.version : null);
+          setDocumentColor(doc.color);
         } else {
           const initial = emptyLayoutContent();
           await layoutPort.createDocument(DEMO_LAYOUT_ID, DEMO_LAYOUT_NAME, initial);
@@ -142,6 +144,15 @@ export function LayoutDesignerAppModule({ platform }: AppContentProps) {
       });
   }
 
+  function handleChangeColor(color: string | undefined) {
+    if (!layoutPort) return;
+    setDocumentColor(color); // optimistic — ghi ngay UI, không đợi round-trip
+    layoutPort.updateDocumentMeta(DEMO_LAYOUT_ID, { color }).catch(() => {
+      // Lưu màu thất bại không nên chặn thao tác thiết kế — fail-soft, bỏ qua (đúng nguyên tắc
+      // chung "không tự động bảo vệ", giống handleTokenInserted).
+    });
+  }
+
   function handleTokenInserted(key: string) {
     if (!layoutPort) return;
     layoutPort
@@ -199,6 +210,8 @@ export function LayoutDesignerAppModule({ platform }: AppContentProps) {
       pickAndSaveImage={assetPort ? () => assetPort.pickAndSaveImage() : undefined}
       resolveAssetUrl={assetPort ? (path: string) => assetPort.resolveAssetUrl(path) : undefined}
       listAssets={assetPort ? () => assetPort.listAssets() : undefined}
+      documentColor={documentColor}
+      onChangeColor={handleChangeColor}
     />
   );
 }

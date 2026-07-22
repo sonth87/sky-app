@@ -10,15 +10,17 @@ loadEnv();
 import type {
   ApiIntegration,
   BackdropAspectRatio,
+  CanonicalRecord,
   ClientToServerEvents,
   CustomVariable,
   FullStatePayload,
   OperatingMode,
+  RecordWithRuntimeState,
   ServerToClientEvents,
-  Student,
-  StudentStatus,
 } from '@sky-app/slide-shared';
 import { SocketErrorCode } from '@sky-app/slide-shared';
+
+type CanonicalRecordResult = CanonicalRecord;
 import { ceremonyStore } from './data/store';
 import { sessionStore } from './session-store';
 import { apiLogger } from './api-logger';
@@ -40,10 +42,10 @@ let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let idleTimerStartedAt: string | null = null;
 let idleTimerTotalSeconds = 0;
 
-// Chống quét trùng/quá nhanh (DESIGN §7.3): bỏ qua cùng MSSV trong cửa sổ ngắn.
+// Chống quét trùng/quá nhanh (DESIGN §7.3): bỏ qua cùng id trong cửa sổ ngắn.
 const SCAN_DEBOUNCE_MS = 500;
 let lastScanAt = 0;
-let lastScanMsv: string | null = null;
+let lastScanId: string | null = null;
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { appConfigJsonPath } from './data/paths';
@@ -307,8 +309,8 @@ function clearIdleTimer() {
   }
 }
 
-/** Đặt lại đếm ngược "về màn chờ nếu không có SV mới" — gọi mỗi khi có SV mới lên sân khấu. */
-function resetIdleTimer(msv: string) {
+/** Đặt lại đếm ngược "về màn chờ nếu không có record mới" — gọi mỗi khi có record mới lên sân khấu. */
+function resetIdleTimer(id: string) {
   clearIdleTimer();
   const cfg = ceremonyStore.getConfig();
   if (!cfg?.idle_timeout_enabled) return;
@@ -318,59 +320,62 @@ function resetIdleTimer(msv: string) {
   idleTimerTotalSeconds = secs;
   io?.emit('event:idleTimer', { active: true, totalSeconds: secs, startedAt: idleTimerStartedAt });
   idleTimer = setTimeout(() => {
-    // Chỉ về màn chờ nếu vẫn đúng SV này (không bị thay bởi SV khác trong lúc chờ)
-    if (sessionStore.get().current_on_stage_msv === msv) {
+    // Chỉ về màn chờ nếu vẫn đúng record này (không bị thay bởi record khác trong lúc chờ)
+    if (sessionStore.get().current_on_stage_id === id) {
       clearStage();
     }
   }, secs * 1000);
+}
+
+function toRecordWithRuntimeState(id: string): RecordWithRuntimeState | null {
+  const record = ceremonyStore.findById(id);
+  if (!record) return null;
+  return { record, runtimeState: ceremonyStore.getRuntimeState(record.id) };
 }
 
 function buildFullState(): FullStatePayload {
   const session = sessionStore.get();
   return {
     session,
-    onStage: session.current_on_stage_msv
-      ? (ceremonyStore.findByMsv(session.current_on_stage_msv) ?? null)
-      : null,
-    pending: session.pending_msv
-      ? (ceremonyStore.findByMsv(session.pending_msv) ?? null)
-      : null,
+    onStage: session.current_on_stage_id ? toRecordWithRuntimeState(session.current_on_stage_id) : null,
+    pending: session.pending_id ? toRecordWithRuntimeState(session.pending_id) : null,
   };
 }
 
-/** Chuyển SV đang on_stage hiện tại → returned, ghi sync_queue. */
-function retireOnStage(msv: string) {
-  ceremonyStore.patchStudent(msv, { status: 'returned', ts_returned: now() });
+/** Chuyển record đang on_stage hiện tại → returned, ghi sync_queue. */
+function retireOnStage(id: string) {
+  ceremonyStore.patchRuntimeState(id, { status: 'returned', tsReturned: now() });
   const session = sessionStore.get();
   // Thêm vào sync_queue để (giai đoạn sau) đồng bộ ngược về backend
-  const queue = session.sync_queue.includes(msv)
+  const queue = session.sync_queue.includes(id)
     ? session.sync_queue
-    : [...session.sync_queue, msv];
+    : [...session.sync_queue, id];
   sessionStore.update({ sync_queue: queue });
 }
 
-/** Đưa 1 SV lên backdrop. SV cũ (nếu có) → returned. */
-function showStudent(msv: string, source: 'auto' | 'manual', opts?: { silent?: boolean }) {
+/** Đưa 1 record lên backdrop. record cũ (nếu có) → returned. */
+function showStudent(id: string, source: 'auto' | 'manual', opts?: { silent?: boolean }) {
   if (!io) return;
-  const student = ceremonyStore.findByMsv(msv);
-  if (!student) {
+  const record = ceremonyStore.findById(id);
+  if (!record) {
     io.emit('event:error', {
       code: SocketErrorCode.STUDENT_NOT_FOUND,
-      message: `Không tìm thấy MSSV ${msv}`,
+      message: `Không tìm thấy bản ghi ${id}`,
     });
     return;
   }
 
-  // Idempotent: quét/Play trùng SV đang on_stage → không làm gì (tránh nhấp nháy).
+  // Idempotent: quét/Play trùng record đang on_stage → không làm gì (tránh nhấp nháy).
   const session = sessionStore.get();
-  if (session.current_on_stage_msv === msv) {
+  if (session.current_on_stage_id === id) {
     return;
   }
 
-  if (student.absent || student.status === 'absent') {
+  const runtimeState = ceremonyStore.getRuntimeState(record.id);
+  if (runtimeState.status === 'absent') {
     io.emit('event:error', {
       code: SocketErrorCode.STUDENT_ABSENT,
-      message: `Sinh viên ${student.full_name} đã được đánh dấu vắng mặt`,
+      message: `${record.full_name} đã được đánh dấu vắng mặt`,
     });
     // vẫn cho phép override (nếu là lệnh thủ công có chủ đích): tiếp tục hiển thị
   }
@@ -379,34 +384,34 @@ function showStudent(msv: string, source: 'auto' | 'manual', opts?: { silent?: b
   clearAutoShow();
   clearIdleTimer();
 
-  // SV đang on_stage → returned
-  if (session.current_on_stage_msv && session.current_on_stage_msv !== msv) {
-    retireOnStage(session.current_on_stage_msv);
+  // record đang on_stage → returned
+  if (session.current_on_stage_id && session.current_on_stage_id !== id) {
+    retireOnStage(session.current_on_stage_id);
   }
 
-  ceremonyStore.patchStudent(msv, {
+  ceremonyStore.patchRuntimeState(record.id, {
     status: 'on_stage',
-    ts_on_stage: now(),
-    src_on_stage: source,
+    tsOnStage: now(),
+    srcOnStage: source,
   });
 
-  sessionStore.update({ current_on_stage_msv: msv, pending_msv: null });
+  sessionStore.update({ current_on_stage_id: record.id, pending_id: null });
   sessionStore.incBroadcast();
 
-  const updated = ceremonyStore.findByMsv(msv) ?? null;
-  io.emit('state:onStage', { student: updated });
-  io.emit('state:pending', { student: null });
+  const updated = toRecordWithRuntimeState(record.id);
+  io.emit('state:onStage', { data: updated });
+  io.emit('state:pending', { data: null });
 
   if (updated) {
-    apiLogger.triggerApiCall(updated);
+    apiLogger.triggerApiCall(updated.record);
     if (source === 'manual') {
-      apiLogger.logPlay(updated);
+      apiLogger.logPlay(updated.record);
     }
   }
 
-  // Về màn chờ nếu không có SV mới trong N giây — áp dụng cả auto+manual (mặc định TẮT).
+  // Về màn chờ nếu không có record mới trong N giây — áp dụng cả auto+manual (mặc định TẮT).
   if (!opts?.silent) {
-    resetIdleTimer(msv);
+    resetIdleTimer(record.id);
   }
 }
 
@@ -415,12 +420,12 @@ function clearStage() {
   clearAutoShow();
   clearIdleTimer();
   const session = sessionStore.get();
-  const wasOnStage = session.current_on_stage_msv !== null;
-  if (session.current_on_stage_msv) {
-    retireOnStage(session.current_on_stage_msv);
+  const wasOnStage = session.current_on_stage_id !== null;
+  if (session.current_on_stage_id) {
+    retireOnStage(session.current_on_stage_id);
   }
-  sessionStore.update({ current_on_stage_msv: null });
-  io.emit('state:onStage', { student: null });
+  sessionStore.update({ current_on_stage_id: null });
+  io.emit('state:onStage', { data: null });
   apiLogger.logClear();
   if (wasOnStage) {
     apiLogger.triggerPauseApiCall();
@@ -439,9 +444,9 @@ export function resetSessionForNewEvent(eventId: string): void {
   if (!io) return;
   clearAutoShow();
   clearIdleTimer();
-  sessionStore.update({ current_on_stage_msv: null, pending_msv: null });
-  io.emit('state:onStage', { student: null });
-  io.emit('state:pending', { student: null });
+  sessionStore.update({ current_on_stage_id: null, pending_id: null });
+  io.emit('state:onStage', { data: null });
+  io.emit('state:pending', { data: null });
   io.emit('state:activeEventChanged', { eventId });
 }
 
@@ -459,32 +464,32 @@ export function setCustomVariablesFromEvent(variables: CustomVariable[]): void {
   io?.emit('event:customVariables', { variables });
 }
 
-function setPending(msv: string) {
+function setPending(id: string) {
   if (!io) return;
-  const student = ceremonyStore.findByMsv(msv);
-  if (!student) {
+  const record = ceremonyStore.findById(id);
+  if (!record) {
     io.emit('event:error', {
       code: SocketErrorCode.STUDENT_NOT_FOUND,
-      message: `Không tìm thấy MSSV ${msv}`,
+      message: `Không tìm thấy bản ghi ${id}`,
     });
     return;
   }
-  sessionStore.update({ pending_msv: msv });
-  io.emit('state:pending', { student });
+  sessionStore.update({ pending_id: record.id });
+  io.emit('state:pending', { data: toRecordWithRuntimeState(record.id) });
 }
 
 /** Xử lý 1 lần quét QR (từ HTTP hoặc socket) theo mode hiện tại */
-export function handleScan(msv: string): { ok: boolean; student?: Student; code?: string } {
+export function handleScan(id: string): { ok: boolean; record?: CanonicalRecordResult; code?: string } {
   console.log('[SocketServer] === handleScan START ===');
   try {
-    if (msv && msv.includes('|')) {
-      const parts = msv.split('|');
+    if (id && id.includes('|')) {
+      const parts = id.split('|');
       const first = parts.find((p) => p.trim());
       if (first) {
-        msv = first.trim();
+        id = first.trim();
       }
     }
-    console.log('[SocketServer] handleScan called with msv:', msv);
+    console.log('[SocketServer] handleScan called with id:', id);
     if (!io) {
       console.log('[SocketServer] IO not initialized');
       return { ok: false, code: SocketErrorCode.INTERNAL };
@@ -492,66 +497,66 @@ export function handleScan(msv: string): { ok: boolean; student?: Student; code?
 
     // Debounce quét trùng/quá nhanh (DESIGN §7.3)
     const t = Date.now();
-    if (msv === lastScanMsv && t - lastScanAt < SCAN_DEBOUNCE_MS) {
+    if (id === lastScanId && t - lastScanAt < SCAN_DEBOUNCE_MS) {
       console.log('[SocketServer] Debounce - ignoring duplicate scan');
-      return { ok: true, student: ceremonyStore.findByMsv(msv) };
+      return { ok: true, record: ceremonyStore.findById(id) };
     }
     lastScanAt = t;
-    lastScanMsv = msv;
+    lastScanId = id;
 
-    const student = ceremonyStore.findByMsv(msv);
-    if (!student) {
-      console.log('[SocketServer] Student not found:', msv);
+    const record = ceremonyStore.findById(id);
+    if (!record) {
+      console.log('[SocketServer] Record not found:', id);
       io.emit('event:error', {
         code: SocketErrorCode.STUDENT_NOT_FOUND,
-        message: `Không tìm thấy MSSV ${msv}`,
+        message: `Không tìm thấy bản ghi ${id}`,
       });
       return { ok: false, code: SocketErrorCode.STUDENT_NOT_FOUND };
     }
-    console.log('[SocketServer] Found student:', student.full_name);
+    console.log('[SocketServer] Found record:', record.full_name);
     console.log('[SocketServer] === About to check on_stage ===');
 
-    // Quét trùng SV đang on_stage → bỏ qua (idempotent), không nhấp nháy
+    // Quét trùng record đang on_stage → bỏ qua (idempotent), không nhấp nháy
     console.log('[SocketServer] About to get sessionStore...');
-    const currentOnStage = sessionStore.get().current_on_stage_msv;
-    console.log('[SocketServer] Current on_stage msv:', currentOnStage, 'vs scanned:', msv);
-    if (currentOnStage === msv) {
-      console.log('[SocketServer] Idempotent - same student on stage, but still logging scan');
+    const currentOnStage = sessionStore.get().current_on_stage_id;
+    console.log('[SocketServer] Current on_stage id:', currentOnStage, 'vs scanned:', record.id);
+    if (currentOnStage === record.id) {
+      console.log('[SocketServer] Idempotent - same record on stage, but still logging scan');
       // Vẫn log lần quét để Control app thêm vào danh sách "Đã quét QR"
-      const updated = ceremonyStore.findByMsv(msv) ?? student;
-      io.emit('event:scanned', { student: updated, ts: now() });
-      return { ok: true, student };
+      const updated = toRecordWithRuntimeState(record.id);
+      if (updated) io.emit('event:scanned', { data: updated, ts: now() });
+      return { ok: true, record };
     }
 
-    console.log('[SocketServer] Patching student status to called...');
-    ceremonyStore.patchStudent(msv, { status: 'called', ts_called: now() });
-    console.log('[SocketServer] Student patched. Updating session...');
-    sessionStore.update({ last_scan_msv: msv, last_scan_ts: now() });
+    console.log('[SocketServer] Patching runtime status to called...');
+    ceremonyStore.patchRuntimeState(record.id, { status: 'called', tsCalled: now() });
+    console.log('[SocketServer] Record patched. Updating session...');
+    sessionStore.update({ last_scan_id: record.id, last_scan_ts: now() });
     console.log('[SocketServer] Session updated.');
 
-    const updated = ceremonyStore.findByMsv(msv)!;
-    console.log('[SocketServer] Emitting event:scanned for:', updated.full_name);
-    apiLogger.logScan(updated);
-    apiLogger.triggerCustomApi('qr_scan', updated).catch((err) => {
+    const updated = toRecordWithRuntimeState(record.id)!;
+    console.log('[SocketServer] Emitting event:scanned for:', updated.record.full_name);
+    apiLogger.logScan(updated.record);
+    apiLogger.triggerCustomApi('qr_scan', updated.record).catch((err) => {
       console.error('[SocketServer] Error triggering custom qr_scan API:', err);
     });
-    io.emit('event:scanned', { student: updated, ts: now() });
+    io.emit('event:scanned', { data: updated, ts: now() });
 
     const mode = sessionStore.get().mode;
     if (mode === 'auto') {
-      // Hủy timer auto-show cũ (nếu SV trước chưa kịp lên) — SV mới thay thế
+      // Hủy timer auto-show cũ (nếu record trước chưa kịp lên) — record mới thay thế
       clearAutoShow();
       const delay = ceremonyStore.getConfig()?.delay_seconds ?? 0;
       if (delay > 0) {
-        autoShowTimer = setTimeout(() => showStudent(msv, 'auto'), delay * 1000);
+        autoShowTimer = setTimeout(() => showStudent(record.id, 'auto'), delay * 1000);
       } else {
-        showStudent(msv, 'auto');
+        showStudent(record.id, 'auto');
       }
     } else {
-      setPending(msv);
+      setPending(record.id);
     }
 
-    return { ok: true, student: updated };
+    return { ok: true, record };
   } catch (err) {
     console.error('[SocketServer] ERROR in handleScan:', err);
     if (io) {
@@ -564,16 +569,16 @@ export function handleScan(msv: string): { ok: boolean; student?: Student; code?
   }
 }
 
-/** Tự load SV đầu tiên (theo stt) khi khởi động nếu config.auto_load_first */
+/** Tự load record đầu tiên (theo displayOrder) khi khởi động nếu config.auto_load_first */
 export function autoLoadFirstIfConfigured() {
   const cfg = ceremonyStore.getConfig();
   if (!cfg?.auto_load_first) return;
-  // Chỉ load khi chưa có SV nào đang on_stage (tránh đè state phục hồi sau crash)
-  if (sessionStore.get().current_on_stage_msv) return;
-  const first = ceremonyStore.neighborByStt(null, 1);
+  // Chỉ load khi chưa có record nào đang on_stage (tránh đè state phục hồi sau crash)
+  if (sessionStore.get().current_on_stage_id) return;
+  const first = ceremonyStore.neighborByDisplayOrder(null, 1);
   if (first) {
     // silent: không auto-hide ngay khi mới mở
-    showStudent(first.student_code, 'auto', { silent: true });
+    showStudent(first.id, 'auto', { silent: true });
   }
 }
 
@@ -700,16 +705,16 @@ export function startSocketServer(port: number): Promise<void> {
         socket.emit('state:full', buildFullState());
       });
 
-      socket.on('cmd:show', ({ student_code, source }) => showStudent(student_code, source));
+      socket.on('cmd:show', ({ id, source }) => showStudent(id, source));
       socket.on('cmd:clear', () => clearStage());
-      socket.on('cmd:preview', ({ student_code }) => setPending(student_code));
-      socket.on('cmd:confirmScan', ({ student_code }) => showStudent(student_code, 'manual'));
-      socket.on('scan:qr', ({ student_code }) => {
-        console.log('[SocketServer] === scan:qr callback START, student_code:', student_code);
+      socket.on('cmd:preview', ({ id }) => setPending(id));
+      socket.on('cmd:confirmScan', ({ id }) => showStudent(id, 'manual'));
+      socket.on('scan:qr', ({ id }) => {
+        console.log('[SocketServer] === scan:qr callback START, id:', id);
         try {
-          console.log('[SocketServer] Received scan:qr event:', student_code);
+          console.log('[SocketServer] Received scan:qr event:', id);
           console.log('[SocketServer] About to call handleScan()...');
-          const result = handleScan(student_code);
+          const result = handleScan(id);
           console.log('[SocketServer] handleScan result:', result.ok);
         } catch (err) {
           console.error('[SocketServer] ERROR in scan:qr handler:', err);
@@ -717,21 +722,21 @@ export function startSocketServer(port: number): Promise<void> {
       });
 
       socket.on('cmd:next', () => {
-        const cur = sessionStore.get().current_on_stage_msv;
-        const next = ceremonyStore.neighborByStt(cur, 1);
-        if (next) showStudent(next.student_code, 'manual');
+        const cur = sessionStore.get().current_on_stage_id;
+        const next = ceremonyStore.neighborByDisplayOrder(cur, 1);
+        if (next) showStudent(next.id, 'manual');
       });
       socket.on('cmd:prev', () => {
-        const cur = sessionStore.get().current_on_stage_msv;
-        const prev = ceremonyStore.neighborByStt(cur, -1);
-        if (prev) showStudent(prev.student_code, 'manual');
+        const cur = sessionStore.get().current_on_stage_id;
+        const prev = ceremonyStore.neighborByDisplayOrder(cur, -1);
+        if (prev) showStudent(prev.id, 'manual');
       });
 
       socket.on('cmd:setMode', ({ mode }: { mode: OperatingMode }) => {
         // Hủy timer auto-show còn treo từ mode cũ (vd đang chờ delay_seconds ở auto)
         // và reset debounce quét — tránh trạng thái cũ kẹt sang mode mới.
         clearAutoShow();
-        lastScanMsv = null;
+        lastScanId = null;
         lastScanAt = 0;
         sessionStore.setMode(mode);
         io?.emit('event:mode', { mode });
@@ -751,8 +756,8 @@ export function startSocketServer(port: number): Promise<void> {
         onBackdropAspectRatioChange?.(aspectRatio);
       });
 
-      socket.on('cmd:setStatus', ({ student_code, status }: { student_code: string; status: StudentStatus }) => {
-        ceremonyStore.patchStudent(student_code, { status });
+      socket.on('cmd:setStatus', ({ id, status }) => {
+        ceremonyStore.patchRuntimeState(id, { status });
         io?.emit('state:full', buildFullState());
       });
 

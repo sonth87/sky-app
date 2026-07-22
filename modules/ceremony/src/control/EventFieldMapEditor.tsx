@@ -20,9 +20,16 @@ interface FieldMapTarget {
   ref: EventLayoutRef;
 }
 
-function targetsFrom(rows: LayoutRuleRow[], defaultRef: EventLayoutRef | undefined, t: (key: string) => string): FieldMapTarget[] {
+function targetsFrom(
+  rows: LayoutRuleRow[],
+  defaultRef: EventLayoutRef | undefined,
+  idleLayoutRef: EventLayoutRef | undefined,
+  t: (key: string) => string,
+): FieldMapTarget[] {
   const list: FieldMapTarget[] = rows.map((r) => ({ id: r.id, label: r.label || r.ref.layoutId, ref: r.ref }));
   if (defaultRef) list.push({ id: '__default__', label: t('eventFieldMap.defaultTabLabel'), ref: defaultRef });
+  // Màn hình chờ (2026-07-21) — tab RIÊNG, cuối cùng, để phân biệt rõ với layout trao giải.
+  if (idleLayoutRef) list.push({ id: '__idle__', label: t('eventFieldMap.idleTabLabel'), ref: idleLayoutRef });
   return list;
 }
 
@@ -62,6 +69,9 @@ interface EventFieldMapEditorProps {
   onChangeRows: (rows: LayoutRuleRow[]) => void;
   defaultRef: EventLayoutRef | undefined;
   onChangeDefaultRef: (ref: EventLayoutRef | undefined) => void;
+  /** Màn hình chờ (2026-07-21) — optional, chỉ hiện tab nếu Event đã chọn màn chờ ở Bước 3. */
+  idleLayoutRef?: EventLayoutRef | undefined;
+  onChangeIdleLayoutRef?: (ref: EventLayoutRef | undefined) => void;
   layoutPort: LayoutPort;
   attrSuggestions: string[];
   customVariables: CustomVariable[];
@@ -73,13 +83,15 @@ export function EventFieldMapEditor({
   onChangeRows,
   defaultRef,
   onChangeDefaultRef,
+  idleLayoutRef,
+  onChangeIdleLayoutRef,
   layoutPort,
   attrSuggestions,
   customVariables,
   onChangeCustomVariables,
 }: EventFieldMapEditorProps) {
   const { t } = useTranslation();
-  const targets = targetsFrom(rows, defaultRef, t);
+  const targets = targetsFrom(rows, defaultRef, idleLayoutRef, t);
   const [activeTargetId, setActiveTargetId] = useState<string>(targets[0]?.id ?? '');
   const [showVariableManager, setShowVariableManager] = useState(false);
   const [tokensByTarget, setTokensByTarget] = useState<Record<string, string[]>>({});
@@ -111,6 +123,11 @@ export function EventFieldMapEditor({
     if (targetId === '__default__') {
       if (!defaultRef) return;
       onChangeDefaultRef({ ...defaultRef, fieldMap: { ...defaultRef.fieldMap, [token]: source } });
+      return;
+    }
+    if (targetId === '__idle__') {
+      if (!idleLayoutRef || !onChangeIdleLayoutRef) return;
+      onChangeIdleLayoutRef({ ...idleLayoutRef, fieldMap: { ...idleLayoutRef.fieldMap, [token]: source } });
       return;
     }
     onChangeRows(rows.map((r) => (r.id === targetId ? { ...r, ref: { ...r.ref, fieldMap: { ...r.ref.fieldMap, [token]: source } } } : r)));
@@ -150,7 +167,7 @@ export function EventFieldMapEditor({
 
           {showVariableManager && (
             <div className="rounded-lg border border-border bg-card p-3">
-              <CustomVariableEditor variables={customVariables} onChange={onChangeCustomVariables} previewStudent={null} students={[]} />
+              <CustomVariableEditor variables={customVariables} onChange={onChangeCustomVariables} previewRecord={null} records={[]} attrSuggestions={attrSuggestions} />
             </div>
           )}
 

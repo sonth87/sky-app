@@ -1,11 +1,9 @@
 import { ipcMain, dialog, app } from 'electron';
-import { rmSync, existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, readdirSync, createWriteStream, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, readdirSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join, basename } from 'node:path';
-import type { ZipArchive as ZipArchiveType } from 'archiver';
 import { ceremonyStore } from './data/store';
-import { syncBundle, commitImport, cancelImport, isIoBusy } from './data/sync';
-import { ceremonyDataDir, autoPlayJsonPath, piperBinPath, piperModelPath, ttsPregenWavPath, ttsPregenDir, PHOTO_DIR_NAMES, ttsPregenManifestPath, vieneuDir, resolveLocalAsset } from './data/paths';
+import { ceremonyDataDir, autoPlayJsonPath, piperBinPath, piperModelPath, ttsPregenWavPath, ttsPregenDir, ttsPregenManifestPath, vieneuDir } from './data/paths';
 import { runVieneu, warmupVieneu } from './vieneu-tts';
 import { synthesizeTtsStudio } from './tts-studio';
 import { getTtsDebugInfo, getPythonStatus, getPythonPort, stopPythonServer, startPythonServer, getPythonPath } from './python-server';
@@ -21,11 +19,12 @@ import {
   openBackdropWindow,
   setBackdropFullscreen,
 } from './windows';
-import { getIO, getUseSampleData, setUseSampleData, getTtsPregenConfig, getApiEnvironment, setApiEnvironment, getApiIntegrations, setApiIntegrations, hasDefaultApiIntegrations, resetApiIntegrationsToDefault, getBackdropAspectRatio } from './socket-server';
+import { getIO, getTtsPregenConfig, getApiEnvironment, setApiEnvironment, getApiIntegrations, setApiIntegrations, hasDefaultApiIntegrations, resetApiIntegrationsToDefault, getBackdropAspectRatio } from './socket-server';
 import { sessionStore } from './session-store';
 import { apiLogger } from './api-logger';
 import { setAppMenu, refreshAppMenu, type MenuLanguage } from './menu';
 import { readCurrentState as readCurrentRendererState, getPendingUpdateInfo } from './renderer-updater';
+import { getCurrentActiveEvent } from '@sky-app/ceremony-db/node';
 
 /** Báo cho Control biết trạng thái Backdrop (mở/đóng) đã thay đổi */
 export function notifyBackdropState() {
@@ -102,225 +101,19 @@ function runPiper(text: string, modelName?: string, speed?: number): Promise<{ o
 export function registerIpcHandlers() {
   // Broadcast full state để Control/Backdrop cập nhật sau khi dữ liệu đổi.
   function broadcastFullState() {
+    const session = sessionStore.get();
+    const toData = (id: string | null) => {
+      if (!id) return null;
+      const record = ceremonyStore.findById(id);
+      if (!record) return null;
+      return { record, runtimeState: ceremonyStore.getRuntimeState(record.id) };
+    };
     getIO()?.emit('state:full', {
-      session: sessionStore.get(),
-      onStage: sessionStore.get().current_on_stage_msv
-        ? (ceremonyStore.findByMsv(sessionStore.get().current_on_stage_msv!) ?? null)
-        : null,
-      pending: sessionStore.get().pending_msv
-        ? (ceremonyStore.findByMsv(sessionStore.get().pending_msv!) ?? null)
-        : null,
+      session,
+      onStage: toData(session.current_on_stage_id),
+      pending: toData(session.pending_id),
     });
   }
-
-  // Làm mới / import dữ liệu — push progress qua event data:progress về renderer.
-  // Import file local trả pendingConfirm (chưa commit) → KHÔNG broadcast tới khi confirm.
-  ipcMain.handle('data:sync', async (e, payload?: { url?: string; zipPath?: string }) => {
-    const result = await syncBundle(payload, (p) => {
-      e.sender.send('data:progress', p);
-    });
-    if (!result.pendingConfirm) {
-      broadcastFullState();
-    }
-    return result;
-  });
-
-  // Bước 2 của import: user đã xác nhận preview → commit staging vào ceremony-data.
-  ipcMain.handle('data:confirmImport', async (e) => {
-    const result = commitImport((p) => e.sender.send('data:progress', p));
-    if (result.ok) broadcastFullState();
-    return result;
-  });
-
-  // Huỷ import đang chờ xác nhận → dọn staging.
-  ipcMain.handle('data:cancelImport', () => {
-    cancelImport();
-    return { ok: true };
-  });
-
-  // Lấy kích thước file (để renderer cảnh báo trước khi import).
-  ipcMain.handle('data:statFile', (_e, filePath: string) => {
-    try {
-      return { size: statSync(filePath).size };
-    } catch {
-      return { size: 0 };
-    }
-  });
-
-  // Mở dialog chọn file ZIP để import
-  ipcMain.handle('data:openFile', async () => {
-    const win = getMainWindow();
-    const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined!, {
-      title: 'Chọn file bundle (.zip)',
-      filters: [{ name: 'Bundle ZIP', extensions: ['zip'] }],
-      properties: ['openFile'],
-    });
-    if (canceled || filePaths.length === 0) return null;
-    return filePaths[0];
-  });
-
-  // Xuất file dữ liệu ZIP (streaming — không giữ toàn bộ trong RAM) gồm students.json, image/, voice/
-  ipcMain.handle('data:export', async (e) => {
-    const emitExport = (step: string, pct: number) => e.sender.send('data:progress', { step, pct });
-    if (getUseSampleData()) {
-      return { ok: false, message: 'Không được phép xuất dữ liệu mẫu (sample data).' };
-    }
-    // V2 — chống chạy đồng thời với import/refresh.
-    if (isIoBusy()) {
-      return { ok: false, message: 'Đang có thao tác dữ liệu khác chạy — vui lòng đợi hoàn tất.' };
-    }
-    const win = getMainWindow();
-    const { canceled, filePath } = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Xuất file dữ liệu (.zip)',
-      defaultPath: `ceremony-bundle-${new Date().toISOString().slice(0, 10)}.zip`,
-      filters: [{ name: 'ZIP archive', extensions: ['zip'] }],
-    });
-    if (canceled || !filePath) return { ok: false, message: 'Đã hủy xuất file' };
-
-    const dataDir = ceremonyDataDir();
-    const students = ceremonyStore.getStudents();
-    if (!students || students.length === 0) {
-      return { ok: false, message: 'Không có dữ liệu sinh viên để xuất' };
-    }
-
-    // Map sinh viên về RawStudent shape
-    const rawStudents = students.map((s) => ({
-      id: s.id,
-      graduation_batch_id: s.graduation_batch_id,
-      batch_name: s.batch_name || '',
-      display_order: s.display_order,
-      student_code: s.student_code,
-      full_name: s.full_name,
-      date_of_birth: s.date_of_birth,
-      major_name: s.major_name,
-      faculty_name: s.faculty_name,
-      class_code: s.class_code,
-      course_code: s.course_code,
-      phone_number: s.phone_number,
-      identity_number: s.identity_number,
-      email: s.email || '',
-      gpa: s.gpa,
-      classification: s.classification,
-      classification_type: s.classification_type || 0,
-      achievement_title: s.achievement_title || '',
-      award_type: s.award_type || '',
-      award_type_code: s.award_type_code || null,
-      award_content: s.award_content || '',
-      quote: s.quote || null,
-      image_file_name: s.image_file_name,
-      image_relative_path: s.image_relative_path,
-      presentation_template_type: s.presentation_template_type || '',
-      presentation_template_type_code: s.presentation_template_type_code || null,
-      registration_status: s.status === 'on_stage' ? 'on_stage' : s.status === 'returned' ? 'received_hardcopy' : s.status === 'checked_in' ? 'checked_in' : s.status === 'called' ? 'called' : s.status === 'absent' ? 'absent' : 'registered',
-      degree_award_status: s.degree_award_status || '',
-    }));
-
-    // V7 — serialize JSON riêng, bắt lỗi String.MAX_LENGTH rõ ràng.
-    let studentsJson: string;
-    try {
-      studentsJson = JSON.stringify(rawStudents, null, 2);
-    } catch (err) {
-      return { ok: false, message: `Không thể tạo students.json (dữ liệu quá lớn?): ${err instanceof Error ? err.message : String(err)}` };
-    }
-
-    // V6 — archiver ghi streaming trực tiếp ra file, RAM hằng số.
-    // archiver@8 là ESM-only — main process là CJS nên phải dùng dynamic import() thay vì require().
-    const { ZipArchive } = await import('archiver');
-    return await new Promise<{ ok: boolean; message: string }>((resolve) => {
-      const output = createWriteStream(filePath);
-      const zip: ZipArchiveType = new ZipArchive({ zlib: { level: 1 } }); // level thấp: ảnh/wav đã nén, ưu tiên tốc độ
-      let settled = false;
-      const done = (r: { ok: boolean; message: string }) => { if (!settled) { settled = true; resolve(r); } };
-
-      output.on('close', () => { emitExport('Hoàn tất', 100); done({ ok: true, message: 'Xuất file thành công!' }); });
-      zip.on('warning', (w: Error) => console.warn('[export] archiver warning:', w));
-      zip.on('error', (err: Error) => { console.error('[export] archiver error:', err); done({ ok: false, message: `Lỗi ghi file: ${err.message}` }); });
-      // Progress theo tổng bytes đã xử lý.
-      zip.on('progress', (p: { entries: { total: number; processed: number } }) => {
-        const pct = p.entries.total > 0 ? Math.round((p.entries.processed / p.entries.total) * 90) : 0;
-        emitExport('Đang ghi file…', Math.min(90, pct));
-      });
-
-      zip.pipe(output);
-
-      emitExport('Chuẩn bị dữ liệu…', 3);
-      zip.append(studentsJson, { name: 'students.json' });
-
-      // Ảnh: chỉ thêm ảnh thực sự tồn tại, tránh trùng tên.
-      let photoDirName = 'image';
-      for (const d of PHOTO_DIR_NAMES) {
-        if (existsSync(join(dataDir, d))) { photoDirName = d; break; }
-      }
-      const photoPath = join(dataDir, photoDirName);
-      const addedImages = new Set<string>();
-      for (const s of students) {
-        const candidates: string[] = [];
-        if (s.image_relative_path) candidates.push(resolveLocalAsset(s.image_relative_path));
-        if (s.image_file_name) candidates.push(join(photoPath, s.image_file_name));
-        for (const file of candidates) {
-          if (existsSync(file)) {
-            const zipName = s.image_file_name || basename(file);
-            if (addedImages.has(zipName)) break;
-            addedImages.add(zipName);
-            zip.file(file, { name: `image/${zipName}` });
-            break;
-          }
-        }
-      }
-
-      // Voice: wav tồn tại + manifest đã lọc.
-      const batchId = students[0]?.graduation_batch_id || 'default';
-      const voicePath = ttsPregenDir(batchId);
-      const manifestPath = ttsPregenManifestPath(batchId);
-      if (existsSync(voicePath)) {
-        for (const s of students) {
-          const safeCode = s.student_code.replace(/[^a-zA-Z0-9_-]/g, '_');
-          const wavFile = join(voicePath, `${safeCode}.wav`);
-          if (existsSync(wavFile)) {
-            zip.file(wavFile, { name: `voice/${safeCode}.wav` });
-          }
-        }
-        if (existsSync(manifestPath)) {
-          try {
-            const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-            const filteredStudents: Record<string, unknown> = {};
-            for (const s of students) {
-              const safeCode = s.student_code.replace(/[^a-zA-Z0-9_-]/g, '_');
-              const wavFile = join(voicePath, `${safeCode}.wav`);
-              if (existsSync(wavFile) && manifest.students?.[s.student_code]) {
-                filteredStudents[s.student_code] = manifest.students[s.student_code];
-              }
-            }
-            zip.append(JSON.stringify({ ...manifest, students: filteredStudents }, null, 2), { name: 'voice/manifest.json' });
-          } catch {
-            zip.file(manifestPath, { name: 'voice/manifest.json' });
-          }
-        }
-      }
-
-      emitExport('Đang ghi file…', 10);
-      zip.finalize().catch((err) => done({ ok: false, message: `Lỗi hoàn tất zip: ${err instanceof Error ? err.message : String(err)}` }));
-    });
-  });
-
-  // Config: dùng data sample hay data thật
-  ipcMain.handle('config:getUseSampleData', () => getUseSampleData());
-  ipcMain.handle('config:setUseSampleData', async (e, val: boolean) => {
-    setUseSampleData(val);
-    refreshAppMenu(); // Cập nhật checkbox "Dùng dữ liệu mẫu" trong menu Develop
-    // Load lại dữ liệu theo mode mới
-    const result = await syncBundle({ useSample: val }, (p) => e.sender.send('data:progress', p));
-    getIO()?.emit('state:full', {
-      session: sessionStore.get(),
-      onStage: sessionStore.get().current_on_stage_msv
-        ? (ceremonyStore.findByMsv(sessionStore.get().current_on_stage_msv!) ?? null)
-        : null,
-      pending: sessionStore.get().pending_msv
-        ? (ceremonyStore.findByMsv(sessionStore.get().pending_msv!) ?? null)
-        : null,
-    });
-    return result;
-  });
 
   // Cấu hình API tích hợp
   ipcMain.handle('config:getApiEnvironment', () => getApiEnvironment());
@@ -339,12 +132,11 @@ export function registerIpcHandlers() {
     return apiLogger.triggerCustomApi('submit_log', null);
   });
 
-  // Lấy thông tin meta để renderer hiển thị (cổng socket, ceremony, danh sách SV)
+  // Lấy thông tin meta để renderer hiển thị (cổng socket, ceremony, danh sách người tham dự)
   ipcMain.handle('data:meta', () => ({
     config: ceremonyStore.getConfig(),
     ceremony: ceremonyStore.getCeremony(),
-    students: ceremonyStore.getStudents(),
-    syncedAt: ceremonyStore.getBundle()?._synced_at ?? null,
+    records: ceremonyStore.getRecords(),
     hasData: ceremonyStore.hasData(),
     apiEnvironment: getApiEnvironment(),
   }));
@@ -409,7 +201,7 @@ export function registerIpcHandlers() {
   // Xóa dữ liệu sinh viên (reset ceremony data nhưng giữ config, không cần khởi động lại app)
   ipcMain.handle('data:resetStudents', async () => {
     try {
-      ceremonyStore.clearStudents();
+      ceremonyStore.clearRecords();
       sessionStore.clear();
       getIO()?.emit('state:full', {
         session: sessionStore.get(),
@@ -1226,33 +1018,35 @@ export function registerIpcHandlers() {
   // ── TTS Pre-Generation ──────────────────────────────────────────────────────
   let pregenQueue: PreGenQueue | null = null;
 
+  /** Batch cache voice pregen giờ gắn với Event active (giai đoạn "bỏ Student", 2026-07-22) —
+   * trước đây dùng graduation_batch_id (field đặc thù sinh viên, không có trong CanonicalRecord
+   * core), giờ mỗi Event có 1 thư mục cache riêng, đúng bản chất "pregen gắn với 1 đợt lễ cụ
+   * thể", không phải thuộc tính dữ liệu người tham dự. */
   function getPregenBatchId(): string {
-    // Dùng graduation_batch_id của lô dữ liệu hiện tại, fallback về 'default'
-    const students = ceremonyStore.getStudents();
-    return students?.[0]?.graduation_batch_id || 'default';
+    const active = getCurrentActiveEvent(ceremonyStore.getExecutor());
+    return active?.id ?? 'default';
   }
 
   ipcMain.handle('tts:pregen-start', async (_e, payload: {
     regenerate?: boolean;
     config: { template: string; ttsModel: string; ttsSpeed: number; ttsConditions?: any[] };
   }) => {
-    const students = ceremonyStore.getStudents();
-    if (!students || students.length === 0) {
-      return { ok: false, error: 'Chưa có dữ liệu sinh viên' };
+    const records = ceremonyStore.getRecords();
+    if (!records || records.length === 0) {
+      return { ok: false, error: 'Chưa có dữ liệu người tham dự' };
     }
     const batchId = getPregenBatchId();
 
     // Tạo queue mới nếu batchId đổi, config đổi (giọng/tốc độ/template), hoặc số
-    // lượng SV đổi (re-import cùng batch_id — ví dụ sửa/nạp lại dữ liệu mà
-    // graduation_batch_id giữ nguyên) — nếu không, queue cũ (đang giữ danh sách SV
-    // cũ trong bộ nhớ) tiếp tục báo total theo số cũ dù dữ liệu đã đổi.
+    // lượng record đổi (re-import cùng Event — sửa/nạp lại dữ liệu) — nếu không, queue cũ
+    // (đang giữ danh sách cũ trong bộ nhớ) tiếp tục báo total theo số cũ dù dữ liệu đã đổi.
     if (
       !pregenQueue ||
       pregenQueue.getBatchId() !== batchId ||
       pregenQueue.configChanged(payload.config) ||
-      pregenQueue.getStatus().total !== students.length
+      pregenQueue.getStatus().total !== records.length
     ) {
-      pregenQueue = new PreGenQueue(batchId, students, payload.config, (status: PreGenStatus) => {
+      pregenQueue = new PreGenQueue(batchId, records, payload.config, (status: PreGenStatus) => {
         getMainWindow()?.webContents.send('tts:pregen-progress', status);
       });
     }
@@ -1278,37 +1072,37 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle('tts:pregen-status', () => {
-    const students = ceremonyStore.getStudents();
-    if (!pregenQueue || (students && students.length > 0 && pregenQueue.getStatus().total !== students.length)) {
-      if (!students || students.length === 0) return pregenQueue?.getStatus() ?? null;
+    const records = ceremonyStore.getRecords();
+    if (!pregenQueue || (records && records.length > 0 && pregenQueue.getStatus().total !== records.length)) {
+      if (!records || records.length === 0) return pregenQueue?.getStatus() ?? null;
       const batchId = getPregenBatchId();
       const config = getTtsPregenConfig();
-      pregenQueue = new PreGenQueue(batchId, students, config, (status: PreGenStatus) => {
+      pregenQueue = new PreGenQueue(batchId, records, config, (status: PreGenStatus) => {
         getMainWindow()?.webContents.send('tts:pregen-progress', status);
       });
     }
     return pregenQueue.getStatus();
   });
 
-  ipcMain.handle('tts:pregen-requeue', (_e, { studentCode }: { studentCode: string }) => {
+  ipcMain.handle('tts:pregen-requeue', (_e, { id }: { id: string }) => {
     if (!pregenQueue) return { ok: false, error: 'Không có queue đang chạy' };
-    const result = pregenQueue.requeueOne(studentCode);
+    const result = pregenQueue.requeueOne(id);
     return { ok: result };
   });
 
-  ipcMain.handle('tts:pregen-get-audio', (_e, { studentCode }: { studentCode: string }) => {
+  ipcMain.handle('tts:pregen-get-audio', (_e, { id }: { id: string }) => {
     const batchId = getPregenBatchId();
-    const wavPath = ttsPregenWavPath(batchId, studentCode);
-    console.log(`[TTS PreGen] get-audio batchId=${batchId} studentCode=${studentCode} wavPath=${wavPath} exists=${existsSync(wavPath)}`);
+    const wavPath = ttsPregenWavPath(batchId, id);
+    console.log(`[TTS PreGen] get-audio batchId=${batchId} id=${id} wavPath=${wavPath} exists=${existsSync(wavPath)}`);
     if (!existsSync(wavPath)) {
       return { ok: false, error: 'File WAV chưa được tạo' };
     }
     try {
       const buffer = readFileSync(wavPath);
-      console.log(`[TTS PreGen] get-audio ok studentCode=${studentCode} bytes=${buffer.length}`);
+      console.log(`[TTS PreGen] get-audio ok id=${id} bytes=${buffer.length}`);
       return { ok: true, buffer };
     } catch (err) {
-      console.error(`[TTS PreGen] get-audio error studentCode=${studentCode} wavPath=${wavPath}`, err);
+      console.error(`[TTS PreGen] get-audio error id=${id} wavPath=${wavPath}`, err);
       return { ok: false, error: String(err) };
     }
   });

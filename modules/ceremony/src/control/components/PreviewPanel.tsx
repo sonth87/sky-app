@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef, useState, useEffect } from 'react';
+import { useLayoutEffect, useRef, useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackdropView, type BackdropTemplateMap } from '@sky-app/slide-shared';
+import { BackdropView, canonicalToStudent, type BackdropTemplateMap } from '@sky-app/slide-shared';
 import { useControlStore } from '../store';
 import { useSocketRef } from '../SocketContext';
 import { resolveAsset } from '../../lib/assets';
@@ -12,8 +12,8 @@ const BASE_H = 720;
 export function PreviewPanel() {
   const { t } = useTranslation();
   const ceremony = useControlStore((s) => s.ceremony);
-  const students = useControlStore((s) => s.students);
-  const selectedMsv = useControlStore((s) => s.selectedMsv);
+  const records = useControlStore((s) => s.records);
+  const selectedId = useControlStore((s) => s.selectedId);
   const onStage = useControlStore((s) => s.onStage);
   const backdropAspectRatio = useControlStore((s) => s.backdropAspectRatio);
   const socket = useSocketRef();
@@ -74,10 +74,12 @@ export function PreviewPanel() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showModal]);
 
-  const selected = selectedMsv
-    ? students.find((s) => s.student_code === selectedMsv) ?? null
+  const selectedRecord = selectedId
+    ? records.find((r) => r.id === selectedId) ?? null
     : null;
-  const isOnStage = !!selected && onStage?.student_code === selected.student_code;
+  // Adapter TẠM cho BackdropView (hệ template cũ) — xem PHỤ LỤC "giữ BackdropView tạm" trong plan.
+  const selected = useMemo(() => (selectedRecord ? canonicalToStudent(selectedRecord, 0) : null), [selectedRecord]);
+  const isOnStage = !!selectedRecord && onStage?.record.id === selectedRecord.id;
 
   if (!ceremony) return null;
 
@@ -88,7 +90,7 @@ export function PreviewPanel() {
           {t('previewPanel.preview')}
         </span>
         {selected && (
-          <span className="font-mono text-xs text-muted-foreground">{selected.student_code}</span>
+          <span className="font-mono text-xs text-muted-foreground">{selectedRecord?.identifierCode ?? selectedRecord?.id}</span>
         )}
       </div>
 
@@ -167,7 +169,7 @@ export function PreviewPanel() {
 
       {selected && (
         <button
-          onClick={() => socket.current?.emit('cmd:show', { student_code: selected.student_code, source: 'manual' })}
+          onClick={() => selectedRecord && socket.current?.emit('cmd:show', { id: selectedRecord.id, source: 'manual' })}
           disabled={isOnStage}
           className="mt-2 w-full rounded-md bg-success px-3 py-2 text-sm font-medium text-success-foreground hover:bg-success/90 disabled:cursor-not-allowed disabled:bg-muted-foreground"
         >

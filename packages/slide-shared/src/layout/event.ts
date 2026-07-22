@@ -7,6 +7,8 @@ import type { CanonicalGroup, CanonicalSubject } from './canonical.js';
 import type { LayoutVariant } from './types.js';
 import type { CustomVariable, VarRuleOp } from '../types.js';
 
+export type { CustomVariable };
+
 /**
  * 1 nguồn dữ liệu người tham dự — 2 chế độ (13-ceremony-mo-rong.md §"Trách nhiệm 4"):
  * `pooled` = dùng chung nhiều Event, không bị trừ; `consumable` = tiêu hao, loại trừ dần qua
@@ -65,6 +67,11 @@ export interface EventLayoutRef {
   selector?: LayoutSelector;
   overrides?: Record<string, Partial<Pick<LayoutVariant, 'background'>>>;
   fieldMap: Record<string, FieldMapSource>;
+  /** 'award' (mặc định) = layout trao giải, chọn qua resolveLayout theo điều kiện/Mặc định.
+   * 'idle' = màn hình chờ (2026-07-21) — CỐ ĐỊNH 1 layout duy nhất cho cả Event, KHÔNG có
+   * selector, KHÔNG đi qua resolveLayout. Optional để tương thích ref cũ (trước khi có khái
+   * niệm màn chờ) — luôn hiểu ngầm là 'award' khi thiếu. */
+  role?: 'award' | 'idle';
 }
 
 export interface EventDocument {
@@ -141,4 +148,70 @@ function matchesRule(value: string | undefined, rule: SelectorRule): boolean {
       return _exhaustive;
     }
   }
+}
+
+/**
+ * Pseudo-record cho LayoutRenderer khi render MÀN CHỜ (2026-07-21) — không có "người tham dự"
+ * nào, chỉ có chính EventDocument. `full_name = event.name` là FALLBACK hiển thị (nhãn quản lý
+ * nội bộ, KHÔNG phải "tên sự kiện đẹp") — mọi token thật trên layout màn chờ PHẢI qua
+ * `EventLayoutRef.fieldMap` (map raw:name hoặc computed qua CustomVariable), KHÔNG tự suy đoán
+ * thêm field nào khác từ EventDocument (quyết định "không thêm field cứng", 2026-07-21).
+ */
+export function eventToIdleRecord(event: EventDocument): CanonicalSubject {
+  return {
+    id: event.id,
+    full_name: event.name,
+    subjectType: 'event',
+    extra: {},
+  };
+}
+
+/**
+ * Trạng thái vận hành runtime của 1 CanonicalRecord trong lễ (giai đoạn "bỏ Student", 2026-07-22)
+ * — TÁCH BIỆT khỏi CanonicalSubject/CanonicalGroup (record = dữ liệu TĨNH từ DataSource, không
+ * mang state). Sống trong 1 map { [recordId]: RecordRuntimeState } ở ceremonyStore/session,
+ * KHÔNG persist vào bảng data_source_record (bảng dữ liệu nguồn, bất biến trừ khi re-import).
+ *
+ * Kế thừa đúng nhóm field "trạng thái vận hành" của Student cũ, BỎ `ts_checkin` (dead field,
+ * không ai từng ghi) và `staff_presenter` (chưa có UI nhập liệu thật, chỉ là placeholder
+ * template) — xác nhận qua khảo sát 2026-07-22, có thể thêm lại sau nếu phát sinh nhu cầu thật.
+ */
+export interface RecordRuntimeState {
+  status: 'registered' | 'checked_in' | 'called' | 'on_stage' | 'returned' | 'absent';
+  tsCalled?: string;
+  tsOnStage?: string;
+  tsReturned?: string;
+  srcOnStage?: 'auto' | 'manual';
+}
+
+export const DEFAULT_RUNTIME_STATE: RecordRuntimeState = { status: 'registered' };
+
+/**
+ * Tính giá trị của mọi CustomVariable cho 1 record — Hướng B (chốt 2026-07-22, xem PHỤ LỤC
+ * "Bỏ schema Student"): nhận object PHẲNG (Record<string, string|undefined>) thay vì trực tiếp
+ * CanonicalRecord/Student, tách "cách lấy giá trị từ 1 record" khỏi "cách so khớp điều kiện" —
+ * cùng 1 hàm so khớp dùng được cho MỌI nguồn (CanonicalRecord qua flatten core+extra, Student cũ
+ * trong quá trình chuyển đổi, hay bất kỳ nguồn nào khác), chỉ cần viết đúng hàm "record → object
+ * phẳng" riêng cho từng nguồn (xem flattenRecord ở api-logger.ts làm ví dụ).
+ *
+ * Mỗi biến: duyệt rules theo thứ tự, rule đầu tiên khớp thắng; hết vòng lặp → default.
+ * `rule.attr` là tên field TỰ DO — tra trực tiếp trong `recordAttrs`, fail-soft nếu thiếu.
+ */
+export function resolveCustomVariables(
+  recordAttrs: Record<string, string | undefined>,
+  vars: CustomVariable[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const v of vars) {
+    if (!v.key) continue;
+    let result = v.default ?? '';
+    for (const rule of v.rules || []) {
+      if (matchesRule(recordAttrs[rule.attr], rule)) {
+        result = rule.result;
+        break;
+      }
+    }
+    out[v.key] = result;
+  }
+  return out;
 }

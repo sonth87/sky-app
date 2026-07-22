@@ -1,9 +1,12 @@
 import { ipcMain, app, dialog, type BrowserWindow } from 'electron';
-import { readFile, writeFile, mkdir, copyFile, stat } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, copyFile, stat, rm, readdir } from 'node:fs/promises';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, extname, basename } from 'node:path';
+import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import AdmZip from 'adm-zip';
 import { isUpdateReadyToInstall, getPendingNativeUpdateInfo } from './update-checker';
-import { layoutAssetsDir } from './slide/data/paths';
+import { layoutAssetsDir, ceremonyDataDir, ttsPregenDir, ttsPregenManifestPath, ttsPregenWavPath } from './slide/data/paths';
 import type { CanonicalGroup, CanonicalSubject, EventDocument, FieldMappingProfile, LayoutContent } from '@sky-app/slide-shared';
 import type { DataSource } from '@sky-app/slide-shared';
 import {
@@ -32,9 +35,37 @@ import {
   saveEvent,
   saveFieldMappingProfile,
   setActiveEvent,
+  updateLayoutDocumentMeta,
 } from '@sky-app/ceremony-db/node';
 import { ceremonyStore } from './slide/data/store';
 import { resetSessionForNewEvent, setCustomVariablesFromEvent } from './slide/socket-server';
+
+/**
+ * Đồng bộ ceremonyStore (server-side, dùng bởi cmd:show/cmd:next/cmd:prev/quét QR qua
+ * socket-server.ts's findById/patchRuntimeState/neighborByDisplayOrder) với danh sách người
+ * tham dự THẬT của Event vừa active — bug chặn đường phát hiện 2026-07-21 (dùng thật: Kích hoạt
+ * Event, bấm hiện 1 người lên sân khấu, không hiện ai). Trước đây `loadStudentsForEvent`
+ * (control/eventStore.ts) chỉ đổ CanonicalSubject[] → Student[] vào useControlStore
+ * (CLIENT-SIDE, chỉ để hiển thị dashboard) — ceremonyStore server-side hoàn toàn không biết
+ * Event/DataSource nào đang active.
+ *
+ * Giai đoạn "bỏ Student" (2026-07-22) — CeremonyStore giờ lưu thẳng CanonicalRecord[], không
+ * cần convert qua canonicalRecordsToStudents nữa (đã xoá cùng Student).
+ *
+ * Event không có dataSourceId (data để sau) → danh sách RỖNG (không giữ sót data Event trước —
+ * quyết định của user: "vào Event nào thì chỉ hiện data của Event đó, chưa có data thì không
+ * hiển thị data").
+ */
+export function syncCeremonyStoreForEvent(event: EventDocument | null): void {
+  if (!event?.dataSourceId) {
+    ceremonyStore.setRecords([]);
+    return;
+  }
+  const records = getDataSourceRecords(ceremonyStore.getExecutor(), event.dataSourceId, {
+    excludeConsumedForEvent: event.id,
+  });
+  ceremonyStore.setRecords(records);
+}
 
 /**
  * IPC router — the main-process counterpart to platform-electron's preload
@@ -51,6 +82,54 @@ import { resetSessionForNewEvent, setCustomVariablesFromEvent } from './slide/so
  * calls window.slide directly (the real Slide-specific bridge), see
  * packages/platform-electron/src/adapters/tts.ts.
  */
+/** Parser CSV tối giản cho main process (đọc `records.csv` bên trong ZIP import — PHỤ LỤC
+ * "Event Hub" 2026-07-22). KHÔNG dùng `xlsx` (đó là dependency của renderer/parseSpreadsheet.ts,
+ * main process không cần Excel binary — ZIP CHỈ chấp nhận CSV/JSON cho records, không phải xlsx
+ * trực tiếp). Chỉ hỗ trợ CSV chuẩn RFC4180 cơ bản (dấu phẩy, ngoặc kép bao field chứa phẩy/xuống
+ * dòng, "" là escape của "). Dòng đầu = header. */
+function parseCsvBuffer(text: string): { columns: string[]; rows: Array<Record<string, string>> } {
+  const rows: string[][] = [];
+  let field = '';
+  let row: string[] = [];
+  let inQuotes = false;
+  const src = text.replace(/^﻿/, ''); // bỏ BOM UTF-8 nếu có
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (src[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      row.push(field);
+      field = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && src[i + 1] === '\n') i++;
+      row.push(field);
+      field = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    } else {
+      field += ch;
+    }
+  }
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  if (rows.length === 0) return { columns: [], rows: [] };
+  const columns = rows[0]!;
+  const dataRows = rows.slice(1).map((r) => {
+    const obj: Record<string, string> = {};
+    columns.forEach((col, idx) => { obj[col] = r[idx] ?? ''; });
+    return obj;
+  });
+  return { columns, rows: dataRows };
+}
+
 export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   ipcMain.handle('kernel:display:list', async () => {
     return [];
@@ -115,6 +194,10 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     },
   );
 
+  ipcMain.handle('kernel:layout:updateDocumentMeta', async (_event, id: string, patch: { color?: string }) => {
+    updateLayoutDocumentMeta(ceremonyStore.getExecutor(), id, patch);
+  });
+
   ipcMain.handle('kernel:layout:saveDraft', async (_event, id: string, content: LayoutContent) => {
     saveDraft(ceremonyStore.getExecutor(), id, content);
   });
@@ -165,7 +248,12 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     // Giai đoạn 4c mở rộng (2026-07-20) — Sửa Event ĐANG active (VD đổi customVariables qua màn
     // Sửa Event) phải cập nhật socket-server NGAY, không chờ setActive() lần sau — backdrop đang
     // chạy thật cần thấy công thức mới lập tức, không phải sau khi thoát/kích hoạt lại.
-    if (doc.status === 'active') setCustomVariablesFromEvent(doc.customVariables);
+    if (doc.status === 'active') {
+      setCustomVariablesFromEvent(doc.customVariables);
+      // Bug chặn đường (2026-07-21) — Sửa Event đang active cũng phải đồng bộ lại ceremonyStore
+      // (cmd:show tra cứu qua đây, KHÔNG qua useControlStore) — xem syncCeremonyStoreForEvent.
+      syncCeremonyStoreForEvent(doc);
+    }
   });
 
   ipcMain.handle('kernel:event:getCurrentActive', async () => {
@@ -183,6 +271,10 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     // customVariables (mảng rỗng mặc định) → an toàn, resolveCustomVariables trả {} cho mọi field.
     const active = getEvent(ceremonyStore.getExecutor(), id);
     setCustomVariablesFromEvent(active?.customVariables ?? []);
+    // Bug chặn đường (2026-07-21) — cmd:show/cmd:next/cmd:prev/quét QR tra cứu ceremonyStore
+    // (server-side), KHÔNG phải useControlStore (client-side, chỉ để hiển thị dashboard) — nếu
+    // không đồng bộ ở đây, mọi thao tác "hiện lên sân khấu" âm thầm thất bại với Event mới.
+    syncCeremonyStoreForEvent(active);
   });
 
   ipcMain.handle('kernel:dataSource:list', async () => {
@@ -213,6 +305,126 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   ipcMain.handle('kernel:dataSource:saveFieldMappingProfile', async (_event, profile: FieldMappingProfile) => {
     saveFieldMappingProfile(ceremonyStore.getExecutor(), profile);
   });
+
+  // Import ZIP cho DataSource (PHỤ LỤC "Event Hub", 2026-07-22) — cấu trúc ZIP: records.json/
+  // records.csv (mảng phẳng THÔ, đi qua field-mapping giống CSV rời — KHÔNG map sẵn) + image/
+  // (tuỳ chọn) + voice/ (tuỳ chọn), file đặt tên theo giá trị naturalKeyField. Giải nén ở main
+  // process (adm-zip đã cài sẵn), KHÔNG giải nén ở renderer — tránh thêm dependency ZIP-in-
+  // browser + tránh phải chuyển buffer lớn qua IPC.
+  //
+  // 2 bước: pickZipFile (mở dialog, giải nén vào thư mục TẠM, đọc records → trả về giống
+  // ParsedSpreadsheet để renderer tái dùng NGUYÊN VẸN luồng field-mapping đã có) rồi
+  // confirmZipImport (SAU KHI renderer đã map cột xong, copy ảnh/voice theo đúng id đã chọn làm
+  // khoá tự nhiên, dọn thư mục tạm). Tách 2 bước vì lúc pickZipFile CHƯA biết naturalKeyField
+  // nào — renderer cần thấy trước danh sách cột để user tự chọn.
+  ipcMain.handle('kernel:dataSource:pickZipFile', async () => {
+    const win = getMainWindow();
+    if (!win) return null;
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Chọn file ZIP',
+      filters: [{ name: 'ZIP', extensions: ['zip'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || filePaths.length === 0) return null;
+
+    const zipPath = filePaths[0]!;
+    const stagingDir = join(tmpdir(), `sky-app-import-${randomUUID()}`);
+    try {
+      const zip = new AdmZip(zipPath);
+      zip.extractAllTo(stagingDir, true);
+    } catch (err) {
+      return { error: `File ZIP hỏng hoặc không đúng định dạng: ${err instanceof Error ? err.message : String(err)}` };
+    }
+
+    const recordsJsonPath = join(stagingDir, 'records.json');
+    const recordsCsvPath = join(stagingDir, 'records.csv');
+    let parsed: { columns: string[]; rows: Array<Record<string, string>> };
+    if (existsSync(recordsJsonPath)) {
+      try {
+        const raw = JSON.parse(readFileSync(recordsJsonPath, 'utf-8'));
+        if (!Array.isArray(raw)) throw new Error('records.json phải là mảng');
+        const rows: Array<Record<string, string>> = raw.map((r) => {
+          const obj: Record<string, string> = {};
+          for (const [k, v] of Object.entries(r ?? {})) obj[k] = v == null ? '' : String(v);
+          return obj;
+        });
+        const columnSet = new Set<string>();
+        for (const row of rows) for (const k of Object.keys(row)) columnSet.add(k);
+        parsed = { columns: [...columnSet], rows };
+      } catch (err) {
+        await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+        return { error: `records.json không hợp lệ: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    } else if (existsSync(recordsCsvPath)) {
+      parsed = parseCsvBuffer(readFileSync(recordsCsvPath, 'utf-8'));
+    } else {
+      await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+      return { error: 'ZIP thiếu file records.json hoặc records.csv ở thư mục gốc.' };
+    }
+
+    const hasImageDir = existsSync(join(stagingDir, 'image'));
+    const hasVoiceDir = existsSync(join(stagingDir, 'voice'));
+    return { stagingDir, columns: parsed.columns, rows: parsed.rows, hasImageDir, hasVoiceDir };
+  });
+
+  ipcMain.handle(
+    'kernel:dataSource:confirmZipImport',
+    async (
+      _event,
+      opts: { stagingDir: string; naturalKeyField: string; eventId: string; rows: Array<Record<string, string>> },
+    ) => {
+      const { stagingDir, naturalKeyField, eventId, rows } = opts;
+      let imagesCopied = 0;
+      let voicesCopied = 0;
+      const imageByKey: Record<string, string> = {};
+
+      const imageDir = join(stagingDir, 'image');
+      const voiceDir = join(stagingDir, 'voice');
+      const destImageDir = join(ceremonyDataDir(), 'image');
+
+      if (existsSync(imageDir)) {
+        await mkdir(destImageDir, { recursive: true });
+        const files = await readdir(imageDir);
+        const filesByBase = new Map(files.map((f) => [basename(f, extname(f)), f] as const));
+        for (const row of rows) {
+          const key = row[naturalKeyField];
+          if (!key) continue;
+          const file = filesByBase.get(key);
+          if (!file) continue;
+          await copyFile(join(imageDir, file), join(destImageDir, file));
+          imageByKey[key] = `image/${file}`;
+          imagesCopied += 1;
+        }
+      }
+
+      if (existsSync(voiceDir)) {
+        const batchDir = ttsPregenDir(eventId);
+        mkdirSync(batchDir, { recursive: true });
+        const manifestPath = ttsPregenManifestPath(eventId);
+        const manifest: { batch_id: string; config_hash: string; students: Record<string, unknown> } = existsSync(manifestPath)
+          ? JSON.parse(readFileSync(manifestPath, 'utf-8'))
+          : { batch_id: eventId, config_hash: '', students: {} };
+        const files = await readdir(voiceDir);
+        const filesByBase = new Map(files.map((f) => [basename(f, extname(f)), f] as const));
+        for (const row of rows) {
+          const key = row[naturalKeyField];
+          if (!key) continue;
+          const file = filesByBase.get(key);
+          if (!file) continue;
+          await copyFile(join(voiceDir, file), ttsPregenWavPath(eventId, key));
+          // Chỉ set đủ field để PreGenChip/PreGenPopover nhận diện "đã có sẵn, không cần tạo lại"
+          // (status='done') — các field khác (text/voice/duration_ms...) để trống vì file này
+          // KHÔNG qua TTS thật của app, không có thông tin đó.
+          manifest.students[key] = { status: 'done' };
+          voicesCopied += 1;
+        }
+        writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+      }
+
+      await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+      return { imagesCopied, voicesCopied, imageByKey };
+    },
+  );
 
   // AssetPort (packages/service-contracts/src/asset.ts) — chọn ảnh cho layout-designer, lưu
   // trong ceremony-data/assets/layout/ (thư mục con riêng, tránh trộn ảnh sinh viên nhập qua

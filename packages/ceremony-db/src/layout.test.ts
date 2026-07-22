@@ -11,6 +11,7 @@ import {
   publish,
   restoreVersion,
   saveDraft,
+  updateLayoutDocumentMeta,
 } from './queries/layout.js';
 import type { SqlExecutor } from './sql-executor.js';
 
@@ -52,6 +53,16 @@ describe('LayoutStore — versioning (layout_document/layout_draft/layout_versio
 
   it('layout chưa tồn tại → getLayoutDocument trả null', () => {
     expect(getLayoutDocument(executor, 'khong-ton-tai')).toBeNull();
+  });
+
+  it('layout mới tạo chưa có color (undefined) — updateLayoutDocumentMeta ghi màu, đọc lại đúng cả getLayoutDocument lẫn listLayoutDocuments', () => {
+    createLayoutDocument(executor, 'l1', 'Layout mẫu', contentV1());
+    expect(getLayoutDocument(executor, 'l1')!.color).toBeUndefined();
+
+    updateLayoutDocumentMeta(executor, 'l1', { color: '#ff0000' });
+
+    expect(getLayoutDocument(executor, 'l1')!.color).toBe('#ff0000');
+    expect(listLayoutDocuments(executor).find((d) => d.id === 'l1')?.color).toBe('#ff0000');
   });
 
   it('saveDraft KHÔNG tăng version, KHÔNG tạo version mới (Save ≠ Publish)', () => {

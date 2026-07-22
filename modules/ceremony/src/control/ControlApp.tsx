@@ -28,7 +28,6 @@ import { IdlePanel } from './components/IdlePanel';
 import { StudentPanels } from './components/StudentPanels';
 import { ModeSwitch } from './components/ModeSwitch';
 import { HallSelector } from './components/HallSelector';
-import { SyncPanel } from './components/SyncPanel';
 import { DisplayPicker } from './components/DisplayPicker';
 import { BackdropToggleCompact } from './components/BackdropToggle';
 import { StatusBar } from './components/StatusBar';
@@ -39,7 +38,6 @@ import { AboutModal } from './components/AboutModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { ConfirmModal } from './components/ui/ConfirmModal';
 import { showSuccessToast } from './lib/toast';
-import { IMPORT_WARN_SIZE, formatGB } from '@sky-app/slide-shared';
 
 /** Bỏ ký tự không phải chữ-số để khớp mã thẻ (CCCD đôi khi kèm khoảng trắng). */
 const normalizeCode = (s: string | null | undefined) => {
@@ -72,7 +70,7 @@ export interface ControlAppProps {
 export function ControlApp({ appId, platform, isActive = true }: ControlAppProps = {}) {
   const { t } = useTranslation();
   const {
-    setMeta, students, setPythonStatus, logsDrawerOpen,
+    setMeta, records, setPythonStatus, logsDrawerOpen,
     language, aboutModalOpen, setAboutModalOpen, openSettingsModal,
     resetConfirmOpen, setResetConfirmOpen, deleteModalOpen, setDeleteModalOpen,
     themeMode, themePalette, appFont, letterSpacing, appSpacing, shadowLevel,
@@ -138,24 +136,24 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
       const code = normalizeCode(rawCode);
       if (!code) return;
 
-      const student = students.find(
-        (s) =>
-          s.student_code === code ||
-          normalizeCode(s.identity_number) === code ||
-          normalizeCode(s.phone_number) === code ||
-          (s.card_code && normalizeCode(s.card_code) === code),
+      const record = records.find(
+        (r) =>
+          (r.identifierCode && normalizeCode(r.identifierCode) === code) ||
+          normalizeCode(r.id) === code ||
+          normalizeCode(r.identityNumber) === code ||
+          normalizeCode(r.phone) === code,
       );
 
-      if (!student) {
+      if (!record) {
         showErrorToast(t('controlApp.studentNotFound', { code }));
         playErrorBeep();
         return;
       }
 
-      showSuccessToast(t('controlApp.studentAdded', { name: student.full_name }));
-      socketRef.current?.emit('scan:qr', { student_code: student.student_code });
+      showSuccessToast(t('controlApp.studentAdded', { name: record.full_name }));
+      socketRef.current?.emit('scan:qr', { id: record.id });
     },
-    [socketRef, students, t],
+    [socketRef, records, t],
   );
 
   const slideForPython = useSlide('tts-python-status');
@@ -205,7 +203,7 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
     getMeta?.then((raw) => {
       const meta = raw as {
         ceremony: unknown;
-        students: unknown;
+        records: unknown;
         syncedAt: string | null;
         config?: { ws_port?: number; mode?: string; delay_seconds?: number; idle_timeout_enabled?: boolean; idle_timeout_seconds?: number } | null;
         apiEnvironment?: string;
@@ -213,7 +211,7 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
       console.log('[ControlApp] Got meta, ws_port:', meta.config?.ws_port);
       setMeta({
         ceremony: meta.ceremony as Parameters<typeof setMeta>[0]['ceremony'],
-        students: meta.students as Parameters<typeof setMeta>[0]['students'],
+        records: meta.records as Parameters<typeof setMeta>[0]['records'],
         syncedAt: meta.syncedAt ?? null,
         wsPort: meta.config?.ws_port ?? 8765,
         mode: (meta.config?.mode as Parameters<typeof setMeta>[0]['mode']) ?? 'manual',
@@ -231,7 +229,6 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
   }, [setMeta, platform, slideForMeta]);
 
   const slideForLanguage = useSlide('app-language');
-  const slideForImportExport = useSlide('data-import-export');
   const slideForMenu = useSlide('native-menu');
   const slideForReset = useSlide('data-reset');
 
@@ -239,67 +236,6 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
   useEffect(() => {
     slideForLanguage?.setAppLanguage(language);
   }, [language, slideForLanguage]);
-
-  const handleImportZip = useCallback(async () => {
-    const slide = slideForImportExport;
-    if (!slide) return;
-    const zipPath = await slide.openBundleFile();
-    if (!zipPath) return;
-    // Cảnh báo file nặng — nhất quán với SyncPanel.
-    const { size } = await slide.statBundleFile(zipPath);
-    if (size >= IMPORT_WARN_SIZE) {
-      if (!window.confirm(t('debugMenu.largeFileConfirm', { size: formatGB(size) }))) return;
-    }
-    try {
-      showSuccessToast(t('debugMenu.checkingData'));
-      const result = await slide.syncData({ zipPath });
-
-      // Import 2 pha: verify xong → hỏi xác nhận trước khi ghi đè.
-      if (result.pendingConfirm) {
-        const p = result.pendingConfirm;
-        const ok = window.confirm(
-          p.invalid.length > 0
-            ? t('debugMenu.importConfirmWithErrors', { valid: p.valid, invalid: p.invalid.length, total: p.total })
-            : t('debugMenu.importConfirm', { valid: p.valid, total: p.total })
-        );
-        if (!ok) { await slide.cancelImport(); return; }
-        const committed = await slide.confirmImport();
-        if (committed.ok) {
-          showSuccessToast(t('debugMenu.importSuccess'));
-          setTimeout(() => window.location.reload(), 1000);
-        } else {
-          alert(t('debugMenu.importError', { message: committed.message }));
-        }
-        return;
-      }
-
-      if (result.ok) {
-        showSuccessToast(t('debugMenu.importSuccess'));
-        setTimeout(() => window.location.reload(), 1000);
-      } else {
-        alert(t('debugMenu.importError', { message: result.message }));
-      }
-    } catch (err) {
-      alert(t('debugMenu.genericError', { message: err instanceof Error ? err.message : String(err) }));
-    }
-  }, [t, slideForImportExport]);
-
-  const handleExportZip = useCallback(async () => {
-    const slide = slideForImportExport;
-    if (!slide) return;
-    try {
-      const result = await slide.exportData();
-      if (result.ok) {
-        showSuccessToast(t('debugMenu.exportSuccess'));
-      } else {
-        if (result.message !== 'Đã hủy xuất file') {
-          alert(t('debugMenu.exportError', { message: result.message }));
-        }
-      }
-    } catch (err) {
-      alert(t('debugMenu.genericError', { message: err instanceof Error ? err.message : String(err) }));
-    }
-  }, [t, slideForImportExport]);
 
   // Xử lý action từ menu — dùng chung cho cả 2 nguồn dispatch:
   // 1. window.slide.onMenuAction (Electron native OS menu, kênh cũ — guard qua slideForMenu).
@@ -330,12 +266,6 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
       case 'settings:backup':
         openSettingsModal('backup');
         break;
-      case 'data:import':
-        handleImportZip();
-        break;
-      case 'data:export':
-        handleExportZip();
-        break;
       case 'data:reset:qr':
         setDeleteModalOpen('scans');
         break;
@@ -344,9 +274,6 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
         break;
       case 'data:reset:cache':
         setDeleteModalOpen('cache');
-        break;
-      case 'develop:sampleData':
-        slideForMenu?.getUseSampleData().then((val) => slideForMenu.setUseSampleData(!val).then(() => window.location.reload()));
         break;
       case 'develop:apiTest':
         openSettingsModal('api');
@@ -359,7 +286,7 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
         if (activeEvent) setConfirmExitEvent(true);
         break;
     }
-  }, [isActive, activeEvent, handleImportZip, handleExportZip, openSettingsModal, setAboutModalOpen, setDeleteModalOpen, slideForMenu]);
+  }, [isActive, activeEvent, openSettingsModal, setAboutModalOpen, setDeleteModalOpen]);
 
   useEffect(() => {
     const unsub = slideForMenu?.onMenuAction(handleMenuAction);
@@ -461,7 +388,6 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
                 <NowOnStage progress={smoothProgress} />
                 <PreviewPanel />
                 <IdlePanel />
-                <SyncPanel />
                 <DisplayPicker />
               </div>
             </div>

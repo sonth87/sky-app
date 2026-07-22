@@ -25,6 +25,15 @@ export function createWebLayoutPort(baseUrl = 'http://localhost:8094'): LayoutPo
       if (!res.ok) throw new Error(`LayoutPort createDocument failed: ${res.status}`);
     },
 
+    async updateDocumentMeta(id, patch) {
+      const res = await fetch(`${baseUrl}/api/layout/${id}/meta`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error(`LayoutPort updateDocumentMeta failed: ${res.status}`);
+    },
+
     async saveDraft(id, content) {
       const res = await fetch(`${baseUrl}/api/layout/${id}/draft`, {
         method: 'POST',

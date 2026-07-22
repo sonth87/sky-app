@@ -6,38 +6,25 @@ import {
   type BackdropAspectRatio,
   type BackdropTemplateMap,
   type Ceremony,
-  type Student,
+  type CanonicalRecord,
+  type RecordWithRuntimeState,
+  flattenCanonicalRecord,
+  canonicalToStudent,
 } from '@sky-app/slide-shared';
 import { createSocket, type SlideSocket } from '../lib/socket';
 import { resolveAsset } from '../lib/assets';
 import { playPcm, stopPcm } from './lib/tts';
 import { renderTemplate } from '../lib/renderTemplate';
 
-function getVoiceForStudent(
-  student: Student,
+function getVoiceForRecord(
+  record: CanonicalRecord,
   conditions: Array<{ attr: string; val: string; voice: string }>,
   fallbackVoice: string,
 ): string {
+  const flat = flattenCanonicalRecord(record);
   for (const cond of conditions) {
-    let studentVal = '';
-    const attr = cond.attr;
-    if (attr === 'Giới tính') {
-      studentVal = student.gender || '';
-    } else if (attr === 'Xếp loại') {
-      studentVal = student.classification || '';
-    } else if (attr === 'Ngành') {
-      studentVal = student.major_name || '';
-    } else if (attr === 'Khoa') {
-      studentVal = student.faculty_name || '';
-    } else if (attr === 'Lớp') {
-      studentVal = student.class_code || '';
-    } else if (attr === 'Khóa') {
-      studentVal = student.course_code || '';
-    } else if (attr === 'Họ tên') {
-      studentVal = student.full_name || '';
-    }
-
-    if (studentVal.trim().toLowerCase() === cond.val.trim().toLowerCase()) {
+    const recordVal = flat[cond.attr] ?? '';
+    if (recordVal.trim().toLowerCase() === cond.val.trim().toLowerCase()) {
       return cond.voice;
     }
   }
@@ -429,7 +416,14 @@ export function BackdropApp() {
   const [layouts, setLayouts] = useState<BackdropTemplateMap | null>(null);
   const [layoutOverrides, setLayoutOverrides] = useState<Record<string, any>>({});
   const [backdropAspectRatio, setBackdropAspectRatio] = useState<BackdropAspectRatio>('16:9');
-  const [onStage, setOnStage] = useState<Student | null>(null);
+  // Giai đoạn "bỏ Student" (2026-07-22): socket giờ gửi RecordWithRuntimeState — giữ nguyên
+  // shape này trong state, chỉ convert sang Student (qua canonicalToStudent) ngay trước khi
+  // truyền vào <BackdropView> bên dưới. BackdropView/DynamicBackdropView là hệ template CŨ
+  // (trước layout-designer) — theo roadmap (13-ceremony-mo-rong.md), sẽ được thay bằng
+  // LayoutRenderer ở 1 giai đoạn RIÊNG sau này (cần viết applyFieldMap + nối Event active vào
+  // backdrop, khối lượng lớn, không làm chung đợt bỏ Student). canonicalToStudent là cầu nối 1
+  // CHIỀU CHỈ dùng ở đây — KHÔNG dùng lại nơi khác trong app.
+  const [onStage, setOnStage] = useState<RecordWithRuntimeState | null>(null);
   const socketRef = useRef<SlideSocket | null>(null);
   const confettiEnabledRef = useRef(true);
   const confettiRepeatRef = useRef(true);
@@ -1076,13 +1070,14 @@ export function BackdropApp() {
         }, intervalMs);
       };
 
-      const handleStudent = (student: Student | null, withConfetti: boolean) => {
-        setOnStage(student);
+      const handleStudent = (data: RecordWithRuntimeState | null, withConfetti: boolean) => {
+        setOnStage(data);
+        const record = data?.record ?? null;
 
-        const isNewStudent = student?.student_code !== lastConfettiCode.current;
+        const isNewStudent = record?.id !== lastConfettiCode.current;
         console.log(
           '[Backdrop] handleStudent:',
-          student?.student_code,
+          record?.id,
           'withConfetti:',
           withConfetti,
           'isNewStudent:',
@@ -1099,12 +1094,12 @@ export function BackdropApp() {
           ribbonsRef.current = [];
         }
 
-        if (!student) {
+        if (!record) {
           stopPcm();
           lastTtsTargetCodeRef.current = null;
         }
 
-        if (student && isNewStudent) {
+        if (record && isNewStudent) {
           if (confettiEnabledRef.current) {
             // Bắn ngay đợt đầu tiên sau 300ms
             setTimeout(() => {
@@ -1138,22 +1133,22 @@ export function BackdropApp() {
           }
 
           if (ttsEnabledRef.current) {
-            const code = student.student_code;
+            const code = record.id;
             lastTtsTargetCodeRef.current = code;
 
             const speed = ttsSpeedRef.current ?? 1.0;
             const fallbackModel = ttsModelRef.current || 'vieneu-NF';
-            const model = getVoiceForStudent(student, ttsConditionsRef.current, fallbackModel);
+            const model = getVoiceForRecord(record, ttsConditionsRef.current, fallbackModel);
             const playMode = ttsPlayModeRef.current;
 
             // Build text từ template hoặc fallback sang prefix + tên
             const template = ttsTemplateRef.current;
             let textToSpeak: string;
             if (template) {
-              textToSpeak = renderTemplate(template, student, customVariablesRef.current);
+              textToSpeak = renderTemplate(template, record, customVariablesRef.current);
             } else {
               const prefix = (ttsSentencePrefixRef.current || '').trim();
-              const fullName = student.full_name?.trim() || '';
+              const fullName = record.full_name?.trim() || '';
               if (prefix) {
                 const separator = /[.,!?;]$/.test(prefix) ? ' ' : ', ';
                 textToSpeak = `${prefix}${separator}${fullName}`;
@@ -1224,11 +1219,11 @@ export function BackdropApp() {
             }
           }
         }
-        lastConfettiCode.current = student?.student_code ?? null;
+        lastConfettiCode.current = record?.id ?? null;
       };
 
       socket.on('state:full', ({ onStage }) => handleStudent(onStage, false));
-      socket.on('state:onStage', ({ student }) => handleStudent(student, true));
+      socket.on('state:onStage', ({ data }) => handleStudent(data, true));
       socket.on('event:confetti', ({ enabled }) => {
         confettiEnabledRef.current = enabled;
       });
@@ -1332,7 +1327,9 @@ export function BackdropApp() {
     };
   }, []);
 
-  const key = useMemo(() => onStage?.student_code ?? 'idle', [onStage]);
+  const key = useMemo(() => onStage?.record.id ?? 'idle', [onStage]);
+  // Adapter TẠM cho BackdropView (hệ template cũ) — xem comment ở khai báo state onStage phía trên.
+  const onStageStudent = useMemo(() => (onStage ? canonicalToStudent(onStage.record, 0) : null), [onStage]);
 
   if (!ceremony) {
     return (
@@ -1366,7 +1363,7 @@ export function BackdropApp() {
           className="h-full w-full"
         >
           <BackdropView
-            student={onStage}
+            student={onStageStudent}
             ceremony={ceremony}
             layouts={layouts}
             layoutOverrides={layoutOverrides}

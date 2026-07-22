@@ -44,7 +44,7 @@ export function useSocket() {
     setBackdropAspectRatio,
     setAwardLocationCode,
     setIdleTimer,
-    patchStudentLocal,
+    patchRuntimeStateLocal,
     markUnplayed,
   } = useControlStore();
 
@@ -66,31 +66,31 @@ export function useSocket() {
       setOnStage(onStage);
       setPending(pending);
       setMode(session.mode);
-      // Đồng bộ status trong danh sách local theo SV đang on_stage/pending
-      if (onStage) patchStudentLocal(onStage.student_code, { status: onStage.status });
-      if (pending) patchStudentLocal(pending.student_code, { status: pending.status });
+      // Đồng bộ status trong danh sách local theo record đang on_stage/pending
+      if (onStage) patchRuntimeStateLocal(onStage.record.id, onStage.runtimeState);
+      if (pending) patchRuntimeStateLocal(pending.record.id, pending.runtimeState);
     });
-    socket.on('state:onStage', ({ student }) => {
-      setOnStage(student);
-      if (student) patchStudentLocal(student.student_code, { status: student.status });
+    socket.on('state:onStage', ({ data }) => {
+      setOnStage(data);
+      if (data) patchRuntimeStateLocal(data.record.id, data.runtimeState);
     });
-    socket.on('state:pending', ({ student }) => {
-      setPending(student);
-      if (student) patchStudentLocal(student.student_code, { status: student.status });
+    socket.on('state:pending', ({ data }) => {
+      setPending(data);
+      if (data) patchRuntimeStateLocal(data.record.id, data.runtimeState);
     });
-    socket.on('event:scanned', ({ student, ts }) => {
-      console.log('[Socket] Received event:scanned:', student.student_code);
-      setLastScan({ student, ts });
-      // Nếu SV đã có trong scanLog (quét lại): reset trạng thái "đã play" để UI hiển
-      // thị SV này có thể play lại (cả auto lẫn manual mode).
+    socket.on('event:scanned', ({ data, ts }) => {
+      console.log('[Socket] Received event:scanned:', data.record.id);
+      setLastScan({ record: data.record, runtimeState: data.runtimeState, ts });
+      // Nếu record đã có trong scanLog (quét lại): reset trạng thái "đã play" để UI hiển
+      // thị record này có thể play lại (cả auto lẫn manual mode).
       const currentLog = useControlStore.getState().scanLog;
       const alreadyInLog = currentLog.some(
-        (x) => x.student.student_code === student.student_code,
+        (x) => x.record.id === data.record.id,
       );
       if (alreadyInLog) {
-        markUnplayed(student.student_code);
+        markUnplayed(data.record.id);
       }
-      pushScan({ student, ts });
+      pushScan({ record: data.record, runtimeState: data.runtimeState, ts });
       playScanBeep();
     });
     socket.on('event:mode', ({ mode }) => setMode(mode));

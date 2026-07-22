@@ -95,3 +95,20 @@ export function resolveCanonicalField(record: HasCanonicalFields, key: string): 
   if (extraVal == null) return undefined;
   return String(extraVal);
 }
+
+/** Merge field core + extra thành object phẳng string — dùng cho renderTemplate/
+ * resolveCustomVariables/api-logger's template context (giai đoạn "bỏ Student", 2026-07-22).
+ * `id` không đưa vào (không phải field nội dung, tránh nhầm với field thật cùng tên trong extra
+ * nếu có) — field core khác (full_name/status/identifierCode...) LUÔN thắng nếu trùng tên với
+ * extra (thứ tự spread: extra trước, core sau). */
+export function flattenCanonicalRecord(record: HasCanonicalFields): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(record.extra)) {
+    out[k] = String(v);
+  }
+  for (const [key, accessor] of Object.entries(CORE_FIELD_ACCESSORS)) {
+    const val = accessor(record);
+    if (val != null) out[key] = val;
+  }
+  return out;
+}

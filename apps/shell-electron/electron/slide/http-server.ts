@@ -28,7 +28,7 @@ export function startHttpServer(port: number): Promise<void> {
         res.status(404).json({ ok: false, code: result.code });
         return;
       }
-      res.json({ ok: true, student: result.student });
+      res.json({ ok: true, record: result.record });
     });
 
     server = appHttp.listen(port, () => resolve());

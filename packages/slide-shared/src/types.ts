@@ -88,7 +88,10 @@ export type VarRuleOp = 'equals' | 'contains' | 'in' | 'gt' | 'lt' | 'gte' | 'lt
 /** Một rule trong biến điều kiện: "Nếu [attr] [op] [val] → [result]" */
 export interface CustomVariableRule {
   id: string | number;
-  attr: string;   // "Ngành" | "Khoa" | "Giới tính" | "Xếp loại" | "Lớp" | "Khóa" | "Họ tên" | "GPA"
+  /** Tên field TỰ DO (giai đoạn "bỏ Student", 2026-07-22) — người dùng gõ tay hoặc chọn từ gợi ý
+   * (FieldMappingProfile.map's keys), KHÔNG còn 8 nhãn tiếng Việt cố định. Đối chiếu với field
+   * core (identifierCode/phone/...) hoặc extra của CanonicalRecord qua resolveCustomVariables. */
+  attr: string;
   op: VarRuleOp;
   val: string;    // với op 'in': các giá trị phân tách bằng dấu phẩy
   result: string; // text kết quả, vd "Kỹ sư"
@@ -140,27 +143,16 @@ export interface ApiIntegration {
   payload: string;
 }
 
-/** Trạng thái phiên hiện tại */
+/** Trạng thái phiên hiện tại — khoá theo CanonicalRecord.id (giai đoạn "bỏ Student", 2026-07-22;
+ * trước đây khoá theo student_code, đổi tên field để tránh nhầm lẫn với khái niệm cũ). */
 export interface SessionState {
-  current_on_stage_msv: string | null; // student_code của SV đang hiển thị
-  pending_msv: string | null;
+  current_on_stage_id: string | null; // id của record đang hiển thị
+  pending_id: string | null;
   mode: OperatingMode;
-  last_scan_msv: string | null;
+  last_scan_id: string | null;
   last_scan_ts: string | null;
   broadcast_count: number;
   sync_queue: string[];
-}
-
-/** Toàn bộ dữ liệu một đợt — cấu trúc bundle.json */
-export interface CeremonyBundle {
-  room_id: string;
-  room_name: string;
-  ceremony: Ceremony;
-  config: AppConfig;
-  students: Student[];
-  session_state: SessionState;
-  _synced_at?: string;
-  _bundle_version?: string;
 }
 
 // ---- Backdrop template types ----

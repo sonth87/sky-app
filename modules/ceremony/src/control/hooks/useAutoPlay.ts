@@ -17,7 +17,7 @@ export function useAutoPlay() {
   const slide = useSlide('autoplay-persistence');
   const socket = useSocketRef();
   const { scrollTo } = useScrollContext();
-  const { autoPlay, setAutoPlay, scanLog, students, mode } = useControlStore();
+  const { autoPlay, setAutoPlay, scanLog, records, mode } = useControlStore();
   const { isPlaying, delaySeconds, currentCode } = autoPlay;
 
   const [countdown, setCountdown] = useState(delaySeconds);
@@ -27,8 +27,8 @@ export function useAutoPlay() {
   stateRef.current = autoPlay;
   const scanLogRef = useRef(scanLog);
   scanLogRef.current = scanLog;
-  const studentsRef = useRef(students);
-  studentsRef.current = students;
+  const recordsRef = useRef(records);
+  recordsRef.current = records;
 
   // Chặn effect persist ghi đè file trước khi load từ đĩa xong (tránh reset delaySeconds
   // về giá trị mặc định của store nếu app bị tắt sớm ngay sau khi mount).
@@ -37,7 +37,7 @@ export function useAutoPlay() {
   // Persist mỗi khi state thay đổi
   useEffect(() => {
     if (!loadedRef.current || !slide) return;
-    const scannedCodes = scanLogRef.current.map((e) => e.student.student_code);
+    const scannedCodes = scanLogRef.current.map((e) => e.record.id);
     slide.saveAutoPlay({
       scannedCodes,
       playedCodes: autoPlay.playedCodes,
@@ -57,13 +57,16 @@ export function useAutoPlay() {
         loadedRef.current = true;
         return;
       }
-      // Restore scanLog từ đĩa: tìm student từ studentsRef, quét lại theo thứ tự
-      const students = studentsRef.current;
-      const byCode = new Map(students.map((s) => [s.student_code, s]));
-      (saved.scannedCodes ?? []).forEach((code: string) => {
-        const student = byCode.get(code);
-        if (student) {
-          useControlStore.getState().pushScan({ student, ts: new Date().toISOString() });
+      // Restore scanLog từ đĩa: tìm record từ recordsRef, quét lại theo thứ tự
+      const byId = new Map(recordsRef.current.map((r) => [r.id, r]));
+      (saved.scannedCodes ?? []).forEach((id: string) => {
+        const record = byId.get(id);
+        if (record) {
+          useControlStore.getState().pushScan({
+            record,
+            runtimeState: useControlStore.getState().runtimeStates[id] ?? { status: 'registered' },
+            ts: new Date().toISOString(),
+          });
         }
       });
       setAutoPlay({
@@ -77,16 +80,16 @@ export function useAutoPlay() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Danh sách SV theo thứ tự hiển thị trong bảng scanned (cũ → mới) */
+  /** Danh sách id theo thứ tự hiển thị trong bảng scanned (cũ → mới) */
   const getScanQueue = useCallback((): string[] => {
-    const byCode = new Map(studentsRef.current.map((s) => [s.student_code, s]));
+    const byId = new Map(recordsRef.current.map((r) => [r.id, r]));
     const seen = new Set<string>();
     const result: string[] = [];
     for (let i = scanLogRef.current.length - 1; i >= 0; i--) {
-      const code = scanLogRef.current[i].student.student_code;
-      if (!seen.has(code) && byCode.has(code)) {
-        seen.add(code);
-        result.push(code);
+      const id = scanLogRef.current[i].record.id;
+      if (!seen.has(id) && byId.has(id)) {
+        seen.add(id);
+        result.push(id);
       }
     }
     return result;
@@ -100,7 +103,7 @@ export function useAutoPlay() {
   }, [getScanQueue]);
 
   const playCode = useCallback((code: string) => {
-    socket.current?.emit('cmd:show', { student_code: code, source: 'auto' });
+    socket.current?.emit('cmd:show', { id: code, source: 'auto' });
     setAutoPlay({ currentCode: code });
     setTimeout(() => scrollTo('scanned', code), 50);
   }, [socket, setAutoPlay, scrollTo]);
@@ -111,7 +114,7 @@ export function useAutoPlay() {
     const next = getNextUnplayed(newPlayed, null);
     if (next) {
       setAutoPlay({ playedCodes: newPlayed, currentCode: next });
-      socket.current?.emit('cmd:show', { student_code: next, source: 'auto' });
+      socket.current?.emit('cmd:show', { id: next, source: 'auto' });
       setTimeout(() => scrollTo('scanned', next), 50);
     } else {
       setAutoPlay({ playedCodes: newPlayed, currentCode: null, isPlaying: false });

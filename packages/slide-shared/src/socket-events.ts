@@ -7,30 +7,32 @@
  *
  * Xem DESIGN.md §6 (Giao thức Socket).
  */
-import type { BackdropAspectRatio, CustomVariable, OperatingMode, OnStageSource, SessionState, Student, StudentStatus, TtsCondition } from './types.js';
+import type { BackdropAspectRatio, CustomVariable, OperatingMode, OnStageSource, SessionState, TtsCondition } from './types.js';
+import type { CanonicalRecord } from './layout/canonical.js';
+import type { RecordRuntimeState } from './layout/event.js';
 
 /** Sự kiện Client -> Server (lệnh điều khiển) */
 export interface ClientToServerEvents {
-  /** Hiển thị SV lên backdrop (chuyển status -> on_stage) */
-  'cmd:show': (payload: { student_code: string; source: Exclude<OnStageSource, null> }) => void;
-  /** Ẩn SV, backdrop về Idle (status SV hiện tại -> returned) */
+  /** Hiển thị record lên backdrop (chuyển status -> on_stage) */
+  'cmd:show': (payload: { id: string; source: Exclude<OnStageSource, null> }) => void;
+  /** Ẩn record, backdrop về Idle (status record hiện tại -> returned) */
   'cmd:clear': () => void;
-  /** Hiển thị SV kế tiếp theo stt */
+  /** Hiển thị record kế tiếp theo displayOrder */
   'cmd:next': () => void;
-  /** Hiển thị SV trước đó theo stt */
+  /** Hiển thị record trước đó theo displayOrder */
   'cmd:prev': () => void;
-  /** Đưa SV vào "pending" (chờ Play), KHÔNG lên backdrop */
-  'cmd:preview': (payload: { student_code: string }) => void;
-  /** Xác nhận SV vừa quét -> tùy mode mà show hoặc đưa vào pending */
-  'cmd:confirmScan': (payload: { student_code: string }) => void;
+  /** Đưa record vào "pending" (chờ Play), KHÔNG lên backdrop */
+  'cmd:preview': (payload: { id: string }) => void;
+  /** Xác nhận record vừa quét -> tùy mode mà show hoặc đưa vào pending */
+  'cmd:confirmScan': (payload: { id: string }) => void;
   /** Đổi chế độ vận hành */
   'cmd:setMode': (payload: { mode: OperatingMode }) => void;
   /** Đổi hội trường đang trao bằng (0 - Quảng trường, 1 - HTL-GD1, 2 - HT1-GD2, 3 - HT2-GD2) */
   'cmd:setAwardLocation': (payload: { code: number }) => void;
   /** Sửa trạng thái thủ công (sửa nhầm) */
-  'cmd:setStatus': (payload: { student_code: string; status: StudentStatus }) => void;
-  /** App quét QR (hoặc client) đẩy MSSV vừa quét vào hệ thống */
-  'scan:qr': (payload: { student_code: string }) => void;
+  'cmd:setStatus': (payload: { id: string; status: RecordRuntimeState['status'] }) => void;
+  /** App quét QR (hoặc client) đẩy id vừa quét vào hệ thống */
+  'scan:qr': (payload: { id: string }) => void;
   /** Bật/tắt hiệu ứng confetti khi chuyển slide (đồng bộ tới Backdrop) */
   'cmd:setConfetti': (payload: { enabled: boolean }) => void;
   /** Bật/tắt lặp lại confetti (đồng bộ tới Backdrop) */
@@ -85,27 +87,35 @@ export interface ClientToServerEvents {
   'state:request': () => void;
 }
 
+/** 1 record kèm trạng thái vận hành hiện tại — dùng cho payload onStage/pending/scanned
+ * (giai đoạn "bỏ Student", 2026-07-22: record TĨNH + runtimeState tách riêng, xem
+ * RecordRuntimeState ở layout/event.ts). */
+export interface RecordWithRuntimeState {
+  record: CanonicalRecord;
+  runtimeState: RecordRuntimeState;
+}
+
 /** Snapshot toàn bộ state hiện tại (gửi khi connect hoặc thay đổi lớn) */
 export interface FullStatePayload {
   session: SessionState;
-  onStage: Student | null;
-  pending: Student | null;
+  onStage: RecordWithRuntimeState | null;
+  pending: RecordWithRuntimeState | null;
 }
 
 /** Sự kiện Server -> Client (broadcast) */
 export interface ServerToClientEvents {
   /** Toàn bộ state hiện tại */
   'state:full': (payload: FullStatePayload) => void;
-  /** SV đang hiển thị thay đổi (Backdrop render theo đây) */
-  'state:onStage': (payload: { student: Student | null }) => void;
-  /** SV đang chờ ở hộp quét thay đổi (Control hiển thị) */
-  'state:pending': (payload: { student: Student | null }) => void;
+  /** record đang hiển thị thay đổi (Backdrop render theo đây) */
+  'state:onStage': (payload: { data: RecordWithRuntimeState | null }) => void;
+  /** record đang chờ ở hộp quét thay đổi (Control hiển thị) */
+  'state:pending': (payload: { data: RecordWithRuntimeState | null }) => void;
   /** Event (đợt lễ) active vừa đổi qua EventPort.setActive() — Control tự nạp lại data theo
    * Event mới, Backdrop tự về Idle (id cũ thuộc DataSource khác, vô nghĩa với Event mới —
    * docs/roadmap/plans/layout-designer/13-ceremony-mo-rong.md §"setActive giữa lễ"). */
   'state:activeEventChanged': (payload: { eventId: string }) => void;
   /** Có QR vừa được quét (Control bật âm thanh / nhấp nháy hộp quét) */
-  'event:scanned': (payload: { student: Student; ts: string }) => void;
+  'event:scanned': (payload: { data: RecordWithRuntimeState; ts: string }) => void;
   /** Mode thay đổi */
   'event:mode': (payload: { mode: OperatingMode }) => void;
   /** Hội trường đang trao bằng thay đổi */

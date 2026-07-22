@@ -80,7 +80,7 @@ describe('useEventStore — checkGate', () => {
     // set({activeEvent}) suông, KHÔNG gọi getRecords()/setMeta() như activateEvent() — dashboard
     // hiện thẳng lên với students là bất cứ gì còn sót từ luồng getMeta() cũ (đọc ceremony.db,
     // không liên quan DataSource của Event), không phải data thật.
-    useControlStore.setState({ students: [{ student_code: 'OLD', full_name: 'Data cũ còn sót' }] as never });
+    useControlStore.setState({ records: [{ id: 'OLD', full_name: 'Data cũ còn sót', subjectType: 'student', extra: {} }] as never });
     const active = eventDoc({ dataSourceId: 'ds1' });
     const records: CanonicalSubject[] = [{ id: 'r1', full_name: 'Nguyễn Văn A', subjectType: 'student', extra: {} }];
     const eventPort = mockEventPort({ getCurrentActive: vi.fn().mockResolvedValue(active) });
@@ -89,9 +89,9 @@ describe('useEventStore — checkGate', () => {
     await useEventStore.getState().checkGate(eventPort, dataSourcePort);
 
     expect(dataSourcePort.getRecords).toHaveBeenCalledWith('ds1', { excludeConsumedForEvent: 'ev1' });
-    const students = useControlStore.getState().students as Array<{ full_name: string }>;
-    expect(students).toHaveLength(1);
-    expect(students[0].full_name).toBe('Nguyễn Văn A');
+    const gotRecords = useControlStore.getState().records as Array<{ full_name: string }>;
+    expect(gotRecords).toHaveLength(1);
+    expect(gotRecords[0].full_name).toBe('Nguyễn Văn A');
   });
 
   it('getCurrentActive() throw (mất kết nối IPC/network) → loading VẪN về false (không treo màn "đang tải" vĩnh viễn), lỗi propagate lên caller', async () => {
@@ -185,7 +185,7 @@ describe('useEventStore — activateEvent', () => {
     expect(localStorage.getItem('ceremony-event-exited-gate')).toBeNull();
   });
 
-  it('gọi setActive rồi get, set activeEvent đúng, gọi setMeta của useControlStore với students rỗng khi không có dataSourceId', async () => {
+  it('gọi setActive rồi get, set activeEvent đúng, gọi setMeta của useControlStore với records rỗng khi không có dataSourceId', async () => {
     const setMetaSpy = vi.spyOn(useControlStore.getState(), 'setMeta');
     const doc = eventDoc({ dataSourceId: undefined });
     const port = mockEventPort({ setActive: vi.fn().mockResolvedValue(undefined), get: vi.fn().mockResolvedValue(doc) });
@@ -194,10 +194,10 @@ describe('useEventStore — activateEvent', () => {
 
     expect(port.setActive).toHaveBeenCalledWith('ev1');
     expect(useEventStore.getState().activeEvent?.id).toBe('ev1');
-    expect(setMetaSpy).toHaveBeenCalledWith(expect.objectContaining({ students: [] }));
+    expect(setMetaSpy).toHaveBeenCalledWith(expect.objectContaining({ records: [] }));
   });
 
-  it('có dataSourceId → gọi DataSourcePort.getRecords với excludeConsumedForEvent, map Canonical→Student vào setMeta', async () => {
+  it('có dataSourceId → gọi DataSourcePort.getRecords với excludeConsumedForEvent, đưa CanonicalRecord[] thẳng vào setMeta', async () => {
     const records: CanonicalSubject[] = [{ id: 'r1', full_name: 'A', subjectType: 'student', extra: {} }];
     const doc = eventDoc({ dataSourceId: 'ds1' });
     const eventPort = mockEventPort({ setActive: vi.fn().mockResolvedValue(undefined), get: vi.fn().mockResolvedValue(doc) });
@@ -208,7 +208,7 @@ describe('useEventStore — activateEvent', () => {
 
     expect(dataSourcePort.getRecords).toHaveBeenCalledWith('ds1', { excludeConsumedForEvent: 'ev1' });
     expect(setMetaSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ students: expect.arrayContaining([expect.objectContaining({ id: 'r1', full_name: 'A' })]) }),
+      expect.objectContaining({ records: expect.arrayContaining([expect.objectContaining({ id: 'r1', full_name: 'A' })]) }),
     );
   });
 

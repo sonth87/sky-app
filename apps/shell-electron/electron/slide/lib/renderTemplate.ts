@@ -1,7 +1,6 @@
 // SYNC: keep identical to src/lib/renderTemplate.ts
-import type { Student, CustomVariable } from '@sky-app/slide-shared';
-import { resolveTokens } from '@sky-app/slide-shared';
-import { resolveCustomVariables } from './customVariables';
+import type { CanonicalRecord, CustomVariable } from '@sky-app/slide-shared';
+import { resolveTokens, resolveCustomVariables, flattenCanonicalRecord } from '@sky-app/slide-shared';
 
 // Title-case chỉ khi chuỗi TOÀN HOA (vd: "NGUYỄN THANH HẢI" → "Nguyễn Thanh Hải").
 // Chuỗi đã mixed-case ("Ngôn ngữ Anh", "Xuất sắc") giữ nguyên.
@@ -14,14 +13,15 @@ function titleCaseIfAllCaps(str: string): string {
 
 export function renderTemplate(
   template: string,
-  student: Student,
+  record: CanonicalRecord,
   customVars: CustomVariable[] = []
 ): string {
-  const resolved = resolveCustomVariables(student, customVars);
+  const flat = flattenCanonicalRecord(record);
+  const resolved = resolveCustomVariables(flat, customVars);
   return resolveTokens(template, (key) => {
-    // Biến điều kiện tùy chỉnh ưu tiên hơn field gốc của Student
+    // Biến điều kiện tùy chỉnh ưu tiên hơn field gốc của record
     if (key in resolved) return resolved[key];
-    const val = (student as unknown as Record<string, unknown>)[key];
+    const val = flat[key];
     if (val == null || val === '') return '';
     return titleCaseIfAllCaps(String(val));
   });

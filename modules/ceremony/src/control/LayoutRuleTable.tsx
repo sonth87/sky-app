@@ -179,8 +179,10 @@ const DEMO_RECORD = demoCanonicalSubject();
 
 /** Hiện thumbnail+tên layout ĐÃ chọn thay vì nút text vô nghĩa (bug UX thật, 2026-07-20 — sau
  * khi chọn xong không có dấu hiệu gì cho biết đã chọn cái gì, trông ra sao). Bấm vào chính
- * thumbnail để mở lại picker đổi layout khác — không cần nút riêng nữa. */
-function LayoutPickerButton({
+ * thumbnail để mở lại picker đổi layout khác — không cần nút riêng nữa. Export để tái dùng cho
+ * UI chọn màn hình chờ (2026-07-21, CreateEventWizard.tsx's Bước 3) — cùng nhu cầu "chọn đúng 1
+ * layout cố định", không cần viết lại. */
+export function LayoutPickerButton({
   layoutId,
   layoutVersion,
   layoutPort,
@@ -195,7 +197,7 @@ function LayoutPickerButton({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [preview, setPreview] = useState<{ name: string; content: LayoutContent } | null>(null);
+  const [preview, setPreview] = useState<{ name: string; content: LayoutContent; color?: string } | null>(null);
   const [assetUrlCache, setAssetUrlCache] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -206,7 +208,7 @@ function LayoutPickerButton({
     let cancelled = false;
     void (async () => {
       const [doc, version] = await Promise.all([layoutPort.getDocument(layoutId), layoutPort.getVersion(layoutId, layoutVersion)]);
-      if (!cancelled && doc && version) setPreview({ name: doc.name, content: version.content });
+      if (!cancelled && doc && version) setPreview({ name: doc.name, content: version.content, color: doc.color });
     })();
     return () => {
       cancelled = true;
@@ -243,7 +245,10 @@ function LayoutPickerButton({
           <div style={{ width: THUMB_SIZE.w, height: THUMB_SIZE.h }} className="shrink-0 overflow-hidden rounded bg-black">
             <LayoutRenderer content={preview.content} screen={THUMB_SIZE} record={DEMO_RECORD} resolveAsset={resolveAsset} />
           </div>
-          <span className="max-w-[140px] truncate text-xs font-medium text-foreground">{preview.name}</span>
+          <span className="flex max-w-[140px] items-center gap-1.5 truncate text-xs font-medium text-foreground">
+            {preview.color && <span className="h-2 w-2 flex-none rounded-full" style={{ backgroundColor: preview.color }} />}
+            <span className="truncate">{preview.name}</span>
+          </span>
         </button>
       ) : (
         <Button variant="secondary-outline" size="sm" onClick={() => setOpen(true)}>

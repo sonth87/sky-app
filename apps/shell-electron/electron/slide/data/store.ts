@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
-import type { CeremonyBundle, SessionState, Student } from '@sky-app/slide-shared';
+import type { AppConfig, Ceremony, CanonicalRecord, RecordRuntimeState } from '@sky-app/slide-shared';
+import { DEFAULT_RUNTIME_STATE, isCanonicalGroup } from '@sky-app/slide-shared';
 import {
   BetterSqlite3Executor,
   runMigrations,
-  getCeremonyBundle as dbGetCeremonyBundle,
-  patchStudent as dbPatchStudent,
-  clearStudents as dbClearStudents,
+  getCeremonyWithConfig as dbGetCeremonyWithConfig,
+  saveCeremonyWithConfig as dbSaveCeremonyWithConfig,
   upsertAppConfig as dbUpsertAppConfig,
 } from '@sky-app/ceremony-db/node';
 import { ceremonyDbPath, ceremonyDataDir, PHOTO_DIR_NAMES } from './paths';
@@ -29,38 +29,39 @@ function detectPhotoDir(): string {
  * Thứ tự thử:
  *   1. Nếu path có prefix hợp lệ (image/, photos/...) VÀ file tồn tại → dùng ngay
  *   2. Lấy basename(path) rồi tìm file trong photoDir thực tế
- *   3. Thử {photoDir}/{student_code}.jpg
+ *   3. Thử {photoDir}/{id}.jpg (id thay cho student_code cũ — khoá đồng bộ mới, giai đoạn
+ *      "bỏ Student" 2026-07-22)
  *   4. Để rỗng → renderer hiển thị placeholder "Không có ảnh"
  */
-function normalizeStudentPhoto(s: Student): Student {
+function normalizeRecordPhoto(r: CanonicalRecord): CanonicalRecord {
   const dataDir = ceremonyDataDir();
   const photoDir = detectPhotoDir();
 
-  const p = (s.image_relative_path ?? '').trim();
+  const p = (r.image_relative_path ?? '').trim();
 
   // Bước 1: path đã có prefix hợp lệ và file tồn tại → dùng ngay
   if (p && PHOTO_DIR_NAMES.some((d) => p.startsWith(`${d}/`))) {
-    if (existsSync(join(dataDir, p))) return s;
+    if (existsSync(join(dataDir, p))) return r;
   }
 
   // Bước 2: thử basename(path) trong photoDir thực tế (xử lý dạng "uuid/filename.jpg")
   if (p) {
     const candidate = `${photoDir}/${basename(p)}`;
     if (existsSync(join(dataDir, candidate))) {
-      return { ...s, image_relative_path: candidate };
+      return { ...r, image_relative_path: candidate };
     }
   }
 
-  // Bước 3: thử {photoDir}/{student_code}.jpg
+  // Bước 3: thử {photoDir}/{id}.jpg
   for (const ext of ['.jpg', '.jpeg', '.png', '.webp']) {
-    const byCode = `${photoDir}/${s.student_code}${ext}`;
-    if (existsSync(join(dataDir, byCode))) {
-      return { ...s, image_relative_path: byCode };
+    const byId = `${photoDir}/${r.id}${ext}`;
+    if (existsSync(join(dataDir, byId))) {
+      return { ...r, image_relative_path: byId };
     }
   }
 
   // Bước 4: không tìm thấy — để rỗng, renderer hiển thị placeholder
-  return { ...s, image_relative_path: '' };
+  return { ...r, image_relative_path: '' };
 }
 
 // Tên file config layout đã đổi (V?) — bundle cũ (đã lưu trên đĩa từ trước) có thể còn trỏ
@@ -68,17 +69,36 @@ function normalizeStudentPhoto(s: Student): Student {
 const LEGACY_BACKDROPS_CONFIG_NAMES = new Set(['assets/2026/backdrops.json']);
 const CURRENT_BACKDROPS_CONFIG = 'assets/2026/backdrops_layouts.json';
 
+const DEFAULT_ROOM_ID = 'H1';
+const DEFAULT_ROOM_NAME = 'Hội trường A';
+
+/** So khớp chuẩn hoá (bỏ ký tự đặc biệt, lowercase) — dùng cho findById's fallback. */
+function normalizeKey(s: string): string {
+  return s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+}
 
 /**
  * Store dữ liệu đợt trong bộ nhớ (main process) — nguồn lưu trữ lâu dài là SQLite
  * (ceremony.db, qua @sky-app/ceremony-db), memory chỉ là cache đọc nhanh cho tra cứu
- * (findByMsv/neighborByStt gọi liên tục mỗi lần quét QR/next/prev).
- * Trạng thái vận hành (session) do session-store quản lý riêng.
+ * (findById/neighborByDisplayOrder gọi liên tục mỗi lần quét QR/next/prev).
+ *
+ * Giai đoạn "bỏ Student" (2026-07-22): tách 2 sổ riêng theo đúng kiến trúc Canonical —
+ * `records: CanonicalRecord[]` là dữ liệu TĨNH từ DataSource (KHÔNG persist ở đây, nguồn thật
+ * là data_source_record — records chỉ là cache RAM đọc lại mỗi khi Event active đổi, xem
+ * setRecords()), `runtimeStates: Map<id, RecordRuntimeState>` là trạng thái vận hành lễ (đã
+ * lên sân khấu chưa, lúc nào...) — KHÔNG persist SQL, chỉ sống trong RAM/phiên chạy hiện tại
+ * (khác `session-store.ts` vốn persist con trỏ "đang lên sân khấu" ra session.json).
+ *
+ * `ceremony`/`config` VẪN persist qua SQLite (bảng ceremony/app_config, KHÔNG đổi) — đây là
+ * cấu hình TĨNH của buổi lễ, tách biệt hoàn toàn khỏi danh sách người tham dự.
  */
 class CeremonyStore {
   private executor: BetterSqlite3Executor | null = null;
-  private bundle: CeremonyBundle | null = null;
-  private byMsv = new Map<string, Student>();
+  private ceremony: Ceremony | null = null;
+  private config: AppConfig | null = null;
+  private records: CanonicalRecord[] = [];
+  private runtimeStates = new Map<string, RecordRuntimeState>();
+  private byId = new Map<string, CanonicalRecord>();
 
   private getExecutorOrOpen(): BetterSqlite3Executor {
     if (!this.executor) {
@@ -88,141 +108,144 @@ class CeremonyStore {
     return this.executor;
   }
 
-  /** Executor dùng chung cho sync.ts (đọc config lúc bootstrap trước khi có bundle trong memory). */
+  /** Executor dùng chung cho ipc.ts (Event/DataSource queries, đọc config lúc bootstrap). */
   getExecutor(): BetterSqlite3Executor {
     return this.getExecutorOrOpen();
   }
 
-  /**
-   * Nạp bundle vào memory — KHÔNG tự ghi DB (caller ghi trước nếu cần persist, VD
-   * sync.ts's applyMerge() gọi dbSaveCeremonyBundle() rồi mới load(), tránh ghi 2 lần).
-   */
-  load(bundle: CeremonyBundle) {
-    bundle.students = bundle.students.map(normalizeStudentPhoto);
-    // Migrate tên file config cũ mỗi khi bundle được nạp (từ đĩa hoặc build mới) —
-    // trước đây chỉ migrate lúc build mới từ students.json, bundle.json đã lưu sẵn trên đĩa
-    // không bao giờ đi qua nhánh đó nên vẫn giữ tên cũ mãi.
-    if (bundle.ceremony && LEGACY_BACKDROPS_CONFIG_NAMES.has(bundle.ceremony.backdrops_config)) {
-      bundle.ceremony.backdrops_config = CURRENT_BACKDROPS_CONFIG;
-    }
-    this.bundle = bundle;
-    this.byMsv = new Map(bundle.students.map((s) => [s.student_code, s]));
-  }
-
-  /** Đọc dữ liệu đã lưu trong ceremony.db, nếu có — không lọc theo room_id (DB local chỉ
-   * chứa 1 ceremony; room_id do nguồn seed quyết định, VD 'H1', không phải hằng cố định). */
+  /** Đọc ceremony+config đã lưu trong ceremony.db, nếu có — không lọc theo room_id (DB local
+   * chỉ chứa 1 ceremony; room_id do nguồn seed quyết định, VD 'H1', không phải hằng cố định). */
   loadFromDisk(): boolean {
-    const loaded = dbGetCeremonyBundle(this.getExecutorOrOpen());
+    const loaded = dbGetCeremonyWithConfig(this.getExecutorOrOpen());
     if (!loaded) return false;
-    loaded.students = loaded.students.map(normalizeStudentPhoto);
-    this.bundle = loaded;
-    this.byMsv = new Map(loaded.students.map((s) => [s.student_code, s]));
+    this.ceremony = migrateBackdropsConfigName(loaded.ceremony);
+    this.config = loaded.config;
     return true;
   }
 
+  /** Ghi ceremony+config mới (VD lần đầu khởi động chưa có gì trong DB) — KHÔNG đụng
+   * records/runtimeStates (2 thứ đó không thuộc ceremony/config nữa). */
+  saveCeremony(ceremony: Ceremony, config: AppConfig): void {
+    dbSaveCeremonyWithConfig(this.getExecutorOrOpen(), {
+      roomId: DEFAULT_ROOM_ID,
+      roomName: DEFAULT_ROOM_NAME,
+      ceremony,
+      config,
+    });
+    this.ceremony = ceremony;
+    this.config = config;
+  }
+
   hasData(): boolean {
-    return this.bundle != null;
+    return this.ceremony != null;
   }
 
-  getBundle(): CeremonyBundle | null {
-    return this.bundle;
+  getCeremony(): Ceremony | null {
+    return this.ceremony;
   }
 
-  getCeremony() {
-    return this.bundle?.ceremony ?? null;
+  getConfig(): AppConfig | null {
+    return this.config;
   }
 
-  getConfig() {
-    return this.bundle?.config ?? null;
+  getRecords(): CanonicalRecord[] {
+    return this.records;
   }
 
-  getInitialSession(): SessionState | null {
-    return this.bundle?.session_state ?? null;
-  }
-
-  getStudents(): Student[] {
-    return this.bundle?.students ?? [];
-  }
-
-  findByMsv(code: string): Student | undefined {
-    const exact = this.byMsv.get(code);
+  /** Tra 1 record theo id, fallback so khớp chuẩn hoá qua identifierCode/identityNumber/phone
+   * (tương đương 4 field fallback của findByMsv cũ, trừ card_code — không có chỗ tương đương
+   * core trong CanonicalSubject, cần tra qua extra nếu cần sau này). */
+  findById(id: string): CanonicalRecord | undefined {
+    const exact = this.byId.get(id);
     if (exact) return exact;
 
-    const normCode = code.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    if (!normCode) return undefined;
+    const normId = normalizeKey(id);
+    if (!normId) return undefined;
 
-    return this.getStudents().find((s) => {
-      const sCode = (s.student_code ?? '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      if (sCode === normCode) return true;
-
-      const idNum = (s.identity_number ?? '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      if (idNum === normCode) return true;
-
-      const phone = (s.phone_number ?? '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      if (phone === normCode) return true;
-
-      const card = (s.card_code ?? '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      if (card === normCode) return true;
-
+    return this.records.find((r) => {
+      if (normalizeKey(r.id) === normId) return true;
+      if (r.identifierCode && normalizeKey(r.identifierCode) === normId) return true;
+      if (r.identityNumber && normalizeKey(r.identityNumber) === normId) return true;
+      if (r.phone && normalizeKey(r.phone) === normId) return true;
       return false;
     });
   }
 
-  /** SV kế tiếp / trước đó theo stt (cho cmd:next / cmd:prev) */
-  neighborByStt(currentCode: string | null, dir: 1 | -1): Student | undefined {
-    const students = [...this.getStudents()].sort((a, b) => a.display_order - b.display_order);
-    if (students.length === 0) return undefined;
-    if (currentCode == null) return dir === 1 ? students[0] : students[students.length - 1];
-    const idx = students.findIndex((s) => s.student_code === currentCode);
-    if (idx < 0) return students[0];
-    return students[idx + dir];
+  getRuntimeState(id: string): RecordRuntimeState {
+    return this.runtimeStates.get(id) ?? DEFAULT_RUNTIME_STATE;
+  }
+
+  /** record kế tiếp / trước đó theo displayOrder (cho cmd:next / cmd:prev). */
+  neighborByDisplayOrder(currentId: string | null, dir: 1 | -1): CanonicalRecord | undefined {
+    const sorted = [...this.records].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    if (sorted.length === 0) return undefined;
+    if (currentId == null) return dir === 1 ? sorted[0] : sorted[sorted.length - 1];
+    const idx = sorted.findIndex((r) => r.id === currentId);
+    if (idx < 0) return sorted[0];
+    return sorted[idx + dir];
+  }
+
+  /** Patch trạng thái vận hành (status, các mốc thời gian, srcOnStage) — KHÔNG đụng records
+   * (dữ liệu tĩnh). KHÔNG persist SQL (runtime state chỉ sống trong RAM, xem comment class). */
+  patchRuntimeState(id: string, patch: Partial<RecordRuntimeState>): RecordRuntimeState | undefined {
+    if (!this.byId.has(id)) return undefined;
+    const current = this.runtimeStates.get(id) ?? { ...DEFAULT_RUNTIME_STATE };
+    const next = { ...current, ...patch };
+    this.runtimeStates.set(id, next);
+    return next;
   }
 
   /**
-   * UPDATE ngay lập tức trong SQLite (không còn "chỉ sửa memory, chờ ghi toàn file" như trước —
-   * xem docs/roadmap/plans/layout-designer/18-luu-tru-sqlite-supabase.md §2), đồng thời cập
-   * nhật cache memory để các lần đọc tiếp theo (findByMsv/getStudents) thấy ngay hiệu ứng.
+   * Thay TOÀN BỘ danh sách record bằng nguồn MỚI (Event active đổi). GIỮ NGUYÊN
+   * ceremony/config hiện có. Luôn RESET runtimeStates — id cũ thuộc Event/DataSource khác,
+   * mang runtime state cũ sang Event mới vô nghĩa (quyết định user: "vào Event nào thì chỉ
+   * hiện data của Event đó").
+   *
+   * `records: []` hợp lệ (Event chưa gắn DataSource) — xoá sạch record cũ, không giữ sót.
    */
-  patchStudent(code: string, patch: Partial<Student>): Student | undefined {
-    const s = this.byMsv.get(code);
-    if (!s) return undefined;
-    Object.assign(s, patch);
-    if (this.bundle) {
-      const ceremonyId = this.bundle.ceremony.id;
-      dbPatchStudent(this.getExecutorOrOpen(), ceremonyId, code, patch);
-    }
-    return s;
+  setRecords(records: CanonicalRecord[]): void {
+    this.records = records.map((r) => normalizeRecordPhoto(r));
+    this.byId = new Map(this.records.map((r) => [r.id, r]));
+    this.runtimeStates = new Map();
   }
 
   clear() {
-    this.bundle = null;
-    this.byMsv.clear();
+    this.ceremony = null;
+    this.config = null;
+    this.records = [];
+    this.runtimeStates = new Map();
+    this.byId.clear();
   }
 
-  /** Xóa dữ liệu sinh viên nhưng giữ ceremony/config để Backdrop không mất màn chờ. */
-  clearStudents() {
-    if (!this.bundle) return;
-    this.bundle.students = [];
-    this.byMsv.clear();
-    try {
-      dbClearStudents(this.getExecutorOrOpen(), this.bundle.ceremony.id);
-    } catch (e) {
-      console.error('[CeremonyStore] Failed to persist clearStudents:', e);
-    }
+  /** Xóa dữ liệu người tham dự nhưng giữ ceremony/config để Backdrop không mất màn chờ. */
+  clearRecords() {
+    this.records = [];
+    this.runtimeStates = new Map();
+    this.byId.clear();
   }
 
-  updateConfig(patch: Partial<CeremonyBundle['config']>) {
-    if (!this.bundle) return;
-    if (!this.bundle.config) {
-      this.bundle.config = {} as CeremonyBundle['config'];
+  updateConfig(patch: Partial<AppConfig>) {
+    if (!this.ceremony) return;
+    if (!this.config) {
+      this.config = {} as AppConfig;
     }
-    Object.assign(this.bundle.config, patch);
+    Object.assign(this.config, patch);
     try {
-      dbUpsertAppConfig(this.getExecutorOrOpen(), this.bundle.ceremony.id, this.bundle.config);
+      dbUpsertAppConfig(this.getExecutorOrOpen(), this.ceremony.id, this.config);
     } catch (e) {
       console.error('[CeremonyStore] Failed to persist updateConfig:', e);
     }
   }
 }
 
+function migrateBackdropsConfigName(ceremony: Ceremony): Ceremony {
+  if (LEGACY_BACKDROPS_CONFIG_NAMES.has(ceremony.backdrops_config)) {
+    return { ...ceremony, backdrops_config: CURRENT_BACKDROPS_CONFIG };
+  }
+  return ceremony;
+}
+
 export const ceremonyStore = new CeremonyStore();
+
+// Re-export tiện cho caller cần kiểm tra loại record (Subject vs Group).
+export { isCanonicalGroup };

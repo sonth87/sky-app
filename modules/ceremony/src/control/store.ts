@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { BackdropAspectRatio, Ceremony, OperatingMode, Student } from '@sky-app/slide-shared';
+import type { BackdropAspectRatio, Ceremony, OperatingMode, CanonicalRecord, RecordRuntimeState } from '@sky-app/slide-shared';
 import i18n from './i18n';
 import { STORAGE_KEY, OLD_STORAGE_KEY } from './storage-key';
 
@@ -35,15 +35,16 @@ export interface PreGenStatus {
   running: boolean;
   paused: boolean;
   configChanged: boolean;
-  currentStudentCode: string | null;
-  students: Record<string, PreGenStudentStatus>;
-  quality: Record<string, string[]>;  // studentCode -> flags (chỉ file bị flag)
+  currentId: string | null;
+  records: Record<string, PreGenStudentStatus>;
+  quality: Record<string, string[]>;  // id -> flags (chỉ file bị flag)
 }
 
 export type PythonStatus = 'starting' | 'ready' | 'error';
 
 interface ScanEvent {
-  student: Student;
+  record: CanonicalRecord;
+  runtimeState: RecordRuntimeState;
   ts: string;
 }
 
@@ -54,24 +55,34 @@ export interface AutoPlayState {
   currentCode: string | null;  // code đang play (chưa kết thúc timer)
 }
 
+export interface OnStageRecord {
+  record: CanonicalRecord;
+  runtimeState: RecordRuntimeState;
+}
+
 interface ControlState {
   // dữ liệu
   ceremony: Ceremony | null;
-  students: Student[];
+  records: CanonicalRecord[];
+  // Trạng thái vận hành (status/ts_*/srcOnStage) TÁCH KHỎI records (giai đoạn "bỏ Student",
+  // 2026-07-22) — server là nguồn thật (ceremonyStore.runtimeStates), map này chỉ là cache hiển
+  // thị client-side, cập nhật qua patchRuntimeStateLocal khi nhận socket event để UI (VD badge
+  // trạng thái trong StudentList) phản ứng ngay không cần đợi records reload toàn bộ.
+  runtimeStates: Record<string, RecordRuntimeState>;
   syncedAt: string | null;
   wsPort: number;
 
   // trạng thái realtime
   connected: boolean;
   mode: OperatingMode;
-  onStage: Student | null;
-  pending: Student | null;
+  onStage: OnStageRecord | null;
+  pending: OnStageRecord | null;
   lastScan: ScanEvent | null;
   lastError: { code: string; message: string } | null;
   lastSuccess: { message: string } | null;
 
-  // SV đang được chọn để xem trước (click trên bảng)
-  selectedMsv: string | null;
+  // record đang được chọn để xem trước (click trên bảng)
+  selectedId: string | null;
 
   // Lịch sử các lần quét QR (mới nhất ở đầu)
   scanLog: ScanEvent[];
@@ -198,7 +209,7 @@ interface ControlState {
   // setters
   setMeta: (p: {
     ceremony: Ceremony | null;
-    students: Student[];
+    records: CanonicalRecord[];
     syncedAt: string | null;
     wsPort: number;
     mode: OperatingMode;
@@ -220,12 +231,12 @@ interface ControlState {
   setShadowLevel: (v: ShadowLevel) => void;
   setConnected: (v: boolean) => void;
   setMode: (m: OperatingMode) => void;
-  setOnStage: (s: Student | null) => void;
-  setPending: (s: Student | null) => void;
+  setOnStage: (s: OnStageRecord | null) => void;
+  setPending: (s: OnStageRecord | null) => void;
   setLastScan: (e: ScanEvent | null) => void;
   setLastError: (e: { code: string; message: string } | null) => void;
   setLastSuccess: (e: { message: string } | null) => void;
-  setSelectedMsv: (msv: string | null) => void;
+  setSelectedId: (id: string | null) => void;
   pushScan: (e: ScanEvent) => void;
   setConfettiEnabled: (v: boolean) => void;
   setConfettiRepeat: (v: boolean) => void;
@@ -263,10 +274,10 @@ interface ControlState {
   setPregenStatus: (v: PreGenStatus | null) => void;
   setAwardLocationCode: (v: number) => void;
   setIdleTimer: (v: { active: boolean; totalSeconds: number; startedAt: string | null }) => void;
-  patchStudentLocal: (code: string, patch: Partial<Student>) => void;
+  patchRuntimeStateLocal: (id: string, patch: Partial<RecordRuntimeState>) => void;
   setAutoPlay: (patch: Partial<AutoPlayState>) => void;
-  /** Xóa 1 code khỏi autoPlay.playedCodes (khi quét lại SV đã play) */
-  markUnplayed: (code: string) => void;
+  /** Xóa 1 id khỏi autoPlay.playedCodes (khi quét lại record đã play) */
+  markUnplayed: (id: string) => void;
   setPythonStatus: (status: PythonStatus, detail?: string) => void;
   refreshVoiceCatalog: () => void;
 
@@ -279,7 +290,8 @@ export const useControlStore = create<ControlState>()(
   persist(
     (set) => ({
   ceremony: null,
-  students: [],
+  records: [],
+  runtimeStates: {},
   syncedAt: null,
   wsPort: 8765,
 
@@ -290,7 +302,7 @@ export const useControlStore = create<ControlState>()(
   lastScan: null,
   lastError: null,
   lastSuccess: null,
-  selectedMsv: null,
+  selectedId: null,
   scanLog: [],
   confettiEnabled: true,
   confettiRepeat: true,
@@ -367,10 +379,10 @@ export const useControlStore = create<ControlState>()(
   appSpacing: 0.25,
   shadowLevel: 'medium' as ShadowLevel,
 
-  setMeta: ({ ceremony, students, syncedAt, wsPort, mode, delaySeconds, idleTimeoutEnabled, idleTimeoutSeconds, apiEnvironment }) =>
+  setMeta: ({ ceremony, records, syncedAt, wsPort, mode, delaySeconds, idleTimeoutEnabled, idleTimeoutSeconds, apiEnvironment }) =>
     set({
       ceremony,
-      students,
+      records,
       syncedAt,
       wsPort,
       mode,
@@ -400,14 +412,14 @@ export const useControlStore = create<ControlState>()(
   setLastScan: (lastScan) => set({ lastScan }),
   setLastError: (lastError) => set({ lastError }),
   setLastSuccess: (lastSuccess) => set({ lastSuccess }),
-  setSelectedMsv: (selectedMsv) => set({ selectedMsv }),
+  setSelectedId: (selectedId) => set({ selectedId }),
   pushScan: (e) =>
     set((state) => {
-      // Bỏ qua nếu trùng SV với lần quét gần nhất (chống debounce nhân đôi từ HID)
-      if (state.scanLog[0]?.student.student_code === e.student.student_code) return state;
-      // Nếu SV đã có trong scanLog (quét lại): xóa entry cũ, đưa lên đầu để giữ thứ tự mới nhất
+      // Bỏ qua nếu trùng record với lần quét gần nhất (chống debounce nhân đôi từ HID)
+      if (state.scanLog[0]?.record.id === e.record.id) return state;
+      // Nếu record đã có trong scanLog (quét lại): xóa entry cũ, đưa lên đầu để giữ thứ tự mới nhất
       const filtered = state.scanLog.filter(
-        (x) => x.student.student_code !== e.student.student_code,
+        (x) => x.record.id !== e.record.id,
       );
       return { scanLog: [e, ...filtered] };
     }),
@@ -449,17 +461,17 @@ export const useControlStore = create<ControlState>()(
   setPregenStatus: (pregenStatus) => set({ pregenStatus }),
   setAwardLocationCode: (awardLocationCode) => set({ awardLocationCode }),
   setIdleTimer: (idleTimer) => set({ idleTimer }),
-  patchStudentLocal: (code, patch) =>
+  patchRuntimeStateLocal: (id, patch) =>
     set((state) => ({
-      students: state.students.map((s) => (s.student_code === code ? { ...s, ...patch } : s)),
+      runtimeStates: { ...state.runtimeStates, [id]: { ...state.runtimeStates[id], ...patch } as RecordRuntimeState },
     })),
   setAutoPlay: (patch) =>
     set((state) => ({ autoPlay: { ...state.autoPlay, ...patch } })),
-  markUnplayed: (code) =>
+  markUnplayed: (id) =>
     set((state) => ({
       autoPlay: {
         ...state.autoPlay,
-        playedCodes: state.autoPlay.playedCodes.filter((c) => c !== code),
+        playedCodes: state.autoPlay.playedCodes.filter((c) => c !== id),
       },
     })),
   setPythonStatus: (status, detail = '') => set({ pythonStatus: status, pythonStatusDetail: detail }),

@@ -1,7 +1,6 @@
 // SYNC: keep identical to electron/lib/renderTemplate.ts
-import type { Student, CustomVariable } from '@sky-app/slide-shared';
-import { resolveTokens } from '@sky-app/slide-shared';
-import { resolveCustomVariables } from './customVariables';
+import type { CanonicalRecord, CustomVariable } from '@sky-app/slide-shared';
+import { resolveTokens, resolveCustomVariables, flattenCanonicalRecord } from '@sky-app/slide-shared';
 
 function titleCaseIfAllCaps(str: string): string {
   if (str === str.toLocaleUpperCase('vi-VN') && str !== str.toLocaleLowerCase('vi-VN')) {
@@ -12,30 +11,31 @@ function titleCaseIfAllCaps(str: string): string {
 
 export function renderTemplate(
   template: string,
-  student: Student,
+  record: CanonicalRecord,
   customVars: CustomVariable[] = []
 ): string {
-  const resolved = resolveCustomVariables(student, customVars);
+  const flat = flattenCanonicalRecord(record);
+  const resolved = resolveCustomVariables(flat, customVars);
   return resolveTokens(template, (key) => {
-    // Biến điều kiện tùy chỉnh ưu tiên hơn field gốc của Student
+    // Biến điều kiện tùy chỉnh ưu tiên hơn field gốc của record
     if (key in resolved) return resolved[key];
-    const val = (student as unknown as Record<string, unknown>)[key];
+    const val = flat[key];
     if (val == null || val === '') return '';
     return titleCaseIfAllCaps(String(val));
   });
 }
 
-export const STUDENT_TEMPLATE_VARIABLES: Array<{ key: string; label: string; example: string }> = [
+/** Gợi ý field core cho autocomplete @var trong TemplateEditor — field đặc thù (major_name,
+ * gpa...) giờ tuỳ theo DataSource của từng Event, không còn liệt kê cố định được ở đây (giai
+ * đoạn "bỏ Student", 2026-07-22). Component dùng danh sách này NÊN bổ sung thêm gợi ý động từ
+ * FieldMappingProfile.map khi có (xem RuleBuilder.tsx làm mẫu). */
+export const CORE_TEMPLATE_VARIABLES: Array<{ key: string; label: string; example: string }> = [
   { key: 'full_name',       label: 'Họ và tên',          example: 'MA THỊ MAI ANH' },
-  { key: 'student_code',    label: 'Mã sinh viên',        example: '1677010006' },
-  { key: 'major_name',      label: 'Ngành học',           example: 'Ngôn ngữ Anh' },
-  { key: 'faculty_name',    label: 'Khoa',                example: 'Ngôn ngữ Anh' },
-  { key: 'class_code',      label: 'Mã lớp',              example: 'TA 16 - 01' },
-  { key: 'course_code',     label: 'Khóa',                example: 'K16' },
-  { key: 'gpa',             label: 'Điểm GPA',            example: '9.08' },
-  { key: 'classification',  label: 'Xếp loại',            example: 'Xuất sắc' },
-  { key: 'award_content',   label: 'Nội dung khen thưởng', example: 'THỦ KHOA CẤP TRƯỜNG' },
-  { key: 'quote',           label: 'Câu nói',             example: 'I only live once.' },
-  { key: 'batch_name',      label: 'Tên đợt trao bằng',  example: 'Đợt trao bằng 25/06/2026' },
-  { key: 'achievement_title', label: 'Danh hiệu',         example: 'Sinh viên xuất sắc' },
+  { key: 'identifierCode',  label: 'Mã định danh',        example: '1677010006' },
+  { key: 'identityNumber',  label: 'CCCD/CMND',           example: '001204012345' },
+  { key: 'phone',           label: 'Số điện thoại',       example: '0912345678' },
+  { key: 'email',           label: 'Email',               example: 'a@example.com' },
+  { key: 'dateOfBirth',     label: 'Ngày sinh',           example: '2004-01-01' },
+  { key: 'title',           label: 'Chức danh/Danh hiệu', example: 'Sinh viên xuất sắc' },
+  { key: 'description',     label: 'Mô tả',               example: '' },
 ];

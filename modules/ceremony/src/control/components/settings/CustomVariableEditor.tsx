@@ -2,12 +2,7 @@ import { useRef } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, Download, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { renderTemplate } from '../../../lib/renderTemplate';
-import { type Student, type CustomVariable, type CustomVariableRule, type VarRuleOp } from '@sky-app/slide-shared';
-
-// Nhãn thuộc tính so khớp — trùng danh sách của bộ điều kiện phân giọng, thêm GPA (so sánh số)
-// Lưu ý: đây là các giá trị dữ liệu nội bộ (lưu trong rule.attr, dùng để so khớp field sinh viên),
-// KHÔNG dịch — nếu dịch sẽ làm sai lệch dữ liệu đã lưu và ATTR_FIELD_MAP bên dưới.
-const VAR_ATTR_OPTIONS = ['Ngành', 'Khoa', 'Giới tính', 'Xếp loại', 'Lớp', 'Khóa', 'Họ tên', 'GPA'];
+import { flattenCanonicalRecord, type CanonicalRecord, type CustomVariable, type CustomVariableRule, type VarRuleOp } from '@sky-app/slide-shared';
 
 // Toán tử so khớp cho rule của biến điều kiện
 const VAR_OP_OPTIONS: Array<{ value: VarRuleOp; labelKey: string }> = [
@@ -20,19 +15,10 @@ const VAR_OP_OPTIONS: Array<{ value: VarRuleOp; labelKey: string }> = [
   { value: 'lte', labelKey: 'customVariables.op.lte' },
 ];
 
-// Field gốc của Student — dùng để cảnh báo khi user đặt key biến trùng field có sẵn
+// Field core reserved — dùng để cảnh báo khi user đặt key biến trùng field có sẵn
 const RESERVED_VARIABLE_KEYS = new Set([
-  'full_name', 'student_code', 'major_name', 'faculty_name', 'class_code', 'course_code',
-  'gpa', 'classification', 'award_content', 'quote', 'batch_name', 'achievement_title',
+  'full_name', 'identifierCode', 'identityNumber', 'phone', 'email', 'dateOfBirth', 'title', 'description',
 ]);
-
-const ATTR_FIELD_MAP: Record<string, keyof Student> = {
-  'Xếp loại': 'classification',
-  'Ngành': 'major_name',
-  'Khoa': 'faculty_name',
-  'Lớp': 'class_code',
-  'Khóa': 'course_code',
-};
 
 function newId(): string {
   return crypto.randomUUID();
@@ -42,27 +28,31 @@ export interface CustomVariableEditorProps {
   variables: CustomVariable[];
   onChange: (variables: CustomVariable[]) => void;
   /** 1 record mẫu để preview giá trị biến (`@key` render thành gì) — settings cũ dùng
-   * students[0], Event context dùng demoCanonicalSubject/record thật đầu tiên của DataSource. */
-  previewStudent: Student | null;
-  /** Gợi ý giá trị có sẵn cho thuộc tính (VD "Xếp loại" → ["Giỏi","Khá",...]) — settings cũ suy
-   * từ toàn bộ students, Event context có thể truyền [] nếu chưa có data thật. */
-  students: Student[];
+   * records[0], Event context dùng demoCanonicalSubject/record thật đầu tiên của DataSource. */
+  previewRecord: CanonicalRecord | null;
+  /** Danh sách record để suy ra gợi ý giá trị có sẵn cho 1 field (VD "Xếp loại" → ["Giỏi",...]). */
+  records: CanonicalRecord[];
+  /** Gợi ý tên field (TỰ DO — giai đoạn "bỏ Student", 2026-07-22) cho dropdown chọn `attr`, thường
+   * lấy từ FieldMappingProfile.map's keys. Rỗng → input gõ tự do hoàn toàn, không gợi ý. */
+  attrSuggestions: string[];
 }
 
 /** UI thuần quản lý CustomVariable[] — tách khỏi nguồn dữ liệu (socket/store hay EventPort) để
  * dùng chung được cho settings cũ (CustomVariablesContent.tsx) VÀ Event context mới (Giai đoạn
  * 4c mở rộng, 2026-07-20). Toàn bộ state nằm ở CALLER qua variables/onChange — component này
- * không tự giữ state, không biết gì về nơi persist. */
-export function CustomVariableEditor({ variables: customVariables, onChange: save, previewStudent, students }: CustomVariableEditorProps) {
+ * không tự giữ state, không biết gì về nơi persist.
+ *
+ * Giai đoạn "bỏ Student" (2026-07-22): `rule.attr` là tên field TỰ DO (gõ tay hoặc chọn từ
+ * `attrSuggestions` qua datalist, đúng pattern RuleBuilder.tsx đã dùng từ Giai đoạn 4b) — KHÔNG
+ * còn 8 nhãn tiếng Việt cố định (ATTR_FIELD_MAP đã xoá). */
+export function CustomVariableEditor({ variables: customVariables, onChange: save, previewRecord, records, attrSuggestions }: CustomVariableEditorProps) {
   const { t } = useTranslation();
+  const datalistId = `custom-variable-attrs-${Math.random().toString(36).slice(2)}`;
 
-  // Gợi ý giá trị có sẵn trong tập dữ liệu sinh viên cho thuộc tính
+  // Gợi ý giá trị có sẵn trong tập dữ liệu cho 1 field — đọc trực tiếp field core+extra đã merge.
   const getUniqueValuesForAttr = (attr: string): string[] => {
-    if (attr === 'Giới tính') return ['Nam', 'Nữ'];
-    if (attr === 'Họ tên' || attr === 'GPA') return [];
-    const field = ATTR_FIELD_MAP[attr];
-    if (!field) return [];
-    const vals = students.map((s) => String(s[field] || '').trim()).filter(Boolean);
+    if (!attr) return [];
+    const vals = records.map((r) => flattenCanonicalRecord(r)[attr]?.trim() || '').filter(Boolean);
     return Array.from(new Set(vals)).sort();
   };
 
@@ -84,7 +74,7 @@ export function CustomVariableEditor({ variables: customVariables, onChange: sav
   const handleAddRule = (varId: string | number) => {
     const v = customVariables.find((v) => v.id === varId);
     if (!v) return;
-    const newRule: CustomVariableRule = { id: newId(), attr: 'Ngành', op: 'contains', val: '', result: '' };
+    const newRule: CustomVariableRule = { id: newId(), attr: attrSuggestions[0] ?? '', op: 'contains', val: '', result: '' };
     handleUpdateVariable(varId, { rules: [...v.rules, newRule] });
   };
 
@@ -146,7 +136,7 @@ export function CustomVariableEditor({ variables: customVariables, onChange: sav
           .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
           .map((r) => ({
             id: newId(),
-            attr: typeof r.attr === 'string' ? r.attr : 'Ngành',
+            attr: typeof r.attr === 'string' ? r.attr : '',
             op: (typeof r.op === 'string' ? r.op : 'contains') as VarRuleOp,
             val: typeof r.val === 'string' ? r.val : '',
             result: typeof r.result === 'string' ? r.result : '',
@@ -188,6 +178,13 @@ export function CustomVariableEditor({ variables: customVariables, onChange: sav
 
   return (
     <div className="flex flex-col gap-3">
+      {attrSuggestions.length > 0 && (
+        <datalist id={datalistId}>
+          {attrSuggestions.map((attr) => (
+            <option key={attr} value={attr} />
+          ))}
+        </datalist>
+      )}
       {/* Header actions */}
       <div className="flex items-center justify-end flex-shrink-0">
         <div className="flex items-center gap-1.5">
@@ -229,9 +226,9 @@ export function CustomVariableEditor({ variables: customVariables, onChange: sav
         const keyInvalid = cv.key !== '' && !/^[a-zA-Z_]+$/.test(cv.key);
         const keyReserved = RESERVED_VARIABLE_KEYS.has(cv.key);
         const keyDuplicate = cv.key !== '' && customVariables.some((o) => o.id !== cv.id && o.key === cv.key);
-        // Preview giá trị biến này cho sinh viên đầu tiên
-        const previewVal = previewStudent && cv.key
-          ? renderTemplate(`@${cv.key}`, previewStudent, [cv])
+        // Preview giá trị biến này cho record đầu tiên
+        const previewVal = previewRecord && cv.key
+          ? renderTemplate(`@${cv.key}`, previewRecord, [cv])
           : null;
         return (
           <div key={cv.id} className="flex flex-col gap-2 p-3.5 border border-accent rounded-xl bg-accent/30 shadow-sm">
@@ -256,7 +253,7 @@ export function CustomVariableEditor({ variables: customVariables, onChange: sav
               />
               {previewVal !== null && (
                 <span className="text-[11px] text-accent-foreground bg-accent rounded-full px-2.5 py-1 font-semibold whitespace-nowrap">
-                  {previewStudent?.full_name?.split(' ').slice(-1)[0] || t('customVariables.studentFallback')} → {previewVal || <span className="italic text-muted-foreground">{t('customVariables.empty')}</span>}
+                  {previewRecord?.full_name?.split(' ').slice(-1)[0] || t('customVariables.studentFallback')} → {previewVal || <span className="italic text-muted-foreground">{t('customVariables.empty')}</span>}
                 </span>
               )}
               <button
@@ -283,13 +280,14 @@ export function CustomVariableEditor({ variables: customVariables, onChange: sav
               {cv.rules.map((rule, rIdx) => (
                 <div key={rule.id} className="flex items-center gap-1.5 flex-wrap bg-card/70 rounded-lg px-2.5 py-2 border border-border">
                   <span className="text-[11px] font-bold text-muted-foreground">{t('customVariables.ifWord')}</span>
-                  <select
+                  <input
+                    type="text"
                     value={rule.attr}
                     onChange={(e) => handleUpdateRule(cv.id, rule.id, { attr: e.target.value })}
-                    className="bg-muted hover:bg-muted text-foreground text-[11px] font-bold rounded px-1.5 py-1 focus:outline-none transition-colors border-none cursor-pointer"
-                  >
-                    {VAR_ATTR_OPTIONS.map((a) => (<option key={a} value={a}>{a}</option>))}
-                  </select>
+                    list={attrSuggestions.length > 0 ? datalistId : undefined}
+                    placeholder={t('customVariables.attrPlaceholder', 'Tên field')}
+                    className="bg-muted hover:bg-muted text-foreground text-[11px] font-bold rounded px-1.5 py-1 focus:outline-none transition-colors border-none cursor-text w-28"
+                  />
                   <select
                     value={rule.op}
                     onChange={(e) => handleUpdateRule(cv.id, rule.id, { op: e.target.value as VarRuleOp })}

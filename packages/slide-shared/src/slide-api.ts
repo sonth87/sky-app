@@ -1,4 +1,5 @@
-import type { ApiIntegration, AppConfig, Ceremony, Student } from './types.js';
+import type { ApiIntegration, AppConfig, Ceremony } from './types.js';
+import type { CanonicalRecord } from './layout/canonical.js';
 
 /**
  * Types + interface cho bridge `window.slide` (Electron preload, port từ
@@ -13,38 +14,9 @@ export type ApiEnvironment = 'prod' | 'test';
 export interface SlideMeta {
   config: AppConfig | null;
   ceremony: Ceremony | null;
-  students: Student[];
-  syncedAt: string | null;
+  records: CanonicalRecord[];
   hasData: boolean;
   apiEnvironment: ApiEnvironment;
-}
-
-export interface InvalidStudent {
-  index: number;
-  code: string;
-  reason: string;
-}
-
-export interface ImportPreview {
-  valid: number;
-  invalid: InvalidStudent[];
-  total: number;
-}
-
-export interface SyncResult {
-  ok: boolean;
-  updated: number;
-  added: number;
-  photosChanged: number;
-  offline: boolean;
-  message: string;
-  warning?: string;
-  pendingConfirm?: ImportPreview;
-}
-
-export interface SyncProgress {
-  step: string;
-  pct: number;
 }
 
 export interface DisplayInfo {
@@ -138,20 +110,13 @@ export interface PreGenStatus {
   running: boolean;
   paused: boolean;
   configChanged: boolean;
-  currentStudentCode: string | null;
-  students: Record<string, PreGenStudentStatus>;
-  quality: Record<string, string[]>; // studentCode -> flags (chỉ file bị flag)
+  currentId: string | null;
+  records: Record<string, PreGenStudentStatus>;
+  quality: Record<string, string[]>; // id -> flags (chỉ file bị flag)
 }
 
 export interface SlideApi {
   getMeta(): Promise<SlideMeta>;
-  syncData(payload?: { url?: string; zipPath?: string }): Promise<SyncResult>;
-  openBundleFile(): Promise<string | null>;
-  statBundleFile(filePath: string): Promise<{ size: number }>;
-  confirmImport(): Promise<SyncResult>;
-  cancelImport(): Promise<{ ok: boolean }>;
-  exportData(): Promise<{ ok: boolean; message: string }>;
-  onSyncProgress(cb: (p: SyncProgress) => void): () => void;
   updateConfig(patch: Partial<unknown>): Promise<unknown>;
   getApiEnvironment(): Promise<ApiEnvironment>;
   setApiEnvironment(env: ApiEnvironment): Promise<ApiEnvironment>;
@@ -176,8 +141,6 @@ export interface SlideApi {
   getAppVersion(): Promise<{ version: string }>;
   setAppLanguage(language: 'vi' | 'en'): Promise<void>;
   onMenuAction(cb: (id: string) => void): () => void;
-  getUseSampleData(): Promise<boolean>;
-  setUseSampleData(val: boolean): Promise<SyncResult>;
   saveAutoPlay(state: {
     scannedCodes: string[];
     playedCodes: string[];
@@ -273,8 +236,8 @@ export interface SlideApi {
   pregenResume(): Promise<{ ok: boolean }>;
   pregenCancel(): Promise<{ ok: boolean }>;
   pregenGetStatus(): Promise<PreGenStatus | null>;
-  pregenRequeue(studentCode: string): Promise<{ ok: boolean; error?: string }>;
-  pregenGetAudio(studentCode: string): Promise<{ ok: boolean; buffer?: ArrayBuffer; error?: string }>;
+  pregenRequeue(id: string): Promise<{ ok: boolean; error?: string }>;
+  pregenGetAudio(id: string): Promise<{ ok: boolean; buffer?: ArrayBuffer; error?: string }>;
   onPregenProgress(cb: (status: PreGenStatus) => void): () => void;
   getLogs(): Promise<unknown[]>;
   retryLog(logId: string): Promise<void>;

@@ -32,6 +32,7 @@ interface PickableLayout {
   name: string;
   version: number;
   content: LayoutContent;
+  color?: string;
 }
 
 const THUMB_SIZE = { w: 200, h: 112 };
@@ -70,7 +71,8 @@ export function LayoutPickerModal({ open, onClose, layoutPort, assetPort, onPick
         publishable.map(async (d) => {
           const version = await layoutPort.getVersion(d.id, d.latestPublishedVersion as number);
           if (!version) return null;
-          return { id: d.id, name: d.name, version: version.version, content: version.content } satisfies PickableLayout;
+          const picked: PickableLayout = { id: d.id, name: d.name, version: version.version, content: version.content, color: d.color };
+          return picked;
         }),
       );
       if (!cancelled) setLayouts(withContent.filter((x): x is PickableLayout => x != null));
@@ -203,7 +205,12 @@ export function LayoutPickerModal({ open, onClose, layoutPort, assetPort, onPick
                     <div style={{ width: THUMB_SIZE.w, height: THUMB_SIZE.h }} className="overflow-hidden rounded-md bg-black">
                       <LayoutRenderer content={layout.content} screen={THUMB_SIZE} record={DEMO_RECORD} resolveAsset={resolveAsset} />
                     </div>
-                    <span className="truncate text-xs font-medium text-foreground">{layout.name}</span>
+                    <span className="flex items-center gap-1.5 truncate text-xs font-medium text-foreground">
+                      {layout.color && (
+                        <span className="h-2 w-2 flex-none rounded-full" style={{ backgroundColor: layout.color }} />
+                      )}
+                      <span className="truncate">{layout.name}</span>
+                    </span>
                   </button>
                 );
               })}

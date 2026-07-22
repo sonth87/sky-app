@@ -1,6 +1,5 @@
 import { Menu, app, type MenuItemConstructorOptions } from 'electron';
 import { getMainWindow, getBackdropWindow } from './windows';
-import { getUseSampleData } from './socket-server';
 
 export type MenuLanguage = 'vi' | 'en';
 export type MenuActionId =
@@ -11,12 +10,9 @@ export type MenuActionId =
   | 'settings:layout'
   | 'settings:api'
   | 'settings:backup'
-  | 'data:import'
-  | 'data:export'
   | 'data:reset:qr'
   | 'data:reset:students'
   | 'data:reset:cache'
-  | 'develop:sampleData'
   | 'develop:apiTest';
 
 const LABELS: Record<MenuLanguage, Record<string, string>> = {
@@ -25,14 +21,11 @@ const LABELS: Record<MenuLanguage, Record<string, string>> = {
     settings: 'Cài đặt…',
     quit: 'Thoát',
     data: 'Dữ liệu',
-    import: 'Import',
-    export: 'Export',
     reset: 'Đặt lại',
     resetQr: 'Danh sách quét QR',
-    resetStudents: 'Danh sách sinh viên',
+    resetStudents: 'Danh sách người tham dự',
     resetCache: 'Cache',
     develop: 'Develop',
-    sampleData: 'Dùng dữ liệu mẫu',
     devtoolsControl: 'DevTools — Control',
     devtoolsBackdrop: 'DevTools — Backdrop',
     apiTest: 'Giao diện thử nghiệm API',
@@ -44,14 +37,11 @@ const LABELS: Record<MenuLanguage, Record<string, string>> = {
     settings: 'Settings…',
     quit: 'Quit',
     data: 'Data',
-    import: 'Import',
-    export: 'Export',
     reset: 'Reset',
     resetQr: 'QR scan list',
-    resetStudents: 'Student list',
+    resetStudents: 'Attendee list',
     resetCache: 'Cache',
     develop: 'Develop',
-    sampleData: 'Use sample data',
     devtoolsControl: 'DevTools — Control',
     devtoolsBackdrop: 'DevTools — Backdrop',
     apiTest: 'API test interface',
@@ -82,9 +72,6 @@ export function buildAppMenu(language: MenuLanguage) {
     {
       label: l.data,
       submenu: [
-        { label: l.import, click: () => sendMenuAction('data:import') },
-        { label: l.export, click: () => sendMenuAction('data:export') },
-        { type: 'separator' },
         {
           label: l.reset,
           submenu: [
@@ -98,13 +85,6 @@ export function buildAppMenu(language: MenuLanguage) {
     {
       label: l.develop,
       submenu: [
-        {
-          label: l.sampleData,
-          type: 'checkbox',
-          checked: getUseSampleData(),
-          click: () => sendMenuAction('develop:sampleData'),
-        },
-        { type: 'separator' },
         { label: l.devtoolsControl, click: () => getMainWindow()?.webContents.openDevTools() },
         { label: l.devtoolsBackdrop, click: () => getBackdropWindow()?.webContents.openDevTools() },
         { label: l.apiTest, click: () => sendMenuAction('develop:apiTest') },

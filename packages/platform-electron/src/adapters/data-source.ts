@@ -33,5 +33,13 @@ export function createElectronDataSourcePort(): DataSourcePort {
     async saveFieldMappingProfile(profile) {
       await window.sky.invoke('kernel:dataSource:saveFieldMappingProfile', profile);
     },
+    async pickZipFile() {
+      return (await window.sky.invoke('kernel:dataSource:pickZipFile')) as Awaited<ReturnType<NonNullable<DataSourcePort['pickZipFile']>>>;
+    },
+    async confirmZipImport(opts) {
+      return (await window.sky.invoke('kernel:dataSource:confirmZipImport', opts)) as Awaited<
+        ReturnType<NonNullable<DataSourcePort['confirmZipImport']>>
+      >;
+    },
   };
 }

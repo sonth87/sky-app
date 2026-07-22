@@ -11,7 +11,7 @@ import { CustomVariableEditor } from './CustomVariableEditor';
 export function CustomVariablesContent() {
   const { t } = useTranslation();
   const storeVariables = useControlStore((s) => s.customVariables || []) as CustomVariable[];
-  const students = useControlStore((s) => s.students);
+  const records = useControlStore((s) => s.records);
   const socket = useSocketRef();
 
   // Local state (optimistic) — UI phản hồi ngay, không chờ round-trip server.
@@ -23,7 +23,7 @@ export function CustomVariablesContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const previewStudent = students[0] ?? null;
+  const previewRecord = records[0] ?? null;
 
   // Cập nhật UI ngay + phát tới server để persist & đồng bộ client khác
   const save = (vars: CustomVariable[]) => {
@@ -40,7 +40,7 @@ export function CustomVariablesContent() {
         </span>
         <span className="text-[11px] font-semibold">{t('customVariables.autoSave')}</span>
       </div>
-      <CustomVariableEditor variables={customVariables} onChange={save} previewStudent={previewStudent} students={students} />
+      <CustomVariableEditor variables={customVariables} onChange={save} previewRecord={previewRecord} records={records} attrSuggestions={[]} />
     </div>
   );
 }

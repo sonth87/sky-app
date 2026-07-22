@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react';
-import { type Student, type TtsCondition, type CustomVariable } from '@sky-app/slide-shared';
+import { type CanonicalRecord, type TtsCondition, type CustomVariable } from '@sky-app/slide-shared';
 import { VoicePickerPopover } from '../VoicePickerPopover';
 import { TemplateEditor } from '../TemplateEditor';
 import { AdvancedTtsConfig } from '../AdvancedTtsConfig';
@@ -31,8 +31,8 @@ interface ConfigColumnProps {
   onChangePlayMode: (val: 'realtime' | 'pregen' | 'pregen-fallback') => void;
   localConditions: TtsCondition[];
   hasConditions: boolean;
-  previewStudent: Student | null;
-  getVoiceForStudent: (student: Student, conditions: TtsCondition[], fallbackVoice: string) => string;
+  previewRecord: CanonicalRecord | null;
+  getVoiceForStudent: (record: CanonicalRecord, conditions: TtsCondition[], fallbackVoice: string) => string;
   onOpenCloneModal: () => void;
   customVariables?: CustomVariable[];
   onManageVariables?: () => void;
@@ -51,7 +51,7 @@ export function ConfigColumn({
   onChangePlayMode,
   localConditions,
   hasConditions,
-  previewStudent,
+  previewRecord,
   getVoiceForStudent,
   onOpenCloneModal,
   customVariables,
@@ -124,8 +124,8 @@ export function ConfigColumn({
         <TemplateEditor
           value={localTemplate}
           onChange={onChangeTemplate}
-          previewStudent={previewStudent}
-          voiceId={previewStudent ? getVoiceForStudent(previewStudent, localConditions, localModel) : localModel}
+          previewRecord={previewRecord}
+          voiceId={previewRecord ? getVoiceForStudent(previewRecord, localConditions, localModel) : localModel}
           speed={localSpeed}
           customVariables={customVariables}
           onManageVariables={onManageVariables}
@@ -168,15 +168,15 @@ export function ConfigColumn({
 
       {/* Cấu hình chuyên sâu (advanced infer params) */}
       <AdvancedTtsConfig
-        previewDisabled={!previewStudent}
+        previewDisabled={!previewRecord}
         onPreview={async () => {
           // Nghe thử: đọc câu template cho SV mẫu bằng config vừa lưu (server-side).
-          const text = previewStudent && localTemplate
-            ? renderTemplate(localTemplate, previewStudent, customVariables)
-            : (previewStudent?.full_name ?? '');
+          const text = previewRecord && localTemplate
+            ? renderTemplate(localTemplate, previewRecord, customVariables)
+            : (previewRecord?.full_name ?? '');
           if (!text) return;
-          const voiceId = previewStudent
-            ? getVoiceForStudent(previewStudent, localConditions, localModel)
+          const voiceId = previewRecord
+            ? getVoiceForStudent(previewRecord, localConditions, localModel)
             : localModel;
           const res = await window.slide?.speak?.(text, voiceId, localSpeed);
           if (res?.ok && res.buffer) {

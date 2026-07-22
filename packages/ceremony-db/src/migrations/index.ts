@@ -5,6 +5,9 @@ import { SQL_004_ASSET_LIBRARY } from './004_asset_library.js';
 import { SQL_005_EVENT_DATA_SOURCE } from './005_event_data_source.js';
 import { SQL_006_FIELD_MAPPING_PROFILE } from './006_field_mapping_profile.js';
 import { SQL_007_CANONICAL_CORE_FIELDS } from './007_canonical_core_fields.js';
+import { SQL_008_EVENT_LAYOUT_REF_ROLE } from './008_event_layout_ref_role.js';
+import { SQL_009_DROP_STUDENT_SCHEMA } from './009_drop_student_schema.js';
+import { SQL_010_LAYOUT_DOCUMENT_COLOR } from './010_layout_document_color.js';
 
 export interface Migration {
   version: number;
@@ -26,4 +29,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 5, name: 'event_data_source', sql: SQL_005_EVENT_DATA_SOURCE },
   { version: 6, name: 'field_mapping_profile', sql: SQL_006_FIELD_MAPPING_PROFILE },
   { version: 7, name: 'canonical_core_fields', sql: SQL_007_CANONICAL_CORE_FIELDS },
+  { version: 8, name: 'event_layout_ref_role', sql: SQL_008_EVENT_LAYOUT_REF_ROLE },
+  { version: 9, name: 'drop_student_schema', sql: SQL_009_DROP_STUDENT_SCHEMA },
+  { version: 10, name: 'layout_document_color', sql: SQL_010_LAYOUT_DOCUMENT_COLOR },
 ];

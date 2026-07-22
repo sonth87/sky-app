@@ -8,12 +8,17 @@ catalog:
   # shell-web) tham chiếu qua "catalog:" thay vì ghi version cụ thể, tránh phải sửa 4 chỗ mỗi
   # lần cập nhật device-layout (phát hiện qua bất tiện thật, 2026-07-21).
   #
-  # v0.2.7 — 4 package.json trước đó ghi "v0.2.6", một tag CHƯA TỪNG TỒN TẠI trên remote (chỉ
-  # "chạy được" vì pnpm-lock.yaml cache sẵn resolve của v0.2.4). Đã tạo + push tag v0.2.7 thật
-  # (repo gốc /Users/skyline/PROJECTS/device-layout, khớp package.json's version đã bump sẵn +
-  # dist-lib/ đã build) cho 4 commit tính năng tồn đọng (colorScheme prop, Simple Mode config,
-  # full-screen exit fix, menu bar customization) — xem CHANGELOG/git log repo đó để chi tiết.
-  "@sonth87/device-layout": "github:sonth87/device-layout#v0.2.7"
+  # v0.2.10 — sửa bug thật phát hiện 2026-07-21: isSimpleMode dạng object custom (không phải
+  # true/false) khiến field KHÔNG khai báo tường minh (VD dock/iconGrid) mặc định TẮT, và
+  # `iconGrid` là nơi DUY NHẤT render icon mở app trên desktop macOS theme (tên field gây hiểu
+  # lầm — nghe như chỉ "sắp xếp icon" nhưng thực chất quyết định "có hiện icon app hay không") —
+  # nếu tắt cả dock lẫn iconGrid, không còn cách nào mở app qua UI. User đã tự sửa ở repo gốc
+  # /Users/skyline/PROJECTS/device-layout, release v0.2.10 "Fix iconGrid default, builtInApps
+  # prop & liveWallpapers customization". Trước đó là v0.2.7 (colorScheme prop, Simple Mode
+  # config, full-screen exit fix, menu bar customization) — xem git log repo đó để chi tiết.
+  # Đã thử nghiệm 2026-07-21: đổi về v0.2.4 KHÔNG sửa được UI vỡ (mất padding/spacing) — xác
+  # nhận KHÔNG phải do version device-layout, giữ v0.2.10 (bản đúng ý user).
+  "@sonth87/device-layout": "github:sonth87/device-layout#v0.2.10"
 
 onlyBuiltDependencies:
   - electron

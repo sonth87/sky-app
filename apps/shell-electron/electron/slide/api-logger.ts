@@ -1,7 +1,8 @@
 import { app, dialog } from 'electron';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ApiIntegration, Student } from '@sky-app/slide-shared';
+import type { ApiIntegration, CanonicalRecord } from '@sky-app/slide-shared';
+import { flattenCanonicalRecord } from '@sky-app/slide-shared';
 import { getAwardLocationCode, getApiIntegrations } from './socket-server';
 import { getMainWindow, isBackdropOpen } from './windows';
 
@@ -35,7 +36,7 @@ export interface LogEntry {
 // build lại template (URL/headers/body) với dữ liệu mới nhất thay vì replay bản đã interpolate cũ.
 interface ApiCallInput {
   integration: ApiIntegration;
-  student: Student | null;
+  record: CanonicalRecord | null;
 }
 
 function formatLocalTime(date: Date): string {
@@ -50,7 +51,7 @@ function formatLocalTime(date: Date): string {
 }
 
 interface TemplateContext {
-  student?: Student | null;
+  student?: Record<string, unknown> | null;
   award_location_code: number;
   event: string;
   backdrop_open: boolean;
@@ -65,7 +66,7 @@ function resolveTemplateVar(key: string, context: TemplateContext): unknown {
   if (key === 'logs') return context.logs || [];
   if (context.student) {
     const cleanKey = key.startsWith('student.') ? key.substring(8) : key;
-    return (context.student as any)[cleanKey];
+    return context.student[cleanKey];
   }
   return undefined;
 }
@@ -173,27 +174,29 @@ class ApiLogger {
     return newEntry;
   }
 
-  logScan(student: Student) {
+  logScan(record: CanonicalRecord) {
+    const flat = flattenCanonicalRecord(record);
     this.addLog({
-      studentCode: student.student_code,
-      studentName: student.full_name,
-      phone: student.phone_number,
-      major: student.major_name,
-      classCode: student.class_code,
+      studentCode: record.identifierCode ?? record.id,
+      studentName: record.full_name,
+      phone: record.phone,
+      major: typeof flat['major_name'] === 'string' ? (flat['major_name'] as string) : undefined,
+      classCode: typeof flat['class_code'] === 'string' ? (flat['class_code'] as string) : undefined,
       action: 'scan',
-      details: `Quét QR/Thẻ thành công: ${student.full_name} (${student.student_code}) - Lớp: ${student.class_code}, Ngành: ${student.major_name}`,
+      details: `Quét QR/Thẻ thành công: ${record.full_name} (${record.identifierCode ?? record.id})`,
     });
   }
 
-  logPlay(student: Student) {
+  logPlay(record: CanonicalRecord) {
+    const flat = flattenCanonicalRecord(record);
     this.addLog({
-      studentCode: student.student_code,
-      studentName: student.full_name,
-      phone: student.phone_number,
-      major: student.major_name,
-      classCode: student.class_code,
+      studentCode: record.identifierCode ?? record.id,
+      studentName: record.full_name,
+      phone: record.phone,
+      major: typeof flat['major_name'] === 'string' ? (flat['major_name'] as string) : undefined,
+      classCode: typeof flat['class_code'] === 'string' ? (flat['class_code'] as string) : undefined,
       action: 'play',
-      details: `Chạy slide chủ động (Play): ${student.full_name} (${student.student_code}) - Lớp: ${student.class_code}, Ngành: ${student.major_name}`,
+      details: `Chạy slide chủ động (Play): ${record.full_name} (${record.identifierCode ?? record.id})`,
     });
   }
 
@@ -213,8 +216,8 @@ class ApiLogger {
     });
   }
 
-  async triggerApiCall(student: Student) {
-    this.triggerCustomApi('play_student', student).catch((err) => {
+  async triggerApiCall(record: CanonicalRecord) {
+    this.triggerCustomApi('play_student', record).catch((err) => {
       console.error('[ApiLogger] triggerApiCall custom error:', err);
     });
   }
@@ -225,7 +228,7 @@ class ApiLogger {
     });
   }
 
-  async triggerCustomApi(action: string, student?: Student | null): Promise<boolean> {
+  async triggerCustomApi(action: string, record?: CanonicalRecord | null): Promise<boolean> {
     const integration = getApiIntegrations().find((i) => i.action === action);
     if (!integration) {
       console.log(`[ApiLogger] No custom API configured for action: ${action}`);
@@ -236,16 +239,17 @@ class ApiLogger {
     // build lại template với dữ liệu mới nhất (vd. {{logs}} snapshot mới) thay vì replay bản cũ.
     const callInput: ApiCallInput = {
       integration,
-      student: student ?? null,
+      record: record ?? null,
     };
 
+    const flat = record ? flattenCanonicalRecord(record) : null;
     const interpolatedUrl = interpolatePlainText(integration.url, this.buildTemplateContext(callInput));
     const logEntry = this.addLog({
-      studentCode: student?.student_code,
-      studentName: student?.full_name,
-      phone: student?.phone_number,
-      major: student?.major_name,
-      classCode: student?.class_code,
+      studentCode: record?.identifierCode ?? record?.id,
+      studentName: record?.full_name,
+      phone: record?.phone,
+      major: flat && typeof flat['major_name'] === 'string' ? (flat['major_name'] as string) : undefined,
+      classCode: flat && typeof flat['class_code'] === 'string' ? (flat['class_code'] as string) : undefined,
       action: 'api_call',
       details: `Gọi API Tích hợp [${integration.action}]: ${integration.method} ${interpolatedUrl}...`,
       apiStatus: 'pending',
@@ -258,7 +262,7 @@ class ApiLogger {
 
   private buildTemplateContext(input: ApiCallInput): TemplateContext {
     return {
-      student: input.student,
+      student: input.record ? flattenCanonicalRecord(input.record) : null,
       award_location_code: getAwardLocationCode(),
       event: input.integration.action,
       backdrop_open: isBackdropOpen(),
@@ -469,13 +473,19 @@ class ApiLogger {
         return { ok: false, message: 'Chưa cấu hình API cho sự kiện "Phát slide sinh viên"' };
       }
 
-      const testStudent = { student_code: 'TEST-SV001', full_name: 'Sinh Viên Thử Nghiệm API' } as Student;
+      const testRecord: CanonicalRecord = {
+        id: 'TEST-SV001',
+        identifierCode: 'TEST-SV001',
+        full_name: 'Sinh Viên Thử Nghiệm API',
+        subjectType: 'student',
+        extra: {},
+      };
       const hallCode = getAwardLocationCode();
-      const callInput: ApiCallInput = { integration, student: testStudent };
+      const callInput: ApiCallInput = { integration, record: testRecord };
 
       const logEntry = this.addLog({
-        studentCode: testStudent.student_code,
-        studentName: testStudent.full_name,
+        studentCode: testRecord.identifierCode,
+        studentName: testRecord.full_name,
         action: 'api_call',
         details: `Gọi API Test: Đang thử kết nối tới cổng dịch vụ tại Hội trường ${hallCode}...`,
         apiStatus: 'pending',

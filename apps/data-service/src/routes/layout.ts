@@ -11,6 +11,7 @@ import {
   recordTokenUsage,
   restoreVersion,
   saveDraft,
+  updateLayoutDocumentMeta,
 } from '@sky-app/ceremony-db/node';
 import { getExecutor } from '../store.js';
 
@@ -33,6 +34,11 @@ export async function layoutRoutes(app: FastifyInstance) {
       return { ok: true };
     },
   );
+
+  app.post<{ Params: { id: string }; Body: { color?: string } }>('/api/layout/:id/meta', async (req) => {
+    updateLayoutDocumentMeta(getExecutor(), req.params.id, req.body);
+    return { ok: true };
+  });
 
   app.post<{ Params: { id: string }; Body: { content: LayoutContent } }>('/api/layout/:id/draft', async (req) => {
     saveDraft(getExecutor(), req.params.id, req.body.content);

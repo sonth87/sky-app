@@ -4,8 +4,6 @@ import type {
   ApiEnvironment,
   SlideApi,
   SlideMeta,
-  SyncResult,
-  SyncProgress,
   DisplayInfo,
   TtsConfig,
   TtsEngines,
@@ -22,10 +20,6 @@ export type {
   ApiEnvironment,
   SlideApi,
   SlideMeta,
-  InvalidStudent,
-  ImportPreview,
-  SyncResult,
-  SyncProgress,
   DisplayInfo,
   TtsConfig,
   TtsEngineInfo,
@@ -38,18 +32,6 @@ export type {
 
 const api: SlideApi = {
   getMeta: (): Promise<SlideMeta> => ipcRenderer.invoke('data:meta'),
-  syncData: (payload?: { url?: string; zipPath?: string }): Promise<SyncResult> =>
-    ipcRenderer.invoke('data:sync', payload),
-  openBundleFile: (): Promise<string | null> => ipcRenderer.invoke('data:openFile'),
-  statBundleFile: (filePath: string): Promise<{ size: number }> => ipcRenderer.invoke('data:statFile', filePath),
-  confirmImport: (): Promise<SyncResult> => ipcRenderer.invoke('data:confirmImport'),
-  cancelImport: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('data:cancelImport'),
-  exportData: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('data:export'),
-  onSyncProgress: (cb: (p: SyncProgress) => void): (() => void) => {
-    const handler = (_e: unknown, p: SyncProgress) => cb(p);
-    ipcRenderer.on('data:progress', handler);
-    return () => ipcRenderer.removeListener('data:progress', handler);
-  },
   updateConfig: (patch: Partial<any>): Promise<any> => ipcRenderer.invoke('config:update', patch),
   getApiEnvironment: (): Promise<ApiEnvironment> => ipcRenderer.invoke('config:getApiEnvironment'),
   setApiEnvironment: (env: ApiEnvironment): Promise<ApiEnvironment> => ipcRenderer.invoke('config:setApiEnvironment', env),
@@ -88,8 +70,6 @@ const api: SlideApi = {
     ipcRenderer.on('menu:action', handler);
     return () => ipcRenderer.removeListener('menu:action', handler);
   },
-  getUseSampleData: (): Promise<boolean> => ipcRenderer.invoke('config:getUseSampleData'),
-  setUseSampleData: (val: boolean): Promise<SyncResult> => ipcRenderer.invoke('config:setUseSampleData', val),
   saveAutoPlay: (state: {
     scannedCodes: string[];
     playedCodes: string[];
@@ -243,10 +223,10 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:pregen-cancel'),
   pregenGetStatus: (): Promise<import('./pregen-queue').PreGenStatus | null> =>
     ipcRenderer.invoke('tts:pregen-status'),
-  pregenRequeue: (studentCode: string): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('tts:pregen-requeue', { studentCode }),
-  pregenGetAudio: (studentCode: string): Promise<{ ok: boolean; buffer?: ArrayBuffer; error?: string }> =>
-    ipcRenderer.invoke('tts:pregen-get-audio', { studentCode }).then((res) => {
+  pregenRequeue: (id: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('tts:pregen-requeue', { id }),
+  pregenGetAudio: (id: string): Promise<{ ok: boolean; buffer?: ArrayBuffer; error?: string }> =>
+    ipcRenderer.invoke('tts:pregen-get-audio', { id }).then((res) => {
       if (res.ok && res.buffer) {
         return {
           ok: true,

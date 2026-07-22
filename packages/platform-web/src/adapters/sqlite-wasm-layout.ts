@@ -10,6 +10,7 @@ import {
   recordTokenUsage,
   restoreVersion,
   saveDraft,
+  updateLayoutDocumentMeta,
 } from '@sky-app/ceremony-db/browser';
 import { getSharedWasmExecutor, persistSharedWasmExecutor } from '../wasm-executor.js';
 
@@ -38,6 +39,12 @@ export function createSqliteWasmLayoutPort(opts: SqliteWasmLayoutPortOptions = {
     async createDocument(id, name, initialContent, description) {
       const executor = await getSharedWasmExecutor(wasmUrl);
       createLayoutDocument(executor, id, name, initialContent, description);
+      await persistSharedWasmExecutor(executor);
+    },
+
+    async updateDocumentMeta(id, patch) {
+      const executor = await getSharedWasmExecutor(wasmUrl);
+      updateLayoutDocumentMeta(executor, id, patch);
       await persistSharedWasmExecutor(executor);
     },
 

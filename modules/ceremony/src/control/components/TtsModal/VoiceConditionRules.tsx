@@ -1,46 +1,26 @@
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
-import { type Student, type TtsCondition } from '@sky-app/slide-shared';
+import { type CanonicalRecord, type TtsCondition, flattenCanonicalRecord } from '@sky-app/slide-shared';
 import type { VoiceInfo } from '../VoicePickerPopover';
-
-// Map giá trị attr (dữ liệu nội bộ, KHÔNG dịch — được lưu/so khớp ở nơi khác) sang key i18n hiển thị.
-const ATTR_LABEL_KEYS: Record<string, string> = {
-  'Giới tính': 'gender',
-  'Xếp loại': 'classification',
-  'Ngành': 'major',
-  'Khoa': 'faculty',
-  'Lớp': 'classCode',
-  'Khóa': 'course',
-  'Họ tên': 'fullName',
-};
 
 interface VoiceConditionRulesProps {
   conditions: TtsCondition[];
   voicePool: string[];
   voiceCatalog: VoiceInfo[];
-  students: Student[];
+  records: CanonicalRecord[];
+  /** Gợi ý tên field (TỰ DO — giai đoạn "bỏ Student", 2026-07-22), thường lấy từ
+   * FieldMappingProfile.map's keys. Rỗng → input gõ tự do hoàn toàn. */
+  attrSuggestions: string[];
   onUpdateCondition: (id: string | number, patch: Partial<TtsCondition>) => void;
   onRemoveCondition: (id: string | number) => void;
   onMoveCondition: (index: number, direction: 'up' | 'down') => void;
   onAddCondition: () => void;
 }
 
-function getUniqueValuesForAttrFactory(students: Student[]) {
+function getUniqueValuesForAttrFactory(records: CanonicalRecord[]) {
   return (attr: string): string[] => {
-    if (attr === 'Giới tính') return ['Nam', 'Nữ'];
-    if (attr === 'Họ tên') return [];
-
-    const fieldMap: Record<string, keyof Student> = {
-      'Xếp loại': 'classification',
-      'Ngành': 'major_name',
-      'Khoa': 'faculty_name',
-      'Lớp': 'class_code',
-      'Khóa': 'course_code',
-    };
-    const field = fieldMap[attr];
-    if (!field) return [];
-
-    const vals = students.map((s) => String(s[field] || '').trim()).filter(Boolean);
+    if (!attr) return [];
+    const vals = records.map((r) => flattenCanonicalRecord(r)[attr]?.trim() || '').filter(Boolean);
     return Array.from(new Set(vals)).sort();
   };
 }
@@ -49,14 +29,16 @@ export function VoiceConditionRules({
   conditions,
   voicePool,
   voiceCatalog,
-  students,
+  records,
+  attrSuggestions,
   onUpdateCondition,
   onRemoveCondition,
   onMoveCondition,
   onAddCondition,
 }: VoiceConditionRulesProps) {
   const { t } = useTranslation();
-  const getUniqueValuesForAttr = getUniqueValuesForAttrFactory(students);
+  const getUniqueValuesForAttr = getUniqueValuesForAttrFactory(records);
+  const datalistId = 'voice-condition-attrs';
 
   return (
     <div className="flex flex-col gap-2">
@@ -64,6 +46,14 @@ export function VoiceConditionRules({
         <span className="text-sm-13 font-semibold text-foreground">{t('voiceConditionRules.title')}</span>
         <span className="text-2xs text-muted-foreground italic">{t('voiceConditionRules.priorityHint')}</span>
       </div>
+
+      {attrSuggestions.length > 0 && (
+        <datalist id={datalistId}>
+          {attrSuggestions.map((attr) => (
+            <option key={attr} value={attr} />
+          ))}
+        </datalist>
+      )}
 
       <div className="flex flex-col gap-2">
         {conditions.map((cond, idx) => (
@@ -73,29 +63,20 @@ export function VoiceConditionRules({
           >
             <span className="text-xs font-bold text-muted-foreground">{t('voiceConditionRules.if')}</span>
 
-            {/* Thuộc tính */}
-            <select
+            {/* Thuộc tính — TỰ DO (giai đoạn "bỏ Student") */}
+            <input
+              type="text"
               value={cond.attr}
               onChange={(e) => onUpdateCondition(cond.id, { attr: e.target.value })}
-              className="bg-muted hover:bg-muted text-foreground text-xs font-bold rounded-lg px-2.5 py-1 focus:outline-none transition-colors border-none cursor-pointer"
-            >
-              {Object.entries(ATTR_LABEL_KEYS).map(([attrValue, labelKey]) => (
-                <option key={attrValue} value={attrValue}>{t(`voiceConditionRules.attrs.${labelKey}`)}</option>
-              ))}
-            </select>
+              list={attrSuggestions.length > 0 ? datalistId : undefined}
+              placeholder={t('voiceConditionRules.attrPlaceholder', 'Tên field')}
+              className="bg-muted hover:bg-muted text-foreground text-xs font-bold rounded-lg px-2.5 py-1 focus:outline-none transition-colors border-none cursor-text w-28"
+            />
 
             <span className="text-xs text-muted-foreground">{t('voiceConditionRules.is')}</span>
 
             {/* Giá trị */}
-            {cond.attr === 'Họ tên' ? (
-              <input
-                type="text"
-                value={cond.val}
-                onChange={(e) => onUpdateCondition(cond.id, { val: e.target.value })}
-                placeholder={t('voiceConditionRules.fullNamePlaceholder') as string}
-                className="bg-muted hover:bg-muted focus:bg-card text-foreground text-xs font-bold rounded-lg px-2.5 py-1 focus:outline-none transition-colors border border-transparent focus:border-border w-32 placeholder-muted-foreground"
-              />
-            ) : (
+            {getUniqueValuesForAttr(cond.attr).length > 0 ? (
               <select
                 value={cond.val}
                 onChange={(e) => onUpdateCondition(cond.id, { val: e.target.value })}
@@ -105,6 +86,14 @@ export function VoiceConditionRules({
                   <option key={val} value={val}>{val}</option>
                 ))}
               </select>
+            ) : (
+              <input
+                type="text"
+                value={cond.val}
+                onChange={(e) => onUpdateCondition(cond.id, { val: e.target.value })}
+                placeholder={t('voiceConditionRules.fullNamePlaceholder') as string}
+                className="bg-muted hover:bg-muted focus:bg-card text-foreground text-xs font-bold rounded-lg px-2.5 py-1 focus:outline-none transition-colors border border-transparent focus:border-border w-32 placeholder-muted-foreground"
+              />
             )}
 
             <span className="text-xs text-muted-foreground">→</span>

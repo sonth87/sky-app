@@ -56,7 +56,7 @@ async function isDataServiceAvailable(baseUrl: string): Promise<boolean> {
  */
 async function resolveDataPort(opts: CreateWebPlatformOptions, baseUrl: string, available: boolean): Promise<DataPort> {
   if (available) return createWebDataPort(baseUrl);
-  return createSqliteWasmDataPort({ sampleStudentsUrl: opts.sampleStudentsUrl, wasmUrl: opts.sqlWasmUrl });
+  return createSqliteWasmDataPort({ wasmUrl: opts.sqlWasmUrl });
 }
 
 async function resolveLayoutPort(opts: CreateWebPlatformOptions, baseUrl: string, available: boolean): Promise<LayoutPort> {

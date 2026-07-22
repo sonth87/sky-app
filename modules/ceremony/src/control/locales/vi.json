@@ -8,7 +8,8 @@
     "edit": "Sửa",
     "add": "Thêm",
     "error": "Lỗi",
-    "loading": "Đang tải..."
+    "loading": "Đang tải...",
+    "or": "hoặc"
   },
   "statusBar": {
     "switchLanguage": "Chuyển ngôn ngữ",
@@ -1200,7 +1201,10 @@
     "archivedActivateConfirmTitle": "Kích hoạt lại sự kiện đã lưu trữ?",
     "archivedActivateConfirmMessage": "Sự kiện \"{{name}}\" đã được lưu trữ. Bạn có chắc muốn kích hoạt lại?",
     "updateSuccess": "Đã lưu thay đổi cho \"{{name}}\"",
-    "editButton": "Sửa"
+    "editButton": "Sửa",
+    "recordCountBadge": "{{count}} người",
+    "noDataBadge": "Chưa có dữ liệu",
+    "noLayoutBadge": "Chưa có layout"
   },
   "createEventWizard": {
     "step1Title": "Thông tin cơ bản",
@@ -1266,7 +1270,48 @@
     "stepIndicatorAriaLabel": "Tiến trình tạo sự kiện",
     "discardConfirmTitle": "Huỷ bỏ thay đổi?",
     "discardConfirmMessage": "Bạn có thay đổi chưa lưu. Thoát ra sẽ mất các thay đổi này.",
-    "discardConfirmButton": "Huỷ thay đổi"
+    "discardConfirmButton": "Huỷ thay đổi",
+    "idleLayoutLabel": "Màn hình chờ (khi chưa có ai lên sân khấu)"
+  },
+  "layoutConfigPanel": {
+    "tabRules": "Quy tắc layout",
+    "tabFieldMap": "Ghép biến",
+    "saveButton": "Lưu cấu hình layout",
+    "saveSuccess": "Đã lưu cấu hình layout",
+    "saveError": "Không lưu được: {{message}}"
+  },
+  "eventHub": {
+    "createTitle": "Tạo sự kiện mới",
+    "createButton": "Tạo",
+    "importTitle": "Nhập dữ liệu — {{name}}",
+    "layoutTitle": "Cấu hình layout — {{name}}",
+    "scheduledAtSummary": "Ngày dự kiến: {{date}}",
+    "noScheduledAt": "Chưa có ngày dự kiến",
+    "importCardTitle": "Import dữ liệu",
+    "importCardNoData": "Chưa có dữ liệu",
+    "importCardHasData": "Đã có dữ liệu",
+    "layoutCardTitle": "Chọn layout",
+    "layoutCardNoLayout": "Chưa có layout",
+    "layoutCardHasLayout": "{{count}} quy tắc layout"
+  },
+  "importDataPanel": {
+    "uploadPrompt": "Kéo file vào đây hoặc bấm để chọn — hỗ trợ Excel (.xlsx), CSV",
+    "zipUploadPrompt": "Chọn file ZIP (kèm ảnh/voice tuỳ chọn)",
+    "zipUnsupportedHint": "Import ZIP chưa hỗ trợ trên nền tảng này — dùng CSV/Excel thay thế.",
+    "zipFileLabel": "File ZIP",
+    "zipDefaultLabel": "Dữ liệu từ ZIP",
+    "zipHasImages": "ZIP có kèm ảnh",
+    "zipHasVoices": "ZIP có kèm giọng đọc sẵn",
+    "parseError": "Không đọc được file: {{message}}",
+    "importSuccess": "Đã import {{count}} người vào \"{{label}}\"",
+    "importError": "Không import được: {{message}}",
+    "errorMissingKey": "Thiếu giá trị khoá định danh",
+    "errorMissingFullName": "Thiếu họ tên",
+    "progressLabel": "Đã xử lý {{done}}/{{total}}",
+    "rowErrorsTitle": "{{count}} dòng có lỗi",
+    "rowErrorRow": "Dòng",
+    "rowErrorField": "Trường",
+    "rowErrorMessage": "Lỗi"
   },
   "layoutPicker": {
     "title": "Chọn layout",
@@ -1317,6 +1362,7 @@
     "sourceRaw": "Cột dữ liệu",
     "sourceComputed": "Tính theo điều kiện",
     "noVariableYet": "— Chưa có biến nào —",
-    "suggestionTooltip": "Gợi ý: dùng cột \"{{column}}\""
+    "suggestionTooltip": "Gợi ý: dùng cột \"{{column}}\"",
+    "idleTabLabel": "Màn hình chờ"
   }
 }

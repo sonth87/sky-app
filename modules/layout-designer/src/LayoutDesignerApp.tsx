@@ -20,6 +20,7 @@ import { PropertyPanel } from './PropertyPanel.js';
 import { Rail, type RailGroup } from './Rail.js';
 import { Flyout } from './Flyout.js';
 import { VersioningPanel } from './VersioningPanel.js';
+import { ColorTagPicker } from './ColorTagPicker.js';
 import { VariantTabs } from './VariantTabs.js';
 import type { CopyVariantMode } from './CopyVariantPopover.js';
 import { usePersistedState } from './usePersistedState.js';
@@ -80,6 +81,10 @@ export interface LayoutDesignerAppProps {
    * lưới thumbnail trong Flyout's panel "Ảnh". Bỏ trống = panel hiện thông báo chưa khả dụng
    * (hành vi cũ). */
   listAssets?: () => Promise<AssetMeta[]>;
+  /** Màu tag layout (PHỤ LỤC "Event Hub", 2026-07-22) — hiện badge ở danh sách Event. Bỏ trống
+   * (cả `documentColor` lẫn `onChangeColor`) = ẩn ColorTagPicker hoàn toàn. */
+  documentColor?: string;
+  onChangeColor?: (color: string | undefined) => void;
 }
 
 export function LayoutDesignerApp({
@@ -92,6 +97,8 @@ export function LayoutDesignerApp({
   pickAndSaveImage,
   resolveAssetUrl,
   listAssets,
+  documentColor,
+  onChangeColor,
 }: LayoutDesignerAppProps) {
   const editor = useCreateEditor({ doc: content });
   const activeVariantId = useEditorState(editor, (s) => s.activeVariantId);
@@ -209,7 +216,7 @@ export function LayoutDesignerApp({
     // fixed bên trong app KHÔNG fix theo viewport toàn màn hình mà fix theo khung cửa sổ app,
     // gây ghost hiện lệch xa so với vị trí chuột thật (đã xác nhận qua ảnh chụp thực tế).
     <div ref={rootElRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f4f5f9', position: 'relative' }}>
-      <Toolbar saveStatusLabel={saveStatusLabel} versioning={versioning} />
+      <Toolbar saveStatusLabel={saveStatusLabel} versioning={versioning} documentColor={documentColor} onChangeColor={onChangeColor} />
       <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
         {variant ? (
           <>
@@ -346,12 +353,23 @@ function PanelEdgeToggle({ side, onClick }: { side: 'left' | 'right'; onClick: (
 
 // Undo/redo giờ CHỈ ở toolbar nổi đáy canvas (Canvas.tsx's FloatingToolbar) — bỏ khỏi đây theo
 // yêu cầu rút gọn 2026-07-17 (ảnh mẫu), tránh 2 nơi cùng hiện 1 chức năng.
-function Toolbar({ saveStatusLabel, versioning }: { saveStatusLabel?: string; versioning?: LayoutDesignerAppProps['versioning'] }) {
+function Toolbar({
+  saveStatusLabel,
+  versioning,
+  documentColor,
+  onChangeColor,
+}: {
+  saveStatusLabel?: string;
+  versioning?: LayoutDesignerAppProps['versioning'];
+  documentColor?: string;
+  onChangeColor?: (color: string | undefined) => void;
+}) {
   return (
     <div style={{ height: 52, flex: 'none', display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', background: '#fff', borderBottom: '1px solid #e6e6ee' }}>
       <div style={{ fontWeight: 600, fontSize: 14 }}>Layout Designer</div>
       {saveStatusLabel && <div style={{ fontSize: 11, color: '#9a9bab', marginLeft: 4 }}>{saveStatusLabel}</div>}
       <div style={{ flex: 1 }} />
+      {onChangeColor && <ColorTagPicker color={documentColor} onChange={onChangeColor} />}
       {versioning && (
         <VersioningPanel
           latestPublishedVersion={versioning.latestPublishedVersion}

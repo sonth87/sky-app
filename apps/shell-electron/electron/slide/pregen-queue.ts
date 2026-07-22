@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import type { Student, TtsCondition, CustomVariable } from '@sky-app/slide-shared';
+import type { CanonicalRecord, TtsCondition, CustomVariable } from '@sky-app/slide-shared';
+import { flattenCanonicalRecord } from '@sky-app/slide-shared';
 import { ttsPregenDir, ttsPregenManifestPath, ttsPregenWavPath } from './data/paths';
 import { renderTemplate } from './lib/renderTemplate';
 import { getPythonPort } from './python-server';
@@ -46,9 +47,9 @@ export interface PreGenStatus {
   running: boolean;
   paused: boolean;
   configChanged: boolean;
-  currentStudentCode: string | null;
-  students: Record<string, PreGenStudentStatus>;
-  quality: Record<string, string[]>;  // studentCode -> flags (chỉ file bị flag)
+  currentId: string | null;
+  records: Record<string, PreGenStudentStatus>;
+  quality: Record<string, string[]>;  // id -> flags (chỉ file bị flag)
 }
 
 function computeConfigHash(config: PreGenConfig): string {
@@ -62,31 +63,15 @@ function computeConfigHash(config: PreGenConfig): string {
   return createHash('md5').update(str).digest('hex');
 }
 
-function getVoiceForStudent(
-  student: Student,
+function getVoiceForRecord(
+  record: CanonicalRecord,
   conditions: TtsCondition[],
   fallbackVoice: string
 ): string {
+  const flat = flattenCanonicalRecord(record);
   for (const cond of conditions) {
-    let studentVal = '';
-    const attr = cond.attr;
-    if (attr === 'Giới tính') {
-      studentVal = student.gender || '';
-    } else if (attr === 'Xếp loại') {
-      studentVal = student.classification || '';
-    } else if (attr === 'Ngành') {
-      studentVal = student.major_name || '';
-    } else if (attr === 'Khoa') {
-      studentVal = student.faculty_name || '';
-    } else if (attr === 'Lớp') {
-      studentVal = student.class_code || '';
-    } else if (attr === 'Khóa') {
-      studentVal = student.course_code || '';
-    } else if (attr === 'Họ tên') {
-      studentVal = student.full_name || '';
-    }
-    
-    if (studentVal.trim().toLowerCase() === cond.val.trim().toLowerCase()) {
+    const recordVal = flat[cond.attr] ?? '';
+    if (recordVal.trim().toLowerCase() === cond.val.trim().toLowerCase()) {
       return cond.voice;
     }
   }
@@ -155,27 +140,27 @@ function sleep(ms: number) {
 
 export class PreGenQueue {
   private batchId: string;
-  private students: Student[];
+  private records: CanonicalRecord[];
   private config: PreGenConfig;
   private configHash: string;
   private onProgress: (status: PreGenStatus) => void;
 
   private manifest: Manifest;
-  private queue: Student[] = [];
+  private queue: CanonicalRecord[] = [];
   private running = false;
   private paused = false;
   private cancelled = false;
-  private currentStudentCode: string | null = null;
+  private currentId: string | null = null;
   private isConfigStale = false;
 
   constructor(
     batchId: string,
-    students: Student[],
+    records: CanonicalRecord[],
     config: PreGenConfig,
     onProgress: (status: PreGenStatus) => void,
   ) {
     this.batchId = batchId;
-    this.students = students;
+    this.records = records;
     this.config = config;
     this.configHash = computeConfigHash(config);
     this.onProgress = onProgress;
@@ -213,31 +198,31 @@ export class PreGenQueue {
     writeFileSync(ttsPregenManifestPath(this.batchId), JSON.stringify(this.manifest, null, 2), 'utf-8');
   }
 
-  private buildQueue(regenerate: boolean): Student[] {
-    return this.students.filter((s) => {
+  private buildQueue(regenerate: boolean): CanonicalRecord[] {
+    return this.records.filter((r) => {
       if (regenerate) return true;
-      const entry = this.manifest.students[s.student_code];
+      const entry = this.manifest.students[r.id];
       return !entry || entry.status !== 'done';
     });
   }
 
   async start(regenerate = false): Promise<void> {
     if (this.running) return;
-    logPregen(`start batchId=${this.batchId} students=${this.students.length} regenerate=${regenerate} stale=${this.isConfigStale}`);
+    logPregen(`start batchId=${this.batchId} records=${this.records.length} regenerate=${regenerate} stale=${this.isConfigStale}`);
 
     if (regenerate) {
       // Reset tất cả về pending
-      for (const s of this.students) {
-        this.manifest.students[s.student_code] = { status: 'pending' };
+      for (const r of this.records) {
+        this.manifest.students[r.id] = { status: 'pending' };
       }
       this.manifest.config_hash = this.configHash;
       this.isConfigStale = false;
       this.saveManifest();
     } else {
-      // Đảm bảo có entry cho mọi sinh viên chưa có
-      for (const s of this.students) {
-        if (!this.manifest.students[s.student_code]) {
-          this.manifest.students[s.student_code] = { status: 'pending' };
+      // Đảm bảo có entry cho mọi record chưa có
+      for (const r of this.records) {
+        if (!this.manifest.students[r.id]) {
+          this.manifest.students[r.id] = { status: 'pending' };
         }
       }
       this.saveManifest();
@@ -270,52 +255,52 @@ export class PreGenQueue {
         if (this.cancelled) break;
       }
 
-      const student = this.queue.shift()!;
-      this.currentStudentCode = student.student_code;
-      logPregen(`processing student=${student.student_code} queueLeft=${this.queue.length}`);
+      const record = this.queue.shift()!;
+      this.currentId = record.id;
+      logPregen(`processing id=${record.id} queueLeft=${this.queue.length}`);
 
-      this.manifest.students[student.student_code] = { status: 'processing' };
+      this.manifest.students[record.id] = { status: 'processing' };
       this.saveManifest();
       this.onProgress(this.getStatus());
 
       try {
-        await this.processStudent(student);
+        await this.processRecord(record);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        this.manifest.students[student.student_code] = { status: 'failed', error: msg };
+        this.manifest.students[record.id] = { status: 'failed', error: msg };
         this.saveManifest();
-        console.error(`[PreGenQueue] Failed student ${student.student_code}:`, msg);
-        logPregen(`failed student=${student.student_code} error=${msg}`);
+        console.error(`[PreGenQueue] Failed record ${record.id}:`, msg);
+        logPregen(`failed id=${record.id} error=${msg}`);
       }
 
       this.onProgress(this.getStatus());
     }
 
-    this.currentStudentCode = null;
+    this.currentId = null;
     this.running = false;
     this.onProgress(this.getStatus());
   }
 
-  private async processStudent(student: Student): Promise<void> {
+  private async processRecord(record: CanonicalRecord): Promise<void> {
     // Khi không có template, dùng @full_name làm template để renderTemplate tự title-case tên.
-    const text = renderTemplate(this.config.template || '@full_name', student, this.config.customVariables || []);
-    logPregen(`render student=${student.student_code} textLen=${text.length} text=${text}`);
+    const text = renderTemplate(this.config.template || '@full_name', record, this.config.customVariables || []);
+    logPregen(`render id=${record.id} textLen=${text.length} text=${text}`);
 
     if (!text) {
-      this.manifest.students[student.student_code] = { status: 'failed', error: 'Empty text after template render' };
+      this.manifest.students[record.id] = { status: 'failed', error: 'Empty text after template render' };
       this.saveManifest();
       return;
     }
 
-    const voice = getVoiceForStudent(student, this.config.ttsConditions || [], this.config.ttsModel);
+    const voice = getVoiceForRecord(record, this.config.ttsConditions || [], this.config.ttsModel);
     const speakerId = voice.replace(/^vieneu-/, '');
-    logPregen(`synthesize student=${student.student_code} speaker=${speakerId} voice=${voice} speed=${this.config.ttsSpeed}`);
+    logPregen(`synthesize id=${record.id} speaker=${speakerId} voice=${voice} speed=${this.config.ttsSpeed}`);
 
     // Retry logic cho network errors: tối đa 3 lần, auto-pause nếu server không phản hồi
     let lastError = '';
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        logPregen(`attempt=${attempt + 1} student=${student.student_code} POST /synthesize`);
+        logPregen(`attempt=${attempt + 1} id=${record.id} POST /synthesize`);
         // Timeout scale theo độ dài text: câu dài (tên + ngành + khoa) cần nhiều
         // thời gian gen hơn, nhất là trên máy yếu (RTF>1). Cứng 30s trước đây làm
         // câu dài luôn timeout → auto-pause + retry vô ích. Base 30s + 250ms/char, cap 150s.
@@ -326,14 +311,14 @@ export class PreGenQueue {
           body: JSON.stringify({ text, speaker_id: speakerId, speed: this.config.ttsSpeed }),
           signal: AbortSignal.timeout(genTimeoutMs),
         });
-        logPregen(`response student=${student.student_code} status=${res.status} ok=${res.ok}`);
+        logPregen(`response id=${record.id} status=${res.status} ok=${res.ok}`);
 
         if (!res.ok) {
           const body = await res.text();
           lastError = `HTTP ${res.status}: ${body}`;
-          logPregen(`failed HTTP student=${student.student_code} body=${lastError}`);
+          logPregen(`failed HTTP id=${record.id} body=${lastError}`);
           if (res.status >= 500 && attempt < 2) {
-            logPregen(`retrying server error student=${student.student_code} after ${250 * (attempt + 1)}ms`);
+            logPregen(`retrying server error id=${record.id} after ${250 * (attempt + 1)}ms`);
             await sleep(250 * (attempt + 1));
             continue;
           }
@@ -342,16 +327,16 @@ export class PreGenQueue {
 
         const quality = parseQualityHeaders(res.headers);
         const pcm = Buffer.from(await res.arrayBuffer());
-        logPregen(`pcm student=${student.student_code} bytes=${pcm.length} qScore=${quality.quality_score ?? '-'} qFlags=${quality.quality_flags?.join('|') ?? '-'}`);
+        logPregen(`pcm id=${record.id} bytes=${pcm.length} qScore=${quality.quality_score ?? '-'} qFlags=${quality.quality_flags?.join('|') ?? '-'}`);
         const header = buildWavHeader(pcm.byteLength);
         const wav = Buffer.concat([header, pcm]);
-        const wavPath = ttsPregenWavPath(this.batchId, student.student_code);
+        const wavPath = ttsPregenWavPath(this.batchId, record.id);
         writeFileSync(wavPath, wav);
-        logPregen(`saved wav student=${student.student_code} path=${wavPath} wavBytes=${wav.length}`);
+        logPregen(`saved wav id=${record.id} path=${wavPath} wavBytes=${wav.length}`);
 
         const sampleRate = 48000;
         const duration_ms = Math.round((pcm.byteLength / 2 / sampleRate) * 1000);
-        this.manifest.students[student.student_code] = {
+        this.manifest.students[record.id] = {
           status: 'done',
           type: 'pregen',
           text,
@@ -365,13 +350,13 @@ export class PreGenQueue {
         return;
       } catch (err) {
         lastError = err instanceof Error ? err.message : String(err);
-        logPregen(`error student=${student.student_code} attempt=${attempt + 1} err=${lastError}`);
+        logPregen(`error id=${record.id} attempt=${attempt + 1} err=${lastError}`);
         // Network error — kiểm tra server health
         const healthy = await checkHealth();
         if (!healthy) {
           // Auto-pause, đợi server phục hồi
           console.warn('[PreGenQueue] Server unhealthy, pausing queue...');
-          logPregen(`server unhealthy student=${student.student_code}, pausing`);
+          logPregen(`server unhealthy id=${record.id}, pausing`);
           this.paused = true;
           this.onProgress(this.getStatus());
           // Đợi cho đến khi server OK
@@ -379,7 +364,7 @@ export class PreGenQueue {
             const interval = setInterval(async () => {
               if (this.cancelled) { clearInterval(interval); resolve(); return; }
               const ok = await checkHealth();
-              if (ok) { clearInterval(interval); this.paused = false; logPregen(`server healthy again student=${student.student_code}`); resolve(); }
+              if (ok) { clearInterval(interval); this.paused = false; logPregen(`server healthy again id=${record.id}`); resolve(); }
             }, 3000);
           });
           if (this.cancelled) throw new Error('Cancelled');
@@ -390,9 +375,9 @@ export class PreGenQueue {
       }
     }
 
-    this.manifest.students[student.student_code] = { status: 'failed', error: lastError };
+    this.manifest.students[record.id] = { status: 'failed', error: lastError };
     this.saveManifest();
-    logPregen(`mark failed student=${student.student_code} error=${lastError}`);
+    logPregen(`mark failed id=${record.id} error=${lastError}`);
   }
 
   pause() {
@@ -410,18 +395,18 @@ export class PreGenQueue {
     this.paused = false;
     this.queue = [];
     this.running = false;
-    this.currentStudentCode = null;
+    this.currentId = null;
     this.onProgress(this.getStatus());
   }
 
-  requeueOne(studentCode: string): boolean {
-    const student = this.students.find((s) => s.student_code === studentCode);
-    if (!student) return false;
+  requeueOne(id: string): boolean {
+    const record = this.records.find((r) => r.id === id);
+    if (!record) return false;
     // Thêm vào đầu queue
-    this.queue.unshift(student);
-    this.manifest.students[studentCode] = { status: 'pending' };
+    this.queue.unshift(record);
+    this.manifest.students[id] = { status: 'pending' };
     this.saveManifest();
-    logPregen(`requeue student=${studentCode}`);
+    logPregen(`requeue id=${id}`);
     // Nếu queue không đang chạy, bắt đầu lại
     if (!this.running) {
       this.cancelled = false;
@@ -440,20 +425,20 @@ export class PreGenQueue {
     const failed = entries.filter(([, v]) => v.status === 'failed').length;
     const pending = entries.filter(([, v]) => v.status === 'pending' || v.status === 'processing').length;
 
-    const students: Record<string, PreGenStudentStatus> = {};
+    const records: Record<string, PreGenStudentStatus> = {};
     const quality: Record<string, string[]> = {};
-    for (const [code, entry] of entries) {
-      students[code] = entry.status;
+    for (const [id, entry] of entries) {
+      records[id] = entry.status;
       if (entry.status === 'done' && entry.quality_flags && entry.quality_flags.length > 0) {
-        quality[code] = entry.quality_flags;
+        quality[id] = entry.quality_flags;
       }
     }
-    if (this.currentStudentCode) {
-      students[this.currentStudentCode] = 'processing';
+    if (this.currentId) {
+      records[this.currentId] = 'processing';
     }
 
     return {
-      total: this.students.length,
+      total: this.records.length,
       done,
       failed,
       pending,
@@ -461,8 +446,8 @@ export class PreGenQueue {
       running: this.running,
       paused: this.paused,
       configChanged: this.isConfigStale,
-      currentStudentCode: this.currentStudentCode,
-      students,
+      currentId: this.currentId,
+      records,
       quality,
     };
   }

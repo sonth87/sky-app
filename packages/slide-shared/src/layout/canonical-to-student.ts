@@ -1,14 +1,18 @@
-// Bridge CanonicalSubject/CanonicalGroup → Student — Giai đoạn 3 kế hoạch Event, theo
-// docs/roadmap/plans/layout-designer/13-ceremony-mo-rong.md §"Hệ quả kỹ thuật". Dashboard cũ
-// (StudentPanels, ScanInbox...) đọc Student[] qua useControlStore — Event cung cấp
-// CanonicalSubject[]/CanonicalGroup[] (từ DataSourcePort.getRecords) — cần map để dashboard cũ
-// KHÔNG phải viết lại.
+// Bridge CanonicalSubject/CanonicalGroup → Student — CHỈ CÒN DÙNG bởi
+// modules/ceremony/src/backdrop/BackdropApp.tsx làm adapter TẠM cho <BackdropView> (hệ template
+// backdrop CŨ, trước cả layout-designer, cần Student cứng qua DynamicBackdropView). Giai đoạn
+// "bỏ Student" (2026-07-22): mọi nơi khác (eventStore.ts, apps/shell-electron/electron/ipc.ts's
+// syncCeremonyStoreForEvent, CeremonyStore, dashboard Control...) đã đổi sang dùng thẳng
+// CanonicalRecord — KHÔNG còn gọi hàm này. Xem PHỤ LỤC "giữ BackdropView tạm, hoãn LayoutRenderer
+// cho backdrop trao giải" trong plan — hàm này sẽ bị xoá hẳn khi BackdropView được thay bằng
+// LayoutRenderer ở 1 giai đoạn riêng sau này.
 //
 // Fail-soft tuyệt đối: field Student không có tương ứng trực tiếp trong CanonicalSubject.extra
 // → chuỗi rỗng/0/null mặc định, KHÔNG throw. Đây là chuyển đổi 1 CHIỀU chỉ phục vụ hiển thị
-// trong dashboard cũ — không ghi ngược lại DataSource.
+// trong BackdropView — không ghi ngược lại DataSource.
 
-import type { CanonicalGroup, CanonicalSubject, Student } from '@sky-app/slide-shared';
+import type { CanonicalGroup, CanonicalSubject } from './canonical.js';
+import type { Student } from '../types.js';
 
 function extraString(extra: Record<string, string | number>, key: string): string {
   const v = extra[key];

@@ -1,8 +1,8 @@
 // resolveLayout — Giai đoạn 3 kế hoạch Event, theo 13-ceremony-mo-rong.md §"Trách nhiệm 5".
 
 import { describe, expect, it } from 'vitest';
-import { resolveLayout } from './event.js';
-import type { EventLayoutRef } from './event.js';
+import { eventToIdleRecord, resolveLayout } from './event.js';
+import type { EventDocument, EventLayoutRef } from './event.js';
 
 function ref(overrides: Partial<EventLayoutRef> = {}): EventLayoutRef {
   return {
@@ -77,5 +77,33 @@ describe('resolveLayout — ưu tiên theo priority, AND trong group, OR giữa 
     ];
     expect(resolveLayout({ major: 'KTPM' }, refs)).toBe('khoa-cntt');
     expect(resolveLayout({ major: 'Kinh tế' }, refs)).toBeNull();
+  });
+});
+
+function event(overrides: Partial<EventDocument> = {}): EventDocument {
+  return {
+    id: 'ev1',
+    name: 'Test',
+    status: 'draft',
+    customVariables: [],
+    layoutRefs: [],
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+    ...overrides,
+  };
+}
+
+describe('eventToIdleRecord — pseudo-record cho LayoutRenderer khi render màn chờ (2026-07-21)', () => {
+  it('map đúng id + full_name (fallback = event.name) + subjectType, extra rỗng', () => {
+    const record = eventToIdleRecord(event({ id: 'ev-abc', name: 'Lễ tốt nghiệp Khoá 2026' }));
+    expect(record.id).toBe('ev-abc');
+    expect(record.full_name).toBe('Lễ tốt nghiệp Khoá 2026');
+    expect(record.subjectType).toBe('event');
+    expect(record.extra).toEqual({});
+  });
+
+  it('event.name rỗng → không throw, full_name rỗng (fail-soft)', () => {
+    expect(() => eventToIdleRecord(event({ name: '' }))).not.toThrow();
+    expect(eventToIdleRecord(event({ name: '' })).full_name).toBe('');
   });
 });

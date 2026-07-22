@@ -27,6 +27,7 @@ interface EventLayoutRefRow {
   selector_json: string | null;
   overrides_json: string | null;
   field_map_json: string;
+  role: string;
 }
 
 function rowToEventLayoutRef(row: EventLayoutRefRow): EventLayoutRef {
@@ -36,6 +37,7 @@ function rowToEventLayoutRef(row: EventLayoutRefRow): EventLayoutRef {
     selector: row.selector_json ? (JSON.parse(row.selector_json) as LayoutSelector) : undefined,
     overrides: row.overrides_json ? (JSON.parse(row.overrides_json) as EventLayoutRef['overrides']) : undefined,
     fieldMap: JSON.parse(row.field_map_json) as Record<string, FieldMapSource>,
+    role: row.role as 'award' | 'idle',
   };
 }
 
@@ -86,10 +88,13 @@ export function listEvents(executor: SqlExecutor): EventSummary[] {
 function replaceLayoutRefs(executor: SqlExecutor, eventId: string, refs: EventLayoutRef[]): void {
   executor.run('DELETE FROM event_layout_ref WHERE event_id = ?', [eventId]);
   for (const ref of refs) {
+    const role = ref.role ?? 'award';
     executor.run(
-      'INSERT INTO event_layout_ref (id, event_id, layout_document_id, layout_version, priority, selector_json, overrides_json, field_map_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO event_layout_ref (id, event_id, layout_document_id, layout_version, priority, selector_json, overrides_json, field_map_json, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
-        `${eventId}:${ref.layoutId}:${ref.layoutVersion}`,
+        // Prefix `role` — 1 Event có thể dùng CÙNG layoutId+layoutVersion cho cả layout trao
+        // giải VÀ màn chờ, tránh đụng PRIMARY KEY nếu chỉ ghép eventId:layoutId:layoutVersion.
+        `${eventId}:${role}:${ref.layoutId}:${ref.layoutVersion}`,
         eventId,
         ref.layoutId,
         ref.layoutVersion,
@@ -97,6 +102,7 @@ function replaceLayoutRefs(executor: SqlExecutor, eventId: string, refs: EventLa
         ref.selector ? JSON.stringify(ref.selector) : null,
         ref.overrides ? JSON.stringify(ref.overrides) : null,
         JSON.stringify(ref.fieldMap),
+        role,
       ],
     );
   }

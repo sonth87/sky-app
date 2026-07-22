@@ -26,4 +26,26 @@ export interface DataSourcePort {
 
   listFieldMappingProfiles(): Promise<FieldMappingProfile[]>;
   saveFieldMappingProfile(profile: FieldMappingProfile): Promise<void>;
+
+  /**
+   * Import ZIP (PHỤ LỤC "Event Hub", 2026-07-22) — CHỈ Electron hỗ trợ (giải nén ở main
+   * process qua adm-zip). Web trả `undefined`/throw rõ ràng — xem adapter Web.
+   * `pickZipFile`: mở dialog chọn ZIP, giải nén vào thư mục TẠM, đọc `records.json`/
+   * `records.csv` → trả về giống ParsedSpreadsheet (để tái dùng field-mapping đã có) + cờ
+   * `hasImageDir`/`hasVoiceDir` + `stagingDir` (giữ lại cho confirmZipImport). `null` nếu user
+   * huỷ chọn file. `{error}` nếu ZIP hỏng/thiếu records.json|csv (fail-soft, không throw).
+   */
+  pickZipFile?(): Promise<
+    | { stagingDir: string; columns: string[]; rows: Array<Record<string, string>>; hasImageDir: boolean; hasVoiceDir: boolean }
+    | { error: string }
+    | null
+  >;
+  /** Copy ảnh/voice từ stagingDir vào đúng vị trí theo `naturalKeyField` đã chọn, dọn stagingDir.
+   * `eventId` dùng làm batchId ghi voice pregen (`tts-pregen/<eventId>/`). */
+  confirmZipImport?(opts: {
+    stagingDir: string;
+    naturalKeyField: string;
+    eventId: string;
+    rows: Array<Record<string, string>>;
+  }): Promise<{ imagesCopied: number; voicesCopied: number; imageByKey: Record<string, string> }>;
 }

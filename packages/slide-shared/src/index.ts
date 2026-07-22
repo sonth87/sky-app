@@ -15,6 +15,7 @@ export * from './layout/field-mapping.js';
 export * from './layout/loop.js';
 export * from './layout/renderer.js';
 export * from './layout/preload.js';
+export * from './layout/canonical-to-student.js';
 export { BackdropView } from './BackdropView.js';
 export type { BackdropViewProps } from './BackdropView.js';
 export { DynamicBackdropView } from './DynamicBackdropView.js';
@@ -23,10 +24,6 @@ export type {
   SlideApi,
   ApiEnvironment,
   SlideMeta,
-  InvalidStudent,
-  ImportPreview,
-  SyncResult,
-  SyncProgress,
   DisplayInfo,
   TtsConfig,
   TtsEngineInfo,
