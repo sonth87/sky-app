@@ -1,6 +1,6 @@
 {
   "name": "@sky-app/module-layout-designer",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -9,7 +9,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./styles.css": "./src/styles.css"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -27,7 +28,9 @@
     "@tiptap/suggestion": "^3.28.0",
     "@uiw/color-convert": "^2.10.3",
     "@uiw/react-color-colorful": "^2.10.3",
+    "clsx": "^2.1.1",
     "lucide-react": "^1.24.0",
+    "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

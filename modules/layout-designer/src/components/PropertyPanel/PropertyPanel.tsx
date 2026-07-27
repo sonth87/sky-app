@@ -85,7 +85,7 @@ export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenIns
   const isSyncParent = !editingLoopId && Boolean(item.syncKey && doc.variants.some((v) => v.items.some((i) => i.syncRef === item.syncKey)));
 
   return (
-    <div style={{ width, flex: 'none', borderLeft: '1px solid #e6e6ee', background: '#fff', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+    <div className="shrink-0 border-l border-[#e6e6ee] bg-white flex flex-col overflow-y-auto" style={{ width }}>
       <PanelHeader
         item={item}
         isSyncParent={isSyncParent}

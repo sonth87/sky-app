@@ -168,7 +168,7 @@ export function CanvasItemView({
         />
       )}
       {selected && item.locked && <SelectionHandlesStatic />}
-      <div style={{ position: 'absolute', top: -3, right: -3, background: '#fff', borderRadius: '50%', padding: 1, lineHeight: 0, pointerEvents: 'none' }}>
+      <div className="absolute -top-[3px] -right-[3px] bg-white rounded-full p-[1px] leading-none pointer-events-none">
         <SyncBadge item={item} isParent={isSyncParent} size={10} />
       </div>
     </div>

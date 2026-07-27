@@ -1,5 +1,6 @@
 import type { TextShadow } from '@sky-app/slide-shared';
-import { pickerBtnStyle, Section } from './CommonControls.js';
+import { Section } from './CommonControls.js';
+import { cn } from '../../lib/cn.js';
 
 export interface ShadowControlProps {
   value: TextShadow | boolean | undefined;
@@ -11,29 +12,32 @@ export function ShadowControl({ value, onChange }: ShadowControlProps) {
   const obj = typeof value === 'object' ? value : {};
   return (
     <Section title="Đổ bóng">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: enabled ? 10 : 0 }}>
+      <div className={cn('flex items-center gap-2', enabled && 'mb-[10px]')}>
         <button
           onClick={() => onChange(enabled ? undefined : { color: 'rgba(0,0,0,0.35)', blur: 4, offsetX: 0, offsetY: 2 })}
-          style={pickerBtnStyle(enabled, { flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11 })}
+          className={cn(
+            'flex-1 py-[7px] rounded-lg border text-[11px] font-semibold cursor-pointer transition-colors duration-100',
+            enabled ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]' : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e] hover:bg-neutral-50'
+          )}
         >
           {enabled ? 'Đang bật' : 'Bật đổ bóng'}
         </button>
       </div>
       {enabled && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <input type="color" value={obj.color ?? '#000000'} onChange={(e) => onChange({ ...obj, color: e.target.value })} />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <label style={{ fontSize: 10.5, color: '#9a9bab', flex: 1 }}>
+        <div className="flex flex-col gap-2">
+          <input type="color" value={obj.color ?? '#000000'} onChange={(e) => onChange({ ...obj, color: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
+          <div className="flex gap-2">
+            <label className="text-[10.5px] text-[#9a9bab] flex-1">
               Lệch X
-              <input type="number" value={obj.offsetX ?? 0} onChange={(e) => onChange({ ...obj, offsetX: Number(e.target.value) })} style={{ width: '100%', border: '1px solid #e6e6ee', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
+              <input type="number" value={obj.offsetX ?? 0} onChange={(e) => onChange({ ...obj, offsetX: Number(e.target.value) })} className="w-full border border-[#e6e6ee] rounded-md p-[4px_6px] text-[11px]" />
             </label>
-            <label style={{ fontSize: 10.5, color: '#9a9bab', flex: 1 }}>
+            <label className="text-[10.5px] text-[#9a9bab] flex-1">
               Lệch Y
-              <input type="number" value={obj.offsetY ?? 2} onChange={(e) => onChange({ ...obj, offsetY: Number(e.target.value) })} style={{ width: '100%', border: '1px solid #e6e6ee', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
+              <input type="number" value={obj.offsetY ?? 2} onChange={(e) => onChange({ ...obj, offsetY: Number(e.target.value) })} className="w-full border border-[#e6e6ee] rounded-md p-[4px_6px] text-[11px]" />
             </label>
-            <label style={{ fontSize: 10.5, color: '#9a9bab', flex: 1 }}>
+            <label className="text-[10.5px] text-[#9a9bab] flex-1">
               Độ mờ nhoè
-              <input type="number" min={0} value={obj.blur ?? 4} onChange={(e) => onChange({ ...obj, blur: Number(e.target.value) })} style={{ width: '100%', border: '1px solid #e6e6ee', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
+              <input type="number" min={0} value={obj.blur ?? 4} onChange={(e) => onChange({ ...obj, blur: Number(e.target.value) })} className="w-full border border-[#e6e6ee] rounded-md p-[4px_6px] text-[11px]" />
             </label>
           </div>
         </div>

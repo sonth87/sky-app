@@ -199,7 +199,7 @@ export function SelectionHandles({ box, editor, variant, itemId, loopItemId, ite
       })}
       {/* Đường nối + handle xoay tròn — đặt phía TRÊN box (cách 20px), xoay theo item vì là con
           trực tiếp của div đã transform:rotate() (xem wrapStyle ở CanvasItemView). */}
-      <div style={{ position: 'absolute', left: '50%', top: -20, width: 1, height: 20, background: 'var(--accent-color, #4b57e6)', transform: 'translateX(-50%)', pointerEvents: 'none' }} />
+      <div className="absolute left-1/2 -top-[20px] w-[1px] h-[20px] bg-[#4b57e6] -translate-x-1/2 pointer-events-none" />
       <div
         aria-label="Xoay"
         onPointerDown={onRotatePointerDown}

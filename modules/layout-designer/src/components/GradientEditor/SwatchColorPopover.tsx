@@ -23,7 +23,6 @@ export function SwatchColorPopover({
     if (color === lastEmittedHexRef.current && Math.round(hsva.a * 100) === alpha) return;
     setHsva({ ...hexToHsva(color), a: alpha / 100 });
     lastEmittedHexRef.current = color;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color, alpha]);
 
   function handleChange(result: ColorResult) {
@@ -39,21 +38,12 @@ export function SwatchColorPopover({
           e.stopPropagation();
           onClose();
         }}
-        style={{ position: 'absolute', inset: '-1000px', zIndex: 9 }}
+        className="absolute -inset-[1000px] z-[9]"
+        style={{ position: 'absolute', inset: '-1000px' }}
       />
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          marginTop: 6,
-          zIndex: 10,
-          borderRadius: 11,
-          boxShadow: '0 14px 34px rgba(20,20,40,.18)',
-          background: '#fff',
-          padding: 10,
-        }}
+        className="absolute top-full left-0 mt-[6px] z-[10] rounded-[11px] shadow-[0_14px_34px_rgba(20,20,40,0.18)] bg-white p-[10px]"
       >
         <Colorful color={hsva} onChange={handleChange} style={{ width: PICKER_SIZE }} />
       </div>

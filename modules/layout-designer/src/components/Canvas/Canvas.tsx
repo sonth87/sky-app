@@ -15,6 +15,7 @@ import { LoopEditBreadcrumb } from './LoopEditBreadcrumb.js';
 import { FloatingToolbar, ZOOM_STEP_FACTOR } from './FloatingToolbar.js';
 import { GuideLine } from './GuideLine.js';
 import { CanvasItemView } from './CanvasItemView.js';
+import { cn } from '../../lib/cn.js';
 
 export interface CanvasProps {
   editor: Editor;
@@ -250,29 +251,22 @@ export function Canvas({
         handleKeyDown(e);
       }}
       onKeyUp={handleSpaceKeyUp}
-      style={{
-        flex: 1,
-        background: '#eceef3',
-        backgroundImage: 'radial-gradient(circle, #00000014 1px, transparent 1px)',
-        backgroundSize: '16px 16px',
-        position: 'relative',
-        minWidth: 0,
-        overflow: 'hidden',
-        outline: 'none',
-        cursor: isPanning ? 'grabbing' : isHandActive ? 'grab' : 'default',
-      }}
+      className={cn(
+        'flex-1 bg-[#eceef3] bg-[radial-gradient(circle,#00000014_1px,transparent_1px)] bg-[length:16px_16px] relative min-w-0 overflow-hidden outline-none',
+        isPanning ? 'cursor-grabbing' : isHandActive ? 'cursor-grab' : 'cursor-default'
+      )}
+      style={{ background: '#eceef3' }}
     >
       <div
         ref={artRef}
         data-testid="canvas-frame"
+        className="absolute origin-top-left"
         style={{
-          position: 'absolute',
           left: originX,
           top: originY,
           width: designW,
           height: designH,
           transform: `scale(${totalScale})`,
-          transformOrigin: 'top left',
         }}
       >
         {isEditingLoop ? <LoopEditFrameSurface /> : <FrameSurface variant={variant} resolvedBackgroundUrl={resolvedBackgroundUrl} />}

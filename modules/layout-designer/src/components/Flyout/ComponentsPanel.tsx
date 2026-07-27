@@ -17,18 +17,18 @@ export interface ComponentsPanelProps {
 export function ComponentsPanel({ editor, onSpawnDown }: ComponentsPanelProps) {
   return (
     <>
-      <div style={{ padding: '15px 15px 10px', fontWeight: 700, fontSize: 13 }}>Thành phần</div>
-      <div style={{ padding: '0 14px 6px', fontSize: 11, color: '#9a9bab', lineHeight: 1.45 }}>Kéo từng khối ra canvas.</div>
-      <div style={{ padding: '8px 14px 14px', overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
+      <div className="px-[15px] pt-[15px] pb-[10px] font-bold text-[13px]">Thành phần</div>
+      <div className="px-[14px] pb-[6px] text-[11px] text-[#9a9bab] leading-[1.45]">Kéo từng khối ra canvas.</div>
+      <div className="p-[8px_14px_14px] overflow-y-auto grid grid-cols-2 gap-[9px]">
         {COMPONENT_TILES.map((t) => {
           const def: ItemTypeDefinition | undefined = editor.itemTypes.get(t.type);
           return (
             <div
               key={t.type}
               onMouseDown={onSpawnDown({ kind: 'itemType', type: t.type as any, label: def?.label ?? t.label })}
-              style={{ height: 60, border: '1px solid #e6e6ee', borderRadius: 11, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, fontWeight: 600, fontSize: 11, color: '#5c5d6e', cursor: 'grab', background: '#fcfcfd' }}
+              className="h-[60px] border border-[#e6e6ee] rounded-[11px] flex flex-col items-center justify-center gap-[5px] font-semibold text-[11px] text-[#5c5d6e] cursor-grab bg-[#fcfcfd] hover:bg-neutral-50"
             >
-              <span style={{ fontSize: 16 }}>{t.icon}</span>
+              <span className="text-[16px]">{t.icon}</span>
               {t.label}
             </div>
           );

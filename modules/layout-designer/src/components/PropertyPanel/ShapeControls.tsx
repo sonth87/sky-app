@@ -1,5 +1,6 @@
 import type { LayoutItem } from '@sky-app/slide-shared';
-import { pickerBtnStyle, Section } from './CommonControls.js';
+import { Section } from './CommonControls.js';
+import { cn } from '../../lib/cn.js';
 
 export interface ShapeControlsProps {
   item: Extract<LayoutItem, { type: 'shape' }>;
@@ -10,12 +11,15 @@ export function ShapeControls({ item, patch }: ShapeControlsProps) {
   return (
     <>
       <Section title="Hình dạng">
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="flex gap-2 flex-wrap">
           {(['rect', 'circle', 'triangle', 'diamond', 'frame', 'line'] as const).map((s) => (
             <button
               key={s}
               onClick={() => patch({ shape: s })}
-              style={pickerBtnStyle(item.shape === s, { width: 30, height: 30, borderRadius: 7 })}
+              className={cn(
+                'w-[30px] h-[30px] rounded-[7px] border flex items-center justify-center cursor-pointer',
+                item.shape === s ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]' : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e]'
+              )}
             >
               {s === 'circle' ? '●' : s === 'triangle' ? '▲' : s === 'diamond' ? '◆' : s === 'frame' ? '▢' : s === 'line' ? '―' : '▮'}
             </button>
@@ -24,23 +28,23 @@ export function ShapeControls({ item, patch }: ShapeControlsProps) {
       </Section>
       {item.shape !== 'line' && (
         <Section title="Màu nền">
-          <input type="color" value={item.fill ?? '#4b57e6'} onChange={(e) => patch({ fill: e.target.value })} />
+          <input type="color" value={item.fill ?? '#4b57e6'} onChange={(e) => patch({ fill: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
         </Section>
       )}
       {item.shape === 'rect' && (
         <Section title="Bo góc">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <input type="range" min={0} max={100} value={item.radius ?? 0} onChange={(e) => patch({ radius: Number(e.target.value) })} style={{ flex: 1 }} />
-            <span style={{ fontSize: 11, width: 34, textAlign: 'right' }}>{item.radius ?? 0}</span>
+          <div className="flex items-center gap-[10px]">
+            <input type="range" min={0} max={100} value={item.radius ?? 0} onChange={(e) => patch({ radius: Number(e.target.value) })} className="flex-1" />
+            <span className="text-[11px] w-[34px] text-right">{item.radius ?? 0}</span>
           </div>
         </Section>
       )}
       <Section title="Viền">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: (item.strokeW ?? 0) > 0 ? 8 : 0 }}>
-          <input type="range" min={0} max={16} value={item.strokeW ?? 0} onChange={(e) => patch({ strokeW: Number(e.target.value) })} style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, width: 34, textAlign: 'right' }}>{item.strokeW ?? 0}</span>
+        <div className={cn('flex items-center gap-[10px]', (item.strokeW ?? 0) > 0 && 'mb-2')}>
+          <input type="range" min={0} max={16} value={item.strokeW ?? 0} onChange={(e) => patch({ strokeW: Number(e.target.value) })} className="flex-1" />
+          <span className="text-[11px] w-[34px] text-right">{item.strokeW ?? 0}</span>
         </div>
-        {(item.strokeW ?? 0) > 0 && <input type="color" value={item.stroke ?? '#000000'} onChange={(e) => patch({ stroke: e.target.value })} />}
+        {(item.strokeW ?? 0) > 0 && <input type="color" value={item.stroke ?? '#000000'} onChange={(e) => patch({ stroke: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />}
       </Section>
     </>
   );

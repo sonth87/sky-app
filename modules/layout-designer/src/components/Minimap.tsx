@@ -1,7 +1,3 @@
-// Minimap — Bước 8 kế hoạch resize/rotate (2026-07-18). Không có tham khảo cụ thể (không có
-// trong khảo sát my-builder) — tự thiết kế: khung nhỏ góc dưới-phải canvas, hiện Frame thu nhỏ +
-// item outline + khung viền = vùng viewport hiện đang nhìn thấy. Click HOẶC kéo khung viền → pan.
-
 import { useCallback, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import type { LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
 
@@ -10,7 +6,6 @@ const MINIMAP_PADDING = 10;
 
 export interface MinimapProps {
   variant: LayoutVariant;
-  /** Khung hiển thị "logic" (đơn vị đã quy đổi qua layoutScaleX/Y — xem Canvas.tsx designSize()). */
   designW: number;
   designH: number;
   originX: number;
@@ -20,9 +15,6 @@ export interface MinimapProps {
   onPan: (originX: number, originY: number) => void;
 }
 
-/** Minimap CHỈ đáng hiện khi vùng nhìn thấy KHÔNG bao trọn toàn bộ Frame (zoom sâu hoặc pan xa
- * khỏi trung tâm) — ẩn khi toàn bộ Frame đã vừa trong khung nhìn (totalScale nhỏ, hành vi mặc
- * định lúc mới mở layout), tránh chiếm chỗ không cần thiết. */
 export function shouldShowMinimap(designW: number, designH: number, originX: number, originY: number, totalScale: number, containerSize: { w: number; h: number }): boolean {
   const frameLeft = originX;
   const frameTop = originY;
@@ -38,8 +30,6 @@ export function Minimap({ variant, designW, designH, originX, originY, totalScal
 
   const dragRef = useRef<{ startX: number; startY: number; fromOriginX: number; fromOriginY: number } | null>(null);
 
-  // Vùng viewport hiện đang nhìn thấy, quy đổi về hệ canvas-logic (đơn vị designW/H) — đảo ngược
-  // công thức screenX = originX + canvasLogicX*totalScale đã dùng cho artEl (xem Canvas.tsx).
   const visibleLeft = (0 - originX) / totalScale;
   const visibleTop = (0 - originY) / totalScale;
   const visibleRight = (containerSize.w - originX) / totalScale;
@@ -57,8 +47,6 @@ export function Minimap({ variant, designW, designH, originX, originY, totalScal
     boxSizing: 'border-box' as const,
   };
 
-  /** Đặt originX/Y sao cho ĐIỂM canvas-logic tương ứng vị trí click trên minimap rơi vào TÂM
-   * container hiện tại — dùng chung cho cả click-để-nhảy-tới VÀ điểm bắt đầu kéo. */
   const jumpTo = useCallback(
     (mmClickX: number, mmClickY: number) => {
       const targetCanvasX = mmClickX / mmScale;
@@ -106,20 +94,12 @@ export function Minimap({ variant, designW, designH, originX, originY, totalScal
       onPointerDown={onMinimapPointerDown}
       onPointerMove={onMinimapPointerMove}
       onPointerUp={onMinimapPointerUp}
+      className="absolute bg-white border border-[#e6e6ee] rounded-lg shadow-[0_6px_20px_-8px_rgba(20,10,50,0.35)] overflow-hidden cursor-pointer z-[999] touch-none"
       style={{
-        position: 'absolute',
         right: MINIMAP_PADDING,
         bottom: MINIMAP_PADDING,
         width: MINIMAP_W,
         height: minimapH,
-        background: '#fff',
-        border: '1px solid #e6e6ee',
-        borderRadius: 8,
-        boxShadow: '0 6px 20px -8px rgba(20,10,50,.35)',
-        overflow: 'hidden',
-        cursor: 'pointer',
-        zIndex: 999,
-        touchAction: 'none',
       }}
     >
       {variant.items.map((item) => (
@@ -133,15 +113,12 @@ export function Minimap({ variant, designW, designH, originX, originY, totalScal
 function MinimapItem({ item, mmScale }: { item: LayoutItem; mmScale: number }) {
   return (
     <div
+      className="absolute bg-[#c9c9d6] rounded-[1px] pointer-events-none"
       style={{
-        position: 'absolute',
         left: item.box.x * mmScale,
         top: item.box.y * mmScale,
         width: item.box.w * mmScale,
         height: item.box.h * mmScale,
-        background: '#c9c9d6',
-        borderRadius: 1,
-        pointerEvents: 'none',
       }}
     />
   );

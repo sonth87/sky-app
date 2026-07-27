@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { Check } from 'lucide-react';
+import { cn } from '../lib/cn.js';
 
 export const LAYOUT_TAG_COLORS = [
   '#ef4444', // đỏ
@@ -26,20 +27,16 @@ export function ColorTagPicker({ color, onChange }: ColorTagPickerProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
         title="Màu tag layout"
+        className={cn(
+          'wa-6 h-6 rounded-full cursor-pointer p-0 shrink-0',
+          color ? 'border-2 border-white outline-1 outline-[#e6e6ee]' : 'border-2 border-dashed border-[#c9c9d3]'
+        )}
         style={{
-          width: 26,
-          height: 26,
-          borderRadius: '50%',
-          border: color ? '2px solid #fff' : '2px dashed #c9c9d3',
-          outline: color ? '1px solid #e6e6ee' : 'none',
           background: color ?? 'transparent',
-          cursor: 'pointer',
-          padding: 0,
-          flex: 'none',
         }}
       />
 
@@ -47,25 +44,9 @@ export function ColorTagPicker({ color, onChange }: ColorTagPickerProps) {
         <>
           <div
             onClick={() => setOpen(false)}
-            style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+            className="fixed inset-0 z-[49]"
           />
-          <div
-            style={{
-              position: 'absolute',
-              right: 0,
-              top: '100%',
-              marginTop: 6,
-              padding: 10,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: 8,
-              background: '#fff',
-              border: '1px solid #e6e6ee',
-              borderRadius: 11,
-              boxShadow: '0 14px 34px rgba(20,20,40,.18)',
-              zIndex: 50,
-            }}
-          >
+          <div className="absolute right-0 top-full mt-[6px] p-[10px] grid grid-cols-4 gap-2 bg-white border border-[#e6e6ee] rounded-[11px] shadow-[0_14px_34px_rgba(20,20,40,0.18)] z-[50]">
             {LAYOUT_TAG_COLORS.map((c) => (
               <button
                 key={c}
@@ -74,17 +55,8 @@ export function ColorTagPicker({ color, onChange }: ColorTagPickerProps) {
                   setOpen(false);
                 }}
                 title={c}
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: '50%',
-                  border: 'none',
-                  background: c,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+                className="w-6 h-6 rounded-full border-none cursor-pointer flex items-center justify-center"
+                style={{ background: c }}
               >
                 {color === c && <Check size={13} color="#fff" strokeWidth={3} />}
               </button>
@@ -95,17 +67,7 @@ export function ColorTagPicker({ color, onChange }: ColorTagPickerProps) {
                 setOpen(false);
               }}
               title="Bỏ màu"
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                border: '1px dashed #c9c9d3',
-                background: '#fff',
-                cursor: 'pointer',
-                gridColumn: 'span 4',
-                fontSize: 10,
-                color: '#9a9bab',
-              }}
+              className="w-6 h-6 rounded-full border border-dashed border-[#c9c9d3] bg-white cursor-pointer col-span-4 text-[10px] text-[#9a9bab]"
             >
               ✕
             </button>

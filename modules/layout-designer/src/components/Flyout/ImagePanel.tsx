@@ -44,8 +44,8 @@ export function ImagePanel({
   if (!listAssets) {
     return (
       <>
-        <div style={{ padding: '15px 15px 10px', fontWeight: 700, fontSize: 13 }}>Ảnh</div>
-        <div style={{ padding: '0 14px', fontSize: 11, color: '#9a9bab', lineHeight: 1.45 }}>
+        <div className="px-[15px] pt-[15px] pb-[10px] font-bold text-[13px]">Ảnh</div>
+        <div className="px-[14px] text-[11px] text-[#9a9bab] leading-[1.45]">
           Tải ảnh — nối tầng lưu trữ thật (Electron file / data-service upload / WASM blob) ở phần asset ảnh 3 tầng.
         </div>
       </>
@@ -70,13 +70,13 @@ export function ImagePanel({
 
   return (
     <>
-      <div style={{ padding: '15px 15px 10px', fontWeight: 700, fontSize: 13 }}>Ảnh</div>
-      <div style={{ padding: '0 14px 8px', fontSize: 11, color: '#9a9bab', lineHeight: 1.45 }}>Nhấp để gán vào ảnh đang chọn, hoặc thêm ảnh mới.</div>
-      {loadError && <div style={{ padding: '0 14px', fontSize: 11, color: '#c0521e' }}>Không tải được danh sách ảnh.</div>}
+      <div className="px-[15px] pt-[15px] pb-[10px] font-bold text-[13px]">Ảnh</div>
+      <div className="px-[14px] pb-[8px] text-[11px] text-[#9a9bab] leading-[1.45]">Nhấp để gán vào ảnh đang chọn, hoặc thêm ảnh mới.</div>
+      {loadError && <div className="px-[14px] text-[11px] text-[#c0521e]">Không tải được danh sách ảnh.</div>}
       {assets && assets.length === 0 && !loadError && (
-        <div style={{ padding: '0 14px', fontSize: 11, color: '#9a9bab' }}>Chưa có ảnh nào — dùng nút &quot;Đổi ảnh&quot; ở panel thuộc tính để tải lên.</div>
+        <div className="px-[14px] text-[11px] text-[#9a9bab]">Chưa có ảnh nào — dùng nút &quot;Đổi ảnh&quot; ở panel thuộc tính để tải lên.</div>
       )}
-      <div style={{ padding: '4px 14px 14px', overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div className="p-[4px_14px_14px] overflow-y-auto grid grid-cols-2 gap-2">
         {(assets ?? []).map((asset) => (
           <AssetThumbnail key={asset.relativePath} asset={asset} resolveAssetUrl={resolveAssetUrl} onClick={() => handlePick(asset)} />
         ))}
@@ -97,13 +97,8 @@ function AssetThumbnail({ asset, resolveAssetUrl, onClick }: { asset: AssetMeta;
     <button
       onClick={onClick}
       title={asset.name}
+      className="aspect-square border border-[#e6e6ee] rounded-lg p-0 overflow-hidden cursor-pointer"
       style={{
-        aspectRatio: '1',
-        border: '1px solid #e6e6ee',
-        borderRadius: 8,
-        padding: 0,
-        overflow: 'hidden',
-        cursor: 'pointer',
         background: url ? `center/cover url(${url})` : 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
       }}
     />

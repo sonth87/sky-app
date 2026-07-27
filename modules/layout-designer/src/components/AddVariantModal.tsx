@@ -1,11 +1,6 @@
-// AddVariantModal — chọn tỷ lệ, dùng cho 2 mục đích (icon "+" Thêm tỷ lệ MỚI, và icon "Đổi tỷ lệ"
-// khi hover tab — đổi aspect CỦA CHÍNH variant đang có, xem changeVariantAspectCommand). Danh
-// sách preset PHỔ BIẾN (không đóng cứng — slide-shared's AspectRatio cho phép mọi id, xem
-// "custom:WxH" bên dưới), disable preset đã dùng trong layout hiện tại (mỗi tỷ lệ chỉ 1 variant/
-// layout). Mục "Tuỳ chỉnh" cuối danh sách cho tự nhập W:H bất kỳ.
-
 import { useState } from 'react';
 import type { AspectRatio } from '@sky-app/slide-shared';
+import { cn } from '../lib/cn.js';
 
 const PRESETS: { id: string; w: number; h: number; label: string }[] = [
   { id: '16:9', w: 16, h: 9, label: '16:9 — Màn hình rộng' },
@@ -22,8 +17,6 @@ export interface AddVariantModalProps {
   usedAspectIds: Set<string>;
   onClose: () => void;
   onConfirm: (aspect: AspectRatio) => void;
-  /** Bỏ trống = tiêu đề "Thêm tỷ lệ màn hình", nút "Thêm" (hành vi mặc định — nút "+"). Truyền
-   * vào khi dùng cho "Đổi tỷ lệ" (hover tab) — tiêu đề/nút khác để không gây hiểu nhầm 2 hành vi. */
   title?: string;
   confirmLabel?: string;
 }
@@ -31,10 +24,6 @@ export interface AddVariantModalProps {
 export function AddVariantModal({ usedAspectIds, onClose, onConfirm, title = 'Thêm tỷ lệ màn hình', confirmLabel = 'Thêm' }: AddVariantModalProps) {
   const [customW, setCustomW] = useState('');
   const [customH, setCustomH] = useState('');
-  // Trạng thái hover cho từng preset (review 2026-07-18: "khi bật phần chọn thay đổi tỷ lệ màn
-  // hình thì cho trạng thái hover đi" — trước đó background luôn 'transparent' cố định, không có
-  // phản hồi thị giác khi rê chuột qua, khác các danh sách khác trong module đã có hover — VD
-  // VariantTabs.tsx's hoveredVariantId).
   const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
 
   const customWNum = Number(customW);
@@ -45,44 +34,24 @@ export function AddVariantModal({ usedAspectIds, onClose, onConfirm, title = 'Th
 
   function confirmCustom() {
     if (!customValid || customUsed) return;
-    // Không gán label dài — tab (VariantTabs) hiện gọn "customWxH" qua fallback aspect.id, nhất
-    // quán với preset (xem comment ở nút preset bên dưới).
     onConfirm({ id: customId, w: customWNum, h: customHNum });
   }
 
   return (
     <>
-      {/* Backdrop — click ra ngoài để đóng, KHÔNG dùng position:fixed (containing-block bug đã
-         gặp ở Flyout.tsx ghost label — root app device-layout giữ transform inline thường trực).
-         stopPropagation() BẮT BUỘC — khi dùng cho "Đổi tỷ lệ" (lồng trong tab của VariantTabs.tsx),
-         backdrop nằm bên trong div tab vốn CŨNG có onClick riêng (mở lại popover 3 nút) — không
-         chặn bubble thì click ra ngoài sẽ đóng rồi MỞ LẠI NGAY do event nổi lên tab cha (bug thật,
-         báo 2026-07-18). Vô hại khi dùng cho nút "+" (không lồng trong tab). */}
       <div
         onClick={(e) => {
           e.stopPropagation();
           onClose();
         }}
-        style={{ position: 'absolute', inset: '-1000px', zIndex: 9 }}
+        className="absolute -inset-[1000px] z-[9]"
       />
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          marginTop: 6,
-          width: 260,
-          background: '#fff',
-          border: '1px solid #e6e6ee',
-          borderRadius: 11,
-          boxShadow: '0 14px 34px rgba(20,20,40,.18)',
-          zIndex: 10,
-          overflow: 'hidden',
-        }}
+        className="absolute top-full left-0 mt-[6px] w-[260px] bg-white border border-[#e6e6ee] rounded-[11px] shadow-[0_14px_34px_rgba(20,20,40,0.18)] z-[10] overflow-hidden"
       >
-        <div style={{ padding: '10px 12px 6px', fontWeight: 700, fontSize: 12, color: '#5c5d6e' }}>{title}</div>
-        <div style={{ maxHeight: 260, overflowY: 'auto', padding: '2px 6px' }}>
+        <div className="p-[10px_12px_6px] font-bold text-xs text-[#5c5d6e]">{title}</div>
+        <div className="max-h-[260px] overflow-y-auto px-[6px] py-[2px]">
           {PRESETS.map((p) => {
             const disabled = usedAspectIds.has(p.id);
             const hovered = !disabled && hoveredPresetId === p.id;
@@ -90,72 +59,55 @@ export function AddVariantModal({ usedAspectIds, onClose, onConfirm, title = 'Th
               <button
                 key={p.id}
                 disabled={disabled}
-                // KHÔNG gán p.label (mô tả dài "16:9 — Màn hình rộng") vào AspectRatio.label —
-                // đó là text CHỈ DÙNG hiển thị trong modal này; VariantTabs cần label NGẮN GỌN
-                // (chính aspect.id, "16:9") để tab không bị dài quá khổ. Bỏ trống label → tab
-                // fallback hiện aspect.id (xem VariantTabs.tsx: v.aspect.label ?? v.aspect.id).
                 onClick={() => onConfirm({ id: p.id, w: p.w, h: p.h })}
                 onMouseEnter={() => setHoveredPresetId(p.id)}
                 onMouseLeave={() => setHoveredPresetId((cur) => (cur === p.id ? null : cur))}
+                className={cn(
+                  'block w-full text-left p-2 rounded-[7px] border-none text-xs font-semibold transition-colors duration-100',
+                  disabled ? 'text-[#c9c9d3] cursor-default' : hovered ? 'text-[#26262e] cursor-pointer' : 'text-[#26262e] cursor-pointer'
+                )}
                 style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '8px 8px',
-                  borderRadius: 7,
-                  border: 'none',
                   background: hovered ? '#f4f5f9' : 'transparent',
-                  color: disabled ? '#c9c9d3' : '#26262e',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: disabled ? 'default' : 'pointer',
-                  transition: 'background 0.1s ease',
                 }}
               >
                 {p.label}
-                {disabled && <span style={{ marginLeft: 6, fontWeight: 400, fontSize: 10.5 }}>(đã dùng)</span>}
+                {disabled && <span className="ml-[6px] font-normal text-[10.5px]">(đã dùng)</span>}
               </button>
             );
           })}
         </div>
-        <div style={{ borderTop: '1px solid #f0f0f5', padding: 10 }}>
-          <div style={{ fontWeight: 700, fontSize: 11, color: '#9a9bab', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>Tuỳ chỉnh</div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <div className="border-t border-[#f0f0f5] p-[10px]">
+          <div className="font-bold text-[11px] text-[#9a9bab] mb-[6px] uppercase tracking-[.04em]">Tuỳ chỉnh</div>
+          <div className="flex gap-[6px] items-center">
             <input
               type="number"
               min={1}
               placeholder="W"
               value={customW}
               onChange={(e) => setCustomW(e.target.value)}
-              style={{ width: 0, flex: 1, border: '1px solid #e6e6ee', borderRadius: 7, padding: '6px 8px', fontSize: 12 }}
+              className="w-0 flex-1 border border-[#e6e6ee] rounded-[7px] p-[6px_8px] text-xs"
             />
-            <span style={{ color: '#9a9bab', fontSize: 12 }}>:</span>
+            <span className="text-[#9a9bab] text-xs">:</span>
             <input
               type="number"
               min={1}
               placeholder="H"
               value={customH}
               onChange={(e) => setCustomH(e.target.value)}
-              style={{ width: 0, flex: 1, border: '1px solid #e6e6ee', borderRadius: 7, padding: '6px 8px', fontSize: 12 }}
+              className="w-0 flex-1 border border-[#e6e6ee] rounded-[7px] p-[6px_8px] text-xs"
             />
             <button
               onClick={confirmCustom}
               disabled={!customValid || customUsed}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 7,
-                border: 'none',
-                background: !customValid || customUsed ? '#e6e6ee' : 'var(--accent-color, #4b57e6)',
-                color: !customValid || customUsed ? '#9a9bab' : '#fff',
-                fontWeight: 700,
-                fontSize: 11.5,
-                cursor: !customValid || customUsed ? 'default' : 'pointer',
-              }}
+              className={cn(
+                'p-[6px_12px] rounded-[7px] border-none font-bold text-[11.5px]',
+                !customValid || customUsed ? 'bg-[#e6e6ee] text-[#9a9bab] cursor-default' : 'bg-[#4b57e6] text-white cursor-pointer hover:bg-[#3b47d6]'
+              )}
             >
               {confirmLabel}
             </button>
           </div>
-          {customUsed && <div style={{ fontSize: 10.5, color: '#e05656', marginTop: 4 }}>Tỷ lệ này đã có trong layout.</div>}
+          {customUsed && <div className="text-[10.5px] text-[#e05656] mt-[4px]">Tỷ lệ này đã có trong layout.</div>}
         </div>
       </div>
     </>

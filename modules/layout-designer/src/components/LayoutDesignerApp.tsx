@@ -24,6 +24,7 @@ import { ColorTagPicker } from './ColorTagPicker.js';
 import { VariantTabs } from './VariantTabs.js';
 import type { CopyVariantMode } from './CopyVariantPopover.js';
 import { usePersistedState } from '../hooks/usePersistedState.js';
+import { cn } from '../lib/cn.js';
 
 /** Giới hạn kéo resize property panel — quá hẹp thì input/nút không đủ chỗ, quá rộng thì canvas
  * bị bóp nhỏ. Rộng mặc định TĂNG từ 302 → 340 theo yêu cầu 2026-07-18 "cho to thêm 1 chút". */
@@ -55,6 +56,9 @@ export interface LayoutDesignerAppProps {
   onDocChange?: (doc: LayoutContent) => void;
   /** Nhãn trạng thái lưu hiện ở toolbar (VD "Đã lưu", "Đang lưu…") — hiển thị thuần, không tự suy luận. */
   saveStatusLabel?: string;
+  layoutId?: string;
+  layoutPort?: any;
+  onRestoreVersion?: (version: any) => void;
   /**
    * Bỏ trống = ẩn VersioningPanel hoàn toàn (VD dùng LayoutDesignerApp cho mục đích khác không
    * cần publish). Truyền vào khi có LayoutPort thật ở tầng gọi (LayoutDesignerAppModule).
@@ -215,9 +219,9 @@ export function LayoutDesignerApp({
     // spec CSS, transform ≠ none trên ancestor biến nó thành containing block cho fixed, khiến
     // fixed bên trong app KHÔNG fix theo viewport toàn màn hình mà fix theo khung cửa sổ app,
     // gây ghost hiện lệch xa so với vị trí chuột thật (đã xác nhận qua ảnh chụp thực tế).
-    <div ref={rootElRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f4f5f9', position: 'relative' }}>
+    <div ref={rootElRef} className="h-full flex flex-col overflow-hidden bg-[#f4f5f9] relative layout-designer-root">
       <Toolbar saveStatusLabel={saveStatusLabel} versioning={versioning} documentColor={documentColor} onChangeColor={onChangeColor} />
-      <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
+      <div className="flex-1 flex min-h-0 relative">
         {variant ? (
           <>
             {leftPanelVisible ? (
@@ -263,19 +267,16 @@ export function LayoutDesignerApp({
               }
             />
             {rightPanelVisible ? (
-              <div style={{ flex: 'none', display: 'flex', position: 'relative' }}>
+              <div className="shrink-0 flex relative">
                 <div
                   onPointerDown={handleResizeHandlePointerDown}
                   onPointerMove={handleResizeHandlePointerMove}
                   onPointerUp={handleResizeHandlePointerUp}
-                  style={{
-                    width: 5,
-                    marginLeft: -2.5,
-                    marginRight: -2.5,
-                    zIndex: 1,
-                    cursor: 'col-resize',
-                    background: isResizingPanel ? 'color-mix(in srgb, var(--accent-color, #4b57e6) 30%, transparent)' : 'transparent',
-                  }}
+                  className={cn(
+                    'w-[5px] -ml-[2.5px] -mr-[2.5px] z-[1]',
+                    isResizingPanel ? 'bg-[#4b57e6]/30' : 'bg-transparent'
+                  )}
+                  style={{ cursor: 'col-resize' }}
                 />
                 <PropertyPanel
                   editor={editor}
@@ -289,7 +290,7 @@ export function LayoutDesignerApp({
                 <button
                   onClick={() => setRightPanelVisible(false)}
                   aria-label="Ẩn panel thuộc tính"
-                  style={{ ...panelToggleBtnStyle, top: 10, right: 10 }}
+                  className="absolute top-[10px] right-[10px] w-[26px] h-[26px] rounded-[7px] border border-[#e6e6ee] bg-white text-[#9a9bab] hover:text-[#5c5d6e] flex items-center justify-center cursor-pointer z-[2]"
                 >
                   <PanelRightClose size={14} />
                 </button>
@@ -299,60 +300,28 @@ export function LayoutDesignerApp({
             )}
           </>
         ) : (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9a9bab' }}>Không có variant nào</div>
+          <div className="flex-1 flex items-center justify-center text-[#9a9bab]">Không có variant nào</div>
         )}
       </div>
     </div>
   );
 }
 
-/** Style dùng chung cho 2 nút toggle "ẩn panel" (nổi góc trên panel, absolute — panel cha luôn
- * có position:relative để làm containing block). */
-const panelToggleBtnStyle: React.CSSProperties = {
-  position: 'absolute',
-  width: 26,
-  height: 26,
-  borderRadius: 7,
-  border: '1px solid #e6e6ee',
-  background: '#fff',
-  color: '#9a9bab',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-  zIndex: 2,
-};
-
-/** Dải mảnh dán sát cạnh Canvas khi 1 bên panel đang ẨN — bấm để mở lại (review 2026-07-18:
- * "palette trái cũng có nút để toggle" + panel phải "có nút để toggle"). Đặt NGOÀI panel (không
- * lồng trong panel đã ẩn) vì panel không render gì khi ẩn — đây là điểm neo duy nhất để mở lại. */
 function PanelEdgeToggle({ side, onClick }: { side: 'left' | 'right'; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       aria-label={side === 'left' ? 'Hiện palette' : 'Hiện panel thuộc tính'}
-      style={{
-        flex: 'none',
-        width: 18,
-        alignSelf: 'stretch',
-        border: 'none',
-        borderRight: side === 'left' ? '1px solid #e6e6ee' : undefined,
-        borderLeft: side === 'right' ? '1px solid #e6e6ee' : undefined,
-        background: '#fff',
-        color: '#c9c9d3',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      className={cn(
+        'shrink-0 w-[18px] self-stretch border-none bg-white text-[#c9c9d3] hover:text-[#5c5d6e] cursor-pointer flex items-center justify-center',
+        side === 'left' ? 'border-r border-[#e6e6ee]' : 'border-l border-[#e6e6ee]'
+      )}
     >
       {side === 'left' ? <PanelLeftOpen size={13} /> : <PanelRightOpen size={13} />}
     </button>
   );
 }
 
-// Undo/redo giờ CHỈ ở toolbar nổi đáy canvas (Canvas.tsx's FloatingToolbar) — bỏ khỏi đây theo
-// yêu cầu rút gọn 2026-07-17 (ảnh mẫu), tránh 2 nơi cùng hiện 1 chức năng.
 function Toolbar({
   saveStatusLabel,
   versioning,
@@ -365,10 +334,10 @@ function Toolbar({
   onChangeColor?: (color: string | undefined) => void;
 }) {
   return (
-    <div style={{ height: 52, flex: 'none', display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', background: '#fff', borderBottom: '1px solid #e6e6ee' }}>
-      <div style={{ fontWeight: 600, fontSize: 14 }}>Layout Designer</div>
-      {saveStatusLabel && <div style={{ fontSize: 11, color: '#9a9bab', marginLeft: 4 }}>{saveStatusLabel}</div>}
-      <div style={{ flex: 1 }} />
+    <div className="h-[52px] shrink-0 flex items-center gap-3 px-[14px] bg-white border-b border-[#e6e6ee]">
+      <div className="font-semibold text-sm">Layout Designer</div>
+      {saveStatusLabel && <div className="text-[11px] text-[#9a9bab] ml-1">{saveStatusLabel}</div>}
+      <div className="flex-1" />
       {onChangeColor && <ColorTagPicker color={documentColor} onChange={onChangeColor} />}
       {versioning && (
         <VersioningPanel

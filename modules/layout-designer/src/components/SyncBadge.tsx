@@ -5,6 +5,7 @@
 
 import { Link2, Link2Off } from 'lucide-react';
 import type { LayoutItem } from '@sky-app/slide-shared';
+import { cn } from '../lib/cn.js';
 
 export interface SyncBadgeProps {
   item: LayoutItem;
@@ -30,7 +31,11 @@ export function SyncBadge({ item, isParent, size = 11 }: SyncBadgeProps) {
   const label = linked ? 'Đang đồng bộ với tỷ lệ khác' : 'Đã tách khỏi đồng bộ (đã khoá)';
 
   return (
-    <span title={label} aria-label={label} style={{ display: 'inline-flex', alignItems: 'center', color: linked ? 'var(--accent-color, #4b57e6)' : '#9a9bab' }}>
+    <span
+      title={label}
+      aria-label={label}
+      className={cn('inline-flex items-center', linked ? 'text-[#4b57e6]' : 'text-[#9a9bab]')}
+    >
       <Icon size={size} />
     </span>
   );

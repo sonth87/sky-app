@@ -4,14 +4,12 @@ import type { LayoutItem, LayoutVariant, RichTextContent, TiptapJSONDoc } from '
 import { patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
 import { useEditorState } from '../../hooks/useEditor.js';
+import { cn } from '../../lib/cn.js';
 
 export function iconOf(t: LayoutItem['type']) {
   return t === 'text' ? 'T' : t === 'image' ? '▦' : t === 'ribbon' ? '⚑' : t === 'loop' ? '⟲' : '◆';
 }
 
-/** Text thô nối từ mọi text node trong content.json — dùng cho nhãn Layers panel (chỉ cần
- * preview ngắn, KHÔNG cần giữ định dạng bold/italic như content.html dùng cho canvas/backdrop,
- * Bước 12). */
 export function plainTextOf(content: string | RichTextContent): string {
   if (typeof content === 'string') return content;
   const parts: string[] = [];
@@ -24,7 +22,6 @@ export function plainTextOf(content: string | RichTextContent): string {
 }
 
 export function labelOf(it: LayoutItem): string {
-  // name tuỳ chỉnh (Bước 2, PropertyPanel's PanelHeader) ưu tiên hơn nhãn tự sinh theo type.
   if (it.name) return it.name;
   if (it.type === 'image') return it.varKey ? `Ảnh · @${it.varKey}` : 'Ảnh';
   if (it.type === 'shape') return 'Shape';
@@ -34,18 +31,12 @@ export function labelOf(it: LayoutItem): string {
 
 export interface LayerNode {
   item: LayoutItem;
-  /** Path đầy đủ (loopId.loopId....itemId) — dùng làm React key, tránh key collision vì id
-   * trong itemTemplate KHÔNG cách biệt namespace với id top-level (Bước 6, rủi ro đã ghi trong
-   * plan). CŨNG dùng để phân biệt "item lồng" (path.length>1) — chỉ item TOP-LEVEL (path.length
-   * === 1) mới setSelection được ở bước này (đợi Bước 9 mới chọn được node lồng). */
   path: string[];
   depth: number;
   children: LayerNode[];
 }
 
 export function buildLayerTree(items: LayoutItem[], parentPath: string[] = []): LayerNode[] {
-  // Đảo ngược thứ tự hiển thị (item vẽ sau/z cao hơn hiện ở TRÊN cùng danh sách, quy ước layer
-  // panel thông thường) — CHỈ đảo ở cấp hiện tại, giữ nguyên thứ tự bên trong itemTemplate.
   return [...items].reverse().map((item) => {
     const path = [...parentPath, item.id];
     const children = item.type === 'loop' ? buildLayerTree(item.itemTemplate, path) : [];
@@ -83,8 +74,8 @@ export function LayersPanel({ editor, variant }: { editor: Editor; variant: Layo
 
   return (
     <>
-      <div style={{ padding: '15px 15px 10px', fontWeight: 700, fontSize: 13 }}>Lớp</div>
-      <div style={{ padding: '6px 14px 14px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div className="px-[15px] pt-[15px] pb-[10px] font-bold text-[13px]">Lớp</div>
+      <div className="p-[6px_14px_14px] overflow-y-auto flex flex-col gap-[5px]">
         {visible.map((node) => {
           const { item: it, path, depth } = node;
           const key = path.join('.');
@@ -96,23 +87,17 @@ export function LayersPanel({ editor, variant }: { editor: Editor; variant: Layo
               key={key}
               onClick={() => {
                 if (isTopLevel) editor.store.getState().setSelection([it.id]);
-                // Node lồng trong itemTemplate: KHÔNG setSelection (id không tồn tại trong
-                // variant.items → PropertyPanel/Canvas sẽ âm thầm không tìm thấy gì, bug im lặng
-                // đã ghi trong plan) — đợi Bước 9 (cầu nối dữ liệu loopItemId) mới chọn được.
               }}
               title={isTopLevel ? undefined : 'Nhấp đúp vào khung lặp trên canvas để sửa mẫu'}
+              className={cn(
+                'flex items-center gap-2 py-[7px] px-[9px] rounded-lg border',
+                isTopLevel ? 'cursor-pointer opacity-100' : 'cursor-default opacity-55',
+                on
+                  ? 'bg-[#4b57e6]/10 text-[#4b57e6] border-[#4b57e6]/30'
+                  : 'bg-transparent text-[#5c5d6e] border-transparent hover:bg-neutral-50'
+              )}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '7px 9px',
                 paddingLeft: 9 + depth * 18,
-                borderRadius: 8,
-                cursor: isTopLevel ? 'pointer' : 'default',
-                opacity: isTopLevel ? 1 : 0.55,
-                background: on ? 'color-mix(in srgb, var(--accent-color, #4b57e6) 10%, transparent)' : 'transparent',
-                color: on ? 'var(--accent-color, #4b57e6)' : '#5c5d6e',
-                border: `1px solid ${on ? 'color-mix(in srgb, var(--accent-color, #4b57e6) 30%, transparent)' : 'transparent'}`,
               }}
             >
               {node.children.length > 0 ? (
@@ -122,27 +107,27 @@ export function LayersPanel({ editor, variant }: { editor: Editor; variant: Layo
                     toggleExpand(key);
                   }}
                   aria-label={isExpanded ? `Thu gọn ${labelOf(it)}` : `Mở rộng ${labelOf(it)}`}
-                  style={{ display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', color: '#9a9bab', cursor: 'pointer', padding: 0, width: 14 }}
+                  className="flex items-center border-none bg-transparent text-[#9a9bab] cursor-pointer p-0 w-3.5"
                 >
                   {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 </button>
               ) : (
-                <span style={{ width: 14 }} />
+                <span className="w-3.5" />
               )}
-              <span style={{ width: 22, textAlign: 'center' }}>{iconOf(it.type)}</span>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 11.5 }}>{labelOf(it)}</span>
+              <span className="w-[22px] text-center">{iconOf(it.type)}</span>
+              <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-semibold text-[11.5px]">{labelOf(it)}</span>
               {isTopLevel && (
                 <>
-                  {/* locked (Bước 2) — toggle nhanh ngay trong Layers, cùng ý nghĩa với nút Pin/
-                     PinOff ở PropertyPanel's PanelHeader (khoá DI CHUYỂN, khác syncLocked). CHỈ
-                     top-level (item lồng chưa có cầu nối patchItem, đợi Bước 9). */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       editor.store.getState().dispatch(patchItemCommand(variant.aspect.id, it.id, it, { locked: !it.locked }));
                     }}
                     aria-label={it.locked ? `Mở khoá ${labelOf(it)}` : `Khoá ${labelOf(it)}`}
-                    style={{ display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', color: it.locked ? 'var(--accent-color, #4b57e6)' : '#c9c9d3', cursor: 'pointer', padding: '0 2px' }}
+                    className={cn(
+                      'flex items-center border-none bg-transparent cursor-pointer px-0.5',
+                      it.locked ? 'text-[#4b57e6]' : 'text-[#c9c9d3] hover:text-[#9a9bab]'
+                    )}
                   >
                     {it.locked ? <PinOff size={13} /> : <Pin size={13} />}
                   </button>
@@ -152,7 +137,7 @@ export function LayersPanel({ editor, variant }: { editor: Editor; variant: Layo
                       editor.store.getState().dispatch(removeItemCommand(variant.aspect.id, it.id));
                     }}
                     aria-label={`Xoá ${labelOf(it)}`}
-                    style={{ display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', color: '#c9c9d3', cursor: 'pointer', padding: '0 2px' }}
+                    className="flex items-center border-none bg-transparent text-[#c9c9d3] hover:text-red-500 cursor-pointer px-0.5"
                   >
                     <X size={13} />
                   </button>

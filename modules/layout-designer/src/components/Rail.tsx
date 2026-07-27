@@ -1,6 +1,7 @@
 // Rail — 6 icon nhóm bên trái, theo prototype "Backdrop Editor 2a - keo tha.dc.html" §RAIL.
 
 import { PanelLeftClose } from 'lucide-react';
+import { cn } from '../lib/cn.js';
 
 export type RailGroup = 'comp' | 'tpl' | 'coll' | 'var' | 'img' | 'layers';
 
@@ -23,25 +24,12 @@ export interface RailProps {
 
 export function Rail({ active, onChange, onToggleVisible }: RailProps) {
   return (
-    <div style={{ width: 78, flex: 'none', borderRight: '1px solid #e6e6ee', background: '#fff', display: 'flex', flexDirection: 'column', padding: '9px 0' }}>
+    <div className="w-[78px] shrink-0 border-r border-[#e6e6ee] bg-white flex flex-col py-[9px]">
       {onToggleVisible && (
         <button
           onClick={onToggleVisible}
           aria-label="Ẩn palette"
-          style={{
-            alignSelf: 'center',
-            marginBottom: 6,
-            width: 26,
-            height: 26,
-            borderRadius: 7,
-            border: '1px solid #e6e6ee',
-            background: 'transparent',
-            color: '#9a9bab',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-          }}
+          className="self-center mb-[6px] w-[26px] h-[26px] rounded-[7px] border border-[#e6e6ee] bg-transparent text-[#9a9bab] flex items-center justify-center cursor-pointer hover:bg-neutral-50"
         >
           <PanelLeftClose size={13} />
         </button>
@@ -52,34 +40,17 @@ export function Rail({ active, onChange, onToggleVisible }: RailProps) {
           <div
             key={g.key}
             onClick={() => onChange(g.key)}
-            style={{
-              position: 'relative',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 4,
-              padding: '9px 0',
-              color: on ? 'var(--accent-color, #4b57e6)' : '#9a9bab',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: 9.5,
-              textAlign: 'center',
-              borderLeft: on ? '3px solid var(--accent-color, #4b57e6)' : '3px solid transparent',
-            }}
+            className={cn(
+              'relative flex flex-col items-center gap-[4px] py-[9px] cursor-pointer font-semibold text-[9.5px] text-center border-l-[3px]',
+              on ? 'text-[#4b57e6] border-[#4b57e6]' : 'text-[#9a9bab] border-transparent'
+            )}
           >
             <span
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 11,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: g.icon === '{ }' ? 13 : 17,
-                fontFamily: g.icon === '{ }' ? "'JetBrains Mono', monospace" : 'inherit',
-                fontWeight: g.icon === '{ }' ? 700 : 400,
-                background: on ? 'color-mix(in srgb, var(--accent-color, #4b57e6) 10%, transparent)' : 'transparent',
-              }}
+              className={cn(
+                'w-[38px] h-[38px] rounded-[11px] flex items-center justify-center',
+                g.icon === '{ }' ? 'text-[13px] font-mono font-bold' : 'text-[17px] font-normal',
+                on ? 'bg-[#4b57e6]/10' : 'bg-transparent'
+              )}
             >
               {g.icon}
             </span>

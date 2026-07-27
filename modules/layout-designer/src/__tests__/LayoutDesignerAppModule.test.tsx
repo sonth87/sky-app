@@ -11,10 +11,10 @@ function makePlatform(layoutPort: LayoutPort | undefined): PlatformContext {
     env: 'web',
     capabilities: { has: () => true, list: () => [] },
     services: {
-      get: <T,>(id: string) => (id === 'layout' ? (layoutPort as T) : undefined),
+      get: <T,>(id: string) => (id === 'layout' ? (layoutPort as T) : id === 'variable_registry' ? (layoutPort as T) : undefined),
       register: () => {},
       unregister: () => {},
-      has: (id: string) => id === 'layout' && layoutPort != null,
+      has: (id: string) => (id === 'layout' || id === 'variable_registry') && layoutPort != null,
     },
     events: { emit: () => {}, on: () => () => {} },
     entitlements: { has: () => true, list: () => [] },
@@ -22,8 +22,8 @@ function makePlatform(layoutPort: LayoutPort | undefined): PlatformContext {
   } as unknown as PlatformContext;
 }
 
-function baseProps(platform: PlatformContext): AppContentProps {
-  return { appId: 'layout-designer', windowId: 'w1', platform, isActive: true };
+function baseProps(platform: PlatformContext): AppContentProps & { layoutId: string } {
+  return { appId: 'layout-designer', windowId: 'w1', layoutId: 'demo-layout', platform, isActive: true };
 }
 
 function makeContent(): LayoutContent {
@@ -150,29 +150,33 @@ describe('LayoutDesignerAppModule — debounce save draft', () => {
 
 describe('LayoutDesignerAppModule — publish', () => {
   it('bấm Publish trong VersioningPanel → gọi layoutPort.publish rồi tải lại listVersions', async () => {
-    const user = userEvent.setup();
     const content = makeContent();
+    let published = false;
     const port = mockLayoutPort({
       getDocument: vi.fn().mockResolvedValue(makeDoc(content)),
-      publish: vi.fn().mockResolvedValue({ version: 1, content, publishedAt: '2026-01-01T00:00:00.000Z' }),
-      listVersions: vi.fn().mockResolvedValue([{ version: 1, content, publishedAt: '2026-01-01T00:00:00.000Z' }]),
+      publish: vi.fn().mockImplementation(() => {
+        published = true;
+        return Promise.resolve({ version: 1, content, publishedAt: '2026-01-01T00:00:00.000Z' });
+      }),
+      listVersions: vi.fn().mockImplementation(() => {
+        return Promise.resolve(published ? [{ version: 1, content, publishedAt: '2026-01-01T00:00:00.000Z' }] : []);
+      }),
     });
     const platform = makePlatform(port);
     render(<LayoutDesignerAppModule {...baseProps(platform)} />);
 
-    await waitFor(() => expect(screen.getByText('Chưa publish ▾')).toBeTruthy());
-    await user.click(screen.getByText('Chưa publish ▾'));
-    await user.click(screen.getByText('Publish → v1'));
+    await waitFor(() => expect(screen.getByText(/Chưa publish/)).toBeTruthy());
+    fireEvent.click(screen.getByText(/Chưa publish/));
+    fireEvent.click(await screen.findByText('Publish → v1'));
 
     expect(port.publish).toHaveBeenCalledWith('demo-layout', undefined);
     await waitFor(() => expect(port.listVersions).toHaveBeenCalledWith('demo-layout'));
-    await waitFor(() => expect(screen.getByText('v1 ▾')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/v1/)).toBeTruthy());
   });
 });
 
 describe('LayoutDesignerAppModule — restore', () => {
   it('bấm Khôi phục → gọi restoreVersion rồi tải lại document (remount editor với content mới)', async () => {
-    const user = userEvent.setup();
     const originalContent = makeContent();
     const restoredContent: LayoutContent = {
       variants: [{ aspect: { id: '16:9', w: 16, h: 9 }, refW: 1920, refH: 1080, items: [{ id: 'restored-item', type: 'text', box: { x: 0, y: 0, w: 100, h: 40 }, content: 'Bản cũ', fontSize: 20 }] }],
@@ -191,9 +195,10 @@ describe('LayoutDesignerAppModule — restore', () => {
     const platform = makePlatform(port);
     render(<LayoutDesignerAppModule {...baseProps(platform)} />);
 
-    await waitFor(() => expect(screen.getByText('v1 ▾')).toBeTruthy());
-    await user.click(screen.getByText('v1 ▾'));
-    await user.click(screen.getByText('Khôi phục'));
+    await waitFor(() => expect(port.listVersions).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText(/v1/)).toBeTruthy());
+    fireEvent.click(screen.getByText(/v1/));
+    fireEvent.click(await screen.findByText('Khôi phục'));
 
     await waitFor(() => expect(port.restoreVersion).toHaveBeenCalledWith('demo-layout', 1));
     // Sau restore, editor remount với content MỚI (restoredContent có item "Bản cũ") —
@@ -205,7 +210,6 @@ describe('LayoutDesignerAppModule — restore', () => {
 
 describe('LayoutDesignerAppModule — variable_registry (gợi ý toàn cục)', () => {
   it('mount → gọi listTopVariables, gợi ý toàn cục xuất hiện trong dropdown khi gõ @', async () => {
-    const user = userEvent.setup();
     const content: LayoutContent = {
       variants: [{ aspect: { id: '16:9', w: 16, h: 9 }, refW: 1920, refH: 1080, items: [{ id: 'a', type: 'text', box: { x: 0, y: 0, w: 100, h: 40 }, content: 'Xin chào', fontSize: 20 }] }],
     };
@@ -217,16 +221,16 @@ describe('LayoutDesignerAppModule — variable_registry (gợi ý toàn cục)',
     render(<LayoutDesignerAppModule {...baseProps(platform)} />);
 
     await waitFor(() => expect(port.listTopVariables).toHaveBeenCalled());
-    await user.pointer({ keys: '[MouseLeft]', target: screen.getByText('Xin chào') });
-    await user.click(screen.getByDisplayValue('Xin chào'));
-    await user.type(screen.getByDisplayValue('Xin chào'), ' @');
+    const itemEl = screen.getByText('Xin chào');
+    fireEvent.pointerDown(itemEl);
+    const textarea = await screen.findByDisplayValue('Xin chào');
+    fireEvent.change(textarea, { target: { value: 'Xin chào @', selectionStart: 10 } });
 
     expect(await screen.findByTestId('variable-suggestion')).toBeTruthy();
     expect(screen.getByText('@chuc_vu')).toBeTruthy();
   });
 
   it('chọn token từ dropdown → gọi recordTokenUsage rồi tải lại listTopVariables', async () => {
-    const user = userEvent.setup();
     const content: LayoutContent = {
       variants: [{ aspect: { id: '16:9', w: 16, h: 9 }, refW: 1920, refH: 1080, items: [{ id: 'a', type: 'text', box: { x: 0, y: 0, w: 100, h: 40 }, content: 'Xin chào', fontSize: 20 }] }],
     };
@@ -239,9 +243,12 @@ describe('LayoutDesignerAppModule — variable_registry (gợi ý toàn cục)',
     render(<LayoutDesignerAppModule {...baseProps(platform)} />);
 
     await waitFor(() => expect(port.listTopVariables).toHaveBeenCalledTimes(1));
-    await user.pointer({ keys: '[MouseLeft]', target: screen.getByText('Xin chào') });
-    await user.type(screen.getByDisplayValue('Xin chào'), ' @');
-    await user.click(await screen.findByTestId('variable-suggestion'));
+    const itemEl = screen.getByText('Xin chào');
+    fireEvent.pointerDown(itemEl);
+    const textarea = await screen.findByDisplayValue('Xin chào');
+    fireEvent.change(textarea, { target: { value: 'Xin chào @', selectionStart: 10 } });
+    const suggestion = await screen.findByTestId('variable-suggestion');
+    fireEvent.mouseDown(suggestion);
 
     expect(port.recordTokenUsage).toHaveBeenCalledWith('chuc_vu');
     await waitFor(() => expect(port.listTopVariables).toHaveBeenCalledTimes(2));

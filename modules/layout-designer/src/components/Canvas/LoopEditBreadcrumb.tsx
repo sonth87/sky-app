@@ -1,40 +1,13 @@
-/** Breadcrumb nổi góc trên-trái báo hiệu đang ở chế độ sửa mẫu LoopItem (Bước 10) — nút "Xong"
- * thoát về variant.items bình thường. */
 export function LoopEditBreadcrumb({ label, onDone }: { label: string; onDone: () => void }) {
   return (
     <div
       data-testid="loop-edit-breadcrumb"
-      style={{
-        position: 'absolute',
-        top: 16,
-        left: 16,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '7px 8px 7px 14px',
-        background: '#fff',
-        border: '1px solid #e6e6ee',
-        borderRadius: 9,
-        boxShadow: '0 6px 20px -8px rgba(20,10,50,.35)',
-        fontSize: 12,
-        fontWeight: 600,
-        color: '#5c5d6e',
-        zIndex: 1001,
-      }}
+      className="absolute top-4 left-4 flex items-center gap-[10px] p-[7px_8px_7px_14px] bg-white border border-[#e6e6ee] rounded-[9px] shadow-[0_6px_20px_-8px_rgba(20,10,50,0.35)] text-xs font-semibold text-[#5c5d6e] z-[1001]"
     >
       <span>Đang sửa mẫu của {label}</span>
       <button
         onClick={onDone}
-        style={{
-          padding: '5px 12px',
-          background: 'var(--accent-color, #4b57e6)',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 7,
-          fontWeight: 700,
-          fontSize: 11.5,
-          cursor: 'pointer',
-        }}
+        className="p-[5px_12px] bg-[#4b57e6] text-white border-none rounded-[7px] font-bold text-[11.5px] cursor-pointer hover:bg-[#3b47d6]"
       >
         Xong
       </button>

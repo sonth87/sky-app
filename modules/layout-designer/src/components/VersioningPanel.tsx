@@ -1,10 +1,6 @@
-// Versioning UI — nút Publish + danh sách version + khôi phục, theo docs/roadmap/plans/
-// layout-designer/21-layout-versioning.md §2/§4. Undo/redo (history.ts) ≠ version (đây) — undo
-// chỉ lùi thao tác TRONG draft hiện tại, KHÔNG "lùi version" (§5 file 23). Panel này thao tác
-// version (mốc đã publish, bất biến), tách biệt hoàn toàn khỏi History panel của editor-core.
-
 import { useState } from 'react';
 import type { LayoutVersion } from '@sky-app/slide-shared';
+import { cn } from '../lib/cn.js';
 
 export interface VersioningPanelProps {
   latestPublishedVersion: number | null;
@@ -25,86 +21,53 @@ export function VersioningPanel({ latestPublishedVersion, versions, onPublish, o
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        style={{
-          height: 34,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 7,
-          padding: '0 15px',
-          background: 'var(--accent-color, #4b57e6)',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 9,
-          fontWeight: 700,
-          fontSize: 12.5,
-          cursor: 'pointer',
-        }}
+        className="h-[34px] flex items-center gap-[7px] px-[15px] bg-[#4b57e6] text-white border-none rounded-[9px] font-bold text-[12.5px] cursor-pointer hover:bg-[#3b47d6]"
       >
         {latestPublishedVersion == null ? 'Chưa publish' : `v${latestPublishedVersion}`} ▾
       </button>
 
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            right: 0,
-            top: '100%',
-            marginTop: 6,
-            width: 320,
-            background: '#fff',
-            border: '1px solid #e6e6ee',
-            borderRadius: 11,
-            boxShadow: '0 14px 34px rgba(20,20,40,.18)',
-            zIndex: 50,
-          }}
-        >
-          <div style={{ padding: 14, borderBottom: '1px solid #f0f0f5' }}>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Publish bản draft hiện tại</div>
+        <div className="absolute right-0 top-full mt-[6px] w-[320px] bg-white border border-[#e6e6ee] rounded-[11px] shadow-[0_14px_34px_rgba(20,20,40,0.18)] z-[50]">
+          <div className="p-[14px] border-b border-[#f0f0f5]">
+            <div className="font-bold text-[13px] mb-2">Publish bản draft hiện tại</div>
             <input
               type="text"
               placeholder="Ghi chú thay đổi (tuỳ chọn)"
               value={noteInput}
               onChange={(e) => setNoteInput(e.target.value)}
-              style={{ width: '100%', border: '1px solid #e6e6ee', borderRadius: 8, padding: '7px 9px', fontSize: 12, marginBottom: 8 }}
+              className="w-full border border-[#e6e6ee] rounded-lg p-[7px_9px] text-xs mb-2"
             />
             <button
               onClick={handlePublish}
               disabled={isPublishing}
-              style={{
-                width: '100%',
-                padding: '8px 0',
-                background: isPublishing ? '#c9c9d3' : 'var(--accent-color, #4b57e6)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: isPublishing ? 'default' : 'pointer',
-              }}
+              className={cn(
+                'w-full py-2 border-none rounded-lg font-bold text-xs',
+                isPublishing ? 'bg-[#c9c9d3] text-white cursor-default' : 'bg-[#4b57e6] text-white cursor-pointer hover:bg-[#3b47d6]'
+              )}
             >
               {isPublishing ? 'Đang publish…' : `Publish → v${(latestPublishedVersion ?? 0) + 1}`}
             </button>
           </div>
 
-          <div style={{ padding: '10px 14px', maxHeight: 260, overflowY: 'auto' }}>
-            <div style={{ fontWeight: 600, fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: '#9a9bab', marginBottom: 6 }}>
+          <div className="p-[10px_14px] max-h-[260px] overflow-y-auto">
+            <div className="font-semibold text-[10.5px] tracking-[.04em] uppercase text-[#9a9bab] mb-[6px]">
               Lịch sử version
             </div>
             {versions.length === 0 ? (
-              <div style={{ fontSize: 11.5, color: '#c9c9d3' }}>Chưa publish lần nào.</div>
+              <div className="text-[11.5px] text-[#c9c9d3]">Chưa publish lần nào.</div>
             ) : (
               [...versions].reverse().map((v) => (
-                <div key={v.version} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #f7f7fa' }}>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 11.5, color: 'var(--accent-color, #4b57e6)' }}>v{v.version}</span>
-                  <span style={{ flex: 1, fontSize: 11, color: '#5c5d6e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div key={v.version} className="flex items-center gap-2 py-[7px] border-b border-[#f7f7fa]">
+                  <span className="font-mono font-bold text-[11.5px] text-[#4b57e6]">v{v.version}</span>
+                  <span className="flex-1 text-[11px] text-[#5c5d6e] overflow-hidden text-ellipsis whitespace-nowrap">
                     {v.note || new Date(v.publishedAt).toLocaleString('vi-VN')}
                   </span>
                   <button
                     onClick={() => onRestore(v.version)}
-                    style={{ fontSize: 10.5, color: 'var(--accent-color, #4b57e6)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                    className="text-[10.5px] text-[#4b57e6] bg-none border-none cursor-pointer font-semibold hover:underline"
                   >
                     Khôi phục
                   </button>

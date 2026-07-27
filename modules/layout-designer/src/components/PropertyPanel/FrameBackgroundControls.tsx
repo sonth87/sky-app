@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { Background, LayoutVariant } from '@sky-app/slide-shared';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
-import { pickerBtnStyle, Section } from './CommonControls.js';
+import { Section } from './CommonControls.js';
 import { GradientEditor } from '../GradientEditor/GradientEditor.js';
+import { cn } from '../../lib/cn.js';
 
 export interface FrameBackgroundControlsProps {
   variant: LayoutVariant;
@@ -12,12 +13,6 @@ export interface FrameBackgroundControlsProps {
   width?: number;
 }
 
-/**
- * Thuộc tính của CHÍNH Frame/Canvas (khi không có item nào đang chọn) — chọn kiểu nền: Không có
- * (mặc định trắng — xem Canvas.tsx đổi 2026-07-18, TRƯỚC ĐÓ mặc định tím `#201748`)/Màu/Gradient/
- * Ảnh. `video`/`effect` CHƯA làm (hoãn — cần đổi cả LayoutRenderer runtime, xem plan Giai đoạn 2.6
- * review "Property panel canvas" — chỉ làm color/gradient/image trước theo quyết định 2026-07-18).
- */
 export function FrameBackgroundControls({
   variant,
   onChange,
@@ -42,13 +37,13 @@ export function FrameBackgroundControls({
   }
 
   return (
-    <div style={{ width, flex: 'none', borderLeft: '1px solid #e6e6ee', background: '#fff', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-      <div style={{ padding: '13px 15px', borderBottom: '1px solid #e6e6ee' }}>
-        <span style={{ fontWeight: 700, fontSize: 13 }}>{variant.aspect.label ?? `${variant.aspect.w}:${variant.aspect.h}`} — Canvas</span>
-        <div style={{ fontSize: 11, color: '#9a9bab', marginTop: 3 }}>Không có phần tử nào đang chọn — chỉnh nền chung cho toàn bộ tỷ lệ này.</div>
+    <div className="shrink-0 border-l border-[#e6e6ee] bg-white flex flex-col overflow-y-auto" style={{ width }}>
+      <div className="p-[13px_15px] border-b border-[#e6e6ee]">
+        <span className="font-bold text-[13px]">{variant.aspect.label ?? `${variant.aspect.w}:${variant.aspect.h}`} — Canvas</span>
+        <div className="text-[11px] text-[#9a9bab] mt-[3px]">Không có phần tử nào đang chọn — chỉnh nền chung cho toàn bộ tỷ lệ này.</div>
       </div>
       <Section title="Kiểu nền">
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div className="flex gap-[6px]">
           {(
             [
               { value: 'none', label: 'Không có' },
@@ -65,7 +60,10 @@ export function FrameBackgroundControls({
                 else if (opt.value === 'gradient') onChange({ kind: 'gradient', gradient: background?.kind === 'gradient' ? background.gradient : 'linear-gradient(135deg, #201748, #4b57e6)' });
                 else onChange({ kind: 'image', src: background?.kind === 'image' ? background.src : undefined });
               }}
-              style={pickerBtnStyle(kind === opt.value, { flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10.5 })}
+              className={cn(
+                'flex-1 py-[6px] rounded-[7px] text-[10.5px] border cursor-pointer font-medium',
+                kind === opt.value ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]' : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e]'
+              )}
             >
               {opt.label}
             </button>
@@ -78,6 +76,7 @@ export function FrameBackgroundControls({
             type="color"
             value={background?.kind === 'color' ? background.color : '#201748'}
             onChange={(e) => onChange({ kind: 'color', color: e.target.value })}
+            className="w-10 h-8 p-0 border-none rounded cursor-pointer"
           />
         </Section>
       )}
@@ -91,28 +90,21 @@ export function FrameBackgroundControls({
       )}
       {kind === 'image' && pickAndSaveImage && (
         <Section title="Ảnh nền">
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="flex gap-[10px] items-center">
             {previewUrl ? (
-              <img src={previewUrl} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', border: '1px solid #e6e6ee' }} />
+              <img src={previewUrl} alt="" className="w-[44px] h-[44px] rounded-lg object-cover border border-[#e6e6ee]" />
             ) : (
-              <div style={{ width: 44, height: 44, borderRadius: 8, border: '1px dashed #cfd0da', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#9a9bab' }}>
+              <div className="w-[44px] h-[44px] rounded-lg border border-dashed border-[#cfd0da] flex items-center justify-center text-[9px] text-[#9a9bab]">
                 ẢNH
               </div>
             )}
             <button
               onClick={handlePickImage}
               disabled={picking}
-              style={{
-                flex: 1,
-                padding: '8px 0',
-                background: picking ? '#c9c9d3' : 'var(--accent-color, #4b57e6)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 11.5,
-                cursor: picking ? 'default' : 'pointer',
-              }}
+              className={cn(
+                'flex-1 py-2 border-none rounded-lg font-bold text-[11.5px]',
+                picking ? 'bg-[#c9c9d3] text-white cursor-default' : 'bg-[#4b57e6] text-white cursor-pointer hover:bg-[#3b47d6]'
+              )}
             >
               {picking ? 'Đang chọn…' : 'Đổi ảnh'}
             </button>

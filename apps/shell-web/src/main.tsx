@@ -13,6 +13,7 @@ import './tailwind-layer-order.css';
 import '@sonth87/device-layout/style.css';
 import '@sky-app/module-ceremony/styles.css';
 import '@sky-app/module-tts-studio/styles.css';
+import '@sky-app/module-layout-designer/styles.css';
 
 async function main() {
   const platform = await createWebPlatform({

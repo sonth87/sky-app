@@ -46,3 +46,4 @@ export { useResolvedAssetUrl } from './hooks/useResolvedAssetUrl.js';
 export { GradientEditor } from './components/GradientEditor/GradientEditor.js';
 export type { GradientEditorProps } from './components/GradientEditor/GradientEditor.js';
 export type { GradientType, GradientStop } from './components/GradientEditor/helpers.js';
+export { cn } from './lib/cn.js';

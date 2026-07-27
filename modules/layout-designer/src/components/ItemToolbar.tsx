@@ -1,24 +1,12 @@
-// Toolbar nổi theo item-type — Bước 7 kế hoạch resize/rotate (2026-07-18). KHÁC FloatingToolbar
-// (Canvas.tsx, cố định đỉnh canvas — select/hand-tool/undo/redo/zoom): ItemToolbar theo dõi VỊ
-// TRÍ item đang chọn, chỉ hiện khi selection.length===1.
-//
-// QUYẾT ĐỊNH KỸ THUẬT (xem plan): toolbar PHẢI render NGOÀI artEl (Frame) — artEl tự
-// transform:scale(totalScale), nếu render bên trong toolbar sẽ bị phóng to/nhỏ theo zoom (không
-// mong muốn, toolbar phải giữ kích thước cố định bất kể zoom). Vị trí tính bằng AABB SAU XOAY
-// (bounding box bao 4 góc đã xoay của box), KHÔNG theo "phía trên trục cục bộ đã xoay" — quá
-// phức tạp, không cần thiết chỉ để đặt 1 toolbar nổi phía trên item.
-
 import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Box, LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
 import { addItemCommand, patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
+import { cn } from '../lib/cn.js';
 
 const TOOLBAR_HEIGHT = 34;
 const TOOLBAR_GAP = 10;
 
-/** AABB (bounding box axis-aligned) bao trọn 4 góc của box SAU KHI đã xoay quanh tâm — dùng để
- * định vị toolbar phía trên item bất kể item có xoay hay không. Trả toạ độ trong hệ canvas-logic
- * (chưa quy đổi màn hình — caller tự nhân pointerScaleX/Y + originX/Y). */
 export function computeRotatedAABB(box: Box): { minX: number; minY: number; maxX: number; maxY: number } {
   const rotation = box.rotation ?? 0;
   if (rotation === 0) {
@@ -57,21 +45,13 @@ export interface ItemToolbarProps {
   item: LayoutItem;
   editor: Editor;
   variant: LayoutVariant;
-  /** Có giá trị khi item nằm trong itemTemplate của 1 LoopItem (Bước 10 kế hoạch resize/rotate,
-   * 2026-07-18 — chế độ sửa mẫu) — truyền xuống mọi command để thao tác đúng ngữ cảnh. */
   loopItemId?: string;
-  /** Cùng công thức originX/Y đã dùng cho artEl (Canvas.tsx) — điểm màn hình của canvas-logic-(0,0). */
   originX: number;
   originY: number;
-  /** = layoutScaleX/Y × totalScale (giống pointerScaleX/Y truyền cho CanvasItemView) — quy đổi
-   * toạ độ canvas-logic → px màn hình thật, ĐÃ tính cả zoom (vì toolbar render NGOÀI artEl, không
-   * được artEl's transform:scale() tự lo phần này như item con bên trong). */
   pointerScaleX: number;
   pointerScaleY: number;
 }
 
-/** Chỉ hiện khi selection.length===1 (không xử lý multi-select toolbar ở bước này — Canvas.tsx
- * tự kiểm tra điều kiện này trước khi render component). */
 export function ItemToolbar({ item, editor, variant, loopItemId, originX, originY, pointerScaleX, pointerScaleY }: ItemToolbarProps) {
   const aabb = computeRotatedAABB(item.box);
   const screenLeft = originX + aabb.minX * pointerScaleX;
@@ -81,7 +61,6 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
   const centerX = (screenLeft + screenRight) / 2;
 
   const wantedTop = screenTop - TOOLBAR_HEIGHT - TOOLBAR_GAP;
-  // Lật xuống dưới item khi không đủ chỗ phía trên (item sát mép trên/ngoài Frame).
   const top = wantedTop < 0 ? screenBottom + TOOLBAR_GAP : wantedTop;
 
   const dispatch = editor.store.getState().dispatch;
@@ -95,62 +74,36 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
   const handleZUp = () => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { box: { ...item.box, z: (item.box.z ?? 0) + 1 } }, loopItemId));
   const handleZDown = () => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { box: { ...item.box, z: (item.box.z ?? 0) - 1 } }, loopItemId));
 
-  const btnStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 26,
-    height: 26,
-    border: 'none',
-    background: 'transparent',
-    color: '#5c5d6e',
-    cursor: 'pointer',
-    borderRadius: 6,
-  };
+  const btnClass = "flex items-center justify-center w6 h-6 border-none bg-transparent text-[#5c5d6e] hover:bg-[#f4f5f9] cursor-pointer rounded-md";
 
   return (
     <div
       data-testid="item-toolbar"
+      className="absolute h-[34px] flex items-center gap-[2px] px-[6px] bg-white border border-[#e6e6ee] rounded-[9px] shadow-[0_6px_20px_-8px_rgba(20,10,50,0.35)] z-[1000] pointer-events-auto -translate-x-1/2"
       style={{
-        position: 'absolute',
         left: centerX,
         top,
-        transform: 'translateX(-50%)',
-        height: TOOLBAR_HEIGHT,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 2,
-        padding: '0 6px',
-        background: '#fff',
-        border: '1px solid #e6e6ee',
-        borderRadius: 9,
-        boxShadow: '0 6px 20px -8px rgba(20,10,50,.35)',
-        zIndex: 1000,
-        pointerEvents: 'auto',
       }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {/* aria-label có hậu tố "(thanh công cụ)" — PHÂN BIỆT tường minh với nút cùng hành động ở
-         PropertyPanel's PanelHeader (Bước 2), tránh trùng label khi cả 2 CÙNG hiện lúc 1 item
-         được chọn (test getByLabelText sẽ báo lỗi "multiple elements found" nếu trùng). */}
-      <button onClick={handleDuplicate} aria-label="Nhân đôi (thanh công cụ)" title="Nhân đôi" style={btnStyle}>
+      <button onClick={handleDuplicate} aria-label="Nhân đôi (thanh công cụ)" title="Nhân đôi" className={btnClass}>
         <Copy size={14} />
       </button>
-      <button onClick={handleZUp} aria-label="Lên 1 lớp (thanh công cụ)" title="Lên 1 lớp" style={btnStyle}>
+      <button onClick={handleZUp} aria-label="Lên 1 lớp (thanh công cụ)" title="Lên 1 lớp" className={btnClass}>
         <ChevronUp size={14} />
       </button>
-      <button onClick={handleZDown} aria-label="Xuống 1 lớp (thanh công cụ)" title="Xuống 1 lớp" style={btnStyle}>
+      <button onClick={handleZDown} aria-label="Xuống 1 lớp (thanh công cụ)" title="Xuống 1 lớp" className={btnClass}>
         <ChevronDown size={14} />
       </button>
       <button
         onClick={handleToggleLock}
         aria-label={item.locked ? 'Mở khoá di chuyển (thanh công cụ)' : 'Khoá di chuyển (thanh công cụ)'}
         title={item.locked ? 'Mở khoá di chuyển' : 'Khoá di chuyển'}
-        style={{ ...btnStyle, color: item.locked ? 'var(--accent-color, #4b57e6)' : '#5c5d6e' }}
+        className={cn(btnClass, item.locked && 'text-[#4b57e6]')}
       >
         {item.locked ? <PinOff size={14} /> : <Pin size={14} />}
       </button>
-      <button onClick={handleDelete} aria-label="Xoá (thanh công cụ)" title="Xoá" style={btnStyle}>
+      <button onClick={handleDelete} aria-label="Xoá (thanh công cụ)" title="Xoá" className={cn(btnClass, 'hover:text-red-500')}>
         <Trash2 size={14} />
       </button>
     </div>

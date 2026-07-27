@@ -35,9 +35,9 @@ export interface FlyoutProps {
 }
 
 export function Flyout({
+  group,
   editor,
   variant,
-  group,
   getArtEl,
   getRootEl,
   editingLoopId,
@@ -49,7 +49,7 @@ export function Flyout({
   const spawn = useSpawnDrag(editor, variant, getArtEl, getRootEl, editingLoopId, editingRefW, editingRefH);
 
   return (
-    <div style={{ width: 242, flex: 'none', borderRight: '1px solid #e6e6ee', background: '#fff', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div className="w-[242px] shrink-0 border-r border-[#e6e6ee] bg-white flex flex-col min-h-0">
       {group === 'comp' && <ComponentsPanel editor={editor} onSpawnDown={spawn.onDown} />}
       {group === 'tpl' && <TemplatesPanel />}
       {group === 'coll' && <CollectionsPanel />}
@@ -66,20 +66,12 @@ export function Flyout({
       {group === 'layers' && <LayersPanel editor={editor} variant={variant} />}
       {spawn.ghost && (
         <div
+          className="absolute pointer-events-none z-[9999] bg-white border border-[#4b57e6] rounded-lg px-[11px] py-[6px] font-bold text-xs text-[#4b57e6] shadow-[0_10px_26px_rgba(20,20,40,0.25)]"
           style={{
             position: 'absolute',
             left: spawn.ghost.x + 10,
             top: spawn.ghost.y + 10,
-            pointerEvents: 'none',
             zIndex: 9999,
-            background: '#fff',
-            border: '1px solid var(--accent-color, #4b57e6)',
-            borderRadius: 8,
-            padding: '6px 11px',
-            fontWeight: 700,
-            fontSize: 12,
-            color: 'var(--accent-color, #4b57e6)',
-            boxShadow: '0 10px 26px rgba(20,20,40,.25)',
           }}
         >
           {spawn.ghost.label}

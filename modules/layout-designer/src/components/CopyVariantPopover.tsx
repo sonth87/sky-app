@@ -1,15 +1,7 @@
-// CopyVariantPopover — mở khi bấm icon "Copy" trên 1 tab (VariantTabs.tsx), cho phép copy nội
-// dung từ 1 variant khác trong CÙNG layout theo 3 chế độ (12-thu-vien-layout.md mở rộng
-// 2026-07-18 — auto-sync liên kết cha-con, xem Giai đoạn 2.6 trong plan gốc):
-//   (a) Ghi đè toàn bộ — thay hết items của variant ĐÍCH bằng bản copy từ NGUỒN.
-//   (b) Chỉ thêm cái thiếu — thêm item nguồn CHƯA có ở đích (so theo syncKey/syncRef).
-//   (c) Cập nhật nội dung cái đã có — patch item đích đã khớp key, giữ nguyên vị trí/field đã khoá.
-// Chế độ (a) cần XÁC NHẬN 2 LỚP: lớp 1 luôn hỏi (hành động phá huỷ), lớp 2 CHỈ hỏi khi variant
-// đích có item đang khoá (syncLocked) — cho chọn "ghi đè cả khoá" hay "chỉ ghi đè cái chưa khoá".
-
 import { useState } from 'react';
 import type { LayoutVariant } from '@sky-app/slide-shared';
 import type { OverwriteAllLockStrategy } from '@sky-app/layout-editor-core';
+import { cn } from '../lib/cn.js';
 
 export type CopyVariantMode = 'overwrite-all' | 'add-missing' | 'overwrite-existing';
 
@@ -20,7 +12,6 @@ const MODE_OPTIONS: { mode: CopyVariantMode; label: string; description: string 
 ];
 
 export interface CopyVariantPopoverProps {
-  /** MỌI variant trong layout hiện tại — component tự loại trừ `targetVariantId` khỏi danh sách nguồn. */
   variants: LayoutVariant[];
   targetVariantId: string;
   onClose: () => void;
@@ -35,22 +26,15 @@ export function CopyVariantPopover({ variants, targetVariantId, onClose, onConfi
   const sources = variants.filter((v) => v.aspect.id !== targetVariantId);
   const target = variants.find((v) => v.aspect.id === targetVariantId);
   const targetHasLocked = target?.items.some((i) => i.syncLocked) ?? false;
-  // Đích TRỐNG HOÀN TOÀN (chưa có item nào — chốt 2026-07-18: "nếu tỷ lệ A chưa có comp nào...
-  // thì cho copy tất cả từ B mà không cần hỏi") — bỏ qua CẢ 2 lớp confirm của chế độ (a), vì
-  // không có gì để "mất" khi ghi đè lên 1 variant rỗng. Chỉ áp dụng cho chế độ (a) — chế độ (b)/
-  // (c) vốn đã không hỏi từ trước (add-missing/overwrite-existing không có luồng confirm nào).
   const targetIsEmpty = (target?.items.length ?? 0) === 0;
 
   const [sourceId, setSourceId] = useState<string>(sources[0]?.aspect.id ?? '');
   const [mode, setMode] = useState<CopyVariantMode>('add-missing');
-  // Luồng xác nhận 2 lớp CHỈ cho chế độ (a): 'idle' → bấm Copy → 'confirm1' (luôn hỏi) → bấm
-  // tiếp → nếu targetHasLocked thì 'confirm2' (hỏi chiến lược khoá), ngược lại thực thi luôn.
   const [confirmStep, setConfirmStep] = useState<'idle' | 'confirm1' | 'confirm2'>('idle');
 
   function handleCopyClick() {
     if (!sourceId) return;
     if (mode === 'overwrite-all' && targetIsEmpty) {
-      // Đích trống hoàn toàn → không thể có item nào bị khoá, bỏ qua cả 2 lớp confirm luôn.
       onConfirm(sourceId, 'overwrite-all', 'skip-locked');
       return;
     }
@@ -65,7 +49,7 @@ export function CopyVariantPopover({ variants, targetVariantId, onClose, onConfi
     if (targetHasLocked) {
       setConfirmStep('confirm2');
     } else {
-      onConfirm(sourceId, 'overwrite-all', 'skip-locked'); // không có item khoá, giá trị này không ảnh hưởng
+      onConfirm(sourceId, 'overwrite-all', 'skip-locked');
     }
   }
 
@@ -75,47 +59,30 @@ export function CopyVariantPopover({ variants, targetVariantId, onClose, onConfi
 
   return (
     <>
-      {/* Backdrop — click ra ngoài để đóng, KHÔNG dùng position:fixed (containing-block bug đã
-         gặp ở Flyout.tsx ghost label — root app device-layout giữ transform inline thường trực).
-         stopPropagation() BẮT BUỘC — backdrop nằm bên trong div tab (VariantTabs.tsx), div tab
-         CŨNG có onClick riêng (mở lại popover) — không chặn bubble thì click ra ngoài sẽ đóng rồi
-         MỞ LẠI NGAY do event nổi lên onClick của tab cha (bug thật, báo 2026-07-18). */}
       <div
         onClick={(e) => {
           e.stopPropagation();
           onClose();
         }}
-        style={{ position: 'absolute', inset: '-1000px', zIndex: 9 }}
+        className="absolute -inset-[1000px] z-[9]"
       />
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          marginTop: 6,
-          width: 300,
-          background: '#fff',
-          border: '1px solid #e6e6ee',
-          borderRadius: 11,
-          boxShadow: '0 14px 34px rgba(20,20,40,.18)',
-          zIndex: 10,
-          overflow: 'hidden',
-        }}
+        className="absolute top-full left-0 mt-[6px] w-[300px] bg-white border border-[#e6e6ee] rounded-[11px] shadow-[0_14px_34px_rgba(20,20,40,0.18)] z-[10] overflow-hidden"
       >
         {confirmStep === 'idle' && (
-          <div style={{ padding: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: 12, color: '#5c5d6e', marginBottom: 8 }}>Copy từ tỷ lệ khác</div>
+          <div className="p-3">
+            <div className="font-bold text-xs text-[#5c5d6e] mb-2">Copy từ tỷ lệ khác</div>
 
             {sources.length === 0 ? (
-              <div style={{ fontSize: 11.5, color: '#9a9bab' }}>Chưa có tỷ lệ nào khác để copy.</div>
+              <div className="text-[11.5px] text-[#9a9bab]">Chưa có tỷ lệ nào khác để copy.</div>
             ) : (
               <>
-                <label style={{ display: 'block', fontSize: 10.5, color: '#9a9bab', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.04em' }}>Nguồn</label>
+                <label className="block text-[10.5px] text-[#9a9bab] mb-1 uppercase tracking-[.04em]">Nguồn</label>
                 <select
                   value={sourceId}
                   onChange={(e) => setSourceId(e.target.value)}
-                  style={{ width: '100%', border: '1px solid #e6e6ee', borderRadius: 7, padding: '6px 8px', fontSize: 12, marginBottom: 10 }}
+                  className="w-full border border-[#e6e6ee] rounded-[7px] p-[6px_8px] text-xs mb-[10px]"
                 >
                   {sources.map((v) => (
                     <option key={v.aspect.id} value={v.aspect.id}>
@@ -124,26 +91,20 @@ export function CopyVariantPopover({ variants, targetVariantId, onClose, onConfi
                   ))}
                 </select>
 
-                <label style={{ display: 'block', fontSize: 10.5, color: '#9a9bab', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.04em' }}>Cách copy</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                <label className="block text-[10.5px] text-[#9a9bab] mb-1 uppercase tracking-[.04em]">Cách copy</label>
+                <div className="flex flex-col gap-[6px] mb-3">
                   {MODE_OPTIONS.map((opt) => (
                     <label
                       key={opt.mode}
-                      style={{
-                        display: 'flex',
-                        gap: 8,
-                        alignItems: 'flex-start',
-                        padding: 8,
-                        borderRadius: 8,
-                        border: `1px solid ${mode === opt.mode ? 'var(--accent-color, #4b57e6)' : '#e6e6ee'}`,
-                        background: mode === opt.mode ? 'color-mix(in srgb, var(--accent-color, #4b57e6) 8%, transparent)' : 'transparent',
-                        cursor: 'pointer',
-                      }}
+                      className={cn(
+                        'flex gap-2 items-start p-2 rounded-lg border cursor-pointer',
+                        mode === opt.mode ? 'border-[#4b57e6] bg-[#4b57e6]/10' : 'border-[#e6e6ee] bg-transparent'
+                      )}
                     >
-                      <input type="radio" name="copy-mode" checked={mode === opt.mode} onChange={() => setMode(opt.mode)} style={{ marginTop: 2 }} />
+                      <input type="radio" name="copy-mode" checked={mode === opt.mode} onChange={() => setMode(opt.mode)} className="mt-[2px]" />
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: 12 }}>{opt.label}</div>
-                        <div style={{ fontSize: 10.5, color: '#9a9bab', marginTop: 2 }}>{opt.description}</div>
+                        <div className="font-semibold text-xs">{opt.label}</div>
+                        <div className="text-[10.5px] text-[#9a9bab] mt-[2px]">{opt.description}</div>
                       </div>
                     </label>
                   ))}
@@ -151,7 +112,7 @@ export function CopyVariantPopover({ variants, targetVariantId, onClose, onConfi
 
                 <button
                   onClick={handleCopyClick}
-                  style={{ width: '100%', padding: '8px 0', background: 'var(--accent-color, #4b57e6)', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                  className="w-full py-2 bg-[#4b57e6] text-white border-none rounded-lg font-bold text-xs cursor-pointer hover:bg-[#3b47d6]"
                 >
                   Copy
                 </button>
@@ -161,16 +122,16 @@ export function CopyVariantPopover({ variants, targetVariantId, onClose, onConfi
         )}
 
         {confirmStep === 'confirm1' && (
-          <div style={{ padding: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Ghi đè toàn bộ tỷ lệ này?</div>
-            <div style={{ fontSize: 11.5, color: '#5c5d6e', marginBottom: 14 }}>
+          <div className="p-3.5">
+            <div className="font-bold text-sm mb-2">Ghi đè toàn bộ tỷ lệ này?</div>
+            <div className="text-[11.5px] text-[#5c5d6e] mb-[14px]">
               Toàn bộ nội dung hiện tại của tỷ lệ này sẽ bị thay thế bằng bản copy từ nguồn. Hành động này có thể hoàn tác bằng Ctrl/Cmd+Z.
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setConfirmStep('idle')} style={{ flex: 1, padding: '8px 0', background: '#f4f5f9', color: '#5c5d6e', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmStep('idle')} className="flex-1 py-2 bg-[#f4f5f9] text-[#5c5d6e] border-none rounded-lg font-semibold text-xs cursor-pointer">
                 Huỷ
               </button>
-              <button onClick={handleConfirm1} style={{ flex: 1, padding: '8px 0', background: '#e05656', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+              <button onClick={handleConfirm1} className="flex-1 py-2 bg-[#e05656] text-white border-none rounded-lg font-bold text-xs cursor-pointer">
                 Ghi đè
               </button>
             </div>
@@ -178,19 +139,19 @@ export function CopyVariantPopover({ variants, targetVariantId, onClose, onConfi
         )}
 
         {confirmStep === 'confirm2' && (
-          <div style={{ padding: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Có phần tử đang khoá</div>
-            <div style={{ fontSize: 11.5, color: '#5c5d6e', marginBottom: 14 }}>Tỷ lệ này có phần tử đã khoá (không nhận đồng bộ tự động). Bạn muốn xử lý thế nào?</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="p-3.5">
+            <div className="font-bold text-sm mb-2">Có phần tử đang khoá</div>
+            <div className="text-[11.5px] text-[#5c5d6e] mb-[14px]">Tỷ lệ này có phần tử đã khoá (không nhận đồng bộ tự động). Bạn muốn xử lý thế nào?</div>
+            <div className="flex flex-col gap-2">
               <button
                 onClick={() => handleConfirm2('skip-locked')}
-                style={{ padding: '8px 0', background: '#f4f5f9', color: '#26262e', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                className="py-2 bg-[#f4f5f9] text-[#26262e] border-none rounded-lg font-semibold text-xs cursor-pointer"
               >
                 Chỉ ghi đè phần tử CHƯA khoá
               </button>
               <button
                 onClick={() => handleConfirm2('overwrite-locked')}
-                style={{ padding: '8px 0', background: '#e05656', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                className="py-2 bg-[#e05656] text-white border-none rounded-lg font-bold text-xs cursor-pointer"
               >
                 Ghi đè cả phần tử đã khoá
               </button>
