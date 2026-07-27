@@ -1,9 +1,9 @@
 import type { AppModule } from '@sky-app/kernel';
 import { LayoutDesignerAppModule } from './LayoutDesignerAppModule.js';
-import { LayoutDesignerIcon } from './assets/LayoutDesignerIcon.js';
+import { LayoutDesignerIcon } from './components/Icon/LayoutDesignerIcon.js';
 
-export { LayoutDesignerApp } from './LayoutDesignerApp.js';
-export type { LayoutDesignerAppProps } from './LayoutDesignerApp.js';
+export { LayoutDesignerApp } from './components/LayoutDesignerApp.js';
+export type { LayoutDesignerAppProps } from './components/LayoutDesignerApp.js';
 export { LayoutDesignerAppModule } from './LayoutDesignerAppModule.js';
 
 /**
@@ -28,19 +28,21 @@ export const layoutDesignerModule: AppModule = {
   requiredServices: [],
   render: LayoutDesignerAppModule,
 };
-export { Canvas } from './Canvas.js';
-export type { CanvasProps } from './Canvas.js';
-export { PropertyPanel } from './PropertyPanel.js';
-export type { PropertyPanelProps } from './PropertyPanel.js';
-export { Rail } from './Rail.js';
-export type { RailGroup, RailProps } from './Rail.js';
-export { Flyout, collectUsedTokenKeys } from './Flyout.js';
-export type { FlyoutProps } from './Flyout.js';
-export { VariableTextarea } from './VariableTextarea.js';
-export type { VariableTextareaProps } from './VariableTextarea.js';
-export { VersioningPanel } from './VersioningPanel.js';
-export type { VersioningPanelProps } from './VersioningPanel.js';
-export { useCreateEditor, useEditorState } from './useEditor.js';
-export { useResolvedAssetUrl } from './useResolvedAssetUrl.js';
-export { GradientEditor } from './GradientEditor.js';
-export type { GradientEditorProps, GradientType, GradientStop } from './GradientEditor.js';
+export { Canvas } from './components/Canvas/Canvas.js';
+export type { CanvasProps } from './components/Canvas/Canvas.js';
+export { PropertyPanel } from './components/PropertyPanel/PropertyPanel.js';
+export type { PropertyPanelProps } from './components/PropertyPanel/PropertyPanel.js';
+export { Rail } from './components/Rail.js';
+export type { RailGroup, RailProps } from './components/Rail.js';
+export { Flyout } from './components/Flyout/Flyout.js';
+export { collectUsedTokenKeys } from './components/Flyout/helpers.js';
+export type { FlyoutProps } from './components/Flyout/Flyout.js';
+export { VariableTextarea } from './components/VariableTextarea.js';
+export type { VariableTextareaProps } from './components/VariableTextarea.js';
+export { VersioningPanel } from './components/VersioningPanel.js';
+export type { VersioningPanelProps } from './components/VersioningPanel.js';
+export { useCreateEditor, useEditorState } from './hooks/useEditor.js';
+export { useResolvedAssetUrl } from './hooks/useResolvedAssetUrl.js';
+export { GradientEditor } from './components/GradientEditor/GradientEditor.js';
+export type { GradientEditorProps } from './components/GradientEditor/GradientEditor.js';
+export type { GradientType, GradientStop } from './components/GradientEditor/helpers.js';

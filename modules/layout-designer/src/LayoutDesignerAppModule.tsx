@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppContentProps } from '@sky-app/kernel';
 import type { LayoutContent, LayoutVersion } from '@sky-app/slide-shared';
 import type { AssetPort, LayoutPort } from '@sky-app/service-contracts';
-import { LayoutDesignerApp } from './LayoutDesignerApp.js';
+import { LayoutDesignerApp } from './components/LayoutDesignerApp.js';
 
 const DEMO_LAYOUT_ID = 'demo-layout';
 const DEMO_LAYOUT_NAME = 'Layout demo';
