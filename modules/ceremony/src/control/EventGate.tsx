@@ -65,7 +65,10 @@ export function EventGate() {
   const [pendingArchivedActivate, setPendingArchivedActivate] = useState<EventSummary | null>(null);
   // Sửa Event (Giai đoạn 4c mở rộng, 2026-07-20) — mở EventHubModal ở chế độ edit qua
   // initialEvent. Cần fetch full EventDocument (list() chỉ trả EventSummary rút gọn).
-  const [editingEvent, setEditingEvent] = useState<EventDocument | null>(null);
+  // `view` (2026-07-23) — bấm trực tiếp vào pill "dữ liệu"/"layout" của 1 dòng phải nhảy THẲNG
+  // vào panel tương ứng thay vì luôn dừng ở màn Hub trung gian (feedback thật: "ấn nút sửa tại
+  // sao lại ra 2 mục import"). Nút "Sửa" chính vẫn mở Hub menu (initialView undefined).
+  const [editingEvent, setEditingEvent] = useState<{ event: EventDocument; view?: 'import' | 'layout' } | null>(null);
   const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
   // Trạng thái data/layout mỗi dòng Event (PHỤ LỤC "Event Hub", 2026-07-22) — EventSummary rút
   // gọn không có dataSourceId/layoutRefs, cần fetch full EventDocument riêng cho từng dòng (danh
@@ -152,7 +155,7 @@ export function EventGate() {
     setLoadingEditId(summary.id);
     try {
       const full = await eventPort.get(summary.id);
-      if (full) setEditingEvent(full);
+      if (full) setEditingEvent({ event: full });
       else showErrorToast(t('eventGate.activateError', { message: 'not found' }));
     } catch (err) {
       showErrorToast(t('eventGate.activateError', { message: err instanceof Error ? err.message : String(err) }));
@@ -190,46 +193,56 @@ export function EventGate() {
             return (
               <li
                 key={ev.id}
-                className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3"
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-foreground">{ev.name}</span>
-                  <Badge variant={badge.variant}>{t(badge.key)}</Badge>
-                  {full && (
-                    <button
-                      type="button"
-                      onClick={() => setEditingEvent(full)}
-                      className="flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground hover:border-primary/50"
-                    >
-                      <Upload size={11} />
-                      {recordCount != null ? t('eventGate.recordCountBadge', { count: recordCount }) : t('eventGate.noDataBadge')}
-                    </button>
-                  )}
-                  {full && (
-                    <button
-                      type="button"
-                      onClick={() => setEditingEvent(full)}
-                      title={layoutInfo?.name}
-                      className="flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground hover:border-primary/50"
-                    >
-                      {layoutInfo ? (
-                        <>
-                          <span
-                            className="h-2.5 w-2.5 flex-none rounded-full"
-                            style={{ backgroundColor: layoutInfo.color ?? '#9a9bab' }}
-                          />
-                          <LayoutTemplate size={11} />
-                        </>
-                      ) : (
-                        <>
-                          <LayoutTemplate size={11} />
-                          {t('eventGate.noLayoutBadge')}
-                        </>
-                      )}
-                    </button>
-                  )}
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <span className="truncate text-sm font-medium text-foreground">{ev.name}</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant={badge.variant}>{t(badge.key)}</Badge>
+                    {full && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingEvent({ event: full, view: 'import' })}
+                        className={
+                          recordCount != null
+                            ? 'flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                            : 'flex items-center gap-1 rounded-md border border-dashed border-primary/40 px-2 py-0.5 text-xs text-primary hover:border-primary hover:bg-primary/5'
+                        }
+                      >
+                        <Upload size={11} />
+                        {recordCount != null ? t('eventGate.recordCountBadge', { count: recordCount }) : t('eventGate.noDataBadge')}
+                      </button>
+                    )}
+                    {full && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingEvent({ event: full, view: 'layout' })}
+                        title={layoutInfo?.name}
+                        className={
+                          layoutInfo
+                            ? 'flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                            : 'flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 px-2 py-0.5 text-xs text-primary hover:border-primary hover:bg-primary/5'
+                        }
+                      >
+                        {layoutInfo ? (
+                          <>
+                            <span
+                              className="h-2.5 w-2.5 flex-none rounded-full"
+                              style={{ backgroundColor: layoutInfo.color ?? '#9a9bab' }}
+                            />
+                            <LayoutTemplate size={11} />
+                          </>
+                        ) : (
+                          <>
+                            <LayoutTemplate size={11} />
+                            {t('eventGate.noLayoutBadge')}
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-none items-center gap-2">
                   <Button
                     variant="secondary-outline"
                     size="sm"
@@ -273,17 +286,18 @@ export function EventGate() {
       {/* Instance RIÊNG cho chế độ Sửa (khác instance tạo mới ở trên) — state nội bộ của
          EventHubModal chỉ useState(initialEvent?.x ?? ...) 1 LẦN lúc mount, React không tự
          re-init khi prop initialEvent đổi giữa 2 Event khác nhau nếu dùng chung 1 instance. Mount
-         mới mỗi lần editingEvent đổi (key={editingEvent.id}) đảm bảo state luôn đúng. */}
+         mới mỗi lần editingEvent đổi (key={editingEvent.event.id}) đảm bảo state luôn đúng. */}
       {eventPort && editingEvent && (
         <EventHubModal
-          key={editingEvent.id}
+          key={editingEvent.event.id}
           open={editingEvent != null}
           onClose={() => setEditingEvent(null)}
           eventPort={eventPort}
           dataSourcePort={dataSourcePort}
           layoutPort={layoutPort}
           assetPort={assetPort}
-          initialEvent={editingEvent}
+          initialEvent={editingEvent.event}
+          initialView={editingEvent.view}
           onChanged={() => {
             void refreshList(eventPort);
           }}

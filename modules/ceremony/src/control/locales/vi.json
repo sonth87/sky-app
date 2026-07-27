@@ -403,11 +403,8 @@
     "error": "Lỗi",
     "sample": "Mẫu",
     "try": "Thử",
-    "styles": {
-      "gentle": "Dịu dàng",
-      "clear": "Rõ ràng",
-      "builtin": "Built-in"
-    }
+    "tabSystem": "Hệ thống",
+    "tabCustom": "Tuỳ chỉnh"
   },
   "ttsToggle": {
     "byConfig": "Theo cấu hình",

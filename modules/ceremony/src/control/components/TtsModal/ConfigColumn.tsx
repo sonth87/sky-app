@@ -73,7 +73,7 @@ export function ConfigColumn({
             </div>
           </div>
         ) : (
-          <VoicePickerPopover value={localModel} onChange={onChangeModel} />
+          <VoicePickerPopover value={localModel} onChange={onChangeModel} onAddVoice={onOpenCloneModal} />
         )}
         <button
           type="button"

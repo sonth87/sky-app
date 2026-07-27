@@ -115,6 +115,26 @@ export interface PreGenStatus {
   quality: Record<string, string[]>; // id -> flags (chỉ file bị flag)
 }
 
+/** 1 entry trong thư viện voice mẫu vendor (resources/voice-ref/{lang}/catalog.json). */
+export interface VoiceCatalogEntry {
+  id: string;
+  name: string;
+  lang: string;
+  language: string;
+  gender: 'female' | 'male';
+  age: string;
+  accent: string;
+  category: string[];
+  tagline: string;
+  description: string;
+  tags: string[];
+  file: string;
+  clonable: boolean;
+  source: 'vendor';
+  /** true nếu entry này đã được import vào registry runtime (voice-registry.json). */
+  imported: boolean;
+}
+
 export interface SlideApi {
   getMeta(): Promise<SlideMeta>;
   updateConfig(patch: Partial<unknown>): Promise<unknown>;
@@ -194,7 +214,20 @@ export interface SlideApi {
   getTtsModelStatus(): Promise<{ downloaded: boolean }>;
   getTtsStatus(): Promise<{ status: 'starting' | 'ready' | 'error'; detail: string }>;
   getTtsPreviewUrl(speakerId: string): Promise<string>;
-  listVoices(): Promise<Array<{ id: string; label: string; gender: string; region: string; type: string; hidden: boolean }>>;
+  listVoices(): Promise<
+    Array<{
+      id: string;
+      label: string;
+      gender: string;
+      region: string;
+      type: string;
+      hidden: boolean;
+      accent?: string;
+      category?: string[];
+      tags?: string[];
+      source_catalog_id?: string;
+    }>
+  >;
   getTtsConfig(): Promise<TtsConfig | null>;
   setTtsConfig(partial: Partial<TtsConfig>): Promise<{ ok: boolean; config?: TtsConfig; error?: string }>;
   getTtsCapabilities(): Promise<TtsCapabilities | null>;
@@ -220,6 +253,13 @@ export interface SlideApi {
   }>;
   updateVoice(voiceId: string, hidden: boolean): Promise<{ ok: boolean; error?: string }>;
   deleteVoice(voiceId: string): Promise<{ ok: boolean; error?: string }>;
+  /** Thư viện voice mẫu 'hệ thống' (resources/voice-ref/{lang}/catalog.json) — search/preview
+   * trước khi chọn dùng. Không cần bước import riêng: chọn synthesize lần đầu server tự
+   * encode ngầm, voice đó tự xuất hiện trong listVoices() từ đó về sau. */
+  listVoiceCatalog(lang?: string): Promise<VoiceCatalogEntry[]>;
+  /** URL nghe thử audio gốc của 1 catalog entry — dùng khi voice CHƯA từng được chọn
+   * dùng (chưa có trong registry nên chưa có /preview qua engine). */
+  getCatalogAudioUrl(lang: string, entryId: string): Promise<string>;
   getSystemStats(): Promise<{
     appRamMb: number;
     totalRamMb: number;

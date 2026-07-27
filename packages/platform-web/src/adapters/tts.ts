@@ -1,10 +1,17 @@
-import type { SpeakOptions, SynthesizeResult, TtsPort, Voice } from '@sky-app/service-contracts';
+import type { SpeakOptions, SynthesizeResult, TtsPort, Voice, VoiceCatalogEntry } from '@sky-app/service-contracts';
 
 interface RawVoice {
   id: string;
   label: string;
   region?: string;
   gender?: string;
+  type?: string;
+  accent?: string;
+  category?: string[];
+  tags?: string[];
+  tagline?: string;
+  description?: string;
+  source_catalog_id?: string;
 }
 
 let audioCtx: AudioContext | null = null;
@@ -90,7 +97,19 @@ export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
       const res = await fetch(`${baseUrl}/voices`);
       if (!res.ok) throw new Error(`TTS listVoices failed: ${res.status}`);
       const raw = (await res.json()) as RawVoice[];
-      return raw.map((v): Voice => ({ id: v.id, name: v.label, language: v.region, gender: v.gender }));
+      return raw.map((v): Voice => ({
+        id: v.id,
+        name: v.label,
+        language: v.region,
+        gender: v.gender,
+        type: v.type,
+        accent: v.accent,
+        category: v.category,
+        tags: v.tags,
+        tagline: v.tagline,
+        description: v.description,
+        sourceCatalogId: v.source_catalog_id,
+      }));
     },
 
     async synthesizeBuffer(text, opts) {
@@ -99,6 +118,55 @@ export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
 
     async getPreviewUrl(voiceId) {
       return `${baseUrl}/preview/${voiceId}`;
+    },
+
+    async listVoiceCatalog(lang) {
+      const url = lang ? `${baseUrl}/voices/catalog?lang=${encodeURIComponent(lang)}` : `${baseUrl}/voices/catalog`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`TTS listVoiceCatalog failed: ${res.status}`);
+      return (await res.json()) as VoiceCatalogEntry[];
+    },
+
+    async getCatalogAudioUrl(lang, entryId) {
+      return `${baseUrl}/voices/catalog/${encodeURIComponent(lang)}/${encodeURIComponent(entryId)}/audio`;
+    },
+
+    async cloneVoice(opts) {
+      if (!(opts.filePath instanceof File)) {
+        throw new Error('Web cloneVoice requires a File object as filePath');
+      }
+      const formData = new FormData();
+      formData.append('file', opts.filePath);
+      formData.append('label', opts.label);
+      formData.append('gender', opts.gender);
+      formData.append('region', opts.region);
+      if (opts.age) formData.append('age', opts.age);
+      if (opts.language) formData.append('language', opts.language);
+      if (opts.tagline) formData.append('tagline', opts.tagline);
+      if (opts.description) formData.append('description', opts.description);
+      if (opts.tags) {
+        opts.tags.forEach(tag => formData.append('tags', tag));
+      }
+
+      const res = await fetch(`${baseUrl}/voices/clone`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        return { ok: false, error: `TTS clone failed: ${res.statusText}` };
+      }
+      const voice = await res.json();
+      return { ok: true, voice };
+    },
+
+    async deleteVoice(voiceId) {
+      const res = await fetch(`${baseUrl}/voices/${encodeURIComponent(voiceId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        return { ok: false, error: `TTS delete failed: ${res.statusText}` };
+      }
+      return { ok: true };
     },
   };
 }

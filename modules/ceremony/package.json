@@ -25,6 +25,7 @@
     "@sky-app/kernel": "workspace:*",
     "@sky-app/service-contracts": "workspace:*",
     "@sky-app/slide-shared": "workspace:*",
+    "@sky-app/voice-catalog-ui": "workspace:*",
     "@sonth87/device-layout": "catalog:",
     "@tanstack/react-virtual": "^3.14.5",
     "canvas-confetti": "^1.9.4",

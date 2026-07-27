@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @source "./**/*.{ts,tsx}";
+@source "../../../packages/voice-catalog-ui/src/**/*.{ts,tsx}";
 
 @theme {
   --text-2xs: 10px;

@@ -44,6 +44,7 @@ _registry = None          # VoiceRegistry instance
 _config = None            # ConfigStore instance (advanced infer params + device + engine)
 _preview_dir: Path | None = None  # FIX: không đọc env tại module level
 _ref_dir: Path | None = None
+_catalog_dir: Path | None = None
 _synth_lock = asyncio.Lock()
 _ref_codes_cache: dict[str, object] = {}
 _LOG_FILE: Path | None = None
@@ -178,17 +179,49 @@ def _pick_ref_dir() -> Path:
     )
 
 
+def _pick_catalog_dir(ref_dir: Path) -> Path:
+    """Resolve catalog dir (read-only system voice library) with fallback to ref_dir."""
+    resources_env = os.environ.get("RESOURCES_PATH", "")
+    if resources_env:
+        rp = Path(resources_env)
+        cand = rp / "voice-ref"
+        if cand.exists():
+            return cand
+        cand_voices = rp / "voices"
+        if cand_voices.exists():
+            return cand_voices
+
+    # Kiểm tra xem ref_dir có chứa catalog.json không
+    if (ref_dir / "vi-VN" / "catalog.json").exists():
+        return ref_dir
+
+    # Fallback khi dev
+    base = Path(__file__).resolve().parent.parent.parent.parent
+    dev_candidates = [
+        base / "apps" / "slide" / "resources" / "voice-ref",
+        Path(__file__).resolve().parent.parent / "resources" / "voice-ref",
+    ]
+    for c in dev_candidates:
+        if c.exists():
+            return c
+
+    return ref_dir
+
+
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _engine, _registry, _config, _preview_dir, _ref_dir, _LOG_FILE
+    global _engine, _registry, _config, _preview_dir, _ref_dir, _catalog_dir, _LOG_FILE
 
     # FIX: đọc tất cả env vars tại đây — KHÔNG tại module level
     log_path = os.environ.get("LOG_FILE_PATH", "")
     _LOG_FILE = Path(log_path) if log_path else None
 
     _ref_dir = _pick_ref_dir()
+    _catalog_dir = _pick_catalog_dir(_ref_dir)
+    _safe_console(f"[TTS] CATALOG_DIR = {_catalog_dir}")
+    _write_log(f"[TTS] CATALOG_DIR = {_catalog_dir}")
 
     # FIX: _preview_dir resolve trong lifespan sau khi env vars đã inject
     preview_env = os.environ.get("VIENEU_PREVIEW_DIR", "")
@@ -365,6 +398,138 @@ def list_voices():
     return _registry.list_voices(include_hidden=False)
 
 
+# ── Voice catalog (thư viện vendor, read-only, resources/voice-ref/{lang}/) ──
+
+@app.get("/voices/catalog")
+def get_voice_catalog(lang: str | None = None):
+    """Danh sách voice mẫu 'mặc định hệ thống' (tab riêng trên UI, khác tab 'Tuỳ chỉnh'
+    của user tự clone) — dùng để search/filter/preview trước khi chọn. Chọn synthesize
+    lần đầu tự động import ngầm (xem _ensure_voice_ready), KHÔNG có bước Clone riêng ở
+    UI cho các voice này. `lang` optional (vd 'vi-VN'); bỏ trống trả tất cả ngôn ngữ."""
+    if _catalog_dir is None:
+        raise HTTPException(503, "Catalog dir not ready")
+    from voice_catalog import load_catalog
+    entries = load_catalog(_catalog_dir, lang)
+    # `imported`: đã từng được chọn dùng (registry đã có sẵn embedding) — chỉ để UI biết
+    # preview nên phát qua registry (nhanh hơn, tận dụng cache) hay phát file catalog gốc.
+    imported_ids = set()
+    if _registry is not None:
+        for v in _registry.list_voices(include_hidden=True):
+            src = v.get("source_catalog_id")
+            if src:
+                imported_ids.add(src)
+    for e in entries:
+        e["imported"] = e["id"] in imported_ids
+    return entries
+
+
+@app.get("/voices/catalog/{lang}/{entry_id}/audio")
+def get_catalog_audio(lang: str, entry_id: str):
+    """Phát file audio preview gốc (mp3/wav) của 1 catalog entry — nghe thử không
+    cần engine (khác /preview/{voice_id} vốn cần voice đã ở trong registry)."""
+    if _catalog_dir is None:
+        raise HTTPException(503, "Catalog dir not ready")
+    from voice_catalog import find_catalog_entry, get_catalog_ref_path
+    entry = find_catalog_entry(_catalog_dir, lang, entry_id)
+    if entry is None:
+        raise HTTPException(404, f"Catalog entry not found: {lang}/{entry_id}")
+    audio_path = get_catalog_ref_path(_catalog_dir, lang, entry)
+    if not audio_path.exists():
+        raise HTTPException(404, f"Audio file not found: {audio_path.name}")
+    media_type = "audio/mpeg" if audio_path.suffix.lower() == ".mp3" else "audio/wav"
+    return FileResponse(str(audio_path), media_type=media_type)
+
+
+def _find_catalog_entry_any_lang(entry_id: str) -> tuple[dict, str] | None:
+    """Tìm catalog entry theo id, quét tất cả ngôn ngữ có sẵn — synthesize request chỉ
+    gửi speaker_id (không có lang), nên phải tự tra ngược ngôn ngữ chứa nó."""
+    if _catalog_dir is None:
+        return None
+    from voice_catalog import list_catalog_langs, find_catalog_entry
+    for lang in list_catalog_langs(_catalog_dir):
+        entry = find_catalog_entry(_catalog_dir, lang, entry_id)
+        if entry is not None:
+            return entry, lang
+    return None
+
+
+def _import_catalog_entry(entry: dict, lang: str) -> dict:
+    """Convert audio nguồn (mp3/wav bất kỳ) → WAV mono trong _ref_dir (phẳng, giống mọi
+    cloned voice khác), rồi add_cloned() + pre-encode reference embedding. Idempotent:
+    nếu entry này đã import trước đó, trả lại voice đã có thay vì tạo trùng.
+
+    Chạy CPU-bound (đọc/ghi audio, encode_reference) — gọi qua asyncio.to_thread ở nơi
+    dùng để không block event loop, giống _run_synthesis.
+    """
+    assert _registry is not None and _engine is not None and _ref_dir is not None
+
+    existing = _registry.find_by_source_catalog_id(entry["id"])
+    if existing is not None:
+        return existing
+
+    from voice_catalog import get_catalog_ref_path
+    src_path = get_catalog_ref_path(_catalog_dir, lang, entry)
+    if not src_path.exists():
+        raise HTTPException(404, f"Audio file not found: {src_path.name}")
+
+    import soundfile as sf
+    data, sr = sf.read(str(src_path), dtype="float32", always_2d=True)
+    mono = data.mean(axis=1)
+
+    ref_filename = f"catalog-{entry['id']}.wav"
+    ref_path = _ref_dir / ref_filename
+    sf.write(str(ref_path), mono, sr, subtype="PCM_16")
+
+    try:
+        _validate_ref_audio(ref_path)
+    except HTTPException:
+        ref_path.unlink(missing_ok=True)
+        raise
+
+    try:
+        emb = _engine.encode_reference(str(ref_path))
+    except Exception as e:
+        ref_path.unlink(missing_ok=True)
+        raise HTTPException(500, f"Không thể encode voice: {e}")
+
+    region_map = {"northern": "Bắc", "central": "Trung", "southern": "Nam"}
+    voice = _registry.add_cloned(
+        label=entry.get("name", entry["id"]),
+        gender=entry.get("gender", "female"),
+        region=region_map.get(entry.get("accent", ""), "Bắc"),
+        ref_file=ref_filename,
+        extra={
+            "accent": entry.get("accent"),
+            "category": entry.get("category", []),
+            "tags": entry.get("tags", []),
+            "source_catalog_id": entry["id"],
+            "source_lang": lang,
+        },
+    )
+    _ref_codes_cache[voice["id"]] = emb
+    return voice
+
+
+def _ensure_voice_ready(speaker_id: str) -> dict:
+    """Trả về voice registry entry cho speaker_id — nếu chưa có trong registry nhưng
+    khớp 1 catalog entry (theo id), tự động import ngầm (convert+encode+persist) rồi
+    trả voice mới. Đây là nơi hiện thực hoá 'chọn giọng catalog = tự sẵn sàng dùng
+    ngay, không cần bước Clone riêng' (UI không còn nút Clone cho catalog voice)."""
+    assert _registry is not None
+    voice = _registry.get_voice(speaker_id)
+    if voice is not None:
+        return voice
+
+    found = _find_catalog_entry_any_lang(speaker_id)
+    if found is None:
+        raise HTTPException(
+            400,
+            f"Unknown speaker_id: '{speaker_id}'. Xem GET /voices và GET /voices/catalog để biết danh sách hợp lệ.",
+        )
+    entry, lang = found
+    return _import_catalog_entry(entry, lang)
+
+
 # Giới hạn ref clone — tránh file quá lớn/dài làm mọi request về sau chậm vĩnh viễn
 # (VieNeu clone in-context: ref codes nhét vào prompt, prefill tỉ lệ độ dài ref).
 _CLONE_MAX_BYTES = 15 * 1024 * 1024   # 15MB
@@ -531,19 +696,23 @@ def _run_synthesis(req: TtsRequest, voice: dict) -> np.ndarray:
         "repetition_penalty": _pick("repetition_penalty"),
         "max_new_frames": _pick("max_new_frames"),
     }
+    # LƯU Ý: dùng voice["id"] (id THẬT trong registry), KHÔNG dùng req.speaker_id —
+    # khi speaker_id gốc là 1 catalog id vừa được _ensure_voice_ready() auto-import,
+    # registry sinh id mới (vd "clone-xxxxx"), khác hẳn catalog id gốc client gửi lên.
+    voice_id = voice["id"]
     if voice.get("type") == "cloned":
-        ref_codes = _ref_codes_cache.get(req.speaker_id)
+        ref_codes = _ref_codes_cache.get(voice_id)
         if ref_codes is None:
-            ref_path = _registry.get_ref_path(req.speaker_id)
+            ref_path = _registry.get_ref_path(voice_id)
             if not ref_path or not ref_path.exists():
-                raise HTTPException(500, f"Ref audio not found: {req.speaker_id}")
+                raise HTTPException(500, f"Ref audio not found: {voice_id}")
             ref_codes = _engine.encode_reference(str(ref_path))
-            _ref_codes_cache[req.speaker_id] = ref_codes
+            _ref_codes_cache[voice_id] = ref_codes
         return _engine.synthesize(req.text, ref_codes, req.speed, overrides=overrides)
 
-    preset_id = _registry.get_preset_id(req.speaker_id)
+    preset_id = _registry.get_preset_id(voice_id)
     if preset_id is None:
-        raise HTTPException(500, f"preset_id missing for: {req.speaker_id}")
+        raise HTTPException(500, f"preset_id missing for: {voice_id}")
     return _engine.synthesize_preset(req.text, preset_id, req.speed, overrides=overrides)
 
 
@@ -555,13 +724,12 @@ async def synthesize(req: TtsRequest):
         if _engine is None or _registry is None:
             raise HTTPException(503, "TTS engine not ready")
 
-        voice = _registry.get_voice(req.speaker_id)
-        if voice is None:
-            raise HTTPException(
-                400,
-                f"Unknown speaker_id: '{req.speaker_id}'. "
-                f"Xem GET /voices để biết danh sách hợp lệ."
-            )
+        # speaker_id có thể là catalog voice chưa từng dùng — import ngầm (encode+persist)
+        # ngay trong request này, trong suốt với client (không có bước "Clone" riêng ở UI).
+        try:
+            voice = await asyncio.to_thread(_ensure_voice_ready, req.speaker_id)
+        except HTTPException:
+            raise
 
         _write_log(f"[TTS] synthesize voice={req.speaker_id} len={len(req.text)} speed={req.speed}")
         _safe_console(

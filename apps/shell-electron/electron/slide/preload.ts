@@ -11,6 +11,7 @@ import type {
   TtsEnginePreflight,
   TtsCapabilities,
   PreGenStatus,
+  VoiceCatalogEntry,
 } from '@sky-app/slide-shared';
 
 // Re-export for the few call-sites elsewhere in electron/slide/* that still
@@ -28,6 +29,7 @@ export type {
   TtsEnginePreflight,
   TtsCapabilities,
   PreGenStatus,
+  VoiceCatalogEntry,
 } from '@sky-app/slide-shared';
 
 const api: SlideApi = {
@@ -149,6 +151,10 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:preview-url', { speakerId }),
   listVoices: (): Promise<Array<{ id: string; label: string; gender: string; region: string; type: string; hidden: boolean }>> =>
     ipcRenderer.invoke('tts:list-voices'),
+  listVoiceCatalog: (lang?: string): Promise<VoiceCatalogEntry[]> =>
+    ipcRenderer.invoke('tts:list-voice-catalog', lang),
+  getCatalogAudioUrl: (lang: string, entryId: string): Promise<string> =>
+    ipcRenderer.invoke('tts:catalog-audio-url', { lang, entryId }),
   // ---- Advanced config + capabilities ----
   getTtsConfig: (): Promise<TtsConfig | null> =>
     ipcRenderer.invoke('tts:get-config'),

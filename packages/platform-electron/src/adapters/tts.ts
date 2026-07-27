@@ -1,4 +1,4 @@
-import type { TtsPort } from '@sky-app/service-contracts';
+import type { TtsPort, Voice } from '@sky-app/service-contracts';
 import type { SlideApi } from '@sky-app/slide-shared';
 
 declare global {
@@ -64,7 +64,19 @@ export function createElectronTtsPort(): TtsPort {
     },
     async listVoices() {
       const voices = await window.slide.listVoices();
-      return voices.map((v) => ({ id: v.id, name: v.label, language: v.region, gender: v.gender }));
+      return voices.map((v): Voice => ({
+        id: v.id,
+        name: v.label,
+        language: v.region,
+        gender: v.gender,
+        type: v.type,
+        accent: v.accent,
+        category: v.category,
+        tags: v.tags,
+        tagline: (v as any).tagline,
+        description: (v as any).description,
+        sourceCatalogId: v.source_catalog_id,
+      }));
     },
     async synthesizeBuffer(text, opts) {
       // Kênh riêng tts-studio:synthesize (không cache/log/pregen) — khác window.slide.speak
@@ -75,6 +87,24 @@ export function createElectronTtsPort(): TtsPort {
     },
     async getPreviewUrl(voiceId) {
       return window.slide.getTtsPreviewUrl(voiceId);
+    },
+    async listVoiceCatalog(lang) {
+      return window.slide.listVoiceCatalog(lang);
+    },
+    async getCatalogAudioUrl(lang, entryId) {
+      return window.slide.getCatalogAudioUrl(lang, entryId);
+    },
+    async cloneVoice(opts) {
+      if (typeof opts.filePath !== 'string') {
+        throw new Error('Electron cloneVoice requires a string filePath');
+      }
+      return window.slide.cloneVoice(opts as any);
+    },
+    async deleteVoice(voiceId) {
+      return window.slide.deleteVoice(voiceId);
+    },
+    async pickAudioFile() {
+      return window.slide.pickAudioFile();
     },
   };
 }

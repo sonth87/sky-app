@@ -122,7 +122,9 @@ describe('createElectronPlatform', () => {
     const tts = platform.services.get<{ listVoices: () => Promise<{ id: string; name: string; language?: string; gender?: string }[]> }>('tts')!;
     const voices = await tts.listVoices();
 
-    expect(voices).toEqual([{ id: 'NF', name: 'Lan Anh', language: 'Bắc', gender: 'female' }]);
+    expect(voices).toEqual([
+      expect.objectContaining({ id: 'NF', name: 'Lan Anh', language: 'Bắc', gender: 'female' }),
+    ]);
   });
 
   it('DisplayPort.setFullscreen gọi window.sky.invoke đúng channel', async () => {

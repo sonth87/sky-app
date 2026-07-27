@@ -29,9 +29,10 @@ import {
   closeBackdropWindow,
   resizeBackdropForAspectRatio,
   setBackdropStateListener,
+  setContextMenuAttacher,
   setMainWindow,
 } from './slide/windows.js';
-import { setAppMenu } from './slide/menu.js';
+import { attachEditContextMenu, setAppMenu } from './slide/menu.js';
 
 // Built as CJS (package.json has no "type": "module") — __dirname is native here.
 let mainWindow: BrowserWindow | null = null;
@@ -169,6 +170,8 @@ function createMainWindow() {
     mainWindow = null;
   });
 
+  attachEditContextMenu(mainWindow.webContents);
+
   // Ceremony's Control UI render TRONG mainWindow (qua device-layout, không
   // phải BrowserWindow riêng — xem docs/dev/history.md GĐ5) nên các event
   // backend→Control (backdrop:state, tts:*-progress, menu:action, ...) phải
@@ -185,6 +188,12 @@ protocol.registerSchemesAsPrivileged([
 const wallpaperImportDir = () => join(app.getPath('userData'), 'wallpapers');
 
 app.whenReady().then(() => {
+  // Đăng ký TRƯỚC createMainWindow()/createBackdropWindow() — windows.ts gọi
+  // attachContextMenu?.() ngay khi tạo webContents mới, phải có sẵn hàm thật trước đó.
+  // Inject qua setter (không import menu.ts thẳng trong windows.ts) để tránh circular import
+  // (menu.ts đã import getMainWindow/getBackdropWindow từ windows.ts).
+  setContextMenuAttacher(attachEditContextMenu);
+
   // Sớm nhất có thể — process.env.RENDERER_MANIFEST_URL (GĐ8 OTA) và mọi biến
   // .env khác phải sẵn sàng trước createMainWindow()/bootstrapSlideBackend().
   loadEnv();

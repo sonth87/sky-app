@@ -32,13 +32,13 @@ FORCE_REFRESH=0
 # nội bộ tts-service sang đích SHELL_RESOURCES — build.sh/build-win.js chỉ
 # ĐỌC REF_DIR làm input (smoke test, generate preview), không tự tạo.
 TTS_SERVICE_RESOURCES="$(cd "$(dirname "$0")" && pwd)/resources"
-if [ -d "$TTS_SERVICE_RESOURCES/voice-ref" ] && [ ! -d "$REF_DIR" ]; then
-  echo "[Build] Copy voice-ref vào $REF_DIR ..."
-  mkdir -p "$SHELL_RESOURCES"
-  cp -r "$TTS_SERVICE_RESOURCES/voice-ref" "$REF_DIR"
+if [ -d "$TTS_SERVICE_RESOURCES/voice-ref" ]; then
+  echo "[Build] Đồng bộ voice-ref vào $REF_DIR ..."
+  mkdir -p "$REF_DIR"
+  cp -r "$TTS_SERVICE_RESOURCES/voice-ref/"* "$REF_DIR/"
 fi
-if [ -f "$TTS_SERVICE_RESOURCES/voice-registry.json" ] && [ ! -f "$SHELL_RESOURCES/voice-registry.json" ]; then
-  echo "[Build] Copy voice-registry.json vào $SHELL_RESOURCES ..."
+if [ -f "$TTS_SERVICE_RESOURCES/voice-registry.json" ]; then
+  echo "[Build] Đồng bộ voice-registry.json vào $SHELL_RESOURCES ..."
   mkdir -p "$SHELL_RESOURCES"
   cp "$TTS_SERVICE_RESOURCES/voice-registry.json" "$SHELL_RESOURCES/voice-registry.json"
 fi

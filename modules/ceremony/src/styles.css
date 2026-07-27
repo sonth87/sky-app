@@ -131,6 +131,7 @@
 
 @import "tailwindcss";
 @source "./**/*.{ts,tsx}";
+@source "../../../packages/voice-catalog-ui/src/**/*.{ts,tsx}";
 
 /*
  * Explicit @layer order — REQUIRED because this bundle shares a page with

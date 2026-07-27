@@ -18,7 +18,7 @@ export function TtsChip({ open, onToggle }: { open: boolean; onToggle: () => voi
   const ttsModel = useControlStore((s) => s.ttsModel);
   const ttsEnabled = useControlStore((s) => s.ttsEnabled);
   const voiceCatalog = useVoiceCatalog();
-  const voiceLabel = voiceCatalog.find((v) => v.id === ttsModel)?.label ?? ttsModel;
+  const voiceLabel = voiceCatalog.find((v) => v.id === ttsModel)?.name ?? ttsModel;
   const [debug, setDebug] = useState<TtsDebug | null>(null);
   const [loadingDebug, setLoadingDebug] = useState(false);
   const [restarting, setRestarting] = useState(false);

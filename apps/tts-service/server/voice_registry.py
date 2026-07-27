@@ -32,6 +32,14 @@ Rules:
 - hidden=true: ẩn khỏi GET /voices nhưng vẫn hoạt động qua /synthesize (backward compat)
 - Preset voices không thể DELETE, chỉ hide
 - Khi load: luôn merge PRESET_VOICES từ code → tự nhận preset mới khi VieNeu update
+
+Cloned voice import từ catalog (voice_catalog.py, resources/voice-ref/{lang}/catalog.json):
+- Field bổ sung optional trên entry cloned: accent, category (list), tags (list),
+  source_catalog_id (id gốc trong catalog), source_lang — dùng để UI filter/hiển thị.
+  Cloned voice KHÔNG từ catalog (upload WAV thủ công qua /voices/clone) không có các field này.
+- KHÔNG còn danh sách cloned voice mặc định cứng trong code (NF/SF/...) — bộ giọng
+  "mặc định hệ thống" giờ là toàn bộ catalog vendor (resources/voice-ref/{lang}/), tự
+  sẵn sàng dùng khi chọn synthesize lần đầu (xem main.py's _ensure_voice_ready).
 """
 from __future__ import annotations
 
@@ -54,19 +62,6 @@ PRESET_VOICES: dict[str, dict] = {
     "preset-NgocLinh": {"type": "preset", "label": "Ngọc Linh", "gender": "female", "region": "Nam", "preset_id": "Ngọc Linh", "hidden": True},
 }
 
-# 5 cloned voices hiện tại — backward compat với speaker_id cũ của apps/slide
-DEFAULT_CLONED_VOICES: dict[str, dict] = {
-    "NF":  {"type": "cloned", "label": "Lan Anh",    "gender": "female", "region": "Bắc", "ref_file": "nu-bac.wav",   "hidden": False},
-    "NF2": {"type": "cloned", "label": "Ngọc Huyền", "gender": "female", "region": "Bắc", "ref_file": "nu-bac-2.wav", "hidden": False},
-    "SF":  {"type": "cloned", "label": "Mai Linh",   "gender": "female", "region": "Nam", "ref_file": "nu-nam.wav",   "hidden": False},
-    "NM1": {"type": "cloned", "label": "Minh Quân",  "gender": "male",   "region": "Bắc", "ref_file": "nam-bac.wav",  "hidden": False},
-    "SM":  {"type": "cloned", "label": "Gia Huy",    "gender": "male",   "region": "Nam", "ref_file": "nam-nam.wav",  "hidden": False},
-    "ADAM": {"type": "cloned", "label": "Adam",     "gender": "male",   "region": "Bắc", "ref_file": "adam-low-tone.wav",  "hidden": False},
-}
-
-# ref_file của các cloned voice mặc định — không xóa file này khi delete voice
-_DEFAULT_REF_FILES = frozenset(v["ref_file"] for v in DEFAULT_CLONED_VOICES.values())
-
 
 class VoiceRegistry:
     """Thread-safe voice registry. Persist sang JSON file."""
@@ -84,10 +79,18 @@ class VoiceRegistry:
                 with self._path.open(encoding="utf-8") as f:
                     self._data = json.load(f)
                 voices = self._data.setdefault("voices", {})
-                # Merge cloned defaults mới (thêm voice mới vào DEFAULT_CLONED_VOICES tự động xuất hiện)
-                for vid, vdef in DEFAULT_CLONED_VOICES.items():
-                    if vid not in voices:
-                        voices[vid] = dict(vdef)
+                # Dọn rác từ registry cũ hơn: cloned voice KHÔNG từ catalog (không có
+                # source_catalog_id — tức từng thuộc DEFAULT_CLONED_VOICES cứng đã bỏ
+                # khỏi code) mà ref_file không còn tồn tại trên đĩa → orphan, xoá luôn.
+                # Không đụng cloned voice user tự upload qua /voices/clone còn ref_file thật.
+                orphan_ids = [
+                    vid for vid, v in voices.items()
+                    if v.get("type") == "cloned"
+                    and not v.get("source_catalog_id")
+                    and not (self._ref_dir / v.get("ref_file", "")).exists()
+                ]
+                for vid in orphan_ids:
+                    del voices[vid]
                 # Merge preset voices mới (nếu VieNeu update thêm preset)
                 for vid, vdef in PRESET_VOICES.items():
                     if vid not in voices:
@@ -104,10 +107,9 @@ class VoiceRegistry:
                 except Exception:
                     pass
 
-        # Init mặc định
+        # Init mặc định — chỉ preset built-in. "Mặc định hệ thống" giờ là catalog vendor,
+        # tự sẵn sàng khi chọn dùng (không cần entry cứng ở đây, xem module docstring).
         voices: dict = {}
-        for vid, vdef in DEFAULT_CLONED_VOICES.items():
-            voices[vid] = dict(vdef)
         for vid, vdef in PRESET_VOICES.items():
             voices[vid] = dict(vdef)  # preset ẩn mặc định (hidden=True trong PRESET_VOICES)
         self._data = {"version": 1, "voices": voices}
@@ -154,8 +156,13 @@ class VoiceRegistry:
         region: str,
         ref_file: str,
         voice_id: str | None = None,
+        extra: dict | None = None,
     ) -> dict:
-        """Thêm cloned voice mới. ref_file là tên file WAV đã lưu trong ref_dir."""
+        """Thêm cloned voice mới. ref_file là tên file WAV đã lưu trong ref_dir.
+
+        `extra` — field bổ sung optional (accent/category/tags/source_catalog_id/source_lang),
+        dùng khi import từ catalog vendor (xem import_from_catalog).
+        """
         with self._lock:
             vid = voice_id or f"clone-{uuid.uuid4().hex[:8]}"
             entry = {
@@ -165,10 +172,19 @@ class VoiceRegistry:
                 "region": region,
                 "ref_file": ref_file,
                 "hidden": False,
+                **(extra or {}),
             }
             self._data.setdefault("voices", {})[vid] = entry
             self._save()
             return {"id": vid, **entry}
+
+    def find_by_source_catalog_id(self, source_catalog_id: str) -> dict | None:
+        """Tìm cloned voice đã import từ 1 catalog entry cụ thể (tránh import trùng)."""
+        with self._lock:
+            for vid, v in self._data.get("voices", {}).items():
+                if v.get("source_catalog_id") == source_catalog_id:
+                    return {"id": vid, **v}
+            return None
 
     def delete_cloned(self, voice_id: str) -> tuple[bool, str]:
         """
@@ -185,9 +201,10 @@ class VoiceRegistry:
             v = voices.pop(voice_id)
             self._save()
 
-            # Xóa ref file nếu không phải file gốc mặc định
+            # ref_file luôn là bản copy riêng trong _ref_dir (upload thủ công hoặc convert
+            # từ catalog khi auto-encode) — không còn file mặc định cứng nào cần bảo vệ.
             ref_file = v.get("ref_file", "")
-            if ref_file and ref_file not in _DEFAULT_REF_FILES:
+            if ref_file:
                 try:
                     (self._ref_dir / ref_file).unlink(missing_ok=True)
                 except Exception:

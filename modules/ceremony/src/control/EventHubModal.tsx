@@ -35,17 +35,22 @@ interface EventHubModalProps {
   onChanged: () => void;
   /** Có giá trị → mở THẲNG vào Giai đoạn B (chế độ Sửa), bỏ qua Giai đoạn A tạo mới. */
   initialEvent?: EventDocument;
+  /** Nhảy thẳng vào panel Import/Layout thay vì dừng ở Hub menu — bấm pill "dữ liệu"/"layout"
+   * ngay trên dòng Event ở EventGate.tsx (2026-07-23, feedback: bấm Sửa không nên phải đi qua
+   * màn trung gian khi ý định đã rõ là muốn sửa đúng 1 mục). Bỏ trống → Hub menu như cũ (nút
+   * "Sửa" chính, không rõ ý định cụ thể). */
+  initialView?: 'import' | 'layout';
 }
 
 type HubView = 'menu' | 'import' | 'layout';
 
-export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layoutPort, assetPort, onChanged, initialEvent }: EventHubModalProps) {
+export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layoutPort, assetPort, onChanged, initialEvent, initialView }: EventHubModalProps) {
   const { t } = useTranslation();
   const [event, setEvent] = useState<EventDocument | null>(initialEvent ?? null);
   const [name, setName] = useState(initialEvent?.name ?? '');
   const [scheduledAt, setScheduledAt] = useState(initialEvent?.scheduledAt ?? '');
   const [submitting, setSubmitting] = useState(false);
-  const [view, setView] = useState<HubView>('menu');
+  const [view, setView] = useState<HubView>(initialView ?? 'menu');
 
   const resetAll = () => {
     setEvent(initialEvent ?? null);

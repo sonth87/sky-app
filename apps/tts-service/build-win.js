@@ -30,14 +30,14 @@ function syncStaticVoiceAssets() {
   const ttsServiceResources = join(cwd, 'resources');
   const srcRef = join(ttsServiceResources, 'voice-ref');
   const srcRegistry = join(ttsServiceResources, 'voice-registry.json');
-  if (existsSync(srcRef) && !existsSync(voiceRefDir)) {
-    log(`Copy voice-ref vao ${voiceRefDir} ...`);
-    mkdirSync(shellResourcesDir, { recursive: true });
+  if (existsSync(srcRef)) {
+    log(`Dong bo voice-ref vao ${voiceRefDir} ...`);
+    mkdirSync(voiceRefDir, { recursive: true });
     cpSync(srcRef, voiceRefDir, { recursive: true });
   }
   const dstRegistry = join(shellResourcesDir, 'voice-registry.json');
-  if (existsSync(srcRegistry) && !existsSync(dstRegistry)) {
-    log(`Copy voice-registry.json vao ${shellResourcesDir} ...`);
+  if (existsSync(srcRegistry)) {
+    log(`Dong bo voice-registry.json vao ${shellResourcesDir} ...`);
     mkdirSync(shellResourcesDir, { recursive: true });
     copyFileSync(srcRegistry, dstRegistry);
   }

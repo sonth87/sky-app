@@ -18,7 +18,36 @@ catalog:
   # config, full-screen exit fix, menu bar customization) — xem git log repo đó để chi tiết.
   # Đã thử nghiệm 2026-07-21: đổi về v0.2.4 KHÔNG sửa được UI vỡ (mất padding/spacing) — xác
   # nhận KHÔNG phải do version device-layout, giữ v0.2.10 (bản đúng ý user).
-  "@sonth87/device-layout": "github:sonth87/device-layout#v0.2.10"
+  #
+  # v0.3.0 (2026-07-23) — thêm EditContextMenu: menu chuột-phải Copy/Paste/Cut/Undo/Redo/
+  # Select All/Save Image tự vẽ, thay cho preventDefault() vô điều kiện ở ThemeProvider's root
+  # div trước đây (bug thật: chặn cả context menu Copy/Paste trong input của app con, ví dụ
+  # EventGate.tsx). Kèm prop mới `resolveEditContextMenuItems` cho host toàn quyền tuỳ biến danh
+  # sách item theo target — xem docs/integration.md's "Edit context menu" ở repo device-layout.
+  #
+  # v0.3.1 (2026-07-23) — fix bug thật phát hiện ngay sau khi dùng v0.3.0: click ra ngoài menu
+  # không tắt được (phải bấm đúng 1 menu item mới tắt). Nguyên nhân: ContextMenu.Root chạy
+  # uncontrolled, state `entries` nội bộ của EditContextMenu không đồng bộ với việc Radix tự đóng
+  # Content qua click-outside/Escape — đã nối `onOpenChange` để dọn state đúng lúc.
+  #
+  # v0.3.2 (2026-07-23) — fix tiếp: v0.3.1 chỉ hết bug khi click ra ngoài TRONG CÙNG app/window;
+  # click sang app/window KHÁC (vd Ceremony khi menu đang mở ở TTS Studio) vẫn không tắt được,
+  # thậm chí có lúc kẹt không click được gì nữa. Nguyên nhân kép: (1) Window.tsx gọi
+  # stopPropagation() trên pointerdown để focus window, chặn mất native event trước khi tới
+  # Radix's bubble-phase outside-click listener nếu click rơi vào window khác; (2) khi tự đóng
+  # bằng capture-phase listener riêng, Radix's internal `open` không biết, và modal={true} mặc
+  # định của nó áp pointer-events:none lên toàn app cho tới khi state đó về false — khoá luôn mọi
+  # tương tác. Đã thêm capture-phase pointerdown listener riêng (không phụ thuộc bubble-phase) +
+  # modal={false} (tắt hẳn cơ chế khoá pointer-events global của Radix).
+  #
+  # v0.3.3 (2026-07-23) — fix TẬN GỐC: hoá ra Window.tsx's stopPropagation() vô điều kiện chặn
+  # click-outside của MỌI component Radix dùng DismissableLayer (Select, DropdownMenu, Popover...)
+  # không riêng context menu tự viết — phát hiện qua VoicePicker's dropdown (Select) ở TTS Studio
+  # không tự đóng khi click ra ngoài, kể cả trong CÙNG window. IconGrid.tsx's marquee-select đã tự
+  # loại trừ click trong window qua target.closest('[id^="window-"]'), không phụ thuộc
+  # stopPropagation() này — không tìm thấy chỗ nào khác cần nó. Đã sửa: chỉ stopPropagation() khi
+  # window CHƯA focused (lần click đầu để focus), mọi click sau đó nổi bọt bình thường.
+  "@sonth87/device-layout": "github:sonth87/device-layout#v0.3.4"
 
 onlyBuiltDependencies:
   - electron

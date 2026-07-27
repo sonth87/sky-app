@@ -1,5 +1,6 @@
 import type { AppModule } from '@sky-app/kernel';
 import { LayoutDesignerAppModule } from './LayoutDesignerAppModule.js';
+import { LayoutDesignerIcon } from './assets/LayoutDesignerIcon.js';
 
 export { LayoutDesignerApp } from './LayoutDesignerApp.js';
 export type { LayoutDesignerAppProps } from './LayoutDesignerApp.js';
@@ -16,7 +17,8 @@ export { LayoutDesignerAppModule } from './LayoutDesignerAppModule.js';
 export const layoutDesignerModule: AppModule = {
   id: 'layout-designer',
   name: 'Layout Designer',
-  icon: 'lucide:LayoutTemplate',
+  icon: LayoutDesignerIcon,
+  iconColor: ['#a855f7', '#6366f1'],
   category: 'ceremony',
   window: {
     defaultSize: { width: 1360, height: 860 },

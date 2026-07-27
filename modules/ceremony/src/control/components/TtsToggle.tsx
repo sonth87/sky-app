@@ -61,7 +61,7 @@ export function TtsToggle() {
 
   const voiceLabel = multiVoiceMode
     ? t('ttsToggle.byConfig')
-    : (voiceCatalog.find((o) => o.id === model)?.label ?? 'TTS');
+    : (voiceCatalog.find((o) => o.id === model)?.name ?? 'TTS');
 
   return (
     <ToolbarGroup icon="🔊" label={enabled ? voiceLabel : 'TTS'} active={enabled}>

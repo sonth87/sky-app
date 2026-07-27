@@ -38,6 +38,24 @@ export default defineConfig({
     // CSS-only config), needs this plugin to expand into real CSS.
     plugins: [react(), tailwindcss()],
     root: '.',
+    resolve: {
+      // Dev-only: trỏ thẳng vào source thay vì package.json's "main" (dist/index.js) —
+      // package @sky-app/module-ceremony chưa có script watch/build --watch, nên trước đây sửa
+      // modules/ceremony/src không bao giờ tự phản ánh khi chạy `pnpm dev:app` (phải build tay
+      // rồi restart). Alias để Vite dev server HMR thẳng TS/TSX nguồn. Production build vẫn dùng
+      // "npm run build" bình thường (process.env check để không rò alias vào bản build).
+      //
+      // PHẢI dùng mảng { find: RegExp, replacement } neo `$` cuối chuỗi — object-form alias
+      // (`{ '@sky-app/module-ceremony': ... }`) match theo PREFIX, nên nó ăn luôn cả subpath
+      // "@sky-app/module-ceremony/styles.css" (export map riêng, phải trỏ src/styles.css) và nối
+      // sai thành 1 đường dẫn không tồn tại → lỗi "Failed to resolve import
+      // .../style.css" (bug thật gặp khi áp dụng, 2026-07-23). RegExp neo cuối chỉ khớp specifier
+      // ĐÚNG BẰNG "@sky-app/module-ceremony", để "/styles.css" rơi qua package.json's exports map
+      // như bình thường.
+      alias: process.env.NODE_ENV !== 'production'
+        ? [{ find: /^@sky-app\/module-ceremony$/, replacement: resolve(__dirname, '../../modules/ceremony/src/index.ts') }]
+        : [],
+    },
     build: {
       outDir: 'dist',
       rollupOptions: {

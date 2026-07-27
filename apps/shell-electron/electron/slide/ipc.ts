@@ -561,6 +561,31 @@ export function registerIpcHandlers() {
     }
   });
 
+  // URL nghe thử audio gốc của 1 catalog entry — tương tự tts:preview-url, không fetch
+  // (chỉ build URL cho <audio> src trỏ thẳng vào python server local).
+  ipcMain.handle('tts:catalog-audio-url', (_e, { lang, entryId }: { lang: string; entryId: string }) => {
+    return `http://127.0.0.1:${getPythonPort()}/voices/catalog/${encodeURIComponent(lang)}/${encodeURIComponent(entryId)}/audio`;
+  });
+
+  // Thư viện voice mẫu 'hệ thống' (resources/voice-ref/{lang}/catalog.json) — khác /voices
+  // (registry runtime): danh sách để search/preview/chọn. Không cần bước import riêng:
+  // chọn 1 voice ở đây rồi synthesize là server tự encode ngầm (xem main.py's
+  // _ensure_voice_ready), voice đó tự xuất hiện qua tts:list-voices từ đó về sau.
+  ipcMain.handle('tts:list-voice-catalog', async (_e, lang?: string) => {
+    const port = getPythonPort();
+    if (!port) return [];
+    try {
+      const url = lang
+        ? `http://127.0.0.1:${port}/voices/catalog?lang=${encodeURIComponent(lang)}`
+        : `http://127.0.0.1:${port}/voices/catalog`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  });
+
   // ── Advanced config (temperature/top_k/... + device + engine) ────────────────
   ipcMain.handle('tts:get-config', async () => {
     const port = getPythonPort();

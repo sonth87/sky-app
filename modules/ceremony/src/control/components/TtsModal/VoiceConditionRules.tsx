@@ -1,12 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { type CanonicalRecord, type TtsCondition, flattenCanonicalRecord } from '@sky-app/slide-shared';
-import type { VoiceInfo } from '../VoicePickerPopover';
+import type { VoiceListItem } from '@sky-app/voice-catalog-ui';
 
 interface VoiceConditionRulesProps {
   conditions: TtsCondition[];
   voicePool: string[];
-  voiceCatalog: VoiceInfo[];
+  voiceCatalog: VoiceListItem[];
   records: CanonicalRecord[];
   /** Gợi ý tên field (TỰ DO — giai đoạn "bỏ Student", 2026-07-22), thường lấy từ
    * FieldMappingProfile.map's keys. Rỗng → input gõ tự do hoàn toàn. */
@@ -112,7 +112,7 @@ export function VoiceConditionRules({
                 const voiceInfo = voiceCatalog.find((v) => v.id === vId);
                 return (
                   <option key={vId} value={vId}>
-                    {voiceInfo?.label || vId}
+                    {voiceInfo?.name || vId}
                   </option>
                 );
               })}

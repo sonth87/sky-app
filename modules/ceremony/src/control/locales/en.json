@@ -403,11 +403,8 @@
     "error": "Error",
     "sample": "Sample",
     "try": "Try",
-    "styles": {
-      "gentle": "Gentle",
-      "clear": "Clear",
-      "builtin": "Built-in"
-    }
+    "tabSystem": "System",
+    "tabCustom": "Custom"
   },
   "ttsToggle": {
     "byConfig": "By configuration",

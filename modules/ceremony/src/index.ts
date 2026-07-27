@@ -1,4 +1,5 @@
 import type { AppModule } from '@sky-app/kernel';
+import { GraduationCap } from 'lucide-react';
 import { CeremonyApp } from './CeremonyApp.js';
 
 // Side-effect import — port từ control/main.tsx gốc. i18n.ts khởi tạo i18next
@@ -15,7 +16,8 @@ import './control/i18n.js';
 export const ceremonyModule: AppModule = {
   id: 'ceremony',
   name: 'Ceremony',
-  icon: 'lucide:GraduationCap',
+  icon: GraduationCap,
+  iconColor: ['#ff5e62', '#ff2a5f'],
   category: 'ceremony',
   window: {
     defaultSize: { width: 1280, height: 820 },

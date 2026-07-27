@@ -7,8 +7,8 @@ settings:
 catalogs:
   default:
     '@sonth87/device-layout':
-      specifier: github:sonth87/device-layout#v0.2.10
-      version: 0.2.10
+      specifier: github:sonth87/device-layout#v0.3.4
+      version: 0.3.4
 
 overrides:
   react: ^19.2.7
@@ -90,7 +90,7 @@ importers:
         version: link:../../packages/slide-shared
       '@sonth87/device-layout':
         specifier: 'catalog:'
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/3355d2a27a672e3f9de930bc56e5886e79c3803a(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.108.4(lightningcss@1.33.0))
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/d4f9ba2ded08c4dae50cc63d1fa4b4d24579deca(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.0(lightningcss@1.33.0))
       adm-zip:
         specifier: ^0.6.0
         version: 0.6.0
@@ -187,7 +187,7 @@ importers:
         version: link:../../packages/platform-web
       '@sonth87/device-layout':
         specifier: 'catalog:'
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/3355d2a27a672e3f9de930bc56e5886e79c3803a(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0))
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/d4f9ba2ded08c4dae50cc63d1fa4b4d24579deca(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.0(esbuild@0.28.1)(lightningcss@1.33.0))
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -248,9 +248,12 @@ importers:
       '@sky-app/slide-shared':
         specifier: workspace:*
         version: link:../../packages/slide-shared
+      '@sky-app/voice-catalog-ui':
+        specifier: workspace:*
+        version: link:../../packages/voice-catalog-ui
       '@sonth87/device-layout':
         specifier: 'catalog:'
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/3355d2a27a672e3f9de930bc56e5886e79c3803a(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.108.4(lightningcss@1.33.0))
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/d4f9ba2ded08c4dae50cc63d1fa4b4d24579deca(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.0(lightningcss@1.33.0))
       '@tanstack/react-virtual':
         specifier: ^3.14.5
         version: 3.14.7(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -443,6 +446,9 @@ importers:
       '@sky-app/service-contracts':
         specifier: workspace:*
         version: link:../../packages/service-contracts
+      '@sky-app/voice-catalog-ui':
+        specifier: workspace:*
+        version: link:../../packages/voice-catalog-ui
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -540,7 +546,7 @@ importers:
         version: link:../kernel
       '@sonth87/device-layout':
         specifier: 'catalog:'
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/3355d2a27a672e3f9de930bc56e5886e79c3803a(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.108.4(lightningcss@1.33.0))
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/d4f9ba2ded08c4dae50cc63d1fa4b4d24579deca(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.0(lightningcss@1.33.0))
     devDependencies:
       '@sky-app/module-mock-app':
         specifier: workspace:*
@@ -744,6 +750,34 @@ importers:
         version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(lightningcss@1.33.0)(terser@5.49.0)(tsx@4.23.1)
 
   packages/tsconfig: {}
+
+  packages/voice-catalog-ui:
+    dependencies:
+      '@sky-app/service-contracts':
+        specifier: workspace:*
+        version: link:../service-contracts
+    devDependencies:
+      '@sky-app/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      lucide-react:
+        specifier: ^1.24.0
+        version: 1.25.0(react@19.2.8)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
 packages:
 
@@ -1464,9 +1498,6 @@ packages:
 
   '@emnapi/runtime@1.11.1':
     resolution: {integrity: sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw==}
-
-  '@emnapi/runtime@1.11.2':
-    resolution: {integrity: sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA==}
 
   '@emnapi/wasi-threads@1.2.2':
     resolution: {integrity: sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA==}
@@ -3089,9 +3120,9 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
-  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/3355d2a27a672e3f9de930bc56e5886e79c3803a':
-    resolution: {tarball: https://codeload.github.com/sonth87/device-layout/tar.gz/3355d2a27a672e3f9de930bc56e5886e79c3803a}
-    version: 0.2.10
+  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/d4f9ba2ded08c4dae50cc63d1fa4b4d24579deca':
+    resolution: {tarball: https://codeload.github.com/sonth87/device-layout/tar.gz/d4f9ba2ded08c4dae50cc63d1fa4b4d24579deca}
+    version: 0.3.4
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -3367,46 +3398,46 @@ packages:
     peerDependencies:
       '@tiptap/core': 3.28.0
 
-  '@tiptap/extension-placeholder@3.28.0':
-    resolution: {integrity: sha512-zueiqNeCHOshDa8dGGSa/0cOBZkMjPrxQhemjF4tj2yZ6EeWHBPtCE5h/uQCagEePxsoaJtvaCRh88199zrgBw==}
+  '@tiptap/extension-placeholder@3.29.0':
+    resolution: {integrity: sha512-V2jb0kL/k3rygAtKmSPYxoyBMCQJtJikPYnxiCYuY7FI1ohmCrmhyhkVqJv0b0EPMNW8BMIqf6DgpKJ/ODmXgA==}
     peerDependencies:
-      '@tiptap/extensions': 3.28.0
+      '@tiptap/extensions': 3.29.0
 
   '@tiptap/extension-strike@3.28.0':
     resolution: {integrity: sha512-VVj2ZZU9QYqiHLcjqMqRYvuHSsokj/AgUl+6TzLrKjlWwyZ18D4H2vkyI0g70iVTKnUpZ3sEy8WA/rqjgBjqBg==}
     peerDependencies:
       '@tiptap/core': 3.28.0
 
-  '@tiptap/extension-table-cell@3.28.0':
-    resolution: {integrity: sha512-/p4c79YkZpAcytvhMqCJ73KKllG4CxkqHvgnkzySR7TEl+Shpt1pdFhaTW3Zm3ExLDNVBlWj8i0+EZ1cAmaZJA==}
+  '@tiptap/extension-table-cell@3.29.0':
+    resolution: {integrity: sha512-rsp2DlD2LQYFH76h0Asu7ysMhsqaFt7y/kBWqZ1skvBvIzRLOMO0bBH7shQtKT91Mb9y5thiqCj7bmkol28aKw==}
     peerDependencies:
-      '@tiptap/extension-table': 3.28.0
+      '@tiptap/extension-table': 3.29.0
 
-  '@tiptap/extension-table-header@3.28.0':
-    resolution: {integrity: sha512-wMHWAZn+JzRCR2+peIGG195DRO8YHee/OpNuN1FK2FyLE/3qjRNfJumN2k8Sj6/ad41yoHp3I738ZW6oWwFgKw==}
+  '@tiptap/extension-table-header@3.29.0':
+    resolution: {integrity: sha512-6eN+zvuDXhc1OedNvejouLKslZSvteGmAMNyd/sRrJIx16Q2ENOGpI5uAintfSRKnrX88XVKMKRp2AGgYo2OJQ==}
     peerDependencies:
-      '@tiptap/extension-table': 3.28.0
+      '@tiptap/extension-table': 3.29.0
 
-  '@tiptap/extension-table-row@3.28.0':
-    resolution: {integrity: sha512-rWxgoHhFlwGcy6Q2uPhoHBZLNd6MO6J5anDhp85+NwZ8f8XPaX+y6+DlGiMsYXTCmQhZRchgSwX8eKxeIszyFg==}
+  '@tiptap/extension-table-row@3.29.0':
+    resolution: {integrity: sha512-+pIw0IEwmAeX53UqDFjSLLZBg6X7eKR6+yOKBfJgI7EsclVVjUFXFVrYs1WdqwaIgUgEx/TbgKq7krQc8lVtyw==}
     peerDependencies:
-      '@tiptap/extension-table': 3.28.0
+      '@tiptap/extension-table': 3.29.0
 
-  '@tiptap/extension-table@3.28.0':
-    resolution: {integrity: sha512-SX2Uwn/bFyrqjbBo2Hg9wfLT/ofByHm4f80BuG0h5/m89Ve78CgtaK2lGz9jHZRM7rKTG6eqel+PUZQUwcSzOg==}
+  '@tiptap/extension-table@3.29.0':
+    resolution: {integrity: sha512-EwWZ5XDrAx1Us61eq9Gv5EblLmH14l8Al6X2VpFVI00TTu4qDwlW5wfnTsAkfAU0Ri0LyxLYb3lBfOvC8NV7uw==}
     peerDependencies:
-      '@tiptap/core': 3.28.0
-      '@tiptap/pm': 3.28.0
+      '@tiptap/core': 3.29.0
+      '@tiptap/pm': 3.29.0
 
-  '@tiptap/extension-task-item@3.28.0':
-    resolution: {integrity: sha512-jLOk+CaPR8DzTFe+qdB78OxCPyb2TLISNWGL3zZvDSvngwCuQYYibcAa2L6yYN3bpooNKc3nY+kCfdevI/v21w==}
+  '@tiptap/extension-task-item@3.29.0':
+    resolution: {integrity: sha512-JWA7zzhwPAseeeUs/xnwl4jPkDPXgclqVHk1VM7b4O6h7m7NOMsh7XuTIzKUr4bNTFxKbKUB/v5s/tDRqO4Esg==}
     peerDependencies:
-      '@tiptap/extension-list': 3.28.0
+      '@tiptap/extension-list': 3.29.0
 
-  '@tiptap/extension-task-list@3.28.0':
-    resolution: {integrity: sha512-j13v2WoGVOGrkM5sXibos/ojUPila+yLQwduqI3+bFstsOXied224atL/76db5Y4vGnwwc4V5Kiqj7DMV7Ypiw==}
+  '@tiptap/extension-task-list@3.29.0':
+    resolution: {integrity: sha512-+W8TJtZR2W3lFvmnD4orcgQdxQ7qH0lrYtSewX7VX7+taPC4cMes7taYzX21d0F3uU77er3GaQIJNxh7dsgu5A==}
     peerDependencies:
-      '@tiptap/extension-list': 3.28.0
+      '@tiptap/extension-list': 3.29.0
 
   '@tiptap/extension-text@3.28.0':
     resolution: {integrity: sha512-Jqp1LgfY1mnp4TQHoy+vnHyfn6qnnAM6nHgGwbY5zA8b/Xf1Etll6pziTx9p1J1qcfAgSrnjOyAmA++H7VQqww==}
@@ -3770,12 +3801,6 @@ packages:
   accepts@1.3.8:
     resolution: {integrity: sha512-PYAthTa2m2VKxuvSD3DPC/Gy+U+sOA1LAuT8mkmRuvw+NACSaeXEQ+NHcVF7rONl6qcaxV3Uuemwawk+7+SJLw==}
     engines: {node: '>= 0.6'}
-
-  acorn-import-phases@1.0.4:
-    resolution: {integrity: sha512-wKmbr/DDiIXzEOiWrTTUcDm24kQ2vGfZQvM2fwg2vXqR5uW6aapr7ObPtj1th32b9u90/Pf4AItvdTh42fBmVQ==}
-    engines: {node: '>=10.13.0'}
-    peerDependencies:
-      acorn: ^8.14.0
 
   acorn@8.17.0:
     resolution: {integrity: sha512-xRQbDb9BnwDafYNn6Vwl839DYVjqXYb1XVGtWAZ1kcDc6iwAL4hg3B1dZlRiuENFeO2H53gFG3in621AdERVAg==}
@@ -5392,10 +5417,6 @@ packages:
   linkifyjs@4.3.3:
     resolution: {integrity: sha512-P8aEP5U/D1/IlTY2OeYsErdwh9bGuLE30NcXtKEjgdHcahveQoQwM2yZNsioQHsWFz0P7KKudisbrzCgR0sDHg==}
 
-  loader-runner@4.3.2:
-    resolution: {integrity: sha512-DFEqQ3ihfS9blba08cLfYf1NRAIEm+dDjic073DRDc3/JspI/8wYmtDsHwd3+4hwvdxSK7PGaElfTmm0awWJ4w==}
-    engines: {node: '>=6.11.5'}
-
   locate-path@5.0.0:
     resolution: {integrity: sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g==}
     engines: {node: '>=8'}
@@ -5712,8 +5733,8 @@ packages:
     resolution: {integrity: sha512-DlL+XwOy3NxAQ8xuC0okPgK46iuVNAK01YN7RueYBqqFeGsBjV9XmCAzAdgt+667bCl5kPh9EqKKDwnaPG1I7A==}
     engines: {node: '>=10'}
 
-  nuqs@2.9.1:
-    resolution: {integrity: sha512-xctOTExJ/M2lV9NBXTkLMb3vnGBLk/eMuZyiXSbj0jA24H6ie2d7/LJiaA0C30p5XCIWaDTZl5DEF/N2Yo1LCw==}
+  nuqs@2.9.2:
+    resolution: {integrity: sha512-SUrBU5PfLckv2SAquHkYs76s603vbjl2OLEc+jlL3sITwvJDbE/fg3vN7l9Rdp4WIUs6E0QD+m3DfH9QUQfLkg==}
     peerDependencies:
       '@remix-run/react': '>=2'
       '@tanstack/react-router': ^1
@@ -7014,8 +7035,8 @@ packages:
     resolution: {integrity: sha512-jyuiGJdtvY434z5bUZrjz67v76/ePNvFZTp9Mdz29IlH4+GPsgyGjiv0fKI+M7BdkU6ADjulUcKAd3tUK3WlEw==}
     engines: {node: '>=10.13.0'}
 
-  webpack@5.108.4:
-    resolution: {integrity: sha512-yur8LyJoeiWh47dErD+Ok7vlbmDsJ3UbbRPAoxbGJ54WpE2y5yVo5G/inUzujnYgw3tPmBRdn+G7PoxXaYC33w==}
+  webpack@5.109.0:
+    resolution: {integrity: sha512-vomrngskVVXEZF9sMZfYAd4pXZUnfaWdJGlF+BTNF+gJBCKYCQBnOeVPlrh39Ewl7nlCsirDplMy6o5g9xJHBg==}
     engines: {node: '>=10.13.0'}
     hasBin: true
     peerDependencies:
@@ -8135,29 +8156,29 @@ snapshots:
       react: 19.2.8
       tslib: 2.8.1
 
-  '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0))':
+  '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(webpack@5.109.0(esbuild@0.28.1)(lightningcss@1.33.0))':
     dependencies:
       fast-glob: 3.3.2
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       semver: 7.6.3
-      webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)
+      webpack: 5.109.0(esbuild@0.28.1)(lightningcss@1.33.0)
       workbox-build: 7.1.1(@types/babel__core@7.20.5)
       workbox-core: 7.1.0
-      workbox-webpack-plugin: 7.1.0(@types/babel__core@7.20.5)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0))
+      workbox-webpack-plugin: 7.1.0(@types/babel__core@7.20.5)(webpack@5.109.0(esbuild@0.28.1)(lightningcss@1.33.0))
       workbox-window: 7.1.0
     transitivePeerDependencies:
       - '@types/babel__core'
       - supports-color
 
-  '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(webpack@5.108.4(lightningcss@1.33.0))':
+  '@ducanh2912/next-pwa@10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(webpack@5.109.0(lightningcss@1.33.0))':
     dependencies:
       fast-glob: 3.3.2
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       semver: 7.6.3
-      webpack: 5.108.4(lightningcss@1.33.0)
+      webpack: 5.109.0(lightningcss@1.33.0)
       workbox-build: 7.1.1(@types/babel__core@7.20.5)
       workbox-core: 7.1.0
-      workbox-webpack-plugin: 7.1.0(@types/babel__core@7.20.5)(webpack@5.108.4(lightningcss@1.33.0))
+      workbox-webpack-plugin: 7.1.0(@types/babel__core@7.20.5)(webpack@5.109.0(lightningcss@1.33.0))
       workbox-window: 7.1.0
     transitivePeerDependencies:
       - '@types/babel__core'
@@ -8264,11 +8285,6 @@ snapshots:
     optional: true
 
   '@emnapi/runtime@1.11.1':
-    dependencies:
-      tslib: 2.8.1
-    optional: true
-
-  '@emnapi/runtime@1.11.2':
     dependencies:
       tslib: 2.8.1
     optional: true
@@ -8568,7 +8584,7 @@ snapshots:
 
   '@img/sharp-wasm32@0.34.5':
     dependencies:
-      '@emnapi/runtime': 1.11.2
+      '@emnapi/runtime': 1.11.1
     optional: true
 
   '@img/sharp-win32-arm64@0.34.5':
@@ -9664,9 +9680,9 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/3355d2a27a672e3f9de930bc56e5886e79c3803a(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.108.4(lightningcss@1.33.0))':
+  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/d4f9ba2ded08c4dae50cc63d1fa4b4d24579deca(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.0(esbuild@0.28.1)(lightningcss@1.33.0))':
     dependencies:
-      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(webpack@5.108.4(lightningcss@1.33.0))
+      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(webpack@5.109.0(esbuild@0.28.1)(lightningcss@1.33.0))
       '@radix-ui/react-context-menu': 2.3.4(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-dialog': 1.1.20(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-dropdown-menu': 2.1.21(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -9681,13 +9697,13 @@ snapshots:
       '@radix-ui/react-tooltip': 1.2.13(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@tanstack/react-query': 5.101.4(react@19.2.8)
       '@tanstack/react-query-devtools': 5.101.4(@tanstack/react-query@5.101.4(react@19.2.8))(react@19.2.8)
-      '@tiptap/extension-placeholder': 3.28.0(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
-      '@tiptap/extension-table': 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
-      '@tiptap/extension-table-cell': 3.28.0(@tiptap/extension-table@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
-      '@tiptap/extension-table-header': 3.28.0(@tiptap/extension-table@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
-      '@tiptap/extension-table-row': 3.28.0(@tiptap/extension-table@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
-      '@tiptap/extension-task-item': 3.28.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
-      '@tiptap/extension-task-list': 3.28.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-placeholder': 3.29.0(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-table': 3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
+      '@tiptap/extension-table-cell': 3.29.0(@tiptap/extension-table@3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-table-header': 3.29.0(@tiptap/extension-table@3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-table-row': 3.29.0(@tiptap/extension-table@3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-task-item': 3.29.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-task-list': 3.29.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
       '@tiptap/extension-underline': 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))
       '@tiptap/react': 3.28.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@tiptap/starter-kit': 3.28.0
@@ -9698,7 +9714,7 @@ snapshots:
       motion: 12.42.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       nanoid: 5.1.16
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      nuqs: 2.9.1(next@16.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      nuqs: 2.9.2(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       tailwind-merge: 3.6.0
@@ -9728,9 +9744,9 @@ snapshots:
       - use-sync-external-store
       - webpack
 
-  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/3355d2a27a672e3f9de930bc56e5886e79c3803a(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0))':
+  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/d4f9ba2ded08c4dae50cc63d1fa4b4d24579deca(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.0(lightningcss@1.33.0))':
     dependencies:
-      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0))
+      '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(webpack@5.109.0(lightningcss@1.33.0))
       '@radix-ui/react-context-menu': 2.3.4(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-dialog': 1.1.20(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-dropdown-menu': 2.1.21(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -9745,13 +9761,13 @@ snapshots:
       '@radix-ui/react-tooltip': 1.2.13(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@tanstack/react-query': 5.101.4(react@19.2.8)
       '@tanstack/react-query-devtools': 5.101.4(@tanstack/react-query@5.101.4(react@19.2.8))(react@19.2.8)
-      '@tiptap/extension-placeholder': 3.28.0(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
-      '@tiptap/extension-table': 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
-      '@tiptap/extension-table-cell': 3.28.0(@tiptap/extension-table@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
-      '@tiptap/extension-table-header': 3.28.0(@tiptap/extension-table@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
-      '@tiptap/extension-table-row': 3.28.0(@tiptap/extension-table@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
-      '@tiptap/extension-task-item': 3.28.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
-      '@tiptap/extension-task-list': 3.28.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-placeholder': 3.29.0(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-table': 3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
+      '@tiptap/extension-table-cell': 3.29.0(@tiptap/extension-table@3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-table-header': 3.29.0(@tiptap/extension-table@3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-table-row': 3.29.0(@tiptap/extension-table@3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-task-item': 3.29.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
+      '@tiptap/extension-task-list': 3.29.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))
       '@tiptap/extension-underline': 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))
       '@tiptap/react': 3.28.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@tiptap/starter-kit': 3.28.0
@@ -9762,7 +9778,7 @@ snapshots:
       motion: 12.42.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       nanoid: 5.1.16
       next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      nuqs: 2.9.1(next@16.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      nuqs: 2.9.2(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       tailwind-merge: 3.6.0
@@ -10038,7 +10054,7 @@ snapshots:
     dependencies:
       '@tiptap/core': 3.28.0(@tiptap/pm@3.28.0)
 
-  '@tiptap/extension-placeholder@3.28.0(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
+  '@tiptap/extension-placeholder@3.29.0(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
     dependencies:
       '@tiptap/extensions': 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
 
@@ -10046,28 +10062,28 @@ snapshots:
     dependencies:
       '@tiptap/core': 3.28.0(@tiptap/pm@3.28.0)
 
-  '@tiptap/extension-table-cell@3.28.0(@tiptap/extension-table@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
+  '@tiptap/extension-table-cell@3.29.0(@tiptap/extension-table@3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
     dependencies:
-      '@tiptap/extension-table': 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
+      '@tiptap/extension-table': 3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
 
-  '@tiptap/extension-table-header@3.28.0(@tiptap/extension-table@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
+  '@tiptap/extension-table-header@3.29.0(@tiptap/extension-table@3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
     dependencies:
-      '@tiptap/extension-table': 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
+      '@tiptap/extension-table': 3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
 
-  '@tiptap/extension-table-row@3.28.0(@tiptap/extension-table@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
+  '@tiptap/extension-table-row@3.29.0(@tiptap/extension-table@3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
     dependencies:
-      '@tiptap/extension-table': 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
+      '@tiptap/extension-table': 3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
 
-  '@tiptap/extension-table@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)':
+  '@tiptap/extension-table@3.29.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)':
     dependencies:
       '@tiptap/core': 3.28.0(@tiptap/pm@3.28.0)
       '@tiptap/pm': 3.28.0
 
-  '@tiptap/extension-task-item@3.28.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
+  '@tiptap/extension-task-item@3.29.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
     dependencies:
       '@tiptap/extension-list': 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
 
-  '@tiptap/extension-task-list@3.28.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
+  '@tiptap/extension-task-list@3.29.0(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))':
     dependencies:
       '@tiptap/extension-list': 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
 
@@ -10571,10 +10587,6 @@ snapshots:
     dependencies:
       mime-types: 2.1.35
       negotiator: 0.6.3
-
-  acorn-import-phases@1.0.4(acorn@8.17.0):
-    dependencies:
-      acorn: 8.17.0
 
   acorn@8.17.0: {}
 
@@ -11882,7 +11894,7 @@ snapshots:
       es6-error: 4.1.1
       matcher: 3.0.0
       roarr: 2.15.4
-      semver: 7.7.4
+      semver: 7.8.5
       serialize-error: 7.0.1
     optional: true
 
@@ -12401,8 +12413,6 @@ snapshots:
 
   linkifyjs@4.3.3: {}
 
-  loader-runner@4.3.2: {}
-
   locate-path@5.0.0:
     dependencies:
       p-locate: 4.1.0
@@ -12517,24 +12527,24 @@ snapshots:
 
   minimist@1.2.8: {}
 
-  minimizer-webpack-plugin@5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)):
+  minimizer-webpack-plugin@5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(webpack@5.109.0(esbuild@0.28.1)(lightningcss@1.33.0)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.3.3
       terser: 5.49.0
-      webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)
+      webpack: 5.109.0(esbuild@0.28.1)(lightningcss@1.33.0)
     optionalDependencies:
       esbuild: 0.28.1
       lightningcss: 1.33.0
 
-  minimizer-webpack-plugin@5.6.1(lightningcss@1.33.0)(webpack@5.108.4(lightningcss@1.33.0)):
+  minimizer-webpack-plugin@5.6.1(lightningcss@1.33.0)(webpack@5.109.0(lightningcss@1.33.0)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.3.3
       terser: 5.49.0
-      webpack: 5.108.4(lightningcss@1.33.0)
+      webpack: 5.109.0(lightningcss@1.33.0)
     optionalDependencies:
       lightningcss: 1.33.0
 
@@ -12645,7 +12655,7 @@ snapshots:
 
   normalize-url@6.1.0: {}
 
-  nuqs@2.9.1(next@16.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8):
+  nuqs@2.9.2(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8):
     dependencies:
       '@standard-schema/spec': 1.1.0
       react: 19.2.8
@@ -14220,7 +14230,7 @@ snapshots:
 
   webpack-sources@3.5.1: {}
 
-  webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0):
+  webpack@5.109.0(esbuild@0.28.1)(lightningcss@1.33.0):
     dependencies:
       '@types/estree': 1.0.9
       '@types/json-schema': 7.0.15
@@ -14228,7 +14238,6 @@ snapshots:
       '@webassemblyjs/wasm-edit': 1.14.1
       '@webassemblyjs/wasm-parser': 1.14.1
       acorn: 8.17.0
-      acorn-import-phases: 1.0.4(acorn@8.17.0)
       browserslist: 4.28.7
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.24.3
@@ -14236,9 +14245,8 @@ snapshots:
       eslint-scope: 5.1.1
       events: 3.3.0
       graceful-fs: 4.2.11
-      loader-runner: 4.3.2
       mime-db: 1.54.0
-      minimizer-webpack-plugin: 5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0))
+      minimizer-webpack-plugin: 5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(webpack@5.109.0(esbuild@0.28.1)(lightningcss@1.33.0))
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.3
@@ -14258,7 +14266,7 @@ snapshots:
       - postcss
       - uglify-js
 
-  webpack@5.108.4(lightningcss@1.33.0):
+  webpack@5.109.0(lightningcss@1.33.0):
     dependencies:
       '@types/estree': 1.0.9
       '@types/json-schema': 7.0.15
@@ -14266,7 +14274,6 @@ snapshots:
       '@webassemblyjs/wasm-edit': 1.14.1
       '@webassemblyjs/wasm-parser': 1.14.1
       acorn: 8.17.0
-      acorn-import-phases: 1.0.4(acorn@8.17.0)
       browserslist: 4.28.7
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.24.3
@@ -14274,9 +14281,8 @@ snapshots:
       eslint-scope: 5.1.1
       events: 3.3.0
       graceful-fs: 4.2.11
-      loader-runner: 4.3.2
       mime-db: 1.54.0
-      minimizer-webpack-plugin: 5.6.1(lightningcss@1.33.0)(webpack@5.108.4(lightningcss@1.33.0))
+      minimizer-webpack-plugin: 5.6.1(lightningcss@1.33.0)(webpack@5.109.0(lightningcss@1.33.0))
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.3
@@ -14519,24 +14525,24 @@ snapshots:
 
   workbox-sw@7.1.0: {}
 
-  workbox-webpack-plugin@7.1.0(@types/babel__core@7.20.5)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)):
+  workbox-webpack-plugin@7.1.0(@types/babel__core@7.20.5)(webpack@5.109.0(esbuild@0.28.1)(lightningcss@1.33.0)):
     dependencies:
       fast-json-stable-stringify: 2.1.0
       pretty-bytes: 5.6.0
       upath: 1.2.0
-      webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)
+      webpack: 5.109.0(esbuild@0.28.1)(lightningcss@1.33.0)
       webpack-sources: 1.4.3
       workbox-build: 7.1.0(@types/babel__core@7.20.5)
     transitivePeerDependencies:
       - '@types/babel__core'
       - supports-color
 
-  workbox-webpack-plugin@7.1.0(@types/babel__core@7.20.5)(webpack@5.108.4(lightningcss@1.33.0)):
+  workbox-webpack-plugin@7.1.0(@types/babel__core@7.20.5)(webpack@5.109.0(lightningcss@1.33.0)):
     dependencies:
       fast-json-stable-stringify: 2.1.0
       pretty-bytes: 5.6.0
       upath: 1.2.0
-      webpack: 5.108.4(lightningcss@1.33.0)
+      webpack: 5.109.0(lightningcss@1.33.0)
       webpack-sources: 1.4.3
       workbox-build: 7.1.0(@types/babel__core@7.20.5)
     transitivePeerDependencies:

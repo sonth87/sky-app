@@ -1,7 +1,7 @@
 import { Trans, useTranslation } from 'react-i18next';
 import { CheckSquare, Square, MinusSquare, RefreshCw, Plus, AlertTriangle } from 'lucide-react';
 import { type CanonicalRecord, type TtsCondition, flattenCanonicalRecord } from '@sky-app/slide-shared';
-import { translateStyle, type VoiceInfo } from '../VoicePickerPopover';
+import type { VoiceListItem } from '@sky-app/voice-catalog-ui';
 import type { PreGenStatus } from '../../store';
 import { VoiceConditionRules } from './VoiceConditionRules';
 import { Button } from '../ui/Button';
@@ -14,9 +14,9 @@ interface DistributionEntry {
 }
 
 interface PregenColumnProps {
-  voiceCatalog: VoiceInfo[];
+  voiceCatalog: VoiceListItem[];
   localVoicePool: string[];
-  remainingVoices: VoiceInfo[];
+  remainingVoices: VoiceListItem[];
   showAddVoiceMenu: boolean;
   onToggleAddVoiceMenu: () => void;
   addVoiceBtnRef: React.RefObject<HTMLButtonElement | null>;
@@ -95,7 +95,7 @@ export function PregenColumn({
           : 'bg-info/10 text-info-foreground border-info/20'
       }`}>
         <span className={`w-1 h-1 rounded-full ${isFemale ? 'bg-pink-400' : 'bg-blue-400'}`} />
-        {voiceInfo?.label || vId}
+        {voiceInfo?.name || vId}
       </span>
     );
   };
@@ -148,7 +148,7 @@ export function PregenColumn({
                 }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${isFemale ? 'bg-pink-500' : 'bg-info'}`} />
-                {voice.label}
+                {voice.name}
                 <button
                   disabled={localVoicePool.length <= 1}
                   onClick={() => onRemoveVoiceFromPool(vId)}
@@ -180,7 +180,7 @@ export function PregenColumn({
                       className="w-full text-left px-3 py-2 text-xs text-foreground hover:bg-primary/10 flex items-center gap-2"
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${v.gender === 'female' ? 'bg-pink-400' : 'bg-blue-400'}`} />
-                      {v.label} ({translateStyle(t, v.style)})
+                      {v.name}{v.tagline ? ` (${v.tagline})` : v.category.length > 0 ? ` (${v.category.join(', ')})` : ''}
                     </button>
                   ))}
                 </div>
@@ -220,7 +220,7 @@ export function PregenColumn({
             const voiceInfo = voiceCatalog.find((v) => v.id === vId);
             return (
               <option key={vId} value={vId}>
-                {voiceInfo?.label || vId}
+                {voiceInfo?.name || vId}
               </option>
             );
           })}

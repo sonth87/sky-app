@@ -4,6 +4,14 @@ export interface StudioVoice {
   id: string;
   name: string;
   gender?: string;
+  language?: string;
+  accent?: string;
+  category?: string[];
+  tags?: string[];
+  type?: string;
+  tagline?: string;
+  description?: string;
+  sourceCatalogId?: string;
 }
 
 export interface HistoryEntryMeta {

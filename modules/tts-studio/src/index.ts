@@ -1,10 +1,12 @@
 import type { AppModule } from '@sky-app/kernel';
+import { Speech } from 'lucide-react';
 import { TtsStudioApp } from './TtsStudioApp.js';
 
 export const ttsStudioModule: AppModule = {
   id: 'tts-studio',
   name: 'TTS Studio',
-  icon: 'lucide:AudioLines',
+  icon: Speech,
+  iconColor: ['#11998e', '#38ef7d'],
   category: 'tools',
   window: {
     defaultSize: { width: 1000, height: 680 },

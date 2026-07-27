@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useControlStore } from '../../store';
 import { useSocketRef } from '../../SocketContext';
 import { useVoiceCatalog } from '../VoicePickerPopover';
-import { VoiceCloneModal } from '../VoiceCloneModal';
+import { VoiceCloneModal } from '@sky-app/voice-catalog-ui';
+import { usePlatform } from '../../PlatformContext';
+import type { TtsPort } from '@sky-app/service-contracts';
 import { type CanonicalRecord, type TtsCondition, flattenCanonicalRecord } from '@sky-app/slide-shared';
 import { ConfigColumn } from '../TtsModal/ConfigColumn';
 import { PregenColumn } from '../TtsModal/PregenColumn';
@@ -39,6 +41,24 @@ export function TtsSettingsContent() {
   const ttsVoicePool = useControlStore((s) => s.ttsVoicePool || ['vieneu-NF', 'vieneu-NM1']);
   const pregenStatus = useControlStore((s) => s.pregenStatus);
   const records = useControlStore((s) => s.records);
+  const platform = usePlatform();
+  const tts = platform?.services.get<TtsPort>('tts');
+  const refreshVoiceCatalog = useControlStore((s) => s.refreshVoiceCatalog);
+
+  const clonedVoices = useMemo(() => {
+    return VOICE_CATALOG
+      .filter((v) => v.origin === 'custom')
+      .map((v) => ({
+        id: v.id.replace(/^vieneu-/, ''),
+        name: v.name,
+        gender: v.gender,
+        language: v.language,
+        accent: v.accent,
+        category: v.category,
+        tags: v.tags,
+        type: 'cloned',
+      }));
+  }, [VOICE_CATALOG]);
 
   const [localModel, setLocalModel] = useState(ttsModel);
   const [localSpeed, setLocalSpeed] = useState(ttsSpeed);
@@ -270,7 +290,7 @@ export function TtsSettingsContent() {
       counts[voice] = (counts[voice] || 0) + 1;
     }
     return Object.entries(counts).map(([vId, count]) => {
-      const label = VOICE_CATALOG.find(v => v.id === vId)?.label ?? vId;
+      const label = VOICE_CATALOG.find(v => v.id === vId)?.name ?? vId;
       return { id: vId, label, count };
     });
   }, [records, localConditions, localModel, localVoicePool]);
@@ -345,7 +365,13 @@ export function TtsSettingsContent() {
           getVoiceForStudent={getVoiceForStudentLocal}
         />
       </div>
-      <VoiceCloneModal open={showCloneModal} onClose={() => setShowCloneModal(false)} />
+      <VoiceCloneModal
+        open={showCloneModal}
+        onClose={() => setShowCloneModal(false)}
+        ttsPort={tts}
+        onRefresh={refreshVoiceCatalog}
+        clonedVoices={clonedVoices}
+      />
     </>
   );
 }

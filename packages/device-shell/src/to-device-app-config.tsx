@@ -46,6 +46,8 @@ export function toDeviceAppConfig(app: AppModule, platform: PlatformContext): Ap
     id: app.id,
     name: app.name,
     icon: app.icon,
+    iconColor: app.iconColor,
+    iconTextColor: app.iconTextColor,
     category: app.category,
     disabled: !gate.canOpen(app),
     defaultSize: app.window?.defaultSize,
