@@ -9,17 +9,18 @@
     "node": ">=20"
   },
   "scripts": {
+    "postinstall": "node scripts/ensure-db-addon.js electron",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "node scripts/ensure-db-addon.js node && turbo run test",
     "lint": "turbo run lint",
     "changeset": "changeset",
-    "dev:app": "turbo run dev --filter=@sky-app/shell-electron",
+    "dev:app": "node scripts/ensure-db-addon.js electron && turbo run dev --filter=@sky-app/shell-electron",
     "dev:web": "turbo run dev --filter=@sky-app/shell-web",
-    "app:mac": "turbo run dist:mac --filter=@sky-app/shell-electron",
-    "app:win": "turbo run dist:win --filter=@sky-app/shell-electron",
-    "app:all": "turbo run dist:all --filter=@sky-app/shell-electron",
+    "app:mac": "node scripts/ensure-db-addon.js electron && turbo run dist:mac --filter=@sky-app/shell-electron",
+    "app:win": "node scripts/ensure-db-addon.js electron && turbo run dist:win --filter=@sky-app/shell-electron",
+    "app:all": "node scripts/ensure-db-addon.js electron && turbo run dist:all --filter=@sky-app/shell-electron",
     "app:renderer-bundle": "turbo run build:renderer-bundle --filter=@sky-app/shell-electron",
     "db:rebuild:node": "cd node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3 && npx node-gyp rebuild --release",
     "db:rebuild:electron": "cd apps/shell-electron && npx electron-builder install-app-deps"
