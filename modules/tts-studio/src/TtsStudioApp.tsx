@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppContentProps } from '@sky-app/kernel';
-import type { TtsPort } from '@sky-app/service-contracts';
+import type { TtsPort, TtsEnginePort } from '@sky-app/service-contracts';
 import { PortalContainerContext } from './PortalContainerContext';
 import { TextareaRefContext } from './TextareaRefContext';
-import { VoicePicker } from './components/VoicePicker';
+import { VoicePicker, previewPlayId } from './components/VoicePicker';
 import { SpeedSlider } from './components/SpeedSlider';
 import { EmotionInsert } from './components/EmotionInsert';
 import { UsageGuide } from './components/UsageGuide';
 import { TextInputPanel } from './components/TextInputPanel';
-import { GenerateBar } from './components/GenerateBar';
+import { GenerateBar, QUICK_PLAY_ID } from './components/GenerateBar';
 import { HistoryList } from './components/HistoryList';
 import { VerticalResizeHandle } from './components/VerticalResizeHandle';
 import { useTtsStudioStore } from './store';
-import { playPcm } from './lib/playPcm';
+import { getPlayingId, playPcmAudio, playUrlAudio, stopAudio } from './lib/audioPlayer';
 import { pcmToWavBlob } from './lib/wav-encode';
 import { getAllHistoryEntries, putHistoryEntry, type HistoryEntry } from './lib/history-db';
 import { VoiceCloneModal } from '@sky-app/voice-catalog-ui';
+import { EngineManager, DeviceSettingsModal } from '@sky-app/tts-engine-ui';
+import { useMenuAction } from '@sonth87/device-layout';
 
 const EDITOR_HEIGHT_KEY = 'tts-studio-editor-height';
 const DEFAULT_EDITOR_HEIGHT = 320;
@@ -32,12 +34,24 @@ function readStoredEditorHeight(): number {
   }
 }
 
-export function TtsStudioApp({ platform }: AppContentProps) {
+export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const textareaRef = useRef<HTMLDivElement>(null);
   const tts = platform.services.get<TtsPort>('tts');
+  const enginePort = platform.services.get<TtsEnginePort>('tts-engine');
   const [showCloneModal, setShowCloneModal] = useState(false);
+  const [showEngineManager, setShowEngineManager] = useState(false);
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
+
+  // Menu "Cài đặt" trên thanh menu (khai ở index.ts's menuBarMenus) dispatch action
+  // string qua CustomEvent. Menu thuộc về cả cửa sổ nên phải bỏ qua khi app không
+  // active, nếu không app nền cũng mở hộp thoại theo.
+  useMenuAction(appId, (action) => {
+    if (!isActive) return;
+    if (action === 'settings:engine') setShowEngineManager(true);
+    else if (action === 'settings:device') setShowDeviceSettings(true);
+  });
 
   // Chiều cao khu vực Trình soạn thảo (px) — phần Danh sách bản ghi chiếm phần còn lại và tự
   // cuộn riêng (feedback: soạn thảo không nên cuộn, chỉ lịch sử cuộn). Lưu localStorage để nhớ
@@ -90,19 +104,24 @@ export function TtsStudioApp({ platform }: AppContentProps) {
         voicesList.map((v) => v.sourceCatalogId).filter((id): id is string => !!id)
       );
 
-      const registryItems = voicesList.map((v) => ({
-        id: v.id,
-        name: v.name,
-        gender: v.gender,
-        language: v.language,
-        accent: v.accent,
-        category: v.category ?? [],
-        tags: v.tags ?? [],
-        type: v.type,
-        tagline: v.tagline,
-        description: v.description,
-        sourceCatalogId: v.sourceCatalogId,
-      }));
+      const catalogMap = new Map((catalogList ?? []).map((c) => [c.id, c]));
+
+      const registryItems = voicesList.map((v) => {
+        const cat = v.sourceCatalogId ? catalogMap.get(v.sourceCatalogId) : undefined;
+        return {
+          id: v.id,
+          name: v.name,
+          gender: v.gender,
+          language: v.language,
+          accent: v.accent,
+          category: v.category ?? cat?.category ?? [],
+          tags: v.tags ?? cat?.tags ?? [],
+          type: v.type,
+          tagline: v.tagline ?? cat?.tagline,
+          description: v.description ?? cat?.description,
+          sourceCatalogId: v.sourceCatalogId,
+        };
+      });
 
       const catalogItems = (catalogList ?? [])
         .filter((e) => !importedCatalogIds.has(e.id))
@@ -152,8 +171,12 @@ export function TtsStudioApp({ platform }: AppContentProps) {
             setTimeout(tryLoad, attempt <= 4 ? 500 : 1000);
             return;
           }
-          if (combined.length > 0 && !selectedVoiceId) {
-            setSelectedVoiceId(combined[0]!.id);
+          if (combined.length > 0) {
+            const currentSelected = useTtsStudioStore.getState().selectedVoiceId;
+            const exists = combined.some((v) => v.id === currentSelected);
+            if (!currentSelected || !exists) {
+              setSelectedVoiceId(combined[0]!.id);
+            }
           }
           setVoicesLoading(false);
         })
@@ -204,13 +227,20 @@ export function TtsStudioApp({ platform }: AppContentProps) {
 
   const handlePreview = async (voiceId: string) => {
     if (!tts) return;
+    const playId = previewPlayId(voiceId);
+    if (getPlayingId() === playId) {
+      // Đang nghe thử đúng giọng này — bấm lại = dừng (toggle Play/Stop).
+      stopAudio();
+      return;
+    }
     setPreviewingId(voiceId);
     try {
       const url = await tts.getPreviewUrl(voiceId);
-      const audio = new Audio(url);
-      audio.onended = () => setPreviewingId(null);
-      audio.onerror = () => setPreviewingId(null);
-      await audio.play();
+      // Tải xong URL — hết pha "loading", chuyển sang phát. playUrlAudio tự dừng bất kỳ
+      // audio nào khác đang phát (nghe thử giọng kia, Phát nhanh, Nghe lại lịch sử…) trước
+      // khi phát cái này, đảm bảo chỉ 1 audio phát cùng lúc trong toàn app.
+      setPreviewingId(null);
+      await playUrlAudio(playId, url);
     } catch {
       setPreviewingId(null);
     }
@@ -225,7 +255,9 @@ export function TtsStudioApp({ platform }: AppContentProps) {
       const result = await tts.synthesizeBuffer(trimmedText, { voiceId: selectedVoiceId, speed });
       lastResultRef.current = result;
       setCanQuickPlay(true);
-      await playPcm(result.buffer, result.sampleRate);
+      // Cùng id với nút "Phát nhanh" (GenerateBar) — auto-play sau khi tạo VÀ nút Phát
+      // nhanh cùng điều khiển 1 audio, nút tự hiện đúng trạng thái Dừng ngay khi vừa tạo.
+      await playPcmAudio(QUICK_PLAY_ID, result.buffer, result.sampleRate);
 
       const voiceLabel = voices.find((v) => v.id === selectedVoiceId)?.name ?? selectedVoiceId;
       const sampleCount = Math.floor(result.buffer.byteLength / 2);
@@ -261,8 +293,13 @@ export function TtsStudioApp({ platform }: AppContentProps) {
 
   const handleQuickPlay = async () => {
     if (!lastResultRef.current) return;
+    if (getPlayingId() === QUICK_PLAY_ID) {
+      // Đang phát — bấm lại nút (giờ hiện icon Dừng) = dừng.
+      stopAudio();
+      return;
+    }
     try {
-      await playPcm(lastResultRef.current.buffer, lastResultRef.current.sampleRate);
+      await playPcmAudio(QUICK_PLAY_ID, lastResultRef.current.buffer, lastResultRef.current.sampleRate);
     } catch {
       /* im lặng — không phải lỗi nghiêm trọng đủ để hiện banner */
     }
@@ -279,7 +316,10 @@ export function TtsStudioApp({ platform }: AppContentProps) {
   }
 
   return (
-    <div ref={rootRef} className="tts-studio-root flex h-full flex-col bg-background" data-env={platform.env}>
+    // relative — BẮT BUỘC: đây là containing block cho VoiceCloneModal's `absolute inset-0`
+    // (và cho Radix Select's portal qua PortalContainerContext bên dưới). Thiếu prop này thì
+    // absolute lại rơi về containing block mặc định (viewport), y hệt bug vừa sửa.
+    <div ref={rootRef} className="tts-studio-root relative flex h-full flex-col bg-background" data-env={platform.env}>
       <PortalContainerContext.Provider value={rootRef}>
         <TextareaRefContext.Provider value={textareaRef}>
         <div className="grid h-full grid-cols-[280px_1fr] overflow-hidden">
@@ -338,6 +378,22 @@ export function TtsStudioApp({ platform }: AppContentProps) {
         onRefresh={refreshVoices}
         clonedVoices={voices.filter((v) => v.type === 'cloned' && !v.sourceCatalogId)}
       />
+      {enginePort && (
+        <>
+          <EngineManager
+            open={showEngineManager}
+            onClose={() => { setShowEngineManager(false); void refreshVoices(); }}
+            port={enginePort}
+            canInstall={platform.capabilities.has('tts-local')}
+          />
+          <DeviceSettingsModal
+            open={showDeviceSettings}
+            onClose={() => setShowDeviceSettings(false)}
+            port={enginePort}
+            canInstall={platform.capabilities.has('tts-local')}
+          />
+        </>
+      )}
     </div>
   );
 }

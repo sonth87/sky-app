@@ -24,6 +24,7 @@
     "@radix-ui/react-tooltip": "^1.2.12",
     "@sky-app/kernel": "workspace:*",
     "@sky-app/service-contracts": "workspace:*",
+    "@sky-app/tts-engine-ui": "workspace:*",
     "@sky-app/slide-shared": "workspace:*",
     "@sky-app/voice-catalog-ui": "workspace:*",
     "@sonth87/device-layout": "catalog:",

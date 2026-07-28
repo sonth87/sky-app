@@ -20,11 +20,15 @@
   "dependencies": {
     "@sky-app/kernel": "workspace:*",
     "@sky-app/service-contracts": "workspace:*",
+    "@sky-app/tts-engine-ui": "workspace:*",
     "@sky-app/voice-catalog-ui": "workspace:*",
+    "@sonth87/device-layout": "catalog:",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "i18next": "^26.3.6",
     "lucide-react": "^1.24.0",
     "radix-ui": "^1.6.2",
+    "react-i18next": "^17.0.9",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
   },

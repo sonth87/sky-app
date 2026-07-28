@@ -25,6 +25,36 @@ export interface DisplayInfo {
   bounds: { x: number; y: number; width: number; height: number };
 }
 
+/** Trạng thái tiến trình local tts-service — chỉ Electron biết được (đọc trực tiếp từ
+ * subprocess đã spawn), khác health check HTTP thuần (getTtsService/health) vốn không
+ * phân biệt được "đang khởi động" với "không kết nối được". */
+export interface TtsProcessStatus {
+  status: 'starting' | 'ready' | 'error';
+  detail: string;
+}
+
+export interface TtsDebugInfo {
+  port: number;
+  processAlive: boolean;
+  processPid: number | null;
+  executableUsed: string;
+  lastStartupError: string | null;
+  lastExitCode: number | null;
+  healthOk: boolean | null;
+  recentStderr: string[];
+  cacheSize: number;
+  activityLog: {
+    time: string;
+    action: string;
+    text: string;
+    model: string;
+    ok: boolean;
+    durationMs: number;
+    error?: string;
+    cacheHit?: boolean;
+  }[];
+}
+
 export interface TtsConfig {
   infer: {
     temperature: number;
@@ -173,7 +203,7 @@ export interface SlideApi {
     currentCode: string | null;
     delaySeconds: number;
   } | null>;
-  onPythonStatus(cb: (payload: { status: 'starting' | 'ready' | 'error'; detail: string }) => void): () => void;
+  onPythonStatus(cb: (payload: TtsProcessStatus) => void): () => void;
   onBackdropState(cb: (payload: { open: boolean; fullscreen: boolean }) => void): () => void;
   speak(
     text: string,
@@ -188,31 +218,11 @@ export interface SlideApi {
     speed?: number,
   ): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }>;
   warmupTts(): Promise<{ ok: boolean }>;
-  getTtsDebug(): Promise<{
-    port: number;
-    processAlive: boolean;
-    processPid: number | null;
-    executableUsed: string;
-    lastStartupError: string | null;
-    lastExitCode: number | null;
-    healthOk: boolean | null;
-    recentStderr: string[];
-    cacheSize: number;
-    activityLog: {
-      time: string;
-      action: string;
-      text: string;
-      model: string;
-      ok: boolean;
-      durationMs: number;
-      error?: string;
-      cacheHit?: boolean;
-    }[];
-  }>;
+  getTtsDebug(): Promise<TtsDebugInfo>;
   preSynthesizeTts(texts: string[], modelName: string, speeds: number[]): Promise<{ ok: boolean }>;
   restartTts(): Promise<{ ok: boolean; error?: string }>;
   getTtsModelStatus(): Promise<{ downloaded: boolean }>;
-  getTtsStatus(): Promise<{ status: 'starting' | 'ready' | 'error'; detail: string }>;
+  getTtsStatus(): Promise<TtsProcessStatus>;
   getTtsPreviewUrl(speakerId: string): Promise<string>;
   listVoices(): Promise<
     Array<{

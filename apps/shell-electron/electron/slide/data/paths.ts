@@ -142,6 +142,20 @@ export function vieneuConfigPath(): string {
 }
 
 /**
+ * Runtime Python RIÊNG cho chế độ tăng tốc phần cứng (GPU) của engine VieNeu bundled.
+ *
+ * Vì sao phải tách hẳn: bản đóng gói chạy VieNeu bằng binary PyInstaller, bên trong đã
+ * đóng băng onnxruntime bản CPU — cài onnxruntime-gpu ra ngoài KHÔNG có tác dụng gì với
+ * binary đó. Muốn dùng GPU thì phải chạy main.py bằng một Python có onnxruntime-gpu,
+ * nên ở đây tải Python rời + cài trọn bộ dependency của server vào.
+ *
+ * Chỉ tồn tại khi người dùng chủ động bật tăng tốc; bản chỉ-CPU không tải gì thêm.
+ */
+export function ttsAccelDir(): string {
+  return join(app.getPath('userData'), 'tts-accel');
+}
+
+/**
  * Thư mục gốc chứa các engine TTS mở rộng TẢI THEO NHU CẦU (ngoài VieNeu bundled).
  * Mỗi engine tự chứa: runtime (Python embeddable + torch...), model, manifest.
  * Cấu trúc: <root>/<engineId>/{runtime, model, install-state.json, manifest.json}.

@@ -1,6 +1,16 @@
 import { useMemo } from 'react';
 import { VoicePickerCombobox, type PreviewState, type VoiceListItem } from '@sky-app/voice-catalog-ui';
 import { useTtsStudioStore } from '../store';
+import { useAudioPlayingId } from '../lib/audioPlayer';
+
+const PREVIEW_PREFIX = 'preview:';
+
+/** `id` dùng chung với module điều phối audio (audioPlayer.ts) cho 1 giọng nghe thử —
+ * export để TtsStudioApp's handlePreview dùng cùng quy ước khi gọi playUrlAudio/so khớp
+ * getPlayingId(). */
+export function previewPlayId(voiceId: string): string {
+  return `${PREVIEW_PREFIX}${voiceId}`;
+}
 
 export interface VoicePickerProps {
   onPreview?: (voiceId: string) => void;
@@ -35,10 +45,15 @@ export function VoicePicker({ onPreview, previewingId, loading, onAddVoice, onDe
     [voices],
   );
 
-  const previewStates: Record<string, PreviewState> = useMemo(
-    () => (previewingId ? { [previewingId]: 'loading' } : {}),
-    [previewingId],
-  );
+  const playingId = useAudioPlayingId();
+  const previewStates: Record<string, PreviewState> = useMemo(() => {
+    const states: Record<string, PreviewState> = {};
+    if (previewingId) states[previewingId] = 'loading';
+    if (playingId?.startsWith(PREVIEW_PREFIX)) {
+      states[playingId.slice(PREVIEW_PREFIX.length)] = 'playing';
+    }
+    return states;
+  }, [previewingId, playingId]);
 
   return (
     <div className="flex flex-col gap-1.5">

@@ -1,5 +1,25 @@
 [
   {
+    "id": "gia_bao",
+    "name": "Gia Bảo",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Test voice (WAV)",
+    "description": "Southern Vietnamese male voice, added for mp3-vs-wav testing.",
+    "tags": [
+      "test"
+    ],
+    "file": "gia_bao.wav",
+    "clonable": true,
+    "source": "vendor"
+  },
+  {
     "id": "bao_ngoc_gentle",
     "name": "Bảo Ngọc",
     "lang": "vi-VN",

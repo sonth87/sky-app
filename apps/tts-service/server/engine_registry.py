@@ -36,6 +36,11 @@ def _make_moss_nano():
     return MossNanoEngine()
 
 
+def _make_voxcpm():
+    from engine_voxcpm import VoxCpmEngine
+    return VoxCpmEngine()
+
+
 # id -> metadata. `factory` lười (chỉ gọi khi chọn engine đó, ở create_engine).
 # `bundled`=True: kèm installer, luôn sẵn sàng. False: phải tải theo nhu cầu.
 _ENGINES: dict[str, dict] = {
@@ -83,6 +88,41 @@ _ENGINES: dict[str, dict] = {
                 "min_ram_gb": 2,
                 "recommended_ram_gb": 4,
                 "needs_gpu": False,
+                "disk_headroom_factor": 2.0,
+            },
+        },
+    },
+    # Engine mở rộng ĐA NGÔN NGỮ CÓ TIẾNG VIỆT (30 ngôn ngữ) — khác MOSS ở đúng điểm
+    # đó. Chạy PyTorch nên nặng và CHẬM (RTF 4.5–9.5 trên CPU: 10 giây audio mất
+    # 45–95 giây); đổi lại chất lượng cao và clone giọng có thể kèm bản chép lời.
+    "voxcpm": {
+        "label": "VoxCPM (đa ngôn ngữ, chất lượng cao)",
+        "factory": _make_voxcpm,
+        "description": "OpenBMB VoxCPM — TTS 30 ngôn ngữ gồm tiếng Việt, clone giọng chất lượng cao. CHẬM hơn VieNeu nhiều lần trên CPU; nên dùng khi ưu tiên chất lượng hoặc cần ngôn ngữ khác.",
+        "implemented": True,
+        "bundled": False,
+        "install": {
+            "runtime": {
+                "python_version": "3.11",
+                # Khác MOSS (torch-free): VoxCPM buộc phải có torch. Ghim CPU-only wheel
+                # là việc của người dùng nếu muốn nhẹ; ở đây để pip tự giải.
+                "pip_packages": [
+                    "torch>=2.5",
+                    "voxcpm",
+                    "soundfile",
+                    "soxr>=0.3,<0.4",
+                ],
+            },
+            "model": {
+                "source": "hf",
+                "repo": "openbmb/VoxCPM2",
+                "files": [],        # resolve từ HF API khi cài
+                "total_mb": 4500,   # ước lượng trọng số 2B; preflight tự cộng ~2500MB cho torch
+            },
+            "requirements": {
+                "min_ram_gb": 8,
+                "recommended_ram_gb": 16,
+                "needs_gpu": False,   # chạy được CPU, chỉ là chậm
                 "disk_headroom_factor": 2.0,
             },
         },

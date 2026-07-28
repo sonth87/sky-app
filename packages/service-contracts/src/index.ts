@@ -1,4 +1,16 @@
 export type { TtsPort, Voice, VoiceCatalogEntry, SpeakOptions, SynthesizeResult } from './tts.js';
+export type {
+  TtsEnginePort,
+  EngineOpResult,
+  TtsConfig,
+  TtsEngineInfo,
+  TtsEngines,
+  EngineInstallProgress,
+  TtsEnginePreflight,
+  TtsCapabilities,
+  TtsProcessStatus,
+  TtsDebugInfo,
+} from './tts-engine.js';
 export type { DataPort, SyncProgress } from './data.js';
 export type { DisplayPort, DisplayInfo } from './display.js';
 export type { CardReaderPort, CardScanEvent } from './card-reader.js';

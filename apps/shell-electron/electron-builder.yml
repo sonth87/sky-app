@@ -70,6 +70,21 @@ extraResources:
     to: voice-previews
   - from: resources/voice-registry.json
     to: voice-registry.json
+  # Mã nguồn server Python. Bản đóng gói chạy bằng binary PyInstaller (vieneu-server)
+  # cho engine mặc định, NHƯNG engine mở rộng phải chạy main.py bằng runtime Python
+  # tải riêng (xem resolveExtensionEngineSpawn trong python-server.ts) — thiếu thư mục
+  # này thì getServerDir() trả '' và mọi engine mở rộng không khởi động được.
+  - from: ../tts-service/server
+    to: python-backend
+    filter:
+      - '**/*.py'
+      - '!venv'
+      - '!__pycache__'
+      - '!**/__pycache__'
+  # Danh sách dependency của server — cần khi dựng runtime GPU (xem ipc 'tts:install-accel').
+  # Ship file thay vì chép cứng danh sách vào TypeScript để không có 2 nguồn sự thật.
+  - from: ../tts-service/requirements.txt
+    to: python-backend/requirements.txt
 
 mac:
   # TODO: icon: build-assets/icons/icon.icns (chưa có asset — xem

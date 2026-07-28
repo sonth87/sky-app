@@ -690,8 +690,8 @@ export function registerIpcHandlers() {
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
-    // Runtime: bản dev dùng venv python (pip --target). Packaged (không venv) → null
-    // → installRuntime báo cần embeddable (đã ghi nợ). Cài runtime sau khi tải model.
+    // Runtime: bản dev dùng venv python (pip --target) cho nhanh. Packaged → null để
+    // installRuntime tự tải Python relocatable về engineDir/runtime (python-runtime.ts).
     inst.setRuntimeInstall(pipPkgs, app.isPackaged ? null : getPythonPath());
     // Không await — chạy nền, báo tiến độ qua event.
     inst.downloadFromHf(repo);
@@ -903,32 +903,70 @@ export function registerIpcHandlers() {
     return false;
   }
 
-  // Cài thư viện tăng tốc (onnxruntime-gpu) theo nhu cầu — CHỈ bản dev (có venv+pip).
-  // Bản đóng gói dùng PyInstaller binary, không có pip → báo rõ không hỗ trợ.
+  /**
+   * Cài thư viện tăng tốc phần cứng (onnxruntime-gpu / -directml) theo nhu cầu.
+   *
+   * Hai đường khác hẳn nhau:
+   *  - DEV: có venv sẵn → pip install thẳng vào venv đó, xong là dùng được.
+   *  - ĐÓNG GÓI: VieNeu chạy bằng binary PyInstaller đã đóng băng onnxruntime CPU, cài
+   *    thêm gói ra ngoài KHÔNG tác động tới nó. Nên phải dựng một runtime Python rời
+   *    (tải về) rồi cài TRỌN BỘ dependency server + gói tăng tốc vào đó; sau đó
+   *    python-server.ts sẽ spawn main.py bằng runtime này khi người dùng chọn GPU
+   *    (xem resolveAccelSpawn).
+   */
   ipcMain.handle('tts:install-accel', async (_e, { packageName }: { packageName: string }) => {
-    if (app.isPackaged) {
-      return {
-        ok: false,
-        error: 'Bản cài đặt sẵn không hỗ trợ tải thêm thư viện tăng tốc. Cần chạy từ mã nguồn (dev) để cài onnxruntime-gpu.',
-      };
-    }
     // Whitelist package để tránh chạy pip install tuỳ ý.
     const ALLOWED = new Set(['onnxruntime-gpu', 'onnxruntime-directml']);
     if (!ALLOWED.has(packageName)) {
       return { ok: false, error: `Gói không hợp lệ: ${packageName}` };
     }
-    const py = getPythonPath();
-    return await new Promise<{ ok: boolean; error?: string; log?: string }>((resolve) => {
-      const proc = spawn(py, ['-m', 'pip', 'install', packageName], { windowsHide: true });
-      let out = '';
-      proc.stdout?.on('data', (d) => { out += d.toString(); });
-      proc.stderr?.on('data', (d) => { out += d.toString(); });
-      proc.on('error', (err) => resolve({ ok: false, error: err.message, log: out }));
-      proc.on('close', (code) => {
-        if (code === 0) resolve({ ok: true, log: out });
-        else resolve({ ok: false, error: `pip install thoát code ${code}`, log: out.slice(-2000) });
+
+    const runPip = (py: string, args: string[]) =>
+      new Promise<{ ok: boolean; error?: string; log?: string }>((resolve) => {
+        const proc = spawn(py, args, { windowsHide: true });
+        let out = '';
+        proc.stdout?.on('data', (d) => { out += d.toString(); });
+        proc.stderr?.on('data', (d) => { out += d.toString(); });
+        proc.on('error', (err) => resolve({ ok: false, error: err.message, log: out }));
+        proc.on('close', (code) => {
+          if (code === 0) resolve({ ok: true, log: out.slice(-2000) });
+          else resolve({ ok: false, error: `pip install thoát code ${code}`, log: out.slice(-2000) });
+        });
       });
-    });
+
+    if (!app.isPackaged) {
+      return await runPip(getPythonPath(), ['-m', 'pip', 'install', packageName]);
+    }
+
+    // ── Bản đóng gói: dựng runtime riêng ─────────────────────────────────────
+    const { ttsAccelDir } = await import('./data/paths');
+    const { ensurePythonRuntime } = await import('./python-runtime');
+    const { getServerDir } = await import('./python-server');
+
+    const serverDir = getServerDir();
+    if (!serverDir) {
+      return { ok: false, error: 'Không tìm thấy mã nguồn server (python-backend) trong bản cài đặt.' };
+    }
+    const runtimeRoot = join(ttsAccelDir(), 'runtime');
+    const sitePackages = join(runtimeRoot, 'site-packages');
+
+    let py: string;
+    try {
+      py = await ensurePythonRuntime(runtimeRoot, new AbortController().signal);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+
+    // Trọn bộ dependency server + gói tăng tốc, cùng một lần pip để giải phụ thuộc
+    // một lượt (tránh onnxruntime CPU được kéo về rồi ghi đè bản GPU).
+    const reqFile = join(serverDir, 'requirements.txt');
+    const pipArgs = ['-m', 'pip', 'install', '--no-cache-dir', '--target', sitePackages];
+    if (existsSync(reqFile)) pipArgs.push('-r', reqFile);
+    pipArgs.push(packageName);
+
+    const res = await runPip(py, pipArgs);
+    if (!res.ok) return res;
+    return { ok: true, log: res.log };
   });
 
   // ── Clone voice ──────────────────────────────────────────────────────────────

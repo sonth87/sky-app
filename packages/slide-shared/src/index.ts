@@ -31,6 +31,8 @@ export type {
   EngineInstallProgress,
   TtsEnginePreflight,
   TtsCapabilities,
+  TtsProcessStatus,
+  TtsDebugInfo,
   PreGenStatus,
   PreGenStudentStatus,
   VoiceCatalogEntry,

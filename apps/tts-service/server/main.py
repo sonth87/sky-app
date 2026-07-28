@@ -502,6 +502,8 @@ def _import_catalog_entry(entry: dict, lang: str) -> dict:
             "accent": entry.get("accent"),
             "category": entry.get("category", []),
             "tags": entry.get("tags", []),
+            "tagline": entry.get("tagline"),
+            "description": entry.get("description"),
             "source_catalog_id": entry["id"],
             "source_lang": lang,
         },
@@ -647,18 +649,32 @@ def delete_voice(voice_id: str):
 
 @app.get("/preview/{voice_id}")
 def get_preview(voice_id: str):
-    """Trả về WAV preview. Backward compat: nhận speaker_id cũ (NF, SF, v.v.)."""
+    """Trả về WAV preview. Nếu không có file preview tĩnh trong _preview_dir, kiểm tra
+    xem voice có source_catalog_id hoặc thuộc catalog vendor không để phát audio gốc."""
     if _registry is None:
         raise HTTPException(503, "Registry not ready")
+    
+    # 1. Thử lấy file preview tĩnh (NF.wav, SF.wav, v.v.)
+    if _preview_dir is not None:
+        wav_path = _preview_dir / f"{voice_id}.wav"
+        if wav_path.exists():
+            return FileResponse(str(wav_path), media_type="audio/wav")
+
+    # 2. Nếu là voice từ catalog (hoặc direct catalog_id như 'cam_hong', 'bao_ngoc_gentle')
     voice = _registry.get_voice(voice_id)
-    if voice is None:
-        raise HTTPException(404, f"Unknown voice_id: {voice_id}")
-    if _preview_dir is None:
-        raise HTTPException(503, "Preview dir not initialized")
-    wav_path = _preview_dir / f"{voice_id}.wav"
-    if not wav_path.exists():
-        raise HTTPException(404, f"Preview not found: {voice_id}.wav")
-    return FileResponse(str(wav_path), media_type="audio/wav")
+    catalog_id = voice.get("source_catalog_id") if voice else voice_id
+
+    if _catalog_dir is not None and catalog_id:
+        found = _find_catalog_entry_any_lang(catalog_id)
+        if found is not None:
+            entry, lang = found
+            from voice_catalog import get_catalog_ref_path
+            audio_path = get_catalog_ref_path(_catalog_dir, lang, entry)
+            if audio_path.exists():
+                media_type = "audio/mpeg" if audio_path.suffix.lower() == ".mp3" else "audio/wav"
+                return FileResponse(str(audio_path), media_type=media_type)
+
+    raise HTTPException(404, f"Preview not found for voice: {voice_id}")
 
 
 # ── Synthesize ────────────────────────────────────────────────────────────────

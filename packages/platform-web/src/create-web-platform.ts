@@ -2,6 +2,7 @@ import { createPlatformContext, createAllowAllEntitlementSet, type PlatformConte
 import { resolveEntitlementsFromPort } from '@sky-app/licensing';
 import type { AssetPort, DataPort, DataSourcePort, EventPort, LayoutPort } from '@sky-app/service-contracts';
 import { createWebTtsPort } from './adapters/tts.js';
+import { createWebTtsEnginePort } from './adapters/tts-engine.js';
 import { createWebLicensePort } from './adapters/license.js';
 import { createWebDataPort } from './adapters/data.js';
 import { createSqliteWasmDataPort } from './adapters/sqlite-wasm-data.js';
@@ -125,6 +126,7 @@ export async function createWebPlatform(opts: CreateWebPlatformOptions = {}): Pr
   const dataServiceAvailable = await isDataServiceAvailable(dataBaseUrl);
 
   platform.services.register('tts', createWebTtsPort(opts.ttsBaseUrl));
+  platform.services.register('tts-engine', createWebTtsEnginePort(opts.ttsBaseUrl));
   platform.services.register('data', await resolveDataPort(opts, dataBaseUrl, dataServiceAvailable));
   platform.services.register('layout', await resolveLayoutPort(opts, dataBaseUrl, dataServiceAvailable));
   platform.services.register('asset', resolveAssetPort(dataBaseUrl, dataServiceAvailable));

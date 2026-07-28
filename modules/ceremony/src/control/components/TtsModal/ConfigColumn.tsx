@@ -1,10 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react';
 import { type CanonicalRecord, type TtsCondition, type CustomVariable } from '@sky-app/slide-shared';
+import type { TtsEnginePort } from '@sky-app/service-contracts';
 import { VoicePickerPopover } from '../VoicePickerPopover';
 import { TemplateEditor } from '../TemplateEditor';
 import { AdvancedTtsConfig } from '../AdvancedTtsConfig';
-import { DeviceConfig } from '../DeviceConfig';
+import { DeviceConfig } from '@sky-app/tts-engine-ui';
+import { CeremonySafetyNote } from '../CeremonySafetyNote';
+import { usePlatform } from '../../PlatformContext';
 import { playPcm } from '../../../lib/audio';
 import { renderTemplate } from '../../../lib/renderTemplate';
 
@@ -58,6 +61,8 @@ export function ConfigColumn({
   onManageVariables,
 }: ConfigColumnProps) {
   const { t } = useTranslation();
+  const platform = usePlatform();
+  const enginePort = platform?.services.get<TtsEnginePort>('tts-engine');
   return (
     <div className="w-[38%] p-6 overflow-y-auto flex flex-col gap-6">
       <div className="text-xs font-bold text-primary tracking-wider uppercase">{t('ttsModal.config.sectionTitle')}</div>
@@ -185,8 +190,14 @@ export function ConfigColumn({
         }}
       />
 
-      {/* Thiết bị xử lý (CPU/GPU + số luồng) */}
-      <DeviceConfig />
+      {/* Thiết bị xử lý (CPU/GPU + số luồng) + quản lý engine — UI dùng chung với TTS Studio */}
+      {enginePort && (
+        <DeviceConfig
+          port={enginePort}
+          canInstall={platform?.capabilities.has('tts-local') ?? false}
+          engineManagerNotice={<CeremonySafetyNote />}
+        />
+      )}
     </div>
   );
 }

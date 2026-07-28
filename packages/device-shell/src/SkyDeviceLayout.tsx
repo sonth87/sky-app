@@ -3,6 +3,7 @@ import type { AppModule, PlatformContext } from '@sky-app/kernel';
 import { APPS_CONFIG, DeviceLayout, type AppConfig, type ImportWallpaperFn, type WallpaperConfig, type UpdateActions, type SimpleModeProp } from '@sonth87/device-layout';
 import { toDeviceAppConfigs } from './to-device-app-config.js';
 import { type BuiltInAppId } from './built-in-apps.js';
+import { useTtsStatusMenuBarItem } from './TtsStatusMenuBarItem.js';
 
 export interface SkyDeviceLayoutProps {
   apps: AppModule[];
@@ -63,14 +64,22 @@ export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps, onI
     return [...builtIn, ...toDeviceAppConfigs(apps, platform)];
   }, [apps, platform, builtInApps]);
 
+  // Icon trạng thái TTS trên menu bar — global, không thuộc app nào, xem doc comment
+  // trong TtsStatusMenuBarItem.tsx cho lý do phải lắp ráp ở đúng tầng này.
+  const { item: ttsStatusItem, modals: ttsStatusModals } = useTtsStatusMenuBarItem(platform);
+
   return (
-    <DeviceLayout
-      apps={deviceApps}
-      assetBaseUrl={assetBaseUrl}
-      onImportWallpaper={onImportWallpaper}
-      wallpapers={wallpapers}
-      updateActions={updateActions}
-      isSimpleMode={isSimpleMode}
-    />
+    <>
+      <DeviceLayout
+        apps={deviceApps}
+        assetBaseUrl={assetBaseUrl}
+        onImportWallpaper={onImportWallpaper}
+        wallpapers={wallpapers}
+        updateActions={updateActions}
+        isSimpleMode={isSimpleMode}
+        menuBarExtras={ttsStatusItem ? [ttsStatusItem] : []}
+      />
+      {ttsStatusModals}
+    </>
   );
 }

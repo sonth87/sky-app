@@ -134,7 +134,14 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    // absolute (không phải fixed) — modal này nằm ngay trong DOM tree của app, không portal
+    // ra ngoài. `fixed` lấy containing block là toàn màn hình Electron (viewport thật) khi
+    // không có ancestor transform nào chặn giữa đường — bug thật phát hiện qua test thực tế:
+    // resize cửa sổ TTS Studio nhỏ lại, modal vẫn theo kích thước MÀN HÌNH chứ không theo
+    // đúng khung cửa sổ. `absolute inset-0` neo chắc chắn vào ancestor `position: relative`
+    // GẦN NHẤT — ở đây là chính root của app (xem `rootRef` trong TtsStudioApp.tsx, tương tự
+    // cho Ceremony), không phụ thuộc suy đoán về hành vi transform của Window.tsx.
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       {/* Hidden file input for web fallback */}
       <input
         type="file"
@@ -145,7 +152,11 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
       />
       
       <div
-        className="flex flex-col w-[960px] max-w-full rounded-xl bg-card border border-border shadow-2xl overflow-hidden"
+        // min-w-0 — BẮT BUỘC: đây là flex item của backdrop (flex items-center), mặc định
+        // min-width:auto khiến item không co xuống dưới kích thước nội dung dù đã có
+        // max-w-full, nên khi cửa sổ chứa (Window.tsx) nhỏ hơn 960px, khung này tràn ra
+        // ngoài viền cửa sổ thay vì co lại — cùng kiểu lỗi mà dòng 326 (bên dưới) đã tự vá.
+        className="flex min-w-0 flex-col w-[960px] max-w-full rounded-xl bg-card border border-border shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -162,7 +173,7 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
         {/* Content - Bố cục 2 cột */}
         <div className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr] divide-y md:divide-y-0 md:divide-x divide-border">
           {/* Cột Trái: Form nhập thông tin */}
-          <div className="p-6 flex flex-col gap-4 max-h-[75vh] overflow-y-auto">
+          <div className="p-6 flex min-w-0 flex-col gap-4 max-h-[75vh] overflow-y-auto">
             <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Thông tin giọng đọc mới</h3>
             
             <div className="flex flex-col gap-3.5">
@@ -175,7 +186,7 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
                 >
                   <Upload size={14} /> Chọn file WAV mẫu
                 </button>
-                <span className="text-xs text-muted-foreground truncate flex-1 font-medium">
+                <span className="text-xs text-muted-foreground truncate min-w-0 flex-1 font-medium">
                   {filePathLabel ? filePathLabel : 'Chưa có file được chọn'}
                 </span>
               </div>
@@ -310,12 +321,12 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
           </div>
 
           {/* Cột Phải: Danh sách giọng cá nhân */}
-          <div className="p-6 flex flex-col gap-4">
+          <div className="p-6 flex min-w-0 flex-col gap-4">
             <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
               Danh sách giọng cá nhân ({clonedVoices.length})
             </h3>
             
-            <div className="flex-1 max-h-[60vh] overflow-y-auto pr-1 flex flex-col gap-2.5">
+            <div className="flex-1 min-w-0 max-h-[60vh] overflow-y-auto pr-1 flex flex-col gap-2.5">
               {clonedVoices.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 border border-dashed border-border rounded-xl bg-muted/10">
                   <p className="text-xs text-muted-foreground">Chưa có giọng cá nhân nào được tạo.</p>

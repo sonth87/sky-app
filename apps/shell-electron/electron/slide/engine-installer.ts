@@ -416,21 +416,35 @@ export class EngineInstaller {
    * bằng `pip install --target`. Engine (Cụm sau) chạy bằng Python này + PYTHONPATH tới đây.
    *
    * pythonBin: interpreter dùng để chạy pip.
-   *   - Bản dev: có thể dùng python hệ thống / venv (đủ để kiểm chứng luồng).
-   *   - Bản ĐÓNG GÓI: KHÔNG có Python → phải tải Python embeddable trước (chưa làm ở Cụm 1;
-   *     cần test trên Windows thật). Nếu pythonBin=null → báo lỗi rõ ràng.
+   *   - Bản dev: venv của app (caller truyền vào) — nhanh, khỏi tải thêm.
+   *   - Bản ĐÓNG GÓI: caller truyền null → tự tải Python relocatable về
+   *     `<engineDir>/runtime/python` (xem python-runtime.ts) rồi pip bằng chính nó.
+   *     Đây cũng là interpreter mà resolveExtensionEngineSpawn() sẽ dùng để chạy engine.
    *
    * Tiến độ pip stream qua stdout (không có % chính xác — báo dòng log gần nhất).
    */
   async installRuntime(pipPackages: string[], pythonBin: string | null): Promise<void> {
     this.ac = new AbortController();
-    const runtimeDir = join(this.dir(), 'runtime', 'site-packages');
+    const runtimeRoot = join(this.dir(), 'runtime');
+    const runtimeDir = join(runtimeRoot, 'site-packages');
     mkdirSync(runtimeDir, { recursive: true });
 
-    if (!pythonBin) {
-      this.emit(this.prog('error', [], [], 0, 0, 0, '', 0,
-        'Bản đóng gói chưa hỗ trợ cài runtime (cần Python embeddable). Chạy bản từ nguồn để thử.'));
-      return;
+    let python = pythonBin;
+    if (!python) {
+      // Không có interpreter sẵn (bản đóng gói) → tải về. Bước này có thể mất vài chục
+      // MB nên báo tiến độ như một phần của phase installing-runtime.
+      try {
+        const { ensurePythonRuntime } = await import('./python-runtime');
+        this.emit(this.prog('installing-runtime', [], [], 0, 0, 0, 'Đang tải runtime Python…'));
+        python = await ensurePythonRuntime(runtimeRoot, this.ac.signal, (p) => {
+          this.emit(this.prog('installing-runtime', [], [], p.receivedBytes, p.totalBytes ?? 0,
+            p.bytesPerSec, 'runtime Python'));
+        });
+      } catch (e) {
+        this.emit(this.prog('error', [], [], 0, 0, 0, '', 0,
+          e instanceof Error ? e.message : String(e)));
+        return;
+      }
     }
 
     this.emit(this.prog('installing-runtime', [], [], 0, 0, 0, 'pip install ' + pipPackages.join(' ')));
@@ -438,7 +452,7 @@ export class EngineInstaller {
     const { spawn } = await import('node:child_process');
     const args = ['-m', 'pip', 'install', '--no-cache-dir', '--target', runtimeDir, ...pipPackages];
     const ok = await new Promise<boolean>((resolve) => {
-      const proc = spawn(pythonBin, args, { windowsHide: true });
+      const proc = spawn(python, args, { windowsHide: true });
       let tail = '';
       const onData = (d: Buffer) => {
         tail = (tail + d.toString()).split('\n').slice(-3).join('\n');

@@ -1,6 +1,7 @@
 import { createPlatformContext, type PlatformContext } from '@sky-app/kernel';
 import { resolveEntitlementsFromPort } from '@sky-app/licensing';
 import { createElectronTtsPort } from './adapters/tts.js';
+import { createElectronTtsEnginePort } from './adapters/tts-engine.js';
 import { createElectronDisplayPort } from './adapters/display.js';
 import { createElectronLicensePort } from './adapters/license.js';
 import { createElectronLayoutPort } from './adapters/layout.js';
@@ -47,6 +48,7 @@ export async function createElectronPlatform(
   });
 
   platform.services.register('tts', createElectronTtsPort());
+  platform.services.register('tts-engine', createElectronTtsEnginePort());
   platform.services.register('display', createElectronDisplayPort());
   platform.services.register('layout', createElectronLayoutPort());
   platform.services.register('asset', createElectronAssetPort());

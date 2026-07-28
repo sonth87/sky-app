@@ -2,7 +2,7 @@ import { spawn, ChildProcess } from 'node:child_process';
 import { appendFileSync, existsSync, chmodSync, mkdirSync, readdirSync, copyFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow } from 'electron';
-import { vieneuRefDir, vieneuRegistryPath, vieneuConfigPath, ttsEnginesDir, ttsEngineDir } from './data/paths';
+import { vieneuRefDir, vieneuRegistryPath, vieneuConfigPath, ttsEnginesDir, ttsEngineDir, ttsAccelDir } from './data/paths';
 const DEBUG_LOG_FILE = join(app.getPath('userData'), 'tts-debug.log');
 const DEFAULT_PORT = 8089;
 const MAX_PORT_TRIES = 20;
@@ -193,6 +193,31 @@ function resolveExtensionEngineSpawn(engineId: string): { cmd: string; args: str
   return { cmd, args: [mainPy], sitePackages };
 }
 
+/**
+ * Runtime tăng tốc (GPU) cho engine VieNeu bundled — chỉ dùng ở bản ĐÓNG GÓI.
+ *
+ * Bản đóng gói vốn chạy VieNeu bằng binary PyInstaller đã đóng băng onnxruntime CPU,
+ * nên không thể bật GPU cho nó. Khi người dùng cài gói tăng tốc, ta dựng một Python
+ * rời có onnxruntime-gpu/directml + trọn bộ dependency server (xem ttsAccelDir) và
+ * chạy main.py bằng nó thay cho binary.
+ *
+ * Trả null khi: chạy dev (venv đã có sẵn, cài thẳng vào đó), chưa cài tăng tốc, hoặc
+ * người dùng đang chọn CPU — lúc đó giữ binary PyInstaller vì nhẹ và khởi động nhanh hơn.
+ */
+function resolveAccelSpawn(providers: string): { cmd: string; args: string[]; sitePackages: string } | null {
+  if (!app.isPackaged || !providers) return null;
+  const serverDir = getServerDir();
+  if (!serverDir) return null;
+  const mainPy = join(serverDir, 'main.py');
+  const runtimeDir = join(ttsAccelDir(), 'runtime');
+  const sitePackages = join(runtimeDir, 'site-packages');
+  const py = process.platform === 'win32'
+    ? join(runtimeDir, 'python', 'python.exe')
+    : join(runtimeDir, 'python', 'bin', 'python3');
+  if (!existsSync(mainPy) || !existsSync(sitePackages) || !existsSync(py)) return null;
+  return { cmd: py, args: [mainPy], sitePackages };
+}
+
 function logPackagedResources() {
   const resourcesPath = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources');
   const refDir = join(resourcesPath, 'voice-ref');
@@ -346,12 +371,16 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
     const previewDir = join(resourcesPath, 'voice-previews');
     const logFilePath = join(app.getPath('userData'), 'tts-debug.log');
 
-    // Ref clone + registry ghi vào userData (không phải bundle read-only). Seed 6 ref
-    // mặc định từ bundle sang userData lần đầu để giọng preset hoạt động.
-    const userRefDir = vieneuRefDir();
-    const userRegistryPath = vieneuRegistryPath();
-    const userConfigPath = vieneuConfigPath();
-    seedUserVoiceDir(bundledRefDir, resourcesPath, userRefDir, userRegistryPath);
+    // Ref clone + registry ghi vào userData (không phải bundle read-only trên bản đã
+    // đóng gói). Seed 6 ref mặc định từ bundle sang userData lần đầu để giọng preset
+    // hoạt động. Khi dev (!isPackaged): trỏ THẲNG vào resources/ trong repo — sửa
+    // catalog.json/voice-registry.json/*.wav ăn ngay, không cần mò userData + restart.
+    const userRefDir = isPackaged ? vieneuRefDir() : bundledRefDir;
+    const userRegistryPath = isPackaged ? vieneuRegistryPath() : join(resourcesPath, 'voice-registry.json');
+    const userConfigPath = isPackaged ? vieneuConfigPath() : join(resourcesPath, 'vieneu-config.json');
+    if (isPackaged) {
+      seedUserVoiceDir(bundledRefDir, resourcesPath, userRefDir, userRegistryPath);
+    }
 
     // Device settings (provider/thread) + engine đang chọn → truyền qua env khi spawn.
     const device = readDeviceConfig(userConfigPath);
@@ -369,6 +398,21 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
           .filter(Boolean).join(process.platform === 'win32' ? ';' : ':'),
       };
       console.log(`[Python Server] Engine mở rộng '${device.engine}' → spawn runtime ${cmd}`);
+    } else {
+      // Không phải engine mở rộng → VieNeu. Nếu người dùng đã bật tăng tốc phần cứng ở
+      // bản đóng gói thì phải chạy bằng runtime có onnxruntime-gpu, vì binary PyInstaller
+      // chỉ có onnxruntime CPU.
+      const accel = resolveAccelSpawn(device.providers);
+      if (accel) {
+        cmd = accel.cmd;
+        args = accel.args;
+        extraEnv = {
+          PYTHONPATH: [accel.sitePackages, getServerDir(), process.env.PYTHONPATH ?? '']
+            .filter(Boolean).join(process.platform === 'win32' ? ';' : ':'),
+        };
+        console.log(`[Python Server] Tăng tốc '${device.providers}' → spawn runtime ${cmd}`);
+        writeDebugLog(`[Python Server] accel runtime: ${cmd}`);
+      }
     }
 
     pythonProcess = spawn(cmd, args, {

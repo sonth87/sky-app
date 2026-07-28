@@ -47,7 +47,22 @@ catalog:
   # loại trừ click trong window qua target.closest('[id^="window-"]'), không phụ thuộc
   # stopPropagation() này — không tìm thấy chỗ nào khác cần nó. Đã sửa: chỉ stopPropagation() khi
   # window CHƯA focused (lần click đầu để focus), mọi click sau đó nổi bọt bình thường.
-  "@sonth87/device-layout": "github:sonth87/device-layout#v0.3.4"
+  #
+  # v0.5.1 (2026-07-28) — fix thật phát hiện sau khi dùng v0.5.0: (1) FloatingWindow's resize
+  # phình ra cả 2 phía quanh tâm thay vì chỉ về phía đang kéo (do vẫn center-by-flex trong lúc
+  # đổi size) — fix bằng cách neo góc trên-trái tại vị trí thật ngay khi bắt đầu kéo/resize,
+  # chuyển sang absolute position từ đó; (2) bỏ icon SVG xấu ở góc resize, giữ hitbox; (3)
+  # MenuBarExtraButton's popover giờ tự đóng khi bấm 1 mục hành động (khớp MenuDropdown) — trước
+  # đó bấm "Xem log" mở FloatingWindow (z 99999) trong khi popover (z 9999) vẫn đứng yên phía
+  # sau, trông như cửa sổ log "đè" lên menu.
+  #
+  # v0.5.2 (2026-07-28) — fix thật phát hiện ngay sau khi test v0.5.1: MenuBarExtraButton's
+  # popover (z-[9999]) thấp hơn FloatingWindow (zIndex 99999) — số z-index khác nhau quyết
+  # định thứ tự vẽ (không phải thứ tự DOM), nên cửa sổ mở từ popover (vd EngineManager) LUÔN
+  # vẽ đè lên popover bất kể đóng/mở lại kiểu gì — không phải lỗi trạng thái đóng-khi-bấm-mục
+  # (v0.5.1 đã có, vẫn đúng, giữ nguyên) mà là lỗi stacking riêng. Bump popover lên z-[100000]
+  # (menu bar macOS thật luôn nổi trên mọi cửa sổ app).
+  "@sonth87/device-layout": "github:sonth87/device-layout#v0.5.2"
 
 onlyBuiltDependencies:
   - electron
