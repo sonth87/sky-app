@@ -22,6 +22,11 @@
 appId: com.skyapp.shell
 productName: Sky-App
 
+# build-assets/icons/icon.png (2026-07-30, nguồn build-assets/icons/icon.svg) — 1 PNG
+# ≥512×512 nền trong suốt là đủ, electron-builder tự sinh .icns (mac)/.ico (win) từ đây,
+# không cần chuẩn bị sẵn cả 2 định dạng (xem build-assets/icons/README.md).
+icon: build-assets/icons/icon.png
+
 directories:
   # PHẢI khác "dist" (renderer output của electron-vite) và "dist-electron"
   # (main/preload output) để tránh electron-builder ghi đè build renderer.
@@ -87,10 +92,6 @@ extraResources:
     to: python-backend/requirements.txt
 
 mac:
-  # TODO: icon: build-assets/icons/icon.icns (chưa có asset — xem
-  # build-assets/icons/README.md). Thiếu icon → dùng icon mặc định Electron,
-  # không chặn build.
-  #
   # zip (cạnh dmg): KHÔNG chỉ để phân phối thêm — Squirrel.Mac (cơ chế
   # electron-updater dùng để auto-update trên macOS, xem `publish:` dưới)
   # BẮT BUỘC định dạng .zip, không đọc .dmg trực tiếp. Chuẩn bị sẵn để
@@ -109,9 +110,6 @@ mac:
       to: vieneu-server
 
 win:
-  # TODO: icon: build-assets/icons/icon.ico (chưa có asset — xem
-  # build-assets/icons/README.md).
-  #
   # portable: bản .exe chạy thẳng không cần cài đặt, tiện test nhanh trên
   # máy không muốn cài. nsis vẫn là target chính cho máy hội trường (production).
   target:

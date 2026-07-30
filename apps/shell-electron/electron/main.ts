@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, nativeImage, protocol, dialog, ipcMain } from 'electron';
 import { existsSync, cpSync, mkdirSync, readFileSync } from 'node:fs';
 import { copyFile, mkdir } from 'node:fs/promises';
 import { extname, join, basename } from 'node:path';
@@ -148,11 +148,20 @@ function resolveRendererEntry(): string {
   return join(__dirname, '../../dist/index.html');
 }
 
+// Icon lúc chạy KHÔNG đóng gói (dev:app) — build-assets/icons/icon.png (2026-07-30) KHÔNG nằm
+// trong `files`/`extraResources` của electron-builder.yml (chỉ dùng để electron-builder tự sinh
+// .icns/.ico lúc đóng gói, xem file đó's top-level `icon:`), nên đường dẫn này CHỈ hợp lệ khi
+// !app.isPackaged (__dirname trỏ thẳng vào cây source thật, không phải app.asar). Bản đóng gói
+// không cần set icon runtime — icon đã có sẵn ở app bundle (Info.plist/.exe resource) qua chính
+// electron-builder.yml, KHÔNG rơi về icon mặc định Electron như trước.
+const DEV_ICON_PATH = join(__dirname, '../../build-assets/icons/icon.png');
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
     title: 'Sky-App',
+    icon: app.isPackaged ? undefined : nativeImage.createFromPath(DEV_ICON_PATH),
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
@@ -188,6 +197,11 @@ protocol.registerSchemesAsPrivileged([
 const wallpaperImportDir = () => join(app.getPath('userData'), 'wallpapers');
 
 app.whenReady().then(() => {
+  // Dock icon lúc dev:app (macOS) — packaged app đã có icon riêng qua Info.plist (electron-
+  // builder.yml's icon:), không cần gọi lại. app.dock chỉ tồn tại trên macOS (undefined ở
+  // Windows/Linux, optional chain xử lý sẵn).
+  if (!app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(DEV_ICON_PATH));
+
   // Đăng ký TRƯỚC createMainWindow()/createBackdropWindow() — windows.ts gọi
   // attachContextMenu?.() ngay khi tạo webContents mới, phải có sẵn hàm thật trước đó.
   // Inject qua setter (không import menu.ts thẳng trong windows.ts) để tránh circular import
