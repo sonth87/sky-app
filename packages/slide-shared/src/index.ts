@@ -10,6 +10,7 @@ export * from './constants.js';
 export * from './layout/types.js';
 export * from './layout/tokens.js';
 export * from './layout/canonical.js';
+export * from './layout/demo-canonical-subject.js';
 export * from './layout/event.js';
 export * from './layout/apply-field-map.js';
 export * from './layout/field-mapping.js';

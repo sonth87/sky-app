@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Copy, Plus, RefreshCw, X } from 'lucide-react';
 import type { AspectRatio, LayoutVariant } from '@sky-app/slide-shared';
-import type { OverwriteAllLockStrategy } from '@sky-app/layout-editor-core';
+import type { LayoutPort } from '@sky-app/service-contracts';
+import { cloneVariantAcrossLayouts, type OverwriteAllLockStrategy } from '@sky-app/layout-editor-core';
 import { AddVariantModal } from './AddVariantModal.js';
 import { CopyVariantPopover, type CopyVariantMode } from './CopyVariantPopover.js';
+import { CrossLayoutVariantPickerModal } from './CrossLayoutVariantPickerModal.js';
+import { nextSpawnId } from './Flyout/useSpawnDrag.js';
 import { cn } from '@sky-app/ui';
 
 export interface VariantTabsProps {
@@ -14,6 +17,12 @@ export interface VariantTabsProps {
   onRemove?: (variantId: string) => void;
   onCopyFromVariant?: (sourceVariantId: string, targetVariantId: string, mode: CopyVariantMode, lockStrategy?: OverwriteAllLockStrategy) => void;
   onChangeAspect?: (variantId: string, newAspect: AspectRatio) => void;
+  /** "Sao chép từ layout khác" (Giai đoạn 5.1) — cả 3 cần có (layoutPort + onAddClonedVariant)
+   * mới hiện link này trong AddVariantModal; bỏ trống = tính năng ẩn hoàn toàn (VD dùng
+   * VariantTabs độc lập, không có LayoutPort thật, xem CopyVariantPopover's quy ước tương tự). */
+  layoutPort?: LayoutPort;
+  resolveAssetUrl?: (path: string) => Promise<string>;
+  onAddClonedVariant?: (variant: LayoutVariant) => void;
 }
 
 function formatAspectLabel(aspect: AspectRatio): string {
@@ -22,12 +31,30 @@ function formatAspectLabel(aspect: AspectRatio): string {
 
 type SubPopover = 'copy' | 'change-aspect' | 'remove' | null;
 
-export function VariantTabs({ variants, activeVariantId, onSelect, onAdd, onRemove, onCopyFromVariant, onChangeAspect }: VariantTabsProps) {
+// "Sao chép từ layout khác" (Giai đoạn 5.1) — luồng 2 bước: chọn variant NGUỒN
+// (CrossLayoutVariantPickerModal) rồi chọn tỷ lệ ĐÍCH (tái dùng AddVariantModal, KHÔNG viết lại
+// UI chọn tỷ lệ). `cloneVariantAcrossLayouts` chạy ở bước 2 khi đã biết cả nguồn lẫn đích.
+type CrossLayoutStep = { step: 'pick-source' } | { step: 'pick-aspect'; source: LayoutVariant; sourceLabel: string } | null;
+
+export function VariantTabs({
+  variants,
+  activeVariantId,
+  onSelect,
+  onAdd,
+  onRemove,
+  onCopyFromVariant,
+  onChangeAspect,
+  layoutPort,
+  resolveAssetUrl,
+  onAddClonedVariant,
+}: VariantTabsProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [actionVariantId, setActionVariantId] = useState<string | null>(null);
   const [subPopover, setSubPopover] = useState<SubPopover>(null);
   const [hoveredVariantId, setHoveredVariantId] = useState<string | null>(null);
+  const [crossLayoutStep, setCrossLayoutStep] = useState<CrossLayoutStep>(null);
   const usedAspectIds = new Set(variants.map((v) => v.aspect.id));
+  const canCopyFromOtherLayout = Boolean(layoutPort && onAddClonedVariant);
 
   const closeAll = () => {
     setActionVariantId(null);
@@ -120,6 +147,35 @@ export function VariantTabs({ variants, activeVariantId, onSelect, onAdd, onRemo
           onConfirm={(aspect) => {
             onAdd(aspect);
             setModalOpen(false);
+          }}
+          onCopyFromOtherLayout={
+            canCopyFromOtherLayout
+              ? () => {
+                  setModalOpen(false);
+                  setCrossLayoutStep({ step: 'pick-source' });
+                }
+              : undefined
+          }
+        />
+      )}
+      {crossLayoutStep?.step === 'pick-source' && layoutPort && (
+        <CrossLayoutVariantPickerModal
+          layoutPort={layoutPort}
+          resolveAssetUrl={resolveAssetUrl}
+          onClose={() => setCrossLayoutStep(null)}
+          onPick={(source, sourceLabel) => setCrossLayoutStep({ step: 'pick-aspect', source, sourceLabel })}
+        />
+      )}
+      {crossLayoutStep?.step === 'pick-aspect' && (
+        <AddVariantModal
+          usedAspectIds={usedAspectIds}
+          title={`Chọn tỷ lệ đích — sao chép từ ${crossLayoutStep.sourceLabel}`}
+          confirmLabel="Sao chép"
+          onClose={() => setCrossLayoutStep(null)}
+          onConfirm={(aspect) => {
+            const cloned = cloneVariantAcrossLayouts(crossLayoutStep.source, aspect, () => nextSpawnId('cln'));
+            onAddClonedVariant?.(cloned);
+            setCrossLayoutStep(null);
           }}
         />
       )}

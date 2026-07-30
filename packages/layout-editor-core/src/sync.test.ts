@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   affectedGroups,
+  cloneVariantAcrossLayouts,
   cloneVariantItemsForOverwrite,
   computePatchSteps,
   computeSyncPropagation,
@@ -158,6 +159,47 @@ describe('cloneVariantItemsForOverwrite', () => {
 
     expect(updatedSourceItems[0]!.syncKey).toBeTruthy();
     expect(clonedItems[0]!.syncRef).toBe(updatedSourceItems[0]!.syncKey);
+  });
+});
+
+describe('cloneVariantAcrossLayouts', () => {
+  it('tỷ lệ đích KHÁC nguồn → scale trục X, giữ Y, bỏ background, gán id mới không mang syncKey/syncRef', () => {
+    const source = variant('16:9', 16, 9, [
+      textItem('a', { syncKey: 'kA', box: { x: 100, y: 50, w: 200, h: 60 } }),
+    ]);
+    source.background = { kind: 'color', color: '#000' } as any;
+    let counter = 0;
+    const cloned = cloneVariantAcrossLayouts(source, { id: '25:9', w: 25, h: 9 }, () => `cln_${++counter}`);
+
+    expect(cloned.aspect).toEqual({ id: '25:9', w: 25, h: 9 });
+    expect(cloned.background).toBeUndefined();
+    const scaleX = 25 / 16;
+    expect(cloned.refW).toBe(Math.round(source.refW * scaleX));
+    expect(cloned.refH).toBe(source.refH);
+
+    const item = cloned.items[0]!;
+    expect(item.id).toBe('cln_1');
+    expect(item.box.x).toBeCloseTo(100 * scaleX, 5);
+    expect(item.box.w).toBeCloseTo(200 * scaleX, 5);
+    expect(item.box.y).toBe(50);
+    expect(item.syncKey).toBeUndefined();
+    expect(item.syncRef).toBeUndefined();
+  });
+
+  it('tỷ lệ đích GIỐNG nguồn → giữ nguyên background, không scale', () => {
+    const source = variant('16:9', 16, 9, [textItem('a', { box: { x: 100, y: 50, w: 200, h: 60 } })]);
+    source.background = { kind: 'color', color: '#fff' } as any;
+    const cloned = cloneVariantAcrossLayouts(source, { id: '16:9', w: 16, h: 9 }, () => 'cln_1');
+
+    expect(cloned.background).toEqual(source.background);
+    expect(cloned.items[0]!.box).toEqual({ x: 100, y: 50, w: 200, h: 60 });
+  });
+
+  it('không sửa đổi variant nguồn (thuần, không mutate)', () => {
+    const source = variant('16:9', 16, 9, [textItem('a', { syncKey: 'kA' })]);
+    const sourceSnapshot = JSON.parse(JSON.stringify(source));
+    cloneVariantAcrossLayouts(source, { id: '21:9', w: 21, h: 9 }, () => 'cln_1');
+    expect(source).toEqual(sourceSnapshot);
   });
 });
 

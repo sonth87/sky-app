@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { demoCanonicalSubject } from './demoCanonicalSubject.js';
+import { demoCanonicalSubject } from './demo-canonical-subject.js';
 
 describe('demoCanonicalSubject', () => {
   it('trả record hợp lệ theo CanonicalSubject — có full_name, subjectType, extra', () => {

@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { AppContentProps } from '@sky-app/kernel';
-import type { LayoutPort } from '@sky-app/service-contracts';
+import type { AssetPort, LayoutPort } from '@sky-app/service-contracts';
 import type { LayoutContent, LayoutDocument } from '@sky-app/slide-shared';
 import { LayoutDesignerApp } from './components/LayoutDesignerApp.js';
+import { LayoutLibraryScreen } from './components/LayoutLibraryScreen.js';
 
 export interface LayoutDesignerAppModuleProps extends AppContentProps {
   layoutId?: string;
   layoutPort?: LayoutPort;
+  assetPort?: AssetPort;
   variableRegistryPort?: any;
 }
 
@@ -19,13 +21,18 @@ type ModuleState =
 const DEBOUNCE_MS = 600;
 
 export function LayoutDesignerAppModule({
-  layoutId = 'demo-layout',
+  layoutId: layoutIdProp,
   platform,
   layoutPort: propLayoutPort,
+  assetPort: propAssetPort,
   variableRegistryPort: propVariableRegistryPort,
 }: LayoutDesignerAppModuleProps) {
   const layoutPort = propLayoutPort ?? (platform as any)?.layout ?? (platform as any)?.services?.get('layout');
+  const assetPort: AssetPort | undefined = propAssetPort ?? (platform as any)?.services?.get('asset');
   const variableRegistryPort = propVariableRegistryPort ?? (platform as any)?.variableRegistry ?? (platform as any)?.services?.get('variable_registry') ?? (typeof (layoutPort as any)?.listTopVariables === 'function' ? layoutPort : undefined);
+
+  // Không truyền layoutId → mở Library (Giai đoạn 5.1) thay vì tự tạo/mở "demo-layout" như trước.
+  const [layoutId, setLayoutId] = useState<string | undefined>(layoutIdProp);
 
   const [state, setState] = useState<ModuleState>({ status: 'loading' });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -64,13 +71,8 @@ export function LayoutDesignerAppModule({
       return;
     }
 
-    if (!layoutId) {
-      setState({
-        status: 'error',
-        message: 'Thiếu layoutId trong tham số mở app.',
-      });
-      return;
-    }
+    // Chưa chọn layout nào → đang ở màn Library (xem render bên dưới), không fetch gì cả.
+    if (!layoutId) return;
 
     setState({ status: 'loading' });
 
@@ -205,17 +207,25 @@ export function LayoutDesignerAppModule({
     [layoutPort, layoutId, loadVersions]
   );
 
-  if (state.status === 'loading') {
-    return (
-      <div className="h-full flex items-center justify-center text-[#9a9bab]">Đang tải layout…</div>
-    );
-  }
-
   if (state.status === 'no-port') {
     return (
       <div className="h-full flex items-center justify-center text-[#9a9bab] text-center p-[30px]">
         Môi trường hiện tại chưa đăng ký LayoutPort — không thể lưu layout.
       </div>
+    );
+  }
+
+  const resolveAssetUrl = assetPort ? (path: string) => assetPort.resolveAssetUrl(path) : undefined;
+  const pickAndSaveImage = assetPort ? () => assetPort.pickAndSaveImage() : undefined;
+
+  // Chưa chọn layout nào → màn Library (Giai đoạn 5.1) thay cho hành vi cũ tự mở "demo-layout".
+  if (!layoutId) {
+    return <LayoutLibraryScreen layoutPort={layoutPort} resolveAssetUrl={resolveAssetUrl} onOpen={setLayoutId} />;
+  }
+
+  if (state.status === 'loading') {
+    return (
+      <div className="h-full flex items-center justify-center text-[#9a9bab]">Đang tải layout…</div>
     );
   }
 
@@ -249,6 +259,9 @@ export function LayoutDesignerAppModule({
       onTokenInserted={handleTokenInserted}
       layoutId={layoutId}
       layoutPort={layoutPort}
+      resolveAssetUrl={resolveAssetUrl}
+      pickAndSaveImage={pickAndSaveImage}
+      onBackToLibrary={() => setLayoutId(undefined)}
       onRestoreVersion={handleRestoreVersion}
       versioning={{
         latestPublishedVersion,

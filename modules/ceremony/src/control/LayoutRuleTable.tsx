@@ -11,12 +11,11 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type D
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { EventLayoutRef, LayoutSelector } from '@sky-app/slide-shared';
-import { LayoutRenderer, type LayoutContent } from '@sky-app/slide-shared';
+import { LayoutRenderer, demoCanonicalSubject, type LayoutContent } from '@sky-app/slide-shared';
 import type { AssetPort, DataSourcePort, LayoutPort } from '@sky-app/service-contracts';
 import { Button } from './components/ui/Button.js';
 import { RuleBuilder } from './RuleBuilder.js';
 import { LayoutPickerModal } from './LayoutPickerModal.js';
-import { demoCanonicalSubject } from './lib/demoCanonicalSubject.js';
 
 export interface LayoutRuleRow {
   id: string;

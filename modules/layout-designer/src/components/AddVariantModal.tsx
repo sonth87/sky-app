@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Copy } from 'lucide-react';
 import type { AspectRatio } from '@sky-app/slide-shared';
 import { cn } from '@sky-app/ui';
 
@@ -19,9 +20,19 @@ export interface AddVariantModalProps {
   onConfirm: (aspect: AspectRatio) => void;
   title?: string;
   confirmLabel?: string;
+  /** "Sao chép từ layout khác..." (Giai đoạn 5.1, 12-thu-vien-layout.md) — bỏ trống = ẩn hàng
+   * này (VD khi modal đang dùng lại cho "Đổi tỷ lệ", không phải "Thêm tỷ lệ"). */
+  onCopyFromOtherLayout?: () => void;
 }
 
-export function AddVariantModal({ usedAspectIds, onClose, onConfirm, title = 'Thêm tỷ lệ màn hình', confirmLabel = 'Thêm' }: AddVariantModalProps) {
+export function AddVariantModal({
+  usedAspectIds,
+  onClose,
+  onConfirm,
+  title = 'Thêm tỷ lệ màn hình',
+  confirmLabel = 'Thêm',
+  onCopyFromOtherLayout,
+}: AddVariantModalProps) {
   const [customW, setCustomW] = useState('');
   const [customH, setCustomH] = useState('');
   const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
@@ -51,6 +62,18 @@ export function AddVariantModal({ usedAspectIds, onClose, onConfirm, title = 'Th
         className="absolute top-full left-0 mt-[6px] w-[260px] bg-white border border-[#e6e6ee] rounded-[11px] shadow-[0_14px_34px_rgba(20,20,40,0.18)] z-[10] overflow-hidden"
       >
         <div className="p-[10px_12px_6px] font-bold text-xs text-[#5c5d6e]">{title}</div>
+        {onCopyFromOtherLayout && (
+          <div className="px-[6px] pb-[4px]">
+            <button
+              onClick={() => onCopyFromOtherLayout()}
+              className="flex items-center gap-2 w-full p-[8px_10px] bg-transparent hover:bg-[#f4f5f9] border-none rounded-[7px] font-semibold text-[12.5px] text-[#4b57e6] cursor-pointer text-left"
+            >
+              <Copy size={13} />
+              Sao chép từ layout khác...
+            </button>
+            <div className="mx-[10px] my-[4px] border-t border-[#f0f0f5]" />
+          </div>
+        )}
         <div className="max-h-[260px] overflow-y-auto px-[6px] py-[2px]">
           {PRESETS.map((p) => {
             const disabled = usedAspectIds.has(p.id);

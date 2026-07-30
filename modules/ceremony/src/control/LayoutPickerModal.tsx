@@ -14,10 +14,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Search } from 'lucide-react';
 import type { AssetPort, LayoutPort } from '@sky-app/service-contracts';
-import { LayoutRenderer, type LayoutContent } from '@sky-app/slide-shared';
+import { LayoutRenderer, demoCanonicalSubject, type LayoutContent } from '@sky-app/slide-shared';
 import { Modal } from './components/ui/Modal.js';
 import { Button } from './components/ui/Button.js';
-import { demoCanonicalSubject } from './lib/demoCanonicalSubject.js';
 
 interface LayoutPickerModalProps {
   open: boolean;

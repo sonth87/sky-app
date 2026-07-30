@@ -4,7 +4,7 @@
 // convention doc-helpers.ts — commands.ts gọi các hàm này để tính patch lan truyền, tự bọc
 // undo/redo (xem sync-commands.ts + commands.ts's patchItemCommand/makeBoxCommand mở rộng).
 
-import type { LayoutContent, LayoutItem, LayoutVariant, SyncFieldGroup } from '@sky-app/slide-shared';
+import type { AspectRatio, LayoutContent, LayoutItem, LayoutVariant, SyncFieldGroup } from '@sky-app/slide-shared';
 
 let syncKeyCounter = 0;
 
@@ -114,6 +114,34 @@ export function cloneVariantItemsForOverwrite(
   }
 
   return { clonedItems, updatedSourceItems };
+}
+
+/** cloneVariantAcrossLayouts — theo 12-thu-vien-layout.md's cloneVariant, dùng khi copy 1 variant
+ * từ 1 LAYOUT KHÁC HẲN (Layout Library picker), KHÁC HOÀN TOÀN cloneVariantItemsForOverwrite ở
+ * trên (dùng cho variant CÙNG document, có auto-sync). Ở đây variant đích phải ĐỘC LẬP HOÀN TOÀN
+ * với nguồn (blueprint: "sửa variant Y không ảnh hưởng layout X") — vì vậy KHÔNG gắn syncKey/
+ * syncRef, và không patch lại gì vào document nguồn (document nguồn không được sửa). Trả nguyên
+ * 1 LayoutVariant hoàn chỉnh (khác cloneVariantItemsForOverwrite chỉ trả items[]) vì caller cần
+ * refW/refH/background/aspect mới để dispatch thẳng addVariantCommand. */
+export function cloneVariantAcrossLayouts(source: LayoutVariant, targetAspect: AspectRatio, nextId: () => string): LayoutVariant {
+  const scaleX = targetAspect.w / source.aspect.w;
+  const sameAspect = targetAspect.id === source.aspect.id;
+
+  return {
+    aspect: targetAspect,
+    refW: Math.round(source.refW * scaleX),
+    refH: source.refH,
+    background: sameAspect ? source.background : undefined,
+    items: source.items.map((item) => ({
+      ...item,
+      id: nextId(),
+      box: { ...item.box, x: item.box.x * scaleX, w: item.box.w * scaleX },
+      syncKey: undefined,
+      syncRef: undefined,
+      syncOverrides: undefined,
+      syncLocked: undefined,
+    })),
+  };
 }
 
 /** "Chỉ copy cái CHƯA CÓ" — so khớp CHỈ dựa vào syncKey/syncRef: 1 item nguồn X được coi là "đã

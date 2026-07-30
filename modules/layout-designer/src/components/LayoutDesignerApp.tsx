@@ -4,8 +4,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
-import type { AspectRatio, LayoutContent, LayoutVersion } from '@sky-app/slide-shared';
-import type { AssetMeta } from '@sky-app/service-contracts';
+import type { AspectRatio, LayoutContent, LayoutVariant, LayoutVersion } from '@sky-app/slide-shared';
+import type { AssetMeta, LayoutPort } from '@sky-app/service-contracts';
 import {
   addVariantCommand,
   changeVariantAspectCommand,
@@ -14,6 +14,7 @@ import {
   copyVariantOverwriteExistingCommand,
   removeVariantCommand,
 } from '@sky-app/layout-editor-core';
+import { ArrowLeft } from 'lucide-react';
 import { useCreateEditor, useEditorState } from '../hooks/useEditor.js';
 import { Canvas } from './Canvas/Canvas.js';
 import { PropertyPanel } from './PropertyPanel/PropertyPanel.js';
@@ -56,7 +57,11 @@ export interface LayoutDesignerAppProps {
   /** Nhãn trạng thái lưu hiện ở toolbar (VD "Đã lưu", "Đang lưu…") — hiển thị thuần, không tự suy luận. */
   saveStatusLabel?: string;
   layoutId?: string;
-  layoutPort?: any;
+  layoutPort?: LayoutPort;
+  /** Quay lại màn Thư viện Layout (Giai đoạn 5.1). Bỏ trống = ẩn nút "← Thư viện" (VD dùng
+   * LayoutDesignerApp cho mục đích khác, không có khái niệm Library — xem VersioningPanel's
+   * quy ước tương tự ở trên). */
+  onBackToLibrary?: () => void;
   onRestoreVersion?: (version: any) => void;
   /**
    * Bỏ trống = ẩn VersioningPanel hoàn toàn (VD dùng LayoutDesignerApp cho mục đích khác không
@@ -97,6 +102,8 @@ export function LayoutDesignerApp({
   versioning,
   globalSuggestions,
   onTokenInserted,
+  layoutPort,
+  onBackToLibrary,
   pickAndSaveImage,
   resolveAssetUrl,
   listAssets,
@@ -179,12 +186,19 @@ export function LayoutDesignerApp({
 
   // Thêm/xoá tỷ lệ (variant) — 12-thu-vien-layout.md "Tạo trống". refW/refH mới theo
   // defaultRefSize() (cạnh dài 3840). "Sao chép từ layout KHÁC" (không phải variant trong CÙNG
-  // layout) vẫn hoãn GĐ5 cùng Layout Library đầy đủ — xem handleCopyFromVariant bên dưới cho copy
-  // giữa variant CÙNG layout.
+  // layout) xem handleAddClonedVariant bên dưới (Giai đoạn 5.1) — khác handleCopyFromVariant vốn
+  // chỉ copy giữa variant CÙNG layout (có auto-sync).
   function handleAddVariant(aspect: AspectRatio) {
     editor.store.getState().dispatch(
       addVariantCommand({ aspect, ...defaultRefSize(aspect), items: [] }, activeVariantId),
     );
+  }
+
+  // "Sao chép từ layout khác" (Giai đoạn 5.1, 12-thu-vien-layout.md) — variant đã dựng SẴN xong
+  // (đã clone qua cloneVariantAcrossLayouts, xem CrossLayoutVariantPickerModal), chỉ cần thêm vào
+  // doc bằng đúng command addVariantCommand đã dùng cho "Tạo trống" ở trên.
+  function handleAddClonedVariant(variant: LayoutVariant) {
+    editor.store.getState().dispatch(addVariantCommand(variant, activeVariantId));
   }
   function handleRemoveVariant(variantId: string) {
     const remaining = doc.variants.filter((v) => v.aspect.id !== variantId);
@@ -219,7 +233,13 @@ export function LayoutDesignerApp({
     // fixed bên trong app KHÔNG fix theo viewport toàn màn hình mà fix theo khung cửa sổ app,
     // gây ghost hiện lệch xa so với vị trí chuột thật (đã xác nhận qua ảnh chụp thực tế).
     <div ref={rootElRef} className="h-full flex flex-col overflow-hidden bg-[#f4f5f9] relative layout-designer-root">
-      <Toolbar saveStatusLabel={saveStatusLabel} versioning={versioning} documentColor={documentColor} onChangeColor={onChangeColor} />
+      <Toolbar
+        saveStatusLabel={saveStatusLabel}
+        versioning={versioning}
+        documentColor={documentColor}
+        onChangeColor={onChangeColor}
+        onBackToLibrary={onBackToLibrary}
+      />
       <div className="flex-1 flex min-h-0 relative">
         {variant ? (
           <>
@@ -262,6 +282,9 @@ export function LayoutDesignerApp({
                   onRemove={handleRemoveVariant}
                   onCopyFromVariant={handleCopyFromVariant}
                   onChangeAspect={handleChangeAspect}
+                  onAddClonedVariant={handleAddClonedVariant}
+                  layoutPort={layoutPort}
+                  resolveAssetUrl={resolveAssetUrl}
                 />
               }
             />
@@ -326,14 +349,25 @@ function Toolbar({
   versioning,
   documentColor,
   onChangeColor,
+  onBackToLibrary,
 }: {
   saveStatusLabel?: string;
   versioning?: LayoutDesignerAppProps['versioning'];
   documentColor?: string;
   onChangeColor?: (color: string | undefined) => void;
+  onBackToLibrary?: () => void;
 }) {
   return (
     <div className="h-[52px] shrink-0 flex items-center gap-3 px-[14px] bg-white border-b border-[#e6e6ee]">
+      {onBackToLibrary && (
+        <button
+          onClick={onBackToLibrary}
+          className="flex items-center gap-1 -ml-1 px-2 py-1 rounded-[7px] border-none bg-transparent text-[#5c5d6e] font-semibold text-[12.5px] cursor-pointer hover:bg-[#f4f5f9]"
+        >
+          <ArrowLeft size={14} />
+          Thư viện
+        </button>
+      )}
       <div className="font-semibold text-sm">Layout Designer</div>
       {saveStatusLabel && <div className="text-[11px] text-[#9a9bab] ml-1">{saveStatusLabel}</div>}
       <div className="flex-1" />

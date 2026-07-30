@@ -9,10 +9,10 @@ export { LayoutDesignerAppModule } from './LayoutDesignerAppModule.js';
 /**
  * AppModule đăng ký vào shell (Electron/Web) — xem apps/shell-electron/src/main.tsx,
  * apps/shell-web/src/main.tsx's mảng `apps`. Đọc/ghi qua LayoutPort thật (persist SQLite —
- * Electron/data-service/WASM, sub-bước 2.4 đã xong), hiện chỉ 1 layout demo cố định
- * (LayoutDesignerAppModule's DEMO_LAYOUT_ID) — chọn/tạo NHIỀU layout thuộc Layout Library
- * (hoãn Giai đoạn 5). Không có entitlement gate (khác ceremonyModule) vì đây vẫn là tính năng
- * đang xây dựng, chưa phát hành.
+ * Electron/data-service/WASM, sub-bước 2.4 đã xong). Mở app không kèm layoutId → hiện màn Layout
+ * Library (chọn/tạo/sao chép nhiều layout, Giai đoạn 5.1) thay vì tự mở 1 layout demo cố định
+ * như trước. Không có entitlement gate (khác ceremonyModule) vì đây vẫn là tính năng đang xây
+ * dựng, chưa phát hành.
  */
 export const layoutDesignerModule: AppModule = {
   id: 'layout-designer',
