@@ -200,7 +200,7 @@ export function EventGate() {
             return (
               <li
                 key={ev.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3"
+                className="relative flex items-center justify-between gap-3 overflow-hidden rounded-lg border border-border bg-card px-4 py-3"
                 // Màu event (2026-07-29, thay chấm tròn) — vạch viền trái + gradient nhạt dần
                 // sang trong suốt thay vì chấm tròn cạnh tên. `transparent` (không phải trắng
                 // cứng) để tự khớp nền card ở cả light/dark theme — gradient chỉ ĐÈ LÊN
@@ -216,6 +216,17 @@ export function EventGate() {
                 }
                 title={full?.color ? (t('eventHub.colorLabel') as string) : undefined}
               >
+                {/* Watermark "DEMO" — chỉ dòng Event mẫu, nhắc đây là data xem thử (2026-07-30,
+                   phản hồi thật). pointer-events-none để không chặn click vào nút/pill phía trên;
+                   overflow-hidden ở <li> cắt gọn phần chữ tràn ra ngoài bo góc card. */}
+                {isSample && (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -bottom-3 right-2 select-none text-5xl font-black uppercase leading-none text-foreground/10"
+                  >
+                    Demo
+                  </span>
+                )}
                 <div className="flex min-w-0 flex-col gap-1.5">
                   <span className="truncate text-sm font-medium text-foreground">{ev.name}</span>
                   <div className="flex flex-wrap items-center gap-1.5">
