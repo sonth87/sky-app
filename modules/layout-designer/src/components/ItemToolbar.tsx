@@ -2,7 +2,7 @@ import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown } from 'lucide-react'
 import type { Box, LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
 import { addItemCommand, patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
-import { cn } from '../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 const TOOLBAR_HEIGHT = 34;
 const TOOLBAR_GAP = 10;

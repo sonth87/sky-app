@@ -159,6 +159,9 @@ interface ControlState {
   // Modal Settings gộp (General/TTS/Variable/Layout/Api) + tab đang chọn
   settingsModalOpen: boolean;
   settingsModalTab: SettingsTab;
+  // Mở EventHubModal (view 'layout') cho Event đang active — trigger từ IdlePanel.tsx khi màn
+  // chờ chưa gán layout nào, thay vì phải thoát ra Gate mới sửa được (2026-07-29).
+  eventHubLayoutModalOpen: boolean;
   // Xác nhận reset toàn bộ dữ liệu ceremony (menu native Data > Reset > ...)
   resetConfirmOpen: boolean;
   // Xác nhận xóa từng loại dữ liệu: false = đóng, hoặc loại đang xác nhận xóa
@@ -267,6 +270,7 @@ interface ControlState {
   openSettingsModal: (tab?: SettingsTab) => void;
   setSettingsModalOpen: (v: boolean) => void;
   setSettingsModalTab: (v: SettingsTab) => void;
+  setEventHubLayoutModalOpen: (v: boolean) => void;
   setResetConfirmOpen: (v: boolean) => void;
   setDeleteModalOpen: (v: false | 'students' | 'scans' | 'cache') => void;
   setLayoutOverrides: (v: Record<string, any>) => void;
@@ -346,6 +350,7 @@ export const useControlStore = create<ControlState>()(
   aboutModalOpen: false,
   settingsModalOpen: false,
   settingsModalTab: 'general' as SettingsTab,
+  eventHubLayoutModalOpen: false,
   resetConfirmOpen: false,
   deleteModalOpen: false as false | 'students' | 'scans' | 'cache',
   layoutOverrides: {},
@@ -454,6 +459,7 @@ export const useControlStore = create<ControlState>()(
   openSettingsModal: (tab) => set({ settingsModalOpen: true, settingsModalTab: tab ?? 'general' }),
   setSettingsModalOpen: (settingsModalOpen) => set({ settingsModalOpen }),
   setSettingsModalTab: (settingsModalTab) => set({ settingsModalTab }),
+  setEventHubLayoutModalOpen: (eventHubLayoutModalOpen) => set({ eventHubLayoutModalOpen }),
   setResetConfirmOpen: (resetConfirmOpen) => set({ resetConfirmOpen }),
   setDeleteModalOpen: (deleteModalOpen) => set({ deleteModalOpen }),
   setLayoutOverrides: (layoutOverrides) => set({ layoutOverrides }),

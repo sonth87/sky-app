@@ -14,6 +14,7 @@ import { create } from 'zustand';
 import type { CanonicalGroup, CanonicalSubject, DataSource, EventDocument, EventSummary, FieldMappingProfile } from '@sky-app/slide-shared';
 import type { EventPort, DataSourcePort } from '@sky-app/service-contracts';
 import { useControlStore } from './store.js';
+import { SAMPLE_EVENT_ID } from './lib/sampleCanonicalData.js';
 
 /**
  * Cờ "đã tự thoát Gate lần trước" — KHÔNG dùng zustand/persist (khác useControlStore's
@@ -49,10 +50,41 @@ function writeExitedGateEventId(eventId: string | null): void {
   }
 }
 
+/**
+ * Bật/tắt hiển thị Event/DataSource mẫu (menu Develop > "Dùng dữ liệu mẫu", 2026-07-30) — CHỈ ẨN/
+ * HIỆN ở UI, KHÔNG xoá dữ liệu khỏi DB (đã khảo sát kỹ: EventPort/DataSourcePort chưa có delete()
+ * nào, không có sẵn ở ceremony-db lẫn Electron IPC/data-service web — thêm mới sẽ là việc lớn hơn
+ * nhiều so với giá trị của tính năng này). Tắt = ẩn dòng Event mẫu khỏi danh sách Gate (xem
+ * EventGate.tsx's filter); bật lại = hiện lại NGUYÊN data cũ, không tạo mới (trừ lần bật đầu tiên,
+ * lúc đó Event/DataSource thật sự chưa tồn tại — xem handleToggleSampleData, ControlApp.tsx). Cờ
+ * riêng khỏi EXITED_GATE_KEY ở trên, cùng lý do KHÔNG dùng zustand/persist: đây là preference
+ * riêng của tính năng debug, không phải state Event nào cả.
+ */
+const SAMPLE_DATA_ENABLED_KEY = 'ceremony-sample-data-enabled';
+
+function readSampleDataEnabled(): boolean {
+  try {
+    return localStorage.getItem(SAMPLE_DATA_ENABLED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeSampleDataEnabled(enabled: boolean): void {
+  try {
+    if (enabled) localStorage.setItem(SAMPLE_DATA_ENABLED_KEY, '1');
+    else localStorage.removeItem(SAMPLE_DATA_ENABLED_KEY);
+  } catch {
+    // localStorage không khả dụng (SSR/test) — fail-soft, mặc định tắt (readSampleDataEnabled trả false).
+  }
+}
+
 interface EventState {
   activeEvent: EventDocument | null;
   events: EventSummary[];
   loading: boolean;
+  sampleDataEnabled: boolean;
+  setSampleDataEnabled: (v: boolean) => void;
   /** `dataSourcePort` optional cùng lý do `activateEvent` — môi trường chưa có adapter (web
    * WASM chưa implement, xem service-contracts's comment) vẫn phải hoạt động, chỉ là
    * `students` rỗng thay vì throw. */
@@ -117,6 +149,11 @@ export const useEventStore = create<EventState>((set, get) => ({
   activeEvent: null,
   events: [],
   loading: true,
+  sampleDataEnabled: readSampleDataEnabled(),
+  setSampleDataEnabled: (v) => {
+    writeSampleDataEnabled(v);
+    set({ sampleDataEnabled: v });
+  },
 
   checkGate: async (eventPort, dataSourcePort) => {
     // try/finally — LUÔN thoát loading dù getCurrentActive() lỗi (mất kết nối IPC/network),
@@ -149,6 +186,11 @@ export const useEventStore = create<EventState>((set, get) => ({
       // students cũ/sai mà không báo lỗi gì).
       if (active) await loadRecordsForEvent(active, dataSourcePort);
       set({ activeEvent: active });
+      // Đồng bộ sampleDataEnabled nếu Event active THẬT SỰ là Event mẫu (VD sampleDataEnabled ở
+      // localStorage đã bị xoá/chưa từng bật ở phiên này, nhưng DB vẫn còn active từ trước) —
+      // đang xem thẳng Event mẫu thì chắc chắn phải coi là "đã bật" (2026-07-30, tránh menu hiện
+      // KHÔNG check trong khi màn hình đang hiện chính Event đó — tự mâu thuẫn).
+      if (active?.id === SAMPLE_EVENT_ID && !get().sampleDataEnabled) get().setSampleDataEnabled(true);
     } finally {
       set({ loading: false });
     }

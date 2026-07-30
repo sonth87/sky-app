@@ -1,6 +1,6 @@
 import { Download, History, Loader2, Pause, Play } from 'lucide-react';
 import { useState } from 'react';
-import { ButtonPrimitive } from './ui/button-primitive';
+import { ButtonPrimitive } from '@sky-app/ui';
 import { useTtsStudioStore } from '../store';
 import { getHistoryEntry } from '../lib/history-db';
 import { getPlayingId, playPcmAudio, stopAudio, useAudioPlayingId } from '../lib/audioPlayer';

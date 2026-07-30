@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { LayoutItem } from '@sky-app/slide-shared';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
 import { Section } from './CommonControls.js';
-import { cn } from '../../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface ImageControlsProps {
   item: Extract<LayoutItem, { type: 'image' }>;

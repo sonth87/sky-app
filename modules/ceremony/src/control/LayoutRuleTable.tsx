@@ -133,7 +133,14 @@ function RuleRow({ row, onUpdate, onRemove, layoutPort, assetPort, attrSuggestio
           layoutVersion={row.ref.layoutVersion}
           layoutPort={layoutPort}
           assetPort={assetPort}
-          onPick={(ref) => onUpdate({ ref: { ...row.ref, ...ref } })}
+          onPick={(ref) =>
+            onUpdate({
+              ref: { ...row.ref, layoutId: ref.layoutId, layoutVersion: ref.layoutVersion },
+              // Auto-điền label lần đầu khi chưa đặt tên (bug UX thật, 2026-07-28 — tab trắng/
+              // ra layoutId khó đọc trong modal Ghép biến) — KHÔNG ghi đè label đã có sẵn.
+              ...(row.label ? {} : { label: ref.name }),
+            })
+          }
         />
         <button type="button" className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-destructive" onClick={onRemove} aria-label={t('layoutRuleTable.removeRule') as string}>
           <Trash2 size={15} />
@@ -193,7 +200,7 @@ export function LayoutPickerButton({
   layoutVersion: number;
   layoutPort: LayoutPort;
   assetPort: AssetPort | undefined;
-  onPick: (ref: { layoutId: string; layoutVersion: number }) => void;
+  onPick: (ref: { layoutId: string; layoutVersion: number; name: string }) => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -245,9 +252,14 @@ export function LayoutPickerButton({
           <div style={{ width: THUMB_SIZE.w, height: THUMB_SIZE.h }} className="shrink-0 overflow-hidden rounded bg-black">
             <LayoutRenderer content={preview.content} screen={THUMB_SIZE} record={DEMO_RECORD} resolveAsset={resolveAsset} />
           </div>
-          <span className="flex max-w-[140px] items-center gap-1.5 truncate text-xs font-medium text-foreground">
-            {preview.color && <span className="h-2 w-2 flex-none rounded-full" style={{ backgroundColor: preview.color }} />}
-            <span className="truncate">{preview.name}</span>
+          <span className="flex max-w-[140px] flex-col">
+            <span className="flex items-center gap-1.5 truncate text-xs font-medium text-foreground">
+              {preview.color && <span className="h-2 w-2 flex-none rounded-full" style={{ backgroundColor: preview.color }} />}
+              <span className="truncate">{preview.name}</span>
+            </span>
+            <span className="truncate text-[10px] text-muted-foreground">
+              {preview.content.variants.map((v) => v.aspect.id).join(', ')}
+            </span>
           </span>
         </button>
       ) : (

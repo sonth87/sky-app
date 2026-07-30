@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { LayoutVariant } from '@sky-app/slide-shared';
 import type { OverwriteAllLockStrategy } from '@sky-app/layout-editor-core';
-import { cn } from '../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export type CopyVariantMode = 'overwrite-all' | 'add-missing' | 'overwrite-existing';
 

@@ -5,10 +5,11 @@ import { X } from 'lucide-react';
 import { useStore as useDeviceLayoutStore, useMenuAction } from '@sonth87/device-layout';
 import type { PlatformContext } from '@sky-app/kernel';
 import type { DataPort } from '@sky-app/service-contracts';
-import type { EventPort, DataSourcePort } from '@sky-app/service-contracts';
+import type { EventPort, DataSourcePort, LayoutPort, AssetPort } from '@sky-app/service-contracts';
 import { useControlStore } from './store';
 import { useEventStore } from './eventStore';
 import { EventGate } from './EventGate';
+import { EventHubModal } from './EventHubModal';
 import { useSocket } from './hooks/useSocket';
 import { useGlobalCardReader } from './hooks/useGlobalCardReader';
 import { playErrorBeep } from './lib/sound';
@@ -20,7 +21,7 @@ import { PortalContainerContext } from './PortalContainerContext';
 import { PlatformProvider } from './PlatformContext';
 import { useSlide } from './lib/slide';
 import { buildCeremonyThemeStyle } from './theme';
-import { cn } from './lib/cn';
+import { cn } from '@sky-app/ui';
 import { ScanInbox } from './components/ScanInbox';
 import { NowOnStage } from './components/NowOnStage';
 import { PreviewPanel } from './components/PreviewPanel';
@@ -38,6 +39,8 @@ import { AboutModal } from './components/AboutModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { ConfirmModal } from './components/ui/ConfirmModal';
 import { showSuccessToast } from './lib/toast';
+import { SAMPLE_DATA_SOURCE_ID, SAMPLE_EVENT_ID, SAMPLE_RECORDS } from './lib/sampleCanonicalData';
+import { buildCeremonyMenuBarMenus } from '../menuBarMenus';
 
 /** Bỏ ký tự không phải chữ-số để khớp mã thẻ (CCCD đôi khi kèm khoảng trắng). */
 const normalizeCode = (s: string | null | undefined) => {
@@ -74,6 +77,7 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
     language, aboutModalOpen, setAboutModalOpen, openSettingsModal,
     resetConfirmOpen, setResetConfirmOpen, deleteModalOpen, setDeleteModalOpen,
     themeMode, themePalette, appFont, letterSpacing, appSpacing, shadowLevel,
+    eventHubLayoutModalOpen, setEventHubLayoutModalOpen,
   } = useControlStore();
   const socketRef = useSocket();
   const { togglePlay, replayCode, countdown, progress, smoothProgress } = useAutoPlay();
@@ -86,10 +90,12 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
   // khi có EventPort đăng ký (Electron/web đã hoàn thiện adapter) — môi trường test/Storybook
   // (platform=undefined) bỏ qua Gate, activeEvent giữ null nhưng loading cũng false ngay từ đầu
   // (initial state), tránh treo màn hình "đang tải" vô thời hạn.
-  const { activeEvent, loading: eventLoading, checkGate, exitToGate } = useEventStore();
+  const { activeEvent, loading: eventLoading, checkGate, exitToGate, sampleDataEnabled, setSampleDataEnabled } = useEventStore();
   const [confirmExitEvent, setConfirmExitEvent] = useState(false);
   const eventPort = platform?.services.get<EventPort>('event');
   const dataSourcePortForGate = platform?.services.get<DataSourcePort>('dataSource');
+  const layoutPort = platform?.services.get<LayoutPort>('layout');
+  const assetPort = platform?.services.get<AssetPort>('asset');
   useEffect(() => {
     if (eventPort) {
       // checkGate() rethrow nếu getCurrentActive()/loadStudentsForEvent() lỗi (mất kết nối IPC/
@@ -237,6 +243,63 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
     slideForLanguage?.setAppLanguage(language);
   }, [language, slideForLanguage]);
 
+  // Đồng bộ dấu check "Dùng dữ liệu mẫu" trong menu Develop theo đúng state thật (localStorage,
+  // xem eventStore.ts's sampleDataEnabled) — menuBarMenus khai TĨNH ở index.ts (luôn bắt đầu
+  // checked=false), nên cần vá lại NGAY lúc mount + mỗi khi bật/tắt qua device-layout's
+  // updateAppConfig (≥0.6.0, tự sửa thêm ở repo device-layout riêng, 2026-07-30) — `apps` trong
+  // store của nó đã đọc reactive sẵn (MenuBar.tsx), patch xong tự re-render, không cần cơ chế nào
+  // khác. Bỏ qua khi appId chưa có (test/Storybook, ControlApp mount ngoài device-shell).
+  useEffect(() => {
+    if (!appId) return;
+    useDeviceLayoutStore.getState().updateAppConfig(appId, { menuBarMenus: buildCeremonyMenuBarMenus(sampleDataEnabled) });
+  }, [appId, sampleDataEnabled]);
+
+  // "Dùng dữ liệu mẫu" (menu Develop) — TOGGLE bật/tắt (2026-07-30, thay hành vi "tạo 1 lần" cũ,
+  // phản hồi thật: dữ liệu mẫu chỉ để xem thử app hoạt động ra sao, cần ẩn/hiện được, không phải
+  // tạo-rồi-để-mãi). Tắt KHÔNG xoá Event/DataSource khỏi DB — đã khảo sát kỹ, EventPort/
+  // DataSourcePort chưa có delete() nào (không có sẵn ở ceremony-db/Electron IPC/data-service
+  // web, thêm mới là việc lớn hơn nhiều so với giá trị tính năng này) — chỉ ẩn khỏi UI qua
+  // sampleDataEnabled (xem EventGate.tsx's filter), bật lại hiện NGUYÊN data cũ ngay, không tạo
+  // lại. Lần bật ĐẦU TIÊN mới thật sự tạo mới (Event/DataSource chưa từng tồn tại).
+  const handleToggleSampleData = useCallback(async () => {
+    if (!eventPort || !dataSourcePortForGate) return;
+    try {
+      if (sampleDataEnabled) {
+        setSampleDataEnabled(false);
+        // Đang xem chính Event mẫu lúc tắt → tự thoát ra danh sách Event (yêu cầu thật,
+        // 2026-07-30) — CHỈ điều hướng UI cục bộ (exitToGate không đổi status DB), giống hành vi
+        // nút X sẵn có, không cần confirm vì đây là data mẫu, không phải lễ thật đang chạy dở.
+        if (useEventStore.getState().activeEvent?.id === SAMPLE_EVENT_ID) exitToGate();
+        showSuccessToast(t('developMenu.sampleDataDisabled'));
+        return;
+      }
+
+      const existing = await eventPort.get(SAMPLE_EVENT_ID);
+      if (!existing) {
+        await dataSourcePortForGate.create({
+          id: SAMPLE_DATA_SOURCE_ID,
+          label: 'Dữ liệu mẫu',
+          mode: 'pooled',
+          naturalKeyField: 'id',
+        });
+        await dataSourcePortForGate.importRecords(SAMPLE_DATA_SOURCE_ID, SAMPLE_RECORDS);
+        await eventPort.create({
+          id: SAMPLE_EVENT_ID,
+          name: '🧪 Dữ liệu mẫu (demo)',
+          status: 'draft',
+          dataSourceId: SAMPLE_DATA_SOURCE_ID,
+          customVariables: [],
+          layoutRefs: [],
+        });
+      }
+      setSampleDataEnabled(true);
+      showSuccessToast(t('developMenu.sampleDataEnabled'));
+      await useEventStore.getState().refreshList(eventPort);
+    } catch (err) {
+      showErrorToast(t('eventGate.activateError', { message: err instanceof Error ? err.message : String(err) }));
+    }
+  }, [eventPort, dataSourcePortForGate, sampleDataEnabled, setSampleDataEnabled, exitToGate, t]);
+
   // Xử lý action từ menu — dùng chung cho cả 2 nguồn dispatch:
   // 1. window.slide.onMenuAction (Electron native OS menu, kênh cũ — guard qua slideForMenu).
   // 2. device-layout's useMenuAction (app:menu:action CustomEvent, từ AppModule.window.menuBarMenus —
@@ -275,6 +338,9 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
       case 'data:reset:cache':
         setDeleteModalOpen('cache');
         break;
+      case 'develop:sampleData':
+        void handleToggleSampleData();
+        break;
       case 'develop:apiTest':
         openSettingsModal('api');
         break;
@@ -286,7 +352,7 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
         if (activeEvent) setConfirmExitEvent(true);
         break;
     }
-  }, [isActive, activeEvent, openSettingsModal, setAboutModalOpen, setDeleteModalOpen]);
+  }, [isActive, activeEvent, openSettingsModal, setAboutModalOpen, setDeleteModalOpen, handleToggleSampleData]);
 
   useEffect(() => {
     const unsub = slideForMenu?.onMenuAction(handleMenuAction);
@@ -397,6 +463,28 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
         <StatusBar />
         <AboutModal open={aboutModalOpen} onClose={() => setAboutModalOpen(false)} />
         <SettingsModal />
+        {/* Mở thẳng EventHubModal (view 'layout') cho Event đang chạy — trigger từ nút icon ở
+           IdlePanel.tsx khi màn chờ chưa gán layout nào (2026-07-29). key={activeEvent.id} đảm
+           bảo state nội bộ của EventHubModal luôn khớp đúng Event hiện tại, cùng lý do EventGate.
+           tsx's instance sửa đã áp dụng (React không tự re-init useState khi prop đổi). */}
+        {eventPort && activeEvent && eventHubLayoutModalOpen && (
+          <EventHubModal
+            key={activeEvent.id}
+            open={eventHubLayoutModalOpen}
+            onClose={() => setEventHubLayoutModalOpen(false)}
+            eventPort={eventPort}
+            dataSourcePort={dataSourcePortForGate}
+            layoutPort={layoutPort}
+            assetPort={assetPort}
+            initialEvent={activeEvent}
+            initialView="layout"
+            onChanged={() => {
+              void eventPort.get(activeEvent.id).then((updated) => {
+                if (updated) useEventStore.setState({ activeEvent: updated });
+              });
+            }}
+          />
+        )}
         <ConfirmModal
           open={confirmExitEvent}
           title={t('controlApp.exitEventConfirmTitle')}

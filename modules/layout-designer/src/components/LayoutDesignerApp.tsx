@@ -20,11 +20,10 @@ import { PropertyPanel } from './PropertyPanel/PropertyPanel.js';
 import { Rail, type RailGroup } from './Rail.js';
 import { Flyout } from './Flyout/Flyout.js';
 import { VersioningPanel } from './VersioningPanel.js';
-import { ColorTagPicker } from './ColorTagPicker.js';
 import { VariantTabs } from './VariantTabs.js';
 import type { CopyVariantMode } from './CopyVariantPopover.js';
 import { usePersistedState } from '../hooks/usePersistedState.js';
-import { cn } from '../lib/cn.js';
+import { cn, ColorSwatchPicker } from '@sky-app/ui';
 
 /** Giới hạn kéo resize property panel — quá hẹp thì input/nút không đủ chỗ, quá rộng thì canvas
  * bị bóp nhỏ. Rộng mặc định TĂNG từ 302 → 340 theo yêu cầu 2026-07-18 "cho to thêm 1 chút". */
@@ -86,7 +85,7 @@ export interface LayoutDesignerAppProps {
    * (hành vi cũ). */
   listAssets?: () => Promise<AssetMeta[]>;
   /** Màu tag layout (PHỤ LỤC "Event Hub", 2026-07-22) — hiện badge ở danh sách Event. Bỏ trống
-   * (cả `documentColor` lẫn `onChangeColor`) = ẩn ColorTagPicker hoàn toàn. */
+   * (cả `documentColor` lẫn `onChangeColor`) = ẩn ColorSwatchPicker hoàn toàn. */
   documentColor?: string;
   onChangeColor?: (color: string | undefined) => void;
 }
@@ -338,7 +337,9 @@ function Toolbar({
       <div className="font-semibold text-sm">Layout Designer</div>
       {saveStatusLabel && <div className="text-[11px] text-[#9a9bab] ml-1">{saveStatusLabel}</div>}
       <div className="flex-1" />
-      {onChangeColor && <ColorTagPicker color={documentColor} onChange={onChangeColor} />}
+      {onChangeColor && (
+        <ColorSwatchPicker color={documentColor} onChange={onChangeColor} title="Màu tag layout" clearLabel="Bỏ màu" />
+      )}
       {versioning && (
         <VersioningPanel
           latestPublishedVersion={versioning.latestPublishedVersion}

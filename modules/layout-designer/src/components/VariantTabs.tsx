@@ -4,7 +4,7 @@ import type { AspectRatio, LayoutVariant } from '@sky-app/slide-shared';
 import type { OverwriteAllLockStrategy } from '@sky-app/layout-editor-core';
 import { AddVariantModal } from './AddVariantModal.js';
 import { CopyVariantPopover, type CopyVariantMode } from './CopyVariantPopover.js';
-import { cn } from '../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface VariantTabsProps {
   variants: LayoutVariant[];

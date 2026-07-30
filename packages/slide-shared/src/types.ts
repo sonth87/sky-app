@@ -65,13 +65,13 @@ export interface Ceremony {
   graduation_year: string;    // "2024-2025"
   date: string;               // ISO date
   venue: string;
-  university_name: string;    // "TRƯỜNG ĐẠI HỌC ĐẠI NAM"
+  university_name: string;    // vd "TRƯỜNG ĐẠI HỌC ABC"
   ministry_name: string;      // "BỘ GIÁO DỤC VÀ ĐÀO TẠO"
   title_line1: string;        // dòng tiêu đề 1 trên backdrop (idle)
   title_line2: string;        // dòng tiêu đề 2
   logo: string;               // tên file logo
   backdrops_config: string;   // tên file config template, vd "assets/2026/backdrops.json"
-  idle_image?: string;        // ảnh nền màn hình chào mừng, vd "assets/2026/backdrop_idle.jpg"
+  idle_image?: string;        // ảnh nền màn hình chào mừng, vd "assets/2026/idle.jpg"
   idle_image_variants?: Partial<Record<BackdropAspectRatio, string>>; // ảnh màn chờ theo tỷ lệ, fallback về idle_image
 }
 

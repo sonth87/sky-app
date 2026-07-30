@@ -53,7 +53,17 @@ export default defineConfig({
       // ĐÚNG BẰNG "@sky-app/module-ceremony", để "/styles.css" rơi qua package.json's exports map
       // như bình thường.
       alias: process.env.NODE_ENV !== 'production'
-        ? [{ find: /^@sky-app\/module-ceremony$/, replacement: resolve(__dirname, '../../modules/ceremony/src/index.ts') }]
+        ? [
+            { find: /^@sky-app\/module-ceremony$/, replacement: resolve(__dirname, '../../modules/ceremony/src/index.ts') },
+            // @sky-app/ui (2026-07-29) — cùng lý do: chưa có script watch/build --watch, và
+            // Vite's dependency pre-bundle cache (node_modules/.vite/deps) không tự phát hiện
+            // "dist/ vừa build lại" giữa các lần restart dev:app — sửa source rồi build tay vẫn
+            // thấy UI CŨ cho tới khi tự tay xoá apps/shell-electron/node_modules/.vite (bug thật
+            // gặp khi refactor ColorfulSwatchButton, "picker nằm dưới modal" tưởng chưa fix
+            // nhưng thực ra do cache). Alias thẳng vào source để Vite dev server HMR trực tiếp
+            // TS/TSX nguồn, không qua dist/ + cache nữa.
+            { find: /^@sky-app\/ui$/, replacement: resolve(__dirname, '../../packages/ui/src/index.ts') },
+          ]
         : [],
     },
     build: {

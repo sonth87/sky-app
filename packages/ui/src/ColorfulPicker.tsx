@@ -1,39 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+// ColorfulPicker — wrap @uiw/react-color-colorful + Hex/RGBA field, khuôn nguyên vẹn
+// module-layout-designer's StopColorPicker.tsx (rút ra dùng chung, 2026-07-29 — xem
+// useColorfulSync.ts cho phần logic đồng bộ HSVA).
 import Colorful from '@uiw/react-color-colorful';
-import { hexToHsva, type ColorResult, type HsvaColor } from '@uiw/color-convert';
-import { hexToRgb, rgbToHex } from './helpers.js';
+import { useColorfulSync } from './useColorfulSync.js';
+import { hexToRgb, rgbToHex } from './colorHex.js';
 
-export const PICKER_SIZE = 168;
+export const COLORFUL_PICKER_SIZE = 168;
 
-export interface StopColorPickerProps {
+export interface ColorfulPickerProps {
   color: string;
   alpha: number;
   onChange: (patch: { color?: string; alpha?: number }) => void;
 }
 
-export function StopColorPicker({
-  color,
-  alpha,
-  onChange,
-}: StopColorPickerProps) {
-  const [hsva, setHsva] = useState<HsvaColor>(() => ({ ...hexToHsva(color), a: alpha / 100 }));
-  const lastEmittedHexRef = useRef<string>(color);
-
-  useEffect(() => {
-    if (color === lastEmittedHexRef.current && Math.round(hsva.a * 100) === alpha) return;
-    setHsva({ ...hexToHsva(color), a: alpha / 100 });
-    lastEmittedHexRef.current = color;
-  }, [color, alpha]);
-
-  function handleColorfulChange(result: ColorResult) {
-    setHsva(result.hsva);
-    lastEmittedHexRef.current = result.hex;
-    onChange({ color: result.hex, alpha: Math.round(result.rgba.a * 100) });
-  }
+export function ColorfulPicker({ color, alpha, onChange }: ColorfulPickerProps) {
+  const { hsva, handleChange } = useColorfulSync(color, alpha, onChange);
 
   return (
     <div className="flex flex-wrap gap-3 mb-[10px]">
-      <Colorful color={hsva} onChange={handleColorfulChange} style={{ width: PICKER_SIZE, flex: 'none' }} />
+      <Colorful color={hsva} onChange={handleChange} style={{ width: COLORFUL_PICKER_SIZE, flex: 'none' }} />
       <div className="flex-1 min-w-[140px]">
         <label className="block text-[10.5px] text-[#9a9bab] mb-1.5 uppercase tracking-[.04em]">Hex</label>
         <input

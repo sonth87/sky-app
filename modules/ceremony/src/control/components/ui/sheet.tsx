@@ -4,7 +4,7 @@ import * as React from "react"
 import { XIcon } from "lucide-react"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
-import { cn } from "../../lib/cn"
+import { cn } from "@sky-app/ui"
 import { usePortalContainer } from "../../PortalContainerContext"
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {

@@ -68,7 +68,7 @@ describe('LayoutPickerModal', () => {
     expect(screen.getByText('Đã chọn: Layout A')).toBeTruthy();
   });
 
-  it('click tích chọn rồi bấm "Chọn layout này" → gọi đúng onPick({layoutId, layoutVersion})', async () => {
+  it('click tích chọn rồi bấm "Chọn layout này" → gọi đúng onPick({layoutId, layoutVersion, name})', async () => {
     const layoutPort = mockLayoutPort();
     const onPick = vi.fn();
     render(<LayoutPickerModal open layoutPort={layoutPort} assetPort={mockAssetPort()} onClose={() => {}} onPick={onPick} />);
@@ -78,7 +78,7 @@ describe('LayoutPickerModal', () => {
     await waitFor(() => expect(screen.getByText('Chọn layout này').closest('button')).not.toBeDisabled());
     fireEvent.click(screen.getByText('Chọn layout này'));
 
-    expect(onPick).toHaveBeenCalledWith({ layoutId: 'layout-a', layoutVersion: 2 });
+    expect(onPick).toHaveBeenCalledWith({ layoutId: 'layout-a', layoutVersion: 2, name: 'Layout A' });
   });
 
   it('nút "Chọn layout này" bị disable khi CHƯA tích chọn layout nào', async () => {
@@ -97,7 +97,7 @@ describe('LayoutPickerModal', () => {
     await waitFor(() => screen.getByText('Layout A'));
     fireEvent.doubleClick(screen.getByText('Layout A').closest('button')!);
 
-    expect(onPick).toHaveBeenCalledWith({ layoutId: 'layout-a', layoutVersion: 2 });
+    expect(onPick).toHaveBeenCalledWith({ layoutId: 'layout-a', layoutVersion: 2, name: 'Layout A' });
   });
 
   it('gõ tìm kiếm không khớp tên → lọc mất layout, hiện thông báo không tìm thấy', async () => {

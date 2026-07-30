@@ -21,7 +21,7 @@
     "@sky-app/service-contracts": "workspace:*",
     "@sky-app/tts-engine-ui": "workspace:*",
     "@sonth87/device-layout": "catalog:",
-    "lucide-react": "^1.24.0"
+    "lucide-react": "catalog:"
   },
   "devDependencies": {
     "@sky-app/module-mock-app": "workspace:*",

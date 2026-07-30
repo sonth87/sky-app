@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { cn } from '../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface VariableTextareaProps {
   value: string;

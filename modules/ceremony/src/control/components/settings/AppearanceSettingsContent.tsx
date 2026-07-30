@@ -3,9 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useControlStore } from '../../store';
 import type { AppFont, ShadowLevel, ThemeMode, ThemePalette } from '../../store';
 import { FONT_STACK } from '../../theme';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Slider } from '../ui/slider';
-import { cn } from '../../lib/cn';
+import { usePortalContainer } from '../../PortalContainerContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Slider, cn } from '@sky-app/ui';
 
 const THEME_MODE_OPTIONS: { value: ThemeMode; Icon: typeof Sun; labelKey: string }[] = [
   { value: 'light', Icon: Sun, labelKey: 'settingsModal.themeLight' },
@@ -156,6 +155,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 /** Tab Appearance của SettingsModal — Theme (mode/palette), Font, Letter Spacing, Spacing, Shadow. */
 export function AppearanceSettingsContent() {
   const { t } = useTranslation();
+  const portalContainer = usePortalContainer();
   const themeMode = useControlStore((s) => s.themeMode);
   const setThemeMode = useControlStore((s) => s.setThemeMode);
   const themePalette = useControlStore((s) => s.themePalette);
@@ -231,7 +231,7 @@ export function AppearanceSettingsContent() {
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent container={portalContainer}>
               {FONT_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value} style={{ fontFamily: FONT_STACK[opt.value] }}>
                   {opt.label}

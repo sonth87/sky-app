@@ -18,7 +18,8 @@ import { applyMapping, detectDuplicateNaturalKeys } from '@sky-app/slide-shared'
 import { useEventStore } from './eventStore.js';
 import { parseSpreadsheet, type ParsedSpreadsheet } from './lib/parseSpreadsheet.js';
 import { Button } from './components/ui/Button.js';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.js';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sky-app/ui';
+import { usePortalContainer } from './PortalContainerContext.js';
 import { showErrorToast, showSuccessToast } from './lib/toast.js';
 
 const CORE_FIELDS = ['full_name', 'image_relative_path', 'status'] as const;
@@ -42,6 +43,7 @@ interface ImportDataPanelProps {
 
 export function ImportDataPanel({ eventId, dataSourcePort, onImported, onBack }: ImportDataPanelProps) {
   const { t } = useTranslation();
+  const portalContainer = usePortalContainer();
   const { createDataSource, importRecords, listFieldMappingProfiles, saveFieldMappingProfile } = useEventStore();
 
   const [parsed, setParsed] = useState<ParsedSpreadsheet | null>(null);
@@ -270,7 +272,7 @@ export function ImportDataPanel({ eventId, dataSourcePort, onImported, onBack }:
           <SelectTrigger className="w-full">
             <SelectValue placeholder={t('createEventWizard.mappingProfileExistingPlaceholder') as string} />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent container={portalContainer}>
             {savedProfiles.map((p) => (
               <SelectItem key={p.id} value={p.id}>
                 {p.label}

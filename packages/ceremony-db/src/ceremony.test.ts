@@ -12,7 +12,7 @@ function sampleCeremony(): Ceremony {
     graduation_year: '2025-2026',
     date: '2026-07-16',
     venue: 'Hội trường A',
-    university_name: 'TRƯỜNG ĐẠI HỌC ĐẠI NAM',
+    university_name: 'TRƯỜNG ĐẠI HỌC MẪU',
     ministry_name: 'BỘ GIÁO DỤC VÀ ĐÀO TẠO',
     title_line1: 'LỄ TRAO BẰNG',
     title_line2: 'TỐT NGHIỆP',

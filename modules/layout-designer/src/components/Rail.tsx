@@ -1,7 +1,7 @@
 // Rail — 6 icon nhóm bên trái, theo prototype "Backdrop Editor 2a - keo tha.dc.html" §RAIL.
 
 import { PanelLeftClose } from 'lucide-react';
-import { cn } from '../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export type RailGroup = 'comp' | 'tpl' | 'coll' | 'var' | 'img' | 'layers';
 

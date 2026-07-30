@@ -4,8 +4,7 @@ import * as React from "react"
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
 import { Select as SelectPrimitive } from "radix-ui"
 
-import { cn } from "../../lib/cn"
-import { usePortalContainer } from "../../PortalContainerContext"
+import { cn } from "../cn.js"
 
 function Select({
   ...props
@@ -56,18 +55,22 @@ function SelectContent({
   children,
   // "popper" (không phải "item-aligned") — item-aligned tính toạ độ theo vị
   // trí item bên trong list, dễ lệch khi portal container là 1 containing
-  // block riêng (.tts-studio-root có transform, xem app-css-theming.md Rule 3).
-  // "popper" định vị theo trigger (giống Tooltip/Popover), ổn định hơn.
+  // block riêng (`.{app}-root` có transform, xem docs/guides/app-css-theming.md
+  // Rule 3). "popper" định vị theo trigger (giống Tooltip/Popover), ổn định hơn.
   position = "popper",
   align = "start",
+  // Package này KHÔNG biết gì về app-specific PortalContainerContext (packages/*
+  // không được phụ thuộc modules/*) — caller PHẢI tự truyền `container` (thường
+  // là `usePortalContainer()` của chính app đó) nếu cần portal đúng theo Rule 3.
+  // Không truyền → Radix tự dùng document.body mặc định (hành vi cũ, có thể lệch
+  // theme/vị trí trong app có `.{app}-root` transform-scoped).
   container,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content> & {
   container?: HTMLElement | null
 }) {
-  const defaultContainer = usePortalContainer()
   return (
-    <SelectPrimitive.Portal container={container ?? defaultContainer}>
+    <SelectPrimitive.Portal container={container ?? undefined}>
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useControlStore } from '../../store';
 import type { Language } from '../../store';
-import { cn } from '../../lib/cn';
+import { cn } from '@sky-app/ui';
 
 const LANGUAGE_OPTIONS: { value: Language; flag: string; label: string }[] = [
   { value: 'vi', flag: '🇻🇳', label: 'Tiếng Việt' },

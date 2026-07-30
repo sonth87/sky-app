@@ -1,7 +1,7 @@
 import type { LayoutItem } from '@sky-app/slide-shared';
 import { VariableTextarea } from '../VariableTextarea.js';
 import { Section } from './CommonControls.js';
-import { cn } from '../../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface RibbonControlsProps {
   item: Extract<LayoutItem, { type: 'ribbon' }>;

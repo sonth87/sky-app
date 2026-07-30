@@ -82,6 +82,11 @@ export interface EventDocument {
   status: 'draft' | 'scheduled' | 'active' | 'archived';
   scheduledAt?: string;
   archivedAt?: string;
+  /** Màu tag để phân biệt nhanh Event này với Event khác trong danh sách (2026-07-29) — cùng
+   * tinh thần `LayoutDocument.color` (file 010 migration), NHƯNG tách biệt hoàn toàn: màu Event
+   * gắn vào CHÍNH Event, không liên quan tới màu của layout đang gán cho nó. Optional — Event cũ
+   * chưa có màu vẫn hợp lệ (fallback không hiện chấm màu ở UI). */
+  color?: string;
   customVariables: CustomVariable[];
   layoutRefs: EventLayoutRef[];
   /** OPTIONAL — Event có thể tồn tại ở status='draft' mà CHƯA có dataSourceId (10-quan-ly-dot-

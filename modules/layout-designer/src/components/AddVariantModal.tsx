@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AspectRatio } from '@sky-app/slide-shared';
-import { cn } from '../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 const PRESETS: { id: string; w: number; h: number; label: string }[] = [
   { id: '16:9', w: 16, h: 9, label: '16:9 — Màn hình rộng' },

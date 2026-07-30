@@ -24,7 +24,7 @@ interface LayoutPickerModalProps {
   onClose: () => void;
   layoutPort: LayoutPort;
   assetPort: AssetPort | undefined;
-  onPick: (ref: { layoutId: string; layoutVersion: number }) => void;
+  onPick: (ref: { layoutId: string; layoutVersion: number; name: string }) => void;
 }
 
 interface PickableLayout {
@@ -120,7 +120,7 @@ export function LayoutPickerModal({ open, onClose, layoutPort, assetPort, onPick
 
   const selectedLayout = layouts?.find((l) => l.id === selectedId);
 
-  const confirmPick = (layout: PickableLayout) => onPick({ layoutId: layout.id, layoutVersion: layout.version });
+  const confirmPick = (layout: PickableLayout) => onPick({ layoutId: layout.id, layoutVersion: layout.version, name: layout.name });
 
   return (
     <Modal
@@ -210,6 +210,9 @@ export function LayoutPickerModal({ open, onClose, layoutPort, assetPort, onPick
                         <span className="h-2 w-2 flex-none rounded-full" style={{ backgroundColor: layout.color }} />
                       )}
                       <span className="truncate">{layout.name}</span>
+                    </span>
+                    <span className="truncate text-[10px] text-muted-foreground">
+                      {layout.content.variants.map((v) => v.aspect.id).join(', ')}
                     </span>
                   </button>
                 );

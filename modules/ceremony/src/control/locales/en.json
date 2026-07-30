@@ -599,6 +599,10 @@
     "confirmClearCacheMessage": "Are you sure you want to clear the app cache? This will clear localStorage, sessionStorage, IndexedDB, and service worker cache.",
     "clearCacheSuccess": "✓ Cache cleared"
   },
+  "developMenu": {
+    "sampleDataEnabled": "✓ Sample data enabled — see it in the event list",
+    "sampleDataDisabled": "Sample data disabled"
+  },
   "syncPanel": {
     "title": "Data",
     "refresh": "Refresh",
@@ -633,7 +637,7 @@
   },
   "apiTestModal": {
     "headerTitle": "API Test Interface",
-    "headerSubtitle": "Test the app's interoperability with the Dai Nam University service gateway.",
+    "headerSubtitle": "Test the app's interoperability with your organization's service gateway.",
     "requestSection": "Request",
     "methodAndUrl": "Request method & URL endpoint",
     "urlPlaceholder": "Enter API URL...",
@@ -651,7 +655,7 @@
     "copyJsonTitle": "Copy JSON",
     "responseSection": "Response",
     "emptyResponseHint": "Click \"Send Request\" to send a test request.",
-    "contactingServer": "Contacting Dai Nam University service gateway...",
+    "contactingServer": "Contacting service gateway...",
     "responseHeaders": "Response Headers",
     "responseBody": "Response Body",
     "noResponseBody": "No response body",
@@ -1023,7 +1027,10 @@
     "welcomeScreen": "Welcome screen",
     "autoReturnTooltip": "Automatically returns to the welcome screen because no new student has been shown. Use the ⚙️ Options button on the toolbar to enable/disable or change the timing.",
     "autoReturnIn": "Returning in {{seconds}}s",
-    "showWelcomeScreen": "Show welcome screen"
+    "showWelcomeScreen": "Show welcome screen",
+    "noPreview": "No welcome screen configured yet",
+    "goToLayoutConfigTooltip": "No layout assigned for the welcome screen — open Event config to pick one",
+    "goToLayoutDesignerTooltip": "Open Layout Designer to design/edit the welcome-screen layout"
   },
   "modeSwitch": {
     "label": "Mode:",
@@ -1106,6 +1113,7 @@
     "createButton": "Create event",
     "activateButton": "Activate",
     "activatingButton": "Activating...",
+    "viewButton": "View",
     "emptyState": "No events yet — click \"Create event\" to get started.",
     "statusDraft": "Draft",
     "statusScheduled": "Scheduled",
@@ -1214,7 +1222,13 @@
     "importCardHasData": "Data already imported",
     "layoutCardTitle": "Choose layout",
     "layoutCardNoLayout": "No layout yet",
-    "layoutCardHasLayout": "{{count}} layout rules"
+    "layoutCardHasLayout": "{{count}} layout rules",
+    "editInfoTooltip": "Edit event name/date",
+    "editInfoTitle": "Edit event info",
+    "saveInfoButton": "Save",
+    "colorLabel": "Color",
+    "colorPickerTooltip": "Pick a color for this event",
+    "colorPickerClear": "Clear color"
   },
   "importDataPanel": {
     "uploadPrompt": "Drag a file here or click to browse — Excel (.xlsx), CSV supported",

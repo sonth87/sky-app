@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { cn } from '../lib/cn';
+import { cn } from '@sky-app/ui';
 
 interface VerticalResizeHandleProps {
   /** Giá trị hiện tại (px) của khu vực phía trên — đọc lúc pointerdown để làm mốc tính toán,

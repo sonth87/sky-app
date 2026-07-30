@@ -7,7 +7,7 @@ import { useControlStore } from '../store';
 import { stopPcm } from '../../lib/audio';
 import { usePlatform } from '../PlatformContext';
 import { useSlide } from '../lib/slide';
-import { cn } from '../lib/cn';
+import { cn } from '@sky-app/ui';
 import { useVoiceCatalog } from './voiceCatalog';
 
 export { useVoiceCatalog };

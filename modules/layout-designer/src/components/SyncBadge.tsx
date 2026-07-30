@@ -5,7 +5,7 @@
 
 import { Link2, Link2Off } from 'lucide-react';
 import type { LayoutItem } from '@sky-app/slide-shared';
-import { cn } from '../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface SyncBadgeProps {
   item: LayoutItem;

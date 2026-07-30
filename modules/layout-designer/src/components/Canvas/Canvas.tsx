@@ -15,7 +15,7 @@ import { LoopEditBreadcrumb } from './LoopEditBreadcrumb.js';
 import { FloatingToolbar, ZOOM_STEP_FACTOR } from './FloatingToolbar.js';
 import { GuideLine } from './GuideLine.js';
 import { CanvasItemView } from './CanvasItemView.js';
-import { cn } from '../../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface CanvasProps {
   editor: Editor;

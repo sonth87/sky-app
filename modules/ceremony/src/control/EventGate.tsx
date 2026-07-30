@@ -10,6 +10,7 @@ import type { AssetPort, EventPort, DataSourcePort, LayoutPort } from '@sky-app/
 import type { DataSourceSummary, EventDocument, EventSummary } from '@sky-app/slide-shared';
 import { extractTokenKeysFromContent } from '@sky-app/slide-shared';
 import { useEventStore } from './eventStore.js';
+import { SAMPLE_EVENT_ID } from './lib/sampleCanonicalData.js';
 import { usePlatform } from './PlatformContext.js';
 import { Button } from './components/ui/Button.js';
 import { Badge } from './components/ui/badge.js';
@@ -54,7 +55,7 @@ async function countMissingTokens(event: EventDocument, layoutPort: LayoutPort |
 export function EventGate() {
   const { t } = useTranslation();
   const platform = usePlatform();
-  const { events, loading, refreshList, activateEvent } = useEventStore();
+  const { events, loading, refreshList, activateEvent, sampleDataEnabled } = useEventStore();
   const [showCreate, setShowCreate] = useState(false);
   const [dataSources, setDataSources] = useState<DataSourceSummary[]>([]);
   const [activatingId, setActivatingId] = useState<string | null>(null);
@@ -150,6 +151,11 @@ export function EventGate() {
     }
   };
 
+  // Dữ liệu mẫu (menu Develop > "Dùng dữ liệu mẫu", 2026-07-30) — tắt thì ẨN hẳn dòng này khỏi
+  // danh sách, KHÔNG xoá khỏi DB (xem eventStore.ts's sampleDataEnabled). Event mẫu vẫn nằm trong
+  // `events` (query DB thật, không lọc ở port) — lọc ở đây là NƠI DUY NHẤT quyết định hiện/ẩn.
+  const visibleEvents = events.filter((ev) => ev.id !== SAMPLE_EVENT_ID || sampleDataEnabled);
+
   const handleEditClick = async (summary: EventSummary) => {
     if (!eventPort) return;
     setLoadingEditId(summary.id);
@@ -177,14 +183,15 @@ export function EventGate() {
           </Button>
         </div>
 
-        {!loading && events.length === 0 && (
+        {!loading && visibleEvents.length === 0 && (
           <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
             {t('eventGate.emptyState')}
           </div>
         )}
 
         <ul className="flex flex-col gap-2">
-          {events.map((ev) => {
+          {visibleEvents.map((ev) => {
+            const isSample = ev.id === SAMPLE_EVENT_ID;
             const badge = STATUS_BADGE[ev.status];
             const full = rowDetails[ev.id];
             const recordCount = full?.dataSourceId ? recordCounts[full.dataSourceId] : undefined;
@@ -194,11 +201,28 @@ export function EventGate() {
               <li
                 key={ev.id}
                 className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3"
+                // Màu event (2026-07-29, thay chấm tròn) — vạch viền trái + gradient nhạt dần
+                // sang trong suốt thay vì chấm tròn cạnh tên. `transparent` (không phải trắng
+                // cứng) để tự khớp nền card ở cả light/dark theme — gradient chỉ ĐÈ LÊN
+                // background-color của bg-card (2 sub-property riêng), không thay thế nó.
+                style={
+                  full?.color
+                    ? {
+                        borderLeftWidth: 4,
+                        borderLeftColor: full.color,
+                        backgroundImage: `linear-gradient(to right, ${full.color}26, transparent 70%)`,
+                      }
+                    : undefined
+                }
+                title={full?.color ? (t('eventHub.colorLabel') as string) : undefined}
               >
                 <div className="flex min-w-0 flex-col gap-1.5">
                   <span className="truncate text-sm font-medium text-foreground">{ev.name}</span>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant={badge.variant}>{t(badge.key)}</Badge>
+                    {/* Không hiện tag trạng thái (VD "Đang hoạt động") cho Event mẫu — đây chỉ là
+                       xem thử, status thật trong DB (draft/active/...) không có ý nghĩa vận hành
+                       gì với người dùng ở đây (2026-07-30, phản hồi thật). */}
+                    {!isSample && <Badge variant={badge.variant}>{t(badge.key)}</Badge>}
                     {full && (
                       <button
                         type="button"
@@ -243,15 +267,19 @@ export function EventGate() {
                   </div>
                 </div>
                 <div className="flex flex-none items-center gap-2">
-                  <Button
-                    variant="secondary-outline"
-                    size="sm"
-                    icon={<Pencil size={13} />}
-                    loading={loadingEditId === ev.id}
-                    onClick={() => void handleEditClick(ev)}
-                  >
-                    {t('eventGate.editButton')}
-                  </Button>
+                  {/* Không cho sửa Event mẫu — đây chỉ để xem thử, không phải Event thật cần cấu
+                     hình (2026-07-30, phản hồi thật). */}
+                  {!isSample && (
+                    <Button
+                      variant="secondary-outline"
+                      size="sm"
+                      icon={<Pencil size={13} />}
+                      loading={loadingEditId === ev.id}
+                      onClick={() => void handleEditClick(ev)}
+                    >
+                      {t('eventGate.editButton')}
+                    </Button>
+                  )}
                   <Button
                     variant="secondary-outline"
                     size="sm"
@@ -259,7 +287,11 @@ export function EventGate() {
                     loading={activatingId === ev.id}
                     onClick={() => handleActivateClick(ev)}
                   >
-                    {activatingId === ev.id ? t('eventGate.activatingButton') : t('eventGate.activateButton')}
+                    {isSample
+                      ? t('eventGate.viewButton')
+                      : activatingId === ev.id
+                        ? t('eventGate.activatingButton')
+                        : t('eventGate.activateButton')}
                   </Button>
                 </div>
               </li>

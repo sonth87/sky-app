@@ -3,13 +3,21 @@ import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import {
   BackdropView,
+  LayoutRenderer,
   type BackdropAspectRatio,
   type BackdropTemplateMap,
   type Ceremony,
   type CanonicalRecord,
   type RecordWithRuntimeState,
+  type EventDocument,
+  type EventLayoutRef,
+  type LayoutContent,
+  type LayoutVersion,
   flattenCanonicalRecord,
   canonicalToStudent,
+  resolveLayout,
+  applyFieldMap,
+  eventToIdleRecord,
 } from '@sky-app/slide-shared';
 import { createSocket, type SlideSocket } from '../lib/socket';
 import { resolveAsset } from '../lib/assets';
@@ -424,6 +432,13 @@ export function BackdropApp() {
   // backdrop, khối lượng lớn, không làm chung đợt bỏ Student). canonicalToStudent là cầu nối 1
   // CHIỀU CHỈ dùng ở đây — KHÔNG dùng lại nơi khác trong app.
   const [onStage, setOnStage] = useState<RecordWithRuntimeState | null>(null);
+  // Nối backdrop trao giải/màn chờ sang LayoutRenderer thật (2026-07-28) — Event active +
+  // LayoutContent tương ứng. `null`/thiếu ref cho vai trò đang cần (award/idle) → fallback về
+  // BackdropView cũ bên dưới (không breaking Event/ceremony chưa cấu hình layout mới).
+  const [activeEvent, setActiveEvent] = useState<EventDocument | null>(null);
+  const [layoutContent, setLayoutContent] = useState<LayoutContent | null>(null);
+  const [screenSize, setScreenSize] = useState({ w: 0, h: 0 });
+  const rootRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<SlideSocket | null>(null);
   const confettiEnabledRef = useRef(true);
   const confettiRepeatRef = useRef(true);
@@ -469,6 +484,62 @@ export function BackdropApp() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ribbonsRef = useRef<any[]>([]);
+
+  // Đo kích thước thật (px) của khung hiển thị — LayoutRenderer cần `screen: {w, h}` cụ thể để
+  // resolveVariant/computeScale (khác BackdropView, tự đo bên trong qua ResizeObserver riêng).
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const update = () => setScreenSize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // EventLayoutRef cần dùng NGAY BÂY GIỜ cho vai trò đang hiển thị (award khi có người trên sân
+  // khấu, idle khi không) — đối xứng: Event/vai trò chưa cấu hình layout mới → null, fallback
+  // BackdropView cũ (quyết định fallback, xem plan "Nối backdrop trao giải + màn chờ").
+  const activeLayoutRef = useMemo<{ ref: EventLayoutRef; slot: 'award' | 'idle' } | null>(() => {
+    if (!activeEvent) return null;
+    if (onStage) {
+      const awardRefs = activeEvent.layoutRefs.filter((r) => r.role !== 'idle');
+      const flat = flattenCanonicalRecord(onStage.record);
+      const layoutId = resolveLayout(flat, awardRefs);
+      const ref = layoutId ? awardRefs.find((r) => r.layoutId === layoutId) : undefined;
+      return ref ? { ref, slot: 'award' } : null;
+    }
+    const idleRef = activeEvent.layoutRefs.find((r) => r.role === 'idle');
+    return idleRef ? { ref: idleRef, slot: 'idle' } : null;
+  }, [activeEvent, onStage]);
+
+  // Fetch LayoutContent của ref đang cần — refetch khi đổi layoutId/version (Event đổi layout
+  // giữa lễ, hoặc chuyển award↔idle sang layout khác nhau).
+  useEffect(() => {
+    if (!activeLayoutRef) {
+      setLayoutContent(null);
+      return;
+    }
+    let cancelled = false;
+    window.sky
+      .invoke('kernel:layout:getVersion', activeLayoutRef.ref.layoutId, activeLayoutRef.ref.layoutVersion)
+      .then((v) => {
+        if (!cancelled) setLayoutContent((v as LayoutVersion | null)?.content ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLayoutRef?.ref.layoutId, activeLayoutRef?.ref.layoutVersion]);
+
+  // Record cuối cùng đưa vào LayoutRenderer — fieldMap đã ghép field thật/CustomVariable vào token.
+  const layoutRecord = useMemo<CanonicalRecord | null>(() => {
+    if (!activeLayoutRef || !activeEvent) return null;
+    const base = activeLayoutRef.slot === 'award' ? onStage?.record : eventToIdleRecord(activeEvent);
+    if (!base) return null;
+    return applyFieldMap(base, activeLayoutRef.ref.fieldMap, activeEvent.customVariables);
+  }, [activeLayoutRef, activeEvent, onStage]);
+
+  const useLayoutRenderer = !!(layoutContent && layoutRecord && screenSize.w > 0 && screenSize.h > 0);
 
   // Vòng lặp vẽ ruy băng (Canvas)
   useEffect(() => {
@@ -1306,6 +1377,16 @@ export function BackdropApp() {
       socket.on('event:customVariables', ({ variables }) => {
         customVariablesRef.current = variables;
       });
+      // Nối backdrop sang LayoutRenderer thật (2026-07-28) — Event active không được phát qua
+      // socket (chỉ có customVariables/layoutOverrides rời), nên fetch nguyên EventDocument
+      // (cần layoutRefs) qua kênh kernel:event:* đã có sẵn, dùng chung bởi control/eventStore.ts.
+      const refreshActiveEvent = () => {
+        window.sky.invoke('kernel:event:getCurrentActive').then((doc) => {
+          setActiveEvent(doc as EventDocument | null);
+        });
+      };
+      refreshActiveEvent();
+      socket.on('state:activeEventChanged', refreshActiveEvent);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (socket as any).on('event:ttsDelay', ({ delay }: { delay: number }) => {
         ttsDelayRef.current = delay;
@@ -1327,7 +1408,10 @@ export function BackdropApp() {
     };
   }, []);
 
-  const key = useMemo(() => onStage?.record.id ?? 'idle', [onStage]);
+  const key = useMemo(
+    () => `${onStage?.record.id ?? 'idle'}:${useLayoutRenderer ? activeLayoutRef!.ref.layoutId : 'old'}`,
+    [onStage, useLayoutRenderer, activeLayoutRef],
+  );
   // Adapter TẠM cho BackdropView (hệ template cũ) — xem comment ở khai báo state onStage phía trên.
   const onStageStudent = useMemo(() => (onStage ? canonicalToStudent(onStage.record, 0) : null), [onStage]);
 
@@ -1340,7 +1424,7 @@ export function BackdropApp() {
   }
 
   return (
-    <div className="relative h-full w-full bg-black">
+    <div ref={rootRef} className="relative h-full w-full bg-black">
       <canvas
         ref={canvasRef}
         style={{
@@ -1362,15 +1446,33 @@ export function BackdropApp() {
           transition={{ duration: 0.15 }}
           className="h-full w-full"
         >
-          <BackdropView
-            student={onStageStudent}
-            ceremony={ceremony}
-            layouts={layouts}
-            layoutOverrides={layoutOverrides}
-            resolveAsset={resolveAsset}
-            idle={!onStage}
-            aspectRatio={backdropAspectRatio}
-          />
+          {useLayoutRenderer ? (
+            <LayoutRenderer
+              content={layoutContent!}
+              screen={screenSize}
+              record={layoutRecord!}
+              resolveAsset={resolveAsset}
+              className="h-full w-full"
+            />
+          ) : onStage ? (
+            // Trao giải: KHÔNG khớp layoutRefs nào (hoặc Event chưa dùng hệ mới) → vẫn fallback
+            // BackdropView cũ, an toàn khi hành lễ (quyết định fallback #1, xem plan "Nối
+            // backdrop trao giải + màn chờ"). Phạm vi yêu cầu 2026-07-29 CHỈ áp dụng cho màn
+            // chờ (nhánh dưới), không đổi hành vi trao giải.
+            <BackdropView
+              student={onStageStudent}
+              ceremony={ceremony}
+              layouts={layouts}
+              layoutOverrides={layoutOverrides}
+              resolveAsset={resolveAsset}
+              idle={false}
+              aspectRatio={backdropAspectRatio}
+            />
+          ) : null /* Màn chờ: KHÔNG chọn layout nào ở Event → hiện màn ĐEN (nền bg-black của
+               root div phía dưới), TUYỆT ĐỐI không fallback text/ảnh cứng nào (2026-07-29,
+               phản hồi thật — "chỉ hiển thị từ layout-design đã chọn, không hard text"). Thao
+               tác viên cần vào Control > màn hình chờ để cấu hình (nút "Thiết kế màn hình chờ"
+               ở IdlePanel.tsx). */}
         </motion.div>
       </AnimatePresence>
     </div>

@@ -9,9 +9,7 @@ import {
   type ParsedGradient,
   type GradientStop,
 } from './helpers.js';
-import { StopColorPicker } from './StopColorPicker.js';
-import { SwatchColorPopover } from './SwatchColorPopover.js';
-import { cn } from '../../lib/cn.js';
+import { ColorfulPicker, ColorfulSwatchPopover, cn } from '@sky-app/ui';
 
 export interface GradientEditorProps {
   value: string;
@@ -188,7 +186,7 @@ export function GradientEditor({ value, onChange }: GradientEditorProps) {
       </div>
 
       {selectedStop && (
-        <StopColorPicker
+        <ColorfulPicker
           key={selectedStop.id}
           color={selectedStop.color}
           alpha={selectedStop.alpha}
@@ -219,7 +217,7 @@ export function GradientEditor({ value, onChange }: GradientEditorProps) {
                 style={{ background: s.color }}
               />
               {openSwatchPopoverId === s.id && (
-                <SwatchColorPopover
+                <ColorfulSwatchPopover
                   color={s.color}
                   alpha={s.alpha}
                   onChange={(patch) => updateStop(s.id, patch)}

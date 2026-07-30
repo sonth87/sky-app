@@ -117,7 +117,9 @@ export function BackdropView({
     width: '100%',
     height: '100%',
     overflow: 'hidden',
-    backgroundColor: '#001a4d',
+    // Nền trắng khi chưa cấu hình ảnh nào (2026-07-29 — trước đây fallback màu xanh navy đặc thù
+    // 1 bản demo cũ) — trung tính, không giả định branding của bất kỳ đơn vị nào.
+    backgroundColor: '#ffffff',
     ...(bgUrl
       ? {
           backgroundImage: `url("${bgUrl}")`,
@@ -179,6 +181,8 @@ function IdleContent({
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
+            // Chữ màu tối — nền fallback giờ là trắng (xem rootStyle), không còn xanh navy cũ.
+            color: '#1a1a1a',
           }}
         >
           {logoUrl && (
@@ -187,7 +191,9 @@ function IdleContent({
           <h1 style={{ fontSize: '3.5rem', fontWeight: 800, textAlign: 'center', margin: 0 }}>
             {ceremony.name}
           </h1>
-          <p style={{ fontSize: '1.6rem', opacity: 0.9, marginTop: '1rem' }}>{ceremony.venue}</p>
+          {ceremony.venue && (
+            <p style={{ fontSize: '1.6rem', opacity: 0.7, marginTop: '1rem' }}>{ceremony.venue}</p>
+          )}
         </div>
       )}
     </>

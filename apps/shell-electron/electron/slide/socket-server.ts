@@ -451,6 +451,19 @@ export function resetSessionForNewEvent(eventId: string): void {
 }
 
 /**
+ * Báo Backdrop refetch Event active KHÔNG kèm reset session (bug thật phát hiện qua QA thủ công,
+ * 2026-07-28) — dùng khi Event ĐANG active được SỬA (VD lưu lại `layoutRefs`/màn chờ qua
+ * `LayoutConfigPanel`), khác `resetSessionForNewEvent` (dùng khi ĐỔI sang Event khác, cố ý xoá
+ * onStage/pending vì thuộc Event cũ). Sửa cấu hình layout của Event đang chạy KHÔNG được làm
+ * gián đoạn người đang trên sân khấu — chỉ báo "dữ liệu Event đã đổi, refetch lại" qua đúng kênh
+ * `BackdropApp.tsx` đã lắng nghe sẵn từ đợt nối LayoutRenderer (`kernel:event:save`, `apps/shell-
+ * electron/electron/ipc.ts`).
+ */
+export function notifyActiveEventChanged(eventId: string): void {
+  io?.emit('state:activeEventChanged', { eventId });
+}
+
+/**
  * Đổi nguồn `customVariables` sang bộ biến của Event VỪA active (Giai đoạn 4c mở rộng,
  * 2026-07-20) — gọi ngay sau `resetSessionForNewEvent` mỗi khi setActive() thành công. CHỈ update
  * biến module-level + broadcast — KHÔNG gọi `saveAppConfig()` (khác `cmd:setCustomVariables`

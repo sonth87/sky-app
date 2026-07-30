@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronUp, Lock, Pin, PinOff, Unlock } from 'lucide-react';
 import type { LayoutItem } from '@sky-app/slide-shared';
 import { SyncBadge } from '../SyncBadge.js';
-import { cn } from '../../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface PanelHeaderProps {
   item: LayoutItem;

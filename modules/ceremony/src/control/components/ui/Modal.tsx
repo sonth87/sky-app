@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
-import { cn } from '../../lib/cn';
+import { cn } from '@sky-app/ui';
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full' | { width: string; maxHeight?: string };
 

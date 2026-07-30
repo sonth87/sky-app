@@ -2,7 +2,7 @@ import { Laugh, Wind, Mic2 } from 'lucide-react';
 import { useTtsStudioStore } from '../store';
 import { useTextareaRef } from '../TextareaRefContext';
 import { buildEmotionHighlightedHtml, getCaretCharOffset, setCaretCharOffset } from '../lib/highlightEditor';
-import { cn } from '../lib/cn';
+import { cn } from '@sky-app/ui';
 
 interface EmotionTag {
   key: string;

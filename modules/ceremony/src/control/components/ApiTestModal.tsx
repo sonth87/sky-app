@@ -16,7 +16,7 @@ export function ApiTestModal({ open, onClose }: ApiTestModalProps) {
   const awardLocationCode = useControlStore((s) => s.awardLocationCode ?? 0);
   const records = useControlStore((s) => s.records || []);
 
-  const [url, setUrl] = useState('https://openapi.dainam.edu.vn/api/v1/graduation-batch-student/update-registration-status');
+  const [url, setUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [studentKeyword, setStudentKeyword] = useState('');
   const [regStatus, setRegStatus] = useState('on_stage');

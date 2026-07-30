@@ -14,6 +14,7 @@ interface EventRow {
   data_source_id: string | null;
   cloned_from: string | null;
   custom_variables_json: string;
+  color: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +61,7 @@ function rowToEvent(row: EventRow, layoutRefs: EventLayoutRef[]): EventDocument 
     layoutRefs,
     dataSourceId: row.data_source_id ?? undefined,
     clonedFrom: row.cloned_from ?? undefined,
+    color: row.color ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -112,7 +114,7 @@ export function createEvent(executor: SqlExecutor, doc: Omit<EventDocument, 'cre
   const now = new Date().toISOString();
   executor.transaction(() => {
     executor.run(
-      'INSERT INTO event (id, name, status, scheduled_at, archived_at, data_source_id, cloned_from, custom_variables_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO event (id, name, status, scheduled_at, archived_at, data_source_id, cloned_from, custom_variables_json, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         doc.id,
         doc.name,
@@ -122,6 +124,7 @@ export function createEvent(executor: SqlExecutor, doc: Omit<EventDocument, 'cre
         doc.dataSourceId ?? null,
         doc.clonedFrom ?? null,
         JSON.stringify(doc.customVariables),
+        doc.color ?? null,
         now,
         now,
       ],
@@ -134,7 +137,7 @@ export function saveEvent(executor: SqlExecutor, doc: EventDocument): void {
   const now = new Date().toISOString();
   executor.transaction(() => {
     const changes = executor.run(
-      'UPDATE event SET name = ?, status = ?, scheduled_at = ?, archived_at = ?, data_source_id = ?, custom_variables_json = ?, updated_at = ? WHERE id = ?',
+      'UPDATE event SET name = ?, status = ?, scheduled_at = ?, archived_at = ?, data_source_id = ?, custom_variables_json = ?, color = ?, updated_at = ? WHERE id = ?',
       [
         doc.name,
         doc.status,
@@ -142,6 +145,7 @@ export function saveEvent(executor: SqlExecutor, doc: EventDocument): void {
         doc.archivedAt ?? null,
         doc.dataSourceId ?? null,
         JSON.stringify(doc.customVariables),
+        doc.color ?? null,
         now,
         doc.id,
       ],

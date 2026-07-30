@@ -64,7 +64,7 @@ Ceremony hiện GIẢ ĐỊNH input đã đúng shape `Student`. Thực tế use
 
 ```ts
 export interface FieldMappingProfile {
-  id: string;                    // "employee-hr" | "student-dainam-2026"
+  id: string;                    // "employee-hr" | "student-batch-2026"
   label: string;                 // "Danh sách nhân viên HR"
   subjectType: string;           // ĐÃ ĐỔI 2026-07-16 (từ targetType union đóng) — mở, khớp
                                   // CanonicalSubject.subjectType ở file 11: "student"|"employee"|

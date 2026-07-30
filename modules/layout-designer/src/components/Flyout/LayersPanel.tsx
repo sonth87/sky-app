@@ -4,7 +4,7 @@ import type { LayoutItem, LayoutVariant, RichTextContent, TiptapJSONDoc } from '
 import { patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
 import { useEditorState } from '../../hooks/useEditor.js';
-import { cn } from '../../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export function iconOf(t: LayoutItem['type']) {
   return t === 'text' ? 'T' : t === 'image' ? '▦' : t === 'ribbon' ? '⚑' : t === 'loop' ? '⟲' : '◆';

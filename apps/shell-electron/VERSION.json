@@ -2,6 +2,15 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.2.1",
+      "date": "2026-07-28",
+      "bump": "patch",
+      "summary": "Sửa lỗi màn hình trình chiếu không cập nhật ngay khi đổi cấu hình layout/màn chờ của sự kiện đang diễn ra.",
+      "breaking": true,
+      "minAppVersion": "0.2.1",
+      "detailsRef": "history/2026-07-28-fix-event-live-sync-va-ux.md"
+    },
+    {
       "version": "0.2.0",
       "date": "2026-07-14",
       "bump": "minor",

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { LayoutVersion } from '@sky-app/slide-shared';
-import { cn } from '../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface VersioningPanelProps {
   latestPublishedVersion: number | null;

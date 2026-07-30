@@ -6,6 +6,12 @@
 
 ## Mục lục (mới nhất trên cùng)
 
+- [2026-07-30 — "Dùng dữ liệu mẫu" thành công tắc bật/tắt, không xoá DB](./2026-07-30-toggle-du-lieu-mau.md)
+- [2026-07-29 — Màn hình chờ chỉ hiển thị từ layout đã chọn, không còn fallback](./2026-07-29-man-hinh-cho-chi-tu-layout-design.md)
+- [2026-07-29 — Dựng packages/ui dùng chung, dọn trùng lặp UI giữa các module](./2026-07-29-package-ui-dung-chung.md)
+- [2026-07-29 — Màu tag cho Event + ModeSwitch theo màu theme ceremony](./2026-07-29-event-color-tag-va-modeswitch-theme.md)
+- [2026-07-28 — Sửa 6 lỗi/UX từ đợt QA thủ công đầu tiên của Event Hub + LayoutRenderer](./2026-07-28-fix-event-live-sync-va-ux.md)
+- [2026-07-28 — Nối backdrop trao giải + màn chờ sang LayoutRenderer thật](./2026-07-28-backdrop-layout-renderer.md)
 - [2026-07-15 — device-layout: chuyển sang git dependency (commit dist-lib + git tag), bỏ tarball local](./2026-07-15-device-layout-git-dependency-commit-dist-lib.md)
 - [2026-07-14 — Đánh giá lại: device-layout giữ tarball local (⚠️ đã bị thay thế 2026-07-15)](./2026-07-14-danh-gia-device-layout-git-dependency.md)
 - [2026-07-14 — App mới `tts-studio`: mở rộng TtsPort thay vì port riêng](./2026-07-14-tts-studio-app-moi.md)

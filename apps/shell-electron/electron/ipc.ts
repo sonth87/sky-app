@@ -38,7 +38,7 @@ import {
   updateLayoutDocumentMeta,
 } from '@sky-app/ceremony-db/node';
 import { ceremonyStore } from './slide/data/store';
-import { resetSessionForNewEvent, setCustomVariablesFromEvent } from './slide/socket-server';
+import { resetSessionForNewEvent, setCustomVariablesFromEvent, notifyActiveEventChanged } from './slide/socket-server';
 
 /**
  * Đồng bộ ceremonyStore (server-side, dùng bởi cmd:show/cmd:next/cmd:prev/quét QR qua
@@ -253,6 +253,11 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
       // Bug chặn đường (2026-07-21) — Sửa Event đang active cũng phải đồng bộ lại ceremonyStore
       // (cmd:show tra cứu qua đây, KHÔNG qua useControlStore) — xem syncCeremonyStoreForEvent.
       syncCeremonyStoreForEvent(doc);
+      // Bug thật phát hiện qua QA thủ công (2026-07-28) — sửa layoutRefs/màn chờ của Event đang
+      // active (qua LayoutConfigPanel) trước đây KHÔNG báo gì cho Backdrop, nên BackdropApp.tsx
+      // (nối LayoutRenderer từ đợt trước) giữ layoutRefs CŨ tới khi tắt/mở lại app hoặc đổi Event
+      // đi rồi quay lại. notifyActiveEventChanged KHÔNG reset session (khác resetSessionForNewEvent).
+      notifyActiveEventChanged(doc.id);
     }
   });
 

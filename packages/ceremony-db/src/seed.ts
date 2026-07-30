@@ -7,12 +7,12 @@ export function defaultCeremony(): Ceremony {
     name: 'Lễ Trao Bằng Tốt Nghiệp',
     graduation_year: new Date().getFullYear().toString(),
     date: new Date().toISOString().slice(0, 10),
-    venue: 'Trường ĐH Đại Nam',
-    university_name: 'TRƯỜNG ĐẠI HỌC ĐẠI NAM',
+    venue: '',
+    university_name: '',
     ministry_name: 'BỘ GIÁO DỤC VÀ ĐÀO TẠO',
     title_line1: 'LỄ TRAO BẰNG TỐT NGHIỆP',
     title_line2: '',
-    logo: 'logo.png',
+    logo: '',
     backdrops_config: 'assets/2026/backdrops_layouts.json',
   };
 }

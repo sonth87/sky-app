@@ -599,6 +599,10 @@
     "confirmClearCacheMessage": "Bạn chắc chắn muốn xóa cache của ứng dụng? Điều này sẽ xóa localStorage, sessionStorage, IndexedDB và service worker cache.",
     "clearCacheSuccess": "✓ Cache đã xóa"
   },
+  "developMenu": {
+    "sampleDataEnabled": "✓ Đã bật dữ liệu mẫu — xem trong danh sách sự kiện",
+    "sampleDataDisabled": "Đã tắt dữ liệu mẫu"
+  },
   "syncPanel": {
     "title": "Dữ liệu",
     "refresh": "Làm mới",
@@ -633,7 +637,7 @@
   },
   "apiTestModal": {
     "headerTitle": "Giao diện Thử nghiệm API",
-    "headerSubtitle": "Kiểm tra khả năng tương tác của ứng dụng với cổng dịch vụ Đại học Đại Nam.",
+    "headerSubtitle": "Kiểm tra khả năng tương tác của ứng dụng với cổng dịch vụ của đơn vị bạn.",
     "requestSection": "Yêu cầu (Request)",
     "methodAndUrl": "Mã yêu cầu & URL Endpoint",
     "urlPlaceholder": "Nhập API URL...",
@@ -651,7 +655,7 @@
     "copyJsonTitle": "Sao chép JSON",
     "responseSection": "Phản hồi (Response)",
     "emptyResponseHint": "Nhấp vào nút \"Gửi Yêu Cầu\" để gửi request thử nghiệm.",
-    "contactingServer": "Đang liên hệ với cổng dịch vụ Đại học Đại Nam...",
+    "contactingServer": "Đang liên hệ với cổng dịch vụ...",
     "responseHeaders": "Response Headers",
     "responseBody": "Response Body",
     "noResponseBody": "No response body",
@@ -1023,7 +1027,10 @@
     "welcomeScreen": "Màn hình chào mừng",
     "autoReturnTooltip": "Tự động quay về màn hình chào mừng vì không có sinh viên mới nào được hiển thị. Vào nút ⚙️ Tùy chọn trên toolbar để bật/tắt hoặc đổi thời gian.",
     "autoReturnIn": "Tự về sau {{seconds}}s",
-    "showWelcomeScreen": "Hiển thị màn hình chào mừng"
+    "showWelcomeScreen": "Hiển thị màn hình chào mừng",
+    "noPreview": "Chưa cấu hình màn hình chào mừng",
+    "goToLayoutConfigTooltip": "Chưa gán layout cho màn chờ — mở cấu hình Event để chọn layout",
+    "goToLayoutDesignerTooltip": "Mở Layout Designer để thiết kế/sửa layout màn chờ"
   },
   "modeSwitch": {
     "label": "Chế độ:",
@@ -1106,6 +1113,7 @@
     "createButton": "Tạo sự kiện",
     "activateButton": "Kích hoạt",
     "activatingButton": "Đang kích hoạt...",
+    "viewButton": "Xem",
     "emptyState": "Chưa có sự kiện nào — bấm \"Tạo sự kiện\" để bắt đầu.",
     "statusDraft": "Nháp",
     "statusScheduled": "Đã lên lịch",
@@ -1214,7 +1222,13 @@
     "importCardHasData": "Đã có dữ liệu",
     "layoutCardTitle": "Chọn layout",
     "layoutCardNoLayout": "Chưa có layout",
-    "layoutCardHasLayout": "{{count}} quy tắc layout"
+    "layoutCardHasLayout": "{{count}} quy tắc layout",
+    "editInfoTooltip": "Sửa tên/ngày sự kiện",
+    "editInfoTitle": "Sửa thông tin sự kiện",
+    "saveInfoButton": "Lưu",
+    "colorLabel": "Màu",
+    "colorPickerTooltip": "Chọn màu cho sự kiện",
+    "colorPickerClear": "Bỏ màu"
   },
   "importDataPanel": {
     "uploadPrompt": "Kéo file vào đây hoặc bấm để chọn — hỗ trợ Excel (.xlsx), CSV",

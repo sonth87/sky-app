@@ -1,6 +1,6 @@
 import type { LayoutItem } from '@sky-app/slide-shared';
 import { Section } from './CommonControls.js';
-import { cn } from '../../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface ShapeControlsProps {
   item: Extract<LayoutItem, { type: 'shape' }>;

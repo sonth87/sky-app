@@ -1,5 +1,5 @@
 import { Loader2, Pause, Play, Sparkles } from 'lucide-react';
-import { ButtonPrimitive } from './ui/button-primitive';
+import { ButtonPrimitive } from '@sky-app/ui';
 import { useTtsStudioStore } from '../store';
 import { useAudioPlayingId } from '../lib/audioPlayer';
 

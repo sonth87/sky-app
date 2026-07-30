@@ -25,6 +25,14 @@ export interface AppMenuBarItem {
   separator?: boolean;
   disabled?: boolean;
   children?: AppMenuBarItem[];
+  /**
+   * Dấu check kiểu checkbox menu item (native macOS) — TĨNH theo giá trị lúc khai báo mảng
+   * menuBarMenus. Để phản ánh state runtime (bật/tắt 1 tính năng), app tự gọi device-layout's
+   * `useStore.getState().updateAppConfig(appId, { menuBarMenus: [...] })` với mảng mới mỗi khi
+   * state đổi — `apps` trong store của device-layout đã được đọc reactive sẵn (MenuBar.tsx), nên
+   * chỉ cần patch lại field này, không cần cơ chế "live config" nào khác (device-layout ≥0.6.0).
+   */
+  checked?: boolean;
 }
 
 export interface AppMenuBarMenu {

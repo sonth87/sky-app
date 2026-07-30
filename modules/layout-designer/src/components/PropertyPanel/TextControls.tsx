@@ -2,7 +2,7 @@ import type { LayoutItem } from '@sky-app/slide-shared';
 import { VariableTextarea } from '../VariableTextarea.js';
 import { Section } from './CommonControls.js';
 import { ShadowControl } from './ShadowControl.js';
-import { cn } from '../../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface TextControlsProps {
   item: Extract<LayoutItem, { type: 'text' }>;

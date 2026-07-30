@@ -1,6 +1,7 @@
 import type { AppModule } from '@sky-app/kernel';
 import { GraduationCap } from 'lucide-react';
 import { CeremonyApp } from './CeremonyApp.js';
+import { buildCeremonyMenuBarMenus } from './menuBarMenus.js';
 
 // Side-effect import — port từ control/main.tsx gốc. i18n.ts khởi tạo i18next
 // ngay khi module này được import lần đầu. theme.ts KHÔNG còn side-effect (đã
@@ -37,45 +38,12 @@ export const ceremonyModule: AppModule = {
     // Không đưa vào menu: 'develop:*' devtools (devtoolsControl/devtoolsBackdrop
     // gọi thẳng webContents.openDevTools() trong Electron main process, không
     // dispatch qua action string nào cả — không có gì để map sang menuBarMenus).
-    menuBarMenus: [
-      {
-        label: 'Cài đặt',
-        items: [
-          { key: 'settings-general', label: 'Tổng quát…', action: 'settings:general' },
-          { key: 'settings-tts', label: 'TTS…', action: 'settings:tts' },
-          { key: 'settings-variable', label: 'Biến tùy chỉnh…', action: 'settings:variable' },
-          { key: 'settings-layout', label: 'Layout…', action: 'settings:layout' },
-          { key: 'settings-api', label: 'API…', action: 'settings:api' },
-          { key: 'settings-backup', label: 'Import/Export Setting…', action: 'settings:backup' },
-        ],
-      },
-      {
-        label: 'Dữ liệu',
-        items: [
-          { key: 'data-import', label: 'Import', action: 'data:import' },
-          { key: 'data-export', label: 'Export', action: 'data:export' },
-          { key: 'sep1', label: '', separator: true },
-          { key: 'data-reset', label: 'Đặt lại', children: [
-            { key: 'data-reset-qr', label: 'Danh sách quét QR', action: 'data:reset:qr' },
-            { key: 'data-reset-students', label: 'Danh sách sinh viên', action: 'data:reset:students' },
-            { key: 'data-reset-cache', label: 'Cache', action: 'data:reset:cache' },
-          ]},
-        ],
-      },
-      {
-        label: 'Develop',
-        items: [
-          { key: 'develop-sample-data', label: 'Dùng dữ liệu mẫu', action: 'develop:sampleData' },
-          { key: 'develop-api-test', label: 'Giao diện thử nghiệm API', action: 'develop:apiTest' },
-        ],
-      },
-      {
-        label: 'Trợ giúp',
-        items: [
-          { key: 'about', label: 'Về ứng dụng', action: 'about' },
-        ],
-      },
-    ],
+    //
+    // false ở đây chỉ là giá trị lúc registerApps() khởi động (menuBarMenus tĩnh, xem
+    // menuBarMenus.ts) — ControlApp.tsx tự đọc sampleDataEnabled thật (localStorage, xem
+    // eventStore.ts) rồi gọi updateAppConfig() vá lại đúng giá trị ngay khi mount, tránh phải biết
+    // trước state runtime ở đây.
+    menuBarMenus: buildCeremonyMenuBarMenus(false),
     // Phần GIỮA menu tên app "Ceremony" (cột đậm đầu tiên bên trái menu bar,
     // giữa "About Ceremony" và "Quit Ceremony" — cả 2 mục đó CỐ ĐỊNH, không
     // khai báo được). Thay khối placeholder mặc định (Services/Hide/Hide

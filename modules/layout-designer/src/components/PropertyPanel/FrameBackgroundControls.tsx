@@ -3,7 +3,7 @@ import type { Background, LayoutVariant } from '@sky-app/slide-shared';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
 import { Section } from './CommonControls.js';
 import { GradientEditor } from '../GradientEditor/GradientEditor.js';
-import { cn } from '../../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface FrameBackgroundControlsProps {
   variant: LayoutVariant;

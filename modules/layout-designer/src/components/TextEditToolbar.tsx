@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/react';
 import { Bold, Italic, Strikethrough } from 'lucide-react';
-import { cn } from '../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 const TOOLBAR_HEIGHT = 34;
 const TOOLBAR_GAP = 8;

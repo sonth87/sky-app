@@ -62,7 +62,19 @@ catalog:
   # vẽ đè lên popover bất kể đóng/mở lại kiểu gì — không phải lỗi trạng thái đóng-khi-bấm-mục
   # (v0.5.1 đã có, vẫn đúng, giữ nguyên) mà là lỗi stacking riêng. Bump popover lên z-[100000]
   # (menu bar macOS thật luôn nổi trên mọi cửa sổ app).
-  "@sonth87/device-layout": "github:sonth87/device-layout#v0.5.2"
+  #
+  # v0.5.3 (2026-07-30) — thêm AppSlice.updateAppConfig(appId, patch) + MenuBarItem.checked (dấu
+  # check kiểu checkbox menu item). Cần cho tính năng bật/tắt "Dùng dữ liệu mẫu" (menu Develop,
+  # module-ceremony) phản ánh trạng thái thật ngay trên menu — `apps` trong store đã đọc reactive
+  # sẵn (MenuBar.tsx), chỉ thiếu 1 action để patch lại sau registerApps(), không cần cơ chế mới.
+  "@sonth87/device-layout": "github:sonth87/device-layout#v0.5.3"
+
+  # Thêm 2026-07-29 — audit dependency trùng lặp giữa modules/* + packages/*ui (dựng
+  # packages/ui dùng chung: cn()/color picker/primitive Radix trùng lặp 3 nơi). lucide-react
+  # là icon lib dùng trực tiếp ở NHIỀU module (không chỉ qua packages/ui) nên vẫn cần khai ở
+  # từng package.json, nhưng version luôn khớp nhau — pin 1 chỗ theo đúng tiền lệ device-layout
+  # ở trên, tránh phải sửa 7 package.json mỗi lần nâng version.
+  "lucide-react": "^1.24.0"
 
 onlyBuiltDependencies:
   - electron

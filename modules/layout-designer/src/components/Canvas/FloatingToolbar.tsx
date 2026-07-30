@@ -1,6 +1,6 @@
 import { MousePointer2, Hand, Undo2, Redo2, Minus, Plus, Maximize } from 'lucide-react';
 import { MIN_ZOOM, MAX_ZOOM } from '@sky-app/layout-editor-core';
-import { cn } from '../../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export const ZOOM_STEP_FACTOR = 1.1;
 

@@ -1,6 +1,6 @@
 import type { TextShadow } from '@sky-app/slide-shared';
 import { Section } from './CommonControls.js';
-import { cn } from '../../lib/cn.js';
+import { cn } from '@sky-app/ui';
 
 export interface ShadowControlProps {
   value: TextShadow | boolean | undefined;

@@ -12,13 +12,15 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Database, LayoutTemplate, Check } from 'lucide-react';
+import { Database, LayoutTemplate, Check, Pencil } from 'lucide-react';
 import type { AssetPort, DataSourcePort, EventPort, LayoutPort } from '@sky-app/service-contracts';
 import type { EventDocument } from '@sky-app/slide-shared';
 import { Modal } from './components/ui/Modal.js';
 import { Button } from './components/ui/Button.js';
 import { ImportDataPanel } from './ImportDataPanel.js';
 import { LayoutConfigPanel } from './LayoutConfigPanel.js';
+import { ColorfulSwatchButton } from '@sky-app/ui';
+import { usePortalContainer } from './PortalContainerContext.js';
 import { showErrorToast, showSuccessToast } from './lib/toast.js';
 
 function newId(prefix: string): string {
@@ -42,13 +44,15 @@ interface EventHubModalProps {
   initialView?: 'import' | 'layout';
 }
 
-type HubView = 'menu' | 'import' | 'layout';
+type HubView = 'menu' | 'import' | 'layout' | 'info';
 
 export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layoutPort, assetPort, onChanged, initialEvent, initialView }: EventHubModalProps) {
   const { t } = useTranslation();
+  const portalContainer = usePortalContainer();
   const [event, setEvent] = useState<EventDocument | null>(initialEvent ?? null);
   const [name, setName] = useState(initialEvent?.name ?? '');
   const [scheduledAt, setScheduledAt] = useState(initialEvent?.scheduledAt ?? '');
+  const [color, setColor] = useState(initialEvent?.color);
   const [submitting, setSubmitting] = useState(false);
   const [view, setView] = useState<HubView>(initialView ?? 'menu');
 
@@ -56,6 +60,7 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
     setEvent(initialEvent ?? null);
     setName(initialEvent?.name ?? '');
     setScheduledAt(initialEvent?.scheduledAt ?? '');
+    setColor(initialEvent?.color);
     setView('menu');
   };
 
@@ -100,6 +105,30 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
       setView('menu');
     } catch (err) {
       showErrorToast(t('eventGate.activateError', { message: err instanceof Error ? err.message : String(err) }));
+    }
+  };
+
+  const openInfoEdit = () => {
+    if (!event) return;
+    setName(event.name);
+    setScheduledAt(event.scheduledAt ?? '');
+    setColor(event.color);
+    setView('info');
+  };
+
+  const handleSaveInfo = async () => {
+    if (!event || !name.trim()) return;
+    setSubmitting(true);
+    try {
+      const updated: EventDocument = { ...event, name: name.trim(), scheduledAt: scheduledAt || undefined, color, updatedAt: new Date().toISOString() };
+      await eventPort.save(updated);
+      setEvent(updated);
+      onChanged();
+      setView('menu');
+    } catch (err) {
+      showErrorToast(t('eventGate.activateError', { message: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -178,14 +207,72 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
     );
   }
 
+  if (view === 'info') {
+    const canSave = name.trim() !== '';
+    return (
+      <Modal open={open} onClose={handleClose} title={t('eventHub.editInfoTitle')} size="md" closeOnBackdrop={false}>
+        <div className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-muted-foreground">{t('createEventWizard.nameLabel')}</span>
+            <input
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('createEventWizard.namePlaceholder') as string}
+              autoFocus
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-muted-foreground">{t('createEventWizard.scheduledAtLabel')}</span>
+            <input
+              type="date"
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+            />
+            <span className="text-xs text-muted-foreground">{t('createEventWizard.scheduledAtHint')}</span>
+          </label>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-muted-foreground">{t('eventHub.colorLabel')}</span>
+            <ColorfulSwatchButton
+              color={color}
+              onChange={setColor}
+              title={t('eventHub.colorPickerTooltip') as string}
+              clearLabel={t('eventHub.colorPickerClear') as string}
+              container={portalContainer}
+            />
+          </div>
+          <div className="mt-2 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setView('menu')}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="primary" disabled={!canSave} loading={submitting} onClick={() => void handleSaveInfo()}>
+              {t('eventHub.saveInfoButton')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   const hasData = event.dataSourceId != null;
   const hasLayout = event.layoutRefs.length > 0;
 
   return (
     <Modal open={open} onClose={handleClose} title={event.name} size="md" closeOnBackdrop={false}>
       <div className="flex flex-col gap-4">
-        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-          {event.scheduledAt ? t('eventHub.scheduledAtSummary', { date: event.scheduledAt }) : t('eventHub.noScheduledAt')}
+        <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+          <span className="flex-1">
+            {event.scheduledAt ? t('eventHub.scheduledAtSummary', { date: event.scheduledAt }) : t('eventHub.noScheduledAt')}
+          </span>
+          <button
+            type="button"
+            onClick={openInfoEdit}
+            title={t('eventHub.editInfoTooltip') as string}
+            className="flex-none rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <Pencil size={13} />
+          </button>
         </div>
 
         <button

@@ -42,6 +42,20 @@ describe('EventStore — CRUD + setActive (chỉ 1 active tại 1 thời điểm
     expect(ev!.status).toBe('draft');
     expect(ev!.layoutRefs).toEqual([]);
     expect(ev!.dataSourceId).toBeUndefined();
+    expect(ev!.color).toBeUndefined();
+  });
+
+  it('color (2026-07-29) — createEvent ghi màu, saveEvent đổi màu, đọc lại đúng nguyên trạng', () => {
+    createEvent(executor, draftEvent({ color: '#3b82f6' }));
+    expect(getEvent(executor, 'ev1')!.color).toBe('#3b82f6');
+
+    const updated: EventDocument = { ...getEvent(executor, 'ev1')!, color: '#ec4899' };
+    saveEvent(executor, updated);
+    expect(getEvent(executor, 'ev1')!.color).toBe('#ec4899');
+
+    const cleared: EventDocument = { ...getEvent(executor, 'ev1')!, color: undefined };
+    saveEvent(executor, cleared);
+    expect(getEvent(executor, 'ev1')!.color).toBeUndefined();
   });
 
   it('createEvent với layoutRefs đầy đủ selector/fieldMap → đọc lại đúng nguyên trạng', () => {

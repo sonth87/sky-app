@@ -3,7 +3,7 @@ import { AlertTriangle, Download, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useControlStore, type AppFont } from '../../store';
 import { useSocketRef } from '../../SocketContext';
-import { cn } from '../../lib/cn';
+import { cn } from '@sky-app/ui';
 import { showErrorToast, showSuccessToast } from '../../lib/toast';
 import { useSlide } from '../../lib/slide';
 import {
