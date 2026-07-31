@@ -35,7 +35,7 @@ export async function layoutRoutes(app: FastifyInstance) {
     },
   );
 
-  app.post<{ Params: { id: string }; Body: { color?: string } }>('/api/layout/:id/meta', async (req) => {
+  app.post<{ Params: { id: string }; Body: { name?: string; description?: string; color?: string; category?: string; tags?: string[] } }>('/api/layout/:id/meta', async (req) => {
     updateLayoutDocumentMeta(getExecutor(), req.params.id, req.body);
     return { ok: true };
   });

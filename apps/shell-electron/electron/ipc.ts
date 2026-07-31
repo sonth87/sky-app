@@ -194,7 +194,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     },
   );
 
-  ipcMain.handle('kernel:layout:updateDocumentMeta', async (_event, id: string, patch: { color?: string }) => {
+  ipcMain.handle('kernel:layout:updateDocumentMeta', async (_event, id: string, patch: { name?: string; description?: string; color?: string; category?: string; tags?: string[] }) => {
     updateLayoutDocumentMeta(ceremonyStore.getExecutor(), id, patch);
   });
 

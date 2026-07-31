@@ -6,10 +6,11 @@
 // cache resolveAssetUrl theo batch).
 
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, Plus, Search } from 'lucide-react';
+import { Copy, Info, Plus, Search } from 'lucide-react';
 import type { LayoutPort } from '@sky-app/service-contracts';
 import { LayoutRenderer, demoCanonicalSubject, type LayoutContent } from '@sky-app/slide-shared';
 import { cn } from '@sky-app/ui';
+import { LayoutInfoModal } from './LayoutInfoModal.js';
 
 export interface LayoutLibraryScreenProps {
   layoutPort: LayoutPort;
@@ -22,6 +23,8 @@ interface LibraryEntry {
   name: string;
   description?: string;
   color?: string;
+  category?: string;
+  tags: string[];
   content: LayoutContent;
 }
 
@@ -38,6 +41,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     | { mode: 'duplicate'; source: LibraryEntry }
     | null
   >(null);
+  const [infoModalEntry, setInfoModalEntry] = useState<LibraryEntry | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +57,8 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             name: d.name,
             description: d.description,
             color: d.color,
+            category: d.category,
+            tags: d.tags ?? [],
             content: d.currentDraft,
           }),
         );
@@ -87,7 +93,12 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     if (!entries) return [];
     const q = search.trim().toLowerCase();
     if (q === '') return entries;
-    return entries.filter((e) => e.name.toLowerCase().includes(q));
+    return entries.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        (e.category?.toLowerCase().includes(q) ?? false) ||
+        e.tags.some((t) => t.toLowerCase().includes(q)),
+    );
   }, [entries, search]);
 
   async function handleCreate(name: string) {
@@ -108,6 +119,12 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     setReloadKey((k) => k + 1);
   }
 
+  async function handleSaveInfo(id: string, patch: { name: string; description?: string; category?: string; tags: string[] }) {
+    await layoutPort.updateDocumentMeta(id, patch);
+    setInfoModalEntry(null);
+    setReloadKey((k) => k + 1);
+  }
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[#f4f5f9]">
       <div className="h-[52px] shrink-0 flex items-center gap-3 px-[14px] bg-white border-b border-[#e6e6ee]">
@@ -118,7 +135,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm layout theo tên..."
+            placeholder="Tìm theo tên, phân loại, thẻ..."
             className="w-full rounded-[8px] border border-[#e6e6ee] bg-[#f4f5f9] py-[7px] pl-8 pr-2 text-xs"
           />
         </div>
@@ -160,19 +177,41 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                 </div>
                 <div className="truncate px-1 text-[10px] text-[#9a9bab]">
                   {entry.content.variants.map((v) => v.aspect.id).join(', ')}
+                  {entry.category && <span> · {entry.category}</span>}
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNameModal({ mode: 'duplicate', source: entry });
-                  }}
-                  title="Sao chép cả layout"
-                  className={cn(
-                    'absolute top-2 right-2 flex items-center justify-center w-[26px] h-[26px] rounded-[7px] border border-[#e6e6ee] bg-white text-[#5c5d6e] cursor-pointer opacity-0 group-hover:opacity-100 hover:bg-[#f4f5f9]',
-                  )}
-                >
-                  <Copy size={13} />
-                </button>
+                {entry.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 px-1">
+                    {entry.tags.map((tag) => (
+                      <span key={tag} className="rounded-full bg-[#f4f5f9] px-[7px] py-[1px] text-[9.5px] font-semibold text-[#5c5d6e]">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInfoModalEntry(entry);
+                    }}
+                    title="Thông tin layout"
+                    className="flex items-center justify-center w-[26px] h-[26px] rounded-[7px] border border-[#e6e6ee] bg-white text-[#5c5d6e] cursor-pointer hover:bg-[#f4f5f9]"
+                  >
+                    <Info size={13} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNameModal({ mode: 'duplicate', source: entry });
+                    }}
+                    title="Sao chép cả layout"
+                    className={cn(
+                      'flex items-center justify-center w-[26px] h-[26px] rounded-[7px] border border-[#e6e6ee] bg-white text-[#5c5d6e] cursor-pointer hover:bg-[#f4f5f9]',
+                    )}
+                  >
+                    <Copy size={13} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -189,6 +228,14 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             if (nameModal.mode === 'create') void handleCreate(name);
             else void handleDuplicate(nameModal.source, name);
           }}
+        />
+      )}
+
+      {infoModalEntry && (
+        <LayoutInfoModal
+          initial={{ name: infoModalEntry.name, description: infoModalEntry.description, category: infoModalEntry.category, tags: infoModalEntry.tags }}
+          onClose={() => setInfoModalEntry(null)}
+          onSave={(patch) => handleSaveInfo(infoModalEntry.id, patch)}
         />
       )}
     </div>

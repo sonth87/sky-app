@@ -10,6 +10,8 @@ interface LayoutDocumentRow {
   name: string;
   description: string | null;
   color: string | null;
+  category: string | null;
+  tags_json: string;
   latest_published_version: number | null;
   created_at: string;
   updated_at: string;
@@ -60,6 +62,8 @@ export function getLayoutDocument(executor: SqlExecutor, id: string): LayoutDocu
     name: docRow.name,
     description: docRow.description ?? undefined,
     color: docRow.color ?? undefined,
+    category: docRow.category ?? undefined,
+    tags: JSON.parse(docRow.tags_json) as string[],
     currentDraft: JSON.parse(draftRow.content_json) as LayoutContent,
     publishedVersions: versionRows.map(rowToVersion),
     createdAt: docRow.created_at,
@@ -67,23 +71,26 @@ export function getLayoutDocument(executor: SqlExecutor, id: string): LayoutDocu
   };
 }
 
-export function listLayoutDocuments(executor: SqlExecutor): Array<{ id: string; name: string; description?: string; color?: string; latestPublishedVersion: number | null }> {
+export function listLayoutDocuments(executor: SqlExecutor): Array<{ id: string; name: string; description?: string; color?: string; category?: string; tags?: string[]; latestPublishedVersion: number | null }> {
   const rows = executor.query<LayoutDocumentRow>('SELECT * FROM layout_document ORDER BY updated_at DESC');
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
     description: r.description ?? undefined,
     color: r.color ?? undefined,
+    category: r.category ?? undefined,
+    tags: JSON.parse(r.tags_json) as string[],
     latestPublishedVersion: r.latest_published_version,
   }));
 }
 
-/** Tạo layout mới — draft khởi tạo bằng `initialContent`, chưa có version nào đã publish. */
+/** Tạo layout mới — draft khởi tạo bằng `initialContent`, chưa có version nào đã publish.
+ * category/tags luôn rỗng lúc tạo — set sau qua updateDocumentMeta (panel "Thông tin layout"). */
 export function createLayoutDocument(executor: SqlExecutor, id: string, name: string, initialContent: LayoutContent, description?: string): void {
   const now = new Date().toISOString();
   executor.transaction(() => {
     executor.run(
-      'INSERT INTO layout_document (id, name, description, color, latest_published_version, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, ?, ?)',
+      "INSERT INTO layout_document (id, name, description, color, category, tags_json, latest_published_version, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, '[]', NULL, ?, ?)",
       [id, name, description ?? null, now, now],
     );
     executor.run('INSERT INTO layout_draft (layout_document_id, content_json, updated_at) VALUES (?, ?, ?)', [
@@ -94,11 +101,44 @@ export function createLayoutDocument(executor: SqlExecutor, id: string, name: st
   });
 }
 
-/** Cập nhật metadata layout (hiện chỉ `color` — PHỤ LỤC "Event Hub", 2026-07-22). Mở rộng thêm
- * `name`/`description` sau nếu cần, KHÔNG đổi `currentDraft`/`publishedVersions`. */
-export function updateLayoutDocumentMeta(executor: SqlExecutor, id: string, patch: { color?: string }): void {
-  const now = new Date().toISOString();
-  executor.run('UPDATE layout_document SET color = ?, updated_at = ? WHERE id = ?', [patch.color ?? null, now, id]);
+/** Cập nhật metadata layout (name/description/color/category/tags — Giai đoạn 5.2, trước đó chỉ
+ * có `color`). TRUE partial-patch: chỉ SET cột nào thực sự có mặt trong `patch` (khác hành vi cũ
+ * "ghi đè toàn bộ" — nâng lên vì đây là lần đầu method này có call site production thật, ghi đè
+ * nhầm field khác khi chỉ định sửa 1 field sẽ là bug thật). KHÔNG đổi `currentDraft`/
+ * `publishedVersions`. */
+export function updateLayoutDocumentMeta(
+  executor: SqlExecutor,
+  id: string,
+  patch: { name?: string; description?: string; color?: string; category?: string; tags?: string[] },
+): void {
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  if (patch.name !== undefined) {
+    sets.push('name = ?');
+    values.push(patch.name);
+  }
+  if (patch.description !== undefined) {
+    sets.push('description = ?');
+    values.push(patch.description);
+  }
+  if (patch.color !== undefined) {
+    sets.push('color = ?');
+    values.push(patch.color);
+  }
+  if (patch.category !== undefined) {
+    sets.push('category = ?');
+    values.push(patch.category);
+  }
+  if (patch.tags !== undefined) {
+    sets.push('tags_json = ?');
+    values.push(JSON.stringify(patch.tags));
+  }
+  if (sets.length === 0) return;
+
+  sets.push('updated_at = ?');
+  values.push(new Date().toISOString());
+  values.push(id);
+  executor.run(`UPDATE layout_document SET ${sets.join(', ')} WHERE id = ?`, values);
 }
 
 /**

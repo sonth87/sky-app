@@ -203,7 +203,7 @@ export function LayoutPickerButton({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [preview, setPreview] = useState<{ name: string; content: LayoutContent; color?: string } | null>(null);
+  const [preview, setPreview] = useState<{ name: string; content: LayoutContent; color?: string; category?: string; tags?: string[] } | null>(null);
   const [assetUrlCache, setAssetUrlCache] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -214,7 +214,7 @@ export function LayoutPickerButton({
     let cancelled = false;
     void (async () => {
       const [doc, version] = await Promise.all([layoutPort.getDocument(layoutId), layoutPort.getVersion(layoutId, layoutVersion)]);
-      if (!cancelled && doc && version) setPreview({ name: doc.name, content: version.content, color: doc.color });
+      if (!cancelled && doc && version) setPreview({ name: doc.name, content: version.content, color: doc.color, category: doc.category, tags: doc.tags });
     })();
     return () => {
       cancelled = true;
@@ -258,6 +258,7 @@ export function LayoutPickerButton({
             </span>
             <span className="truncate text-[10px] text-muted-foreground">
               {preview.content.variants.map((v) => v.aspect.id).join(', ')}
+              {preview.category && <span> · {preview.category}</span>}
             </span>
           </span>
         </button>

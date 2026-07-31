@@ -32,6 +32,8 @@ interface PickableLayout {
   version: number;
   content: LayoutContent;
   color?: string;
+  category?: string;
+  tags?: string[];
 }
 
 const THUMB_SIZE = { w: 200, h: 112 };
@@ -70,7 +72,7 @@ export function LayoutPickerModal({ open, onClose, layoutPort, assetPort, onPick
         publishable.map(async (d) => {
           const version = await layoutPort.getVersion(d.id, d.latestPublishedVersion as number);
           if (!version) return null;
-          const picked: PickableLayout = { id: d.id, name: d.name, version: version.version, content: version.content, color: d.color };
+          const picked: PickableLayout = { id: d.id, name: d.name, version: version.version, content: version.content, color: d.color, category: d.category, tags: d.tags };
           return picked;
         }),
       );
@@ -212,7 +214,11 @@ export function LayoutPickerModal({ open, onClose, layoutPort, assetPort, onPick
                     </span>
                     <span className="truncate text-[10px] text-muted-foreground">
                       {layout.content.variants.map((v) => v.aspect.id).join(', ')}
+                      {layout.category && <span> · {layout.category}</span>}
                     </span>
+                    {layout.tags && layout.tags.length > 0 && (
+                      <span className="truncate text-[9.5px] text-muted-foreground">{layout.tags.join(', ')}</span>
+                    )}
                   </button>
                 );
               })}

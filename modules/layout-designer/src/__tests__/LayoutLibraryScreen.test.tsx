@@ -30,7 +30,17 @@ function mockLayoutPort(overrides: Partial<LayoutPort> = {}): LayoutPort {
   };
   return {
     listDocuments: vi.fn().mockImplementation(() =>
-      Promise.resolve(Object.values(docs).map((d) => ({ id: d.id, name: d.name, description: d.description, color: d.color, latestPublishedVersion: null }))),
+      Promise.resolve(
+        Object.values(docs).map((d) => ({
+          id: d.id,
+          name: d.name,
+          description: d.description,
+          color: d.color,
+          category: d.category,
+          tags: d.tags,
+          latestPublishedVersion: null,
+        })),
+      ),
     ),
     getDocument: vi.fn().mockImplementation((id: string) => Promise.resolve(docs[id] ?? null)),
     createDocument: vi.fn().mockResolvedValue(undefined),
@@ -63,10 +73,32 @@ describe('LayoutLibraryScreen', () => {
   it('gõ tìm kiếm khớp 1 phần tên (không phân biệt hoa/thường) → lọc đúng', async () => {
     render(<LayoutLibraryScreen layoutPort={mockLayoutPort()} onOpen={() => {}} />);
     await waitFor(() => screen.getByText('Layout A'));
-    fireEvent.change(screen.getByPlaceholderText('Tìm layout theo tên...'), { target: { value: 'layout b' } });
+    fireEvent.change(screen.getByPlaceholderText('Tìm theo tên, phân loại, thẻ...'), { target: { value: 'layout b' } });
 
     expect(screen.queryByText('Layout A')).toBeNull();
     expect(screen.getByText('Layout B')).toBeTruthy();
+  });
+
+  it('gõ tìm kiếm khớp category hoặc tag → lọc đúng dù không khớp tên', async () => {
+    const layoutPort = mockLayoutPort({
+      getDocument: vi.fn().mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'layout-a'
+            ? { ...doc('layout-a', 'Layout A', CONTENT_A), category: 'Trao bằng', tags: ['2026'] }
+            : doc('layout-b', 'Layout B', CONTENT_B),
+        ),
+      ),
+      listDocuments: vi.fn().mockResolvedValue([
+        { id: 'layout-a', name: 'Layout A', category: 'Trao bằng', tags: ['2026'], latestPublishedVersion: null },
+        { id: 'layout-b', name: 'Layout B', latestPublishedVersion: null },
+      ]),
+    });
+    render(<LayoutLibraryScreen layoutPort={layoutPort} onOpen={() => {}} />);
+    await waitFor(() => screen.getByText('Layout A'));
+
+    fireEvent.change(screen.getByPlaceholderText('Tìm theo tên, phân loại, thẻ...'), { target: { value: '2026' } });
+    expect(screen.getByText('Layout A')).toBeTruthy();
+    expect(screen.queryByText('Layout B')).toBeNull();
   });
 
   it('click 1 card layout → gọi onOpen đúng id', async () => {
@@ -122,5 +154,51 @@ describe('LayoutLibraryScreen', () => {
     fireEvent.click(within(cardA).getByTitle('Sao chép cả layout'));
 
     expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('card hiện category cạnh tỷ lệ + chip tags nếu có', async () => {
+    const layoutPort = mockLayoutPort({
+      getDocument: vi.fn().mockImplementation((id: string) =>
+        Promise.resolve({ ...doc('layout-a', 'Layout A', CONTENT_A), category: 'Trao bằng', tags: ['2026', 'xuất sắc'] }),
+      ),
+      listDocuments: vi
+        .fn()
+        .mockResolvedValue([{ id: 'layout-a', name: 'Layout A', category: 'Trao bằng', tags: ['2026', 'xuất sắc'], latestPublishedVersion: null }]),
+    });
+    render(<LayoutLibraryScreen layoutPort={layoutPort} onOpen={() => {}} />);
+
+    await waitFor(() => expect(screen.getByText(/Trao bằng/)).toBeTruthy());
+    expect(screen.getByText('2026')).toBeTruthy();
+    expect(screen.getByText('xuất sắc')).toBeTruthy();
+  });
+
+  it('bấm icon "i" trên card → mở LayoutInfoModal với dữ liệu hiện tại, KHÔNG gọi onOpen', async () => {
+    const onOpen = vi.fn();
+    render(<LayoutLibraryScreen layoutPort={mockLayoutPort()} onOpen={onOpen} />);
+    await waitFor(() => screen.getByText('Layout A'));
+
+    const cardA = screen.getByText('Layout A').closest('.group') as HTMLElement;
+    fireEvent.click(within(cardA).getByTitle('Thông tin layout'));
+
+    expect(screen.getByText('Thông tin layout')).toBeTruthy();
+    expect(screen.getByDisplayValue('Layout A')).toBeTruthy();
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('sửa thông tin rồi Lưu → gọi updateDocumentMeta đúng id + patch, đóng modal, refresh danh sách', async () => {
+    const layoutPort = mockLayoutPort();
+    render(<LayoutLibraryScreen layoutPort={layoutPort} onOpen={() => {}} />);
+    await waitFor(() => screen.getByText('Layout A'));
+
+    const cardA = screen.getByText('Layout A').closest('.group') as HTMLElement;
+    fireEvent.click(within(cardA).getByTitle('Thông tin layout'));
+    fireEvent.change(screen.getByDisplayValue('Layout A'), { target: { value: 'Layout A đã sửa' } });
+    fireEvent.change(screen.getByPlaceholderText('VD: Trao bằng, Khen thưởng...'), { target: { value: 'Trao bằng' } });
+    fireEvent.click(screen.getByText('Lưu'));
+
+    await waitFor(() => expect(layoutPort.updateDocumentMeta).toHaveBeenCalledWith('layout-a', { name: 'Layout A đã sửa', description: undefined, category: 'Trao bằng', tags: [] }));
+    expect(screen.queryByText('Thông tin layout')).toBeNull();
+    // Sau khi lưu, danh sách được tải lại (reloadKey đổi) — getDocument('layout-a') gọi lại lần 2.
+    await waitFor(() => expect((layoutPort.getDocument as ReturnType<typeof vi.fn>).mock.calls.filter((c) => c[0] === 'layout-a').length).toBe(2));
   });
 });

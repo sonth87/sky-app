@@ -236,6 +236,10 @@ export interface LayoutDocument {
   /** Màu tag phân biệt layout (badge ở danh sách Event, module-ceremony) — 1 layout luôn cùng
    * 1 màu ở mọi nơi được chọn/hiển thị. Optional — layout cũ chưa có màu fallback màu trung tính. */
   color?: string;
+  /** Phân loại + gắn thẻ layout (Giai đoạn 5.2, panel "Thông tin layout" — layout-designer's
+   * Library). Tự do nhập, không phải taxonomy cố định — chỉ để tìm/lọc khi số lượng layout tăng. */
+  category?: string;
+  tags?: string[];
   currentDraft: LayoutContent; // bản đang sửa (chỉ 1), CHƯA công bố
   publishedVersions: LayoutVersion[]; // lịch sử đã publish, mới nhất ở cuối
   createdAt: string;

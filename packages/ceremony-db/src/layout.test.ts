@@ -65,6 +65,42 @@ describe('LayoutStore — versioning (layout_document/layout_draft/layout_versio
     expect(listLayoutDocuments(executor).find((d) => d.id === 'l1')?.color).toBe('#ff0000');
   });
 
+  it('layout mới tạo có category undefined + tags rỗng — updateLayoutDocumentMeta ghi cả 2, đọc lại đúng cả getLayoutDocument lẫn listLayoutDocuments', () => {
+    createLayoutDocument(executor, 'l1', 'Layout mẫu', contentV1());
+    expect(getLayoutDocument(executor, 'l1')!.category).toBeUndefined();
+    expect(getLayoutDocument(executor, 'l1')!.tags).toEqual([]);
+
+    updateLayoutDocumentMeta(executor, 'l1', { category: 'Trao bằng', tags: ['2026', 'xuất sắc'] });
+
+    const doc = getLayoutDocument(executor, 'l1');
+    expect(doc!.category).toBe('Trao bằng');
+    expect(doc!.tags).toEqual(['2026', 'xuất sắc']);
+    const summary = listLayoutDocuments(executor).find((d) => d.id === 'l1');
+    expect(summary?.category).toBe('Trao bằng');
+    expect(summary?.tags).toEqual(['2026', 'xuất sắc']);
+  });
+
+  it('updateLayoutDocumentMeta là true partial-patch — chỉ sửa field truyền vào, KHÔNG xoá field khác đã lưu trước đó', () => {
+    createLayoutDocument(executor, 'l1', 'Layout mẫu', contentV1());
+    updateLayoutDocumentMeta(executor, 'l1', { color: '#ff0000', category: 'Trao bằng', tags: ['2026'] });
+
+    updateLayoutDocumentMeta(executor, 'l1', { tags: ['2026', 'thêm-tag'] });
+
+    const doc = getLayoutDocument(executor, 'l1');
+    expect(doc!.color).toBe('#ff0000');
+    expect(doc!.category).toBe('Trao bằng');
+    expect(doc!.tags).toEqual(['2026', 'thêm-tag']);
+  });
+
+  it('updateLayoutDocumentMeta sửa được name/description (trước đó không thể sửa sau khi tạo)', () => {
+    createLayoutDocument(executor, 'l1', 'Tên cũ', contentV1(), 'Mô tả cũ');
+    updateLayoutDocumentMeta(executor, 'l1', { name: 'Tên mới', description: 'Mô tả mới' });
+
+    const doc = getLayoutDocument(executor, 'l1');
+    expect(doc!.name).toBe('Tên mới');
+    expect(doc!.description).toBe('Mô tả mới');
+  });
+
   it('saveDraft KHÔNG tăng version, KHÔNG tạo version mới (Save ≠ Publish)', () => {
     createLayoutDocument(executor, 'l1', 'Layout mẫu', contentV1());
     saveDraft(executor, 'l1', contentV2());

@@ -19,12 +19,13 @@ export interface VariableRegistryEntry {
  * 1 version mới bất biến.
  */
 export interface LayoutPort {
-  listDocuments(): Promise<Array<{ id: string; name: string; description?: string; color?: string; latestPublishedVersion: number | null }>>;
+  listDocuments(): Promise<Array<{ id: string; name: string; description?: string; color?: string; category?: string; tags?: string[]; latestPublishedVersion: number | null }>>;
   getDocument(id: string): Promise<LayoutDocument | null>;
   createDocument(id: string, name: string, initialContent: LayoutContent, description?: string): Promise<void>;
-  /** Cập nhật metadata layout (hiện chỉ `color` — badge phân biệt layout ở danh sách Event,
-   * PHỤ LỤC "Event Hub" 2026-07-22). KHÔNG đụng currentDraft/publishedVersions. */
-  updateDocumentMeta(id: string, patch: { color?: string }): Promise<void>;
+  /** Cập nhật metadata layout — name/description/color/category/tags (Giai đoạn 5.2, panel
+   * "Thông tin layout"). TRUE partial-patch: chỉ field có mặt trong `patch` mới bị đổi, field
+   * khác giữ nguyên. KHÔNG đụng currentDraft/publishedVersions. */
+  updateDocumentMeta(id: string, patch: { name?: string; description?: string; color?: string; category?: string; tags?: string[] }): Promise<void>;
   saveDraft(id: string, content: LayoutContent): Promise<void>;
   publish(id: string, note?: string): Promise<LayoutVersion>;
   listVersions(id: string): Promise<LayoutVersion[]>;
