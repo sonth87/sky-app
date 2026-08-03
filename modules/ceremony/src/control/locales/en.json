@@ -1134,7 +1134,13 @@
     "editButton": "Edit",
     "recordCountBadge": "{{count}} people",
     "noDataBadge": "No data yet",
-    "noLayoutBadge": "No layout yet"
+    "noLayoutBadge": "No layout yet",
+    "importBundleButton": "Import event...",
+    "importBundleSuccess": "Imported \"{{name}}\"{{renamedSuffix}} — {{layoutsCreated}} new layouts, DataSource {{dataSourceStatus}}.",
+    "importBundleRenamedSuffix": " (renamed to avoid conflict)",
+    "importBundleDataImported": "imported",
+    "importBundleDataKept": "kept as-is/none",
+    "importBundleError": "Could not import event: {{message}}"
   },
   "createEventWizard": {
     "step1Title": "Basic information",
@@ -1228,7 +1234,15 @@
     "saveInfoButton": "Save",
     "colorLabel": "Color",
     "colorPickerTooltip": "Pick a color for this event",
-    "colorPickerClear": "Clear color"
+    "colorPickerClear": "Clear color",
+    "exportCardTitle": "Export this event",
+    "exportCardSubtitle": "Save Event + layout + data as a .zip file",
+    "exportConfirmTitle": "Export event to file",
+    "exportIncludeDataLabel": "Include attendee data (name/photo/phone...)",
+    "exportPiiWarning": "The exported file contains personal information — store/delete it according to your organization's policy after use.",
+    "exportConfirmButton": "Export",
+    "exportSuccess": "Event exported to: {{filePath}}",
+    "exportError": "Export failed: {{message}}"
   },
   "importDataPanel": {
     "uploadPrompt": "Drag a file here or click to browse — Excel (.xlsx), CSV supported",

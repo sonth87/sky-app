@@ -38,5 +38,9 @@ export {
   getDataSourceRecords,
   insertDataSource,
   insertDataSourceRecords,
+  listConsumedRecordIds,
+  insertConsumedRecords,
 } from './queries/data-source.js';
 export { listFieldMappingProfiles, saveFieldMappingProfile } from './queries/field-mapping-profile.js';
+export { buildEventBundle, applyEventBundle } from './queries/event-bundle.js';
+export type { ApplyEventBundleResult } from './queries/event-bundle.js';

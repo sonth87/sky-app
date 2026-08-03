@@ -4,8 +4,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { CanonicalSubject, FieldMappingProfile } from '@sky-app/slide-shared';
 import { BetterSqlite3Executor } from './drivers/better-sqlite3-executor.js';
 import { runMigrations } from './migrate.js';
-import { getDataSource, insertDataSource, insertDataSourceRecords } from './queries/data-source.js';
+import { getDataSource, insertDataSource, insertDataSourceRecords, insertConsumedRecords, listConsumedRecordIds } from './queries/data-source.js';
 import { listFieldMappingProfiles, saveFieldMappingProfile } from './queries/field-mapping-profile.js';
+import { createEvent } from './queries/event.js';
 import type { SqlExecutor } from './sql-executor.js';
 
 function subject(overrides: Partial<CanonicalSubject> = {}): CanonicalSubject {
@@ -149,5 +150,39 @@ describe('FieldMappingProfile — lưu persistent', () => {
   it('sample optional — không truyền vẫn lưu/đọc lại đúng (undefined, không phải null string)', () => {
     saveFieldMappingProfile(executor, profile({ sample: undefined }));
     expect(listFieldMappingProfiles(executor)[0]!.sample).toBeUndefined();
+  });
+});
+
+describe('listConsumedRecordIds / insertConsumedRecords (Giai đoạn 5.3 — Export/Import Loại 2)', () => {
+  let executor: SqlExecutor;
+
+  beforeEach(() => {
+    executor = new BetterSqlite3Executor(':memory:');
+    runMigrations(executor);
+    insertDataSource(executor, { id: 'ds1', label: 'SV', mode: 'consumable', naturalKeyField: 'masv' });
+    insertDataSourceRecords(executor, 'ds1', [subject({ id: 'SV001' }), subject({ id: 'SV002' })]);
+    createEvent(executor, { id: 'ev1', name: 'Đợt 1', status: 'draft', customVariables: [], layoutRefs: [], dataSourceId: 'ds1' });
+  });
+
+  it('chưa insert gì → listConsumedRecordIds trả mảng rỗng', () => {
+    expect(listConsumedRecordIds(executor, 'ev1')).toEqual([]);
+  });
+
+  it('insertConsumedRecords ghi đúng storage id, listConsumedRecordIds đọc lại đủ', () => {
+    insertConsumedRecords(executor, 'ev1', ['ds1::SV001', 'ds1::SV002'], '2026-08-03T00:00:00.000Z');
+    expect(listConsumedRecordIds(executor, 'ev1').sort()).toEqual(['ds1::SV001', 'ds1::SV002']);
+  });
+
+  it('mảng rỗng → no-op, không throw dù chưa có event nào tồn tại', () => {
+    expect(() => insertConsumedRecords(executor, 'khong-ton-tai', [], '2026-08-03T00:00:00.000Z')).not.toThrow();
+  });
+
+  it('chỉ đọc đúng event_id truyền vào, không lẫn record của event khác cùng DataSource', () => {
+    createEvent(executor, { id: 'ev2', name: 'Đợt 2', status: 'draft', customVariables: [], layoutRefs: [], dataSourceId: 'ds1' });
+    insertConsumedRecords(executor, 'ev1', ['ds1::SV001'], '2026-08-03T00:00:00.000Z');
+    insertConsumedRecords(executor, 'ev2', ['ds1::SV002'], '2026-08-03T00:00:00.000Z');
+
+    expect(listConsumedRecordIds(executor, 'ev1')).toEqual(['ds1::SV001']);
+    expect(listConsumedRecordIds(executor, 'ev2')).toEqual(['ds1::SV002']);
   });
 });

@@ -1134,7 +1134,13 @@
     "editButton": "Sửa",
     "recordCountBadge": "{{count}} người",
     "noDataBadge": "Chưa có dữ liệu",
-    "noLayoutBadge": "Chưa có layout"
+    "noLayoutBadge": "Chưa có layout",
+    "importBundleButton": "Nhập đợt lễ...",
+    "importBundleSuccess": "Đã nhập \"{{name}}\"{{renamedSuffix}} — {{layoutsCreated}} layout mới, DataSource {{dataSourceStatus}}.",
+    "importBundleRenamedSuffix": " (đổi tên tránh trùng)",
+    "importBundleDataImported": "đã nhập",
+    "importBundleDataKept": "giữ nguyên/không có",
+    "importBundleError": "Không nhập được đợt lễ: {{message}}"
   },
   "createEventWizard": {
     "step1Title": "Thông tin cơ bản",
@@ -1228,7 +1234,15 @@
     "saveInfoButton": "Lưu",
     "colorLabel": "Màu",
     "colorPickerTooltip": "Chọn màu cho sự kiện",
-    "colorPickerClear": "Bỏ màu"
+    "colorPickerClear": "Bỏ màu",
+    "exportCardTitle": "Xuất đợt lễ này",
+    "exportCardSubtitle": "Lưu Event + layout + dữ liệu ra 1 file .zip",
+    "exportConfirmTitle": "Xuất đợt lễ ra file",
+    "exportIncludeDataLabel": "Bao gồm dữ liệu người tham dự (tên/ảnh/SĐT...)",
+    "exportPiiWarning": "File xuất ra chứa thông tin cá nhân — bảo quản/xoá sau khi dùng đúng quy định của đơn vị.",
+    "exportConfirmButton": "Xuất",
+    "exportSuccess": "Đã xuất đợt lễ ra file: {{filePath}}",
+    "exportError": "Không xuất được: {{message}}"
   },
   "importDataPanel": {
     "uploadPrompt": "Kéo file vào đây hoặc bấm để chọn — hỗ trợ Excel (.xlsx), CSV",

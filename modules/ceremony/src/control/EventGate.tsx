@@ -151,6 +151,37 @@ export function EventGate() {
     }
   };
 
+  // Nhập đợt lễ từ file .zip (Export/Import Loại 2, Giai đoạn 5.3) — chỉ Electron có
+  // eventPort.importBundle (giống pickZipFile, Web ẩn nút hẳn qua check typeof bên dưới).
+  const [importingBundle, setImportingBundle] = useState(false);
+  const handleImportBundle = async () => {
+    if (!eventPort || typeof eventPort.importBundle !== 'function') return;
+    setImportingBundle(true);
+    try {
+      const result = await eventPort.importBundle();
+      if (result === null) {
+        // Người dùng huỷ dialog chọn file — không phải lỗi, không thông báo gì.
+      } else if (result.ok) {
+        const { summary } = result;
+        showSuccessToast(
+          t('eventGate.importBundleSuccess', {
+            name: summary.eventName,
+            renamedSuffix: summary.renamed ? t('eventGate.importBundleRenamedSuffix') : '',
+            layoutsCreated: summary.layoutsCreated,
+            dataSourceStatus: summary.dataSourceImported ? t('eventGate.importBundleDataImported') : t('eventGate.importBundleDataKept'),
+          }),
+        );
+        await refreshList(eventPort);
+      } else {
+        showErrorToast(t('eventGate.importBundleError', { message: result.message }));
+      }
+    } catch (err) {
+      showErrorToast(t('eventGate.importBundleError', { message: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      setImportingBundle(false);
+    }
+  };
+
   // Dữ liệu mẫu (menu Develop > "Dùng dữ liệu mẫu", 2026-07-30) — tắt thì ẨN hẳn dòng này khỏi
   // danh sách, KHÔNG xoá khỏi DB (xem eventStore.ts's sampleDataEnabled). Event mẫu vẫn nằm trong
   // `events` (query DB thật, không lọc ở port) — lọc ở đây là NƠI DUY NHẤT quyết định hiện/ẩn.
@@ -178,9 +209,16 @@ export function EventGate() {
             <h1 className="text-lg font-semibold text-foreground">{t('eventGate.title')}</h1>
             <p className="text-sm text-muted-foreground">{t('eventGate.subtitle')}</p>
           </div>
-          <Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowCreate(true)}>
-            {t('eventGate.createButton')}
-          </Button>
+          <div className="flex items-center gap-2">
+            {typeof eventPort?.importBundle === 'function' && (
+              <Button variant="secondary" icon={<Upload size={14} />} loading={importingBundle} onClick={() => void handleImportBundle()}>
+                {t('eventGate.importBundleButton')}
+              </Button>
+            )}
+            <Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowCreate(true)}>
+              {t('eventGate.createButton')}
+            </Button>
+          </div>
         </div>
 
         {!loading && visibleEvents.length === 0 && (

@@ -4,8 +4,9 @@
 // tham dự, optional lúc tạo — có thể gán sau).
 
 import type { CanonicalGroup, CanonicalSubject } from './canonical.js';
-import type { LayoutVariant } from './types.js';
+import type { LayoutContent, LayoutVariant } from './types.js';
 import type { CustomVariable, VarRuleOp } from '../types.js';
+import type { FieldMappingProfile } from './field-mapping.js';
 
 export type { CustomVariable };
 
@@ -103,6 +104,35 @@ export interface EventSummary {
   status: EventDocument['status'];
   scheduledAt?: string;
   updatedAt: string;
+}
+
+/**
+ * EventBundleManifest — Giai đoạn 5.3 (docs/roadmap/plans/layout-designer/15-import-export.md
+ * "Loại 2"). File tự chứa để sao lưu/chuyển 1 Event sang máy khác — gồm Event + layout THAM
+ * CHIẾU (chỉ đúng version đã ghim trong layoutRefs lúc export, KHÔNG phải toàn bộ lịch sử
+ * publishedVersions) + DataSource (optional, tuỳ chọn "bao gồm dữ liệu" lúc export) + mapping
+ * profile + trạng thái đã trao (event_consumed_record). `assets` là danh sách relativePath cần
+ * đóng gói kèm trong zip's `assets/` (ảnh nền layout + ảnh record) — bản thân type này KHÔNG
+ * chứa byte ảnh, đó là việc của tầng zip (Electron main process, xem ipc.ts).
+ */
+export interface EventBundleManifest {
+  version: 1;
+  exportedAt: string;
+  event: EventDocument;
+  referencedLayouts: Array<{
+    layoutId: string;
+    layoutVersion: number;
+    name: string;
+    description?: string;
+    color?: string;
+    category?: string;
+    tags?: string[];
+    content: LayoutContent;
+  }>;
+  dataSource?: DataSource;
+  mappingProfile?: FieldMappingProfile;
+  consumedRecordIds: string[];
+  assets: string[];
 }
 
 /**

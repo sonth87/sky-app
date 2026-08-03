@@ -25,5 +25,11 @@ export function createElectronEventPort(): EventPort {
     async setActive(id) {
       await window.sky.invoke('kernel:event:setActive', id);
     },
+    async exportBundle(eventId, opts) {
+      return (await window.sky.invoke('kernel:event:exportBundle', eventId, opts)) as Awaited<ReturnType<NonNullable<EventPort['exportBundle']>>>;
+    },
+    async importBundle() {
+      return (await window.sky.invoke('kernel:event:importBundle')) as Awaited<ReturnType<NonNullable<EventPort['importBundle']>>>;
+    },
   };
 }

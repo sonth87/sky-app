@@ -91,6 +91,35 @@ function rowToRecord(row: DataSourceRecordRow): CanonicalSubject | CanonicalGrou
   };
 }
 
+/** Toàn bộ storage id (`dataSourceId::naturalKey`) đã "đã trao" cho 1 Event cụ thể — dùng bởi
+ * Giai đoạn 5.3 (Export/Import Loại 2) để đóng gói/khôi phục trạng thái đã trao vào bundle. Khác
+ * `getDataSourceRecords`'s JOIN loại trừ (cộng dồn qua NHIỀU Event) — hàm này CHỈ đọc đúng 1
+ * event_id, dùng cho export (mỗi Event tự đóng gói trạng thái của chính nó). */
+export function listConsumedRecordIds(executor: SqlExecutor, eventId: string): string[] {
+  const rows = executor.query<{ data_source_record_id: string }>(
+    'SELECT data_source_record_id FROM event_consumed_record WHERE event_id = ?',
+    [eventId],
+  );
+  return rows.map((r) => r.data_source_record_id);
+}
+
+/** Ghi lại trạng thái "đã trao" khi import bundle (Giai đoạn 5.3) — `recordIds` là storage id
+ * nguyên trạng lấy từ bundle, `eventId` là id THẬT SỰ dùng ở máy đích (có thể đã đổi nếu trùng
+ * Event cũ, xem applyEventBundle). Yêu cầu record tương ứng đã tồn tại trong `data_source_record`
+ * (FK) — caller đảm bảo DataSource đã được khôi phục trước khi gọi hàm này. */
+export function insertConsumedRecords(executor: SqlExecutor, eventId: string, recordIds: string[], consumedAt: string): void {
+  if (recordIds.length === 0) return;
+  executor.transaction(() => {
+    for (const recordId of recordIds) {
+      executor.run('INSERT INTO event_consumed_record (event_id, data_source_record_id, consumed_at) VALUES (?, ?, ?)', [
+        eventId,
+        recordId,
+        consumedAt,
+      ]);
+    }
+  });
+}
+
 export function getDataSource(executor: SqlExecutor, id: string): DataSource | null {
   const rows = executor.query<DataSourceRow>('SELECT * FROM data_source WHERE id = ?', [id]);
   const row = rows[0];

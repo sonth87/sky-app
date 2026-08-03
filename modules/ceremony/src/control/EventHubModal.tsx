@@ -12,7 +12,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Database, LayoutTemplate, Check, Pencil } from 'lucide-react';
+import { Database, LayoutTemplate, Check, Pencil, Download } from 'lucide-react';
 import type { AssetPort, DataSourcePort, EventPort, LayoutPort } from '@sky-app/service-contracts';
 import type { EventDocument } from '@sky-app/slide-shared';
 import { Modal } from './components/ui/Modal.js';
@@ -44,7 +44,7 @@ interface EventHubModalProps {
   initialView?: 'import' | 'layout';
 }
 
-type HubView = 'menu' | 'import' | 'layout' | 'info';
+type HubView = 'menu' | 'import' | 'layout' | 'info' | 'export-confirm';
 
 export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layoutPort, assetPort, onChanged, initialEvent, initialView }: EventHubModalProps) {
   const { t } = useTranslation();
@@ -55,6 +55,8 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
   const [color, setColor] = useState(initialEvent?.color);
   const [submitting, setSubmitting] = useState(false);
   const [view, setView] = useState<HubView>(initialView ?? 'menu');
+  const [exportIncludeData, setExportIncludeData] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   const resetAll = () => {
     setEvent(initialEvent ?? null);
@@ -132,6 +134,26 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
     }
   };
 
+  const handleExport = async () => {
+    if (!event || typeof eventPort.exportBundle !== 'function') return;
+    setExporting(true);
+    try {
+      const result = await eventPort.exportBundle(event.id, { includeData: exportIncludeData });
+      if (result === null) {
+        // Người dùng huỷ dialog chọn nơi lưu — không phải lỗi, không thông báo gì.
+      } else if (result.ok) {
+        showSuccessToast(t('eventHub.exportSuccess', { filePath: result.filePath }));
+        setView('menu');
+      } else {
+        showErrorToast(t('eventHub.exportError', { message: result.message }));
+      }
+    } catch (err) {
+      showErrorToast(t('eventHub.exportError', { message: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleLayoutSaved = (updated: EventDocument) => {
     setEvent(updated);
     onChanged();
@@ -203,6 +225,37 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
           onSaved={handleLayoutSaved}
           onBack={() => setView('menu')}
         />
+      </Modal>
+    );
+  }
+
+  if (view === 'export-confirm') {
+    return (
+      <Modal open={open} onClose={handleClose} title={t('eventHub.exportConfirmTitle')} size="md" closeOnBackdrop={false}>
+        <div className="flex flex-col gap-4">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={exportIncludeData}
+              onChange={(e) => setExportIncludeData(e.target.checked)}
+            />
+            <span>{t('eventHub.exportIncludeDataLabel')}</span>
+          </label>
+          {exportIncludeData && (
+            <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-foreground">
+              {t('eventHub.exportPiiWarning')}
+            </div>
+          )}
+          <div className="mt-2 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setView('menu')}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="primary" loading={exporting} onClick={() => void handleExport()}>
+              {t('eventHub.exportConfirmButton')}
+            </Button>
+          </div>
+        </div>
       </Modal>
     );
   }
@@ -305,6 +358,19 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
             </div>
           </div>
           {hasLayout && <Check size={16} className="flex-none text-success" />}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setView('export-confirm')}
+          disabled={typeof eventPort.exportBundle !== 'function'}
+          className="flex items-center gap-3 rounded-lg border border-border p-4 text-left hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Download size={22} className="flex-none text-muted-foreground" />
+          <div className="flex-1">
+            <div className="text-sm font-medium text-foreground">{t('eventHub.exportCardTitle')}</div>
+            <div className="text-xs text-muted-foreground">{t('eventHub.exportCardSubtitle')}</div>
+          </div>
         </button>
 
         <div className="mt-2 flex justify-end">

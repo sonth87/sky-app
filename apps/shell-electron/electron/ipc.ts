@@ -6,10 +6,12 @@ import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { isUpdateReadyToInstall, getPendingNativeUpdateInfo } from './update-checker';
-import { layoutAssetsDir, ceremonyDataDir, ttsPregenDir, ttsPregenManifestPath, ttsPregenWavPath } from './slide/data/paths';
-import type { CanonicalGroup, CanonicalSubject, EventDocument, FieldMappingProfile, LayoutContent } from '@sky-app/slide-shared';
+import { layoutAssetsDir, ceremonyDataDir, resolveLocalAsset, ttsPregenDir, ttsPregenManifestPath, ttsPregenWavPath } from './slide/data/paths';
+import type { CanonicalGroup, CanonicalSubject, EventBundleManifest, EventDocument, FieldMappingProfile, LayoutContent } from '@sky-app/slide-shared';
 import type { DataSource } from '@sky-app/slide-shared';
 import {
+  applyEventBundle,
+  buildEventBundle,
   createEvent,
   createLayoutDocument,
   getCurrentActiveEvent,
@@ -280,6 +282,84 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     // (server-side), KHÔNG phải useControlStore (client-side, chỉ để hiển thị dashboard) — nếu
     // không đồng bộ ở đây, mọi thao tác "hiện lên sân khấu" âm thầm thất bại với Event mới.
     syncCeremonyStoreForEvent(active);
+  });
+
+  // Export/Import Loại 2 (Giai đoạn 5.3, 15-import-export.md) — gom bundle qua buildEventBundle
+  // (thuần, packages/ceremony-db) rồi đóng gói zip Ở ĐÂY (main process, đúng lý do đã ghi ở
+  // kernel:dataSource:pickZipFile: tránh thêm dependency zip-in-browser + tránh chuyển buffer
+  // ảnh lớn qua IPC). Tên entry trong zip = CHÍNH relativePath của asset (VD "assets/layout/
+  // x.jpg", "avatar/sv001.jpg") — resolveLocalAsset() đã biết map 2 dạng path này về đúng chỗ
+  // trên đĩa cho CẢ export (đọc) lẫn import (ghi), không cần thêm logic map riêng.
+  ipcMain.handle('kernel:event:exportBundle', async (_event, eventId: string, opts: { includeData: boolean }) => {
+    const manifest = buildEventBundle(ceremonyStore.getExecutor(), eventId, opts);
+    if (!manifest) return { ok: false, message: `Không tìm thấy đợt lễ "${eventId}".` };
+
+    const win = getMainWindow();
+    if (!win) return { ok: false, message: 'Không tìm thấy cửa sổ chính.' };
+    const slug = manifest.event.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-+|-+$)/g, '') || 'dot-le';
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Xuất đợt lễ',
+      defaultPath: `${slug}-${new Date().toISOString().slice(0, 10)}.zip`,
+      filters: [{ name: 'ZIP', extensions: ['zip'] }],
+    });
+    if (canceled || !filePath) return null;
+
+    try {
+      const zip = new AdmZip();
+      zip.addFile('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2)));
+      for (const relativePath of manifest.assets) {
+        const absPath = resolveLocalAsset(relativePath);
+        if (existsSync(absPath)) zip.addFile(relativePath, readFileSync(absPath));
+        // Thiếu file (VD ảnh đã bị xoá thủ công ngoài app) → bỏ qua, không chặn export.
+      }
+      zip.writeZip(filePath);
+      return { ok: true, filePath };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('kernel:event:importBundle', async () => {
+    const win = getMainWindow();
+    if (!win) return { ok: false, message: 'Không tìm thấy cửa sổ chính.' };
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Chọn file đợt lễ (.zip)',
+      filters: [{ name: 'ZIP', extensions: ['zip'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || filePaths.length === 0) return null;
+
+    try {
+      const zip = new AdmZip(filePaths[0]!);
+      const manifestEntry = zip.getEntry('manifest.json');
+      if (!manifestEntry) return { ok: false, message: 'File ZIP thiếu manifest.json — không đúng định dạng bundle đợt lễ.' };
+      const manifest = JSON.parse(zip.readAsText(manifestEntry)) as EventBundleManifest;
+
+      for (const entry of zip.getEntries()) {
+        if (entry.isDirectory || entry.entryName === 'manifest.json') continue;
+        const destPath = resolveLocalAsset(entry.entryName);
+        mkdirSync(dirname(destPath), { recursive: true });
+        writeFileSync(destPath, entry.getData());
+      }
+
+      const result = applyEventBundle(ceremonyStore.getExecutor(), manifest);
+      return {
+        ok: true,
+        summary: {
+          eventName: result.eventName,
+          renamed: result.renamed,
+          layoutsCreated: result.layoutsCreated.length,
+          dataSourceImported: result.dataSourceImported,
+        },
+      };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   ipcMain.handle('kernel:dataSource:list', async () => {

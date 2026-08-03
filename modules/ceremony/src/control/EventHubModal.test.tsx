@@ -200,3 +200,101 @@ describe('EventHubModal — Giai đoạn B (Hub, Event đã tồn tại)', () =>
     expect(screen.getByText(/Cấu hình layout/)).toBeTruthy();
   });
 });
+
+describe('EventHubModal — Xuất đợt lễ (Giai đoạn 5.3, Export/Import Loại 2)', () => {
+  it('eventPort không có exportBundle (VD Web) → thẻ "Xuất đợt lễ này" bị disable', () => {
+    render(
+      <EventHubModal
+        open
+        onClose={() => {}}
+        eventPort={mockEventPort()}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={() => {}}
+        initialEvent={sampleEvent()}
+      />,
+    );
+    expect(screen.getByText('Xuất đợt lễ này').closest('button')).toBeDisabled();
+  });
+
+  it('eventPort có exportBundle → bấm thẻ mở màn xác nhận, checkbox "bao gồm dữ liệu" mặc định BẬT kèm cảnh báo PII', () => {
+    render(
+      <EventHubModal
+        open
+        onClose={() => {}}
+        eventPort={mockEventPort({ exportBundle: vi.fn() })}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={() => {}}
+        initialEvent={sampleEvent()}
+      />,
+    );
+    fireEvent.click(screen.getByText('Xuất đợt lễ này'));
+
+    const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+    expect(screen.getByText(/chứa thông tin cá nhân/)).toBeTruthy();
+  });
+
+  it('bỏ tích checkbox → cảnh báo PII biến mất', () => {
+    render(
+      <EventHubModal
+        open
+        onClose={() => {}}
+        eventPort={mockEventPort({ exportBundle: vi.fn() })}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={() => {}}
+        initialEvent={sampleEvent()}
+      />,
+    );
+    fireEvent.click(screen.getByText('Xuất đợt lễ này'));
+    fireEvent.click(screen.getByRole('checkbox'));
+
+    expect(screen.queryByText(/chứa thông tin cá nhân/)).toBeNull();
+  });
+
+  it('bấm Xuất → gọi exportBundle đúng eventId + includeData, thành công → quay lại Hub menu', async () => {
+    const exportBundle = vi.fn().mockResolvedValue({ ok: true, filePath: '/tmp/dot-le.zip' });
+    render(
+      <EventHubModal
+        open
+        onClose={() => {}}
+        eventPort={mockEventPort({ exportBundle })}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={() => {}}
+        initialEvent={sampleEvent({ id: 'ev-export-1' })}
+      />,
+    );
+    fireEvent.click(screen.getByText('Xuất đợt lễ này'));
+    fireEvent.click(screen.getByText('Xuất'));
+
+    await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('ev-export-1', { includeData: true }));
+    await waitFor(() => expect(screen.getByText('Xuất đợt lễ này')).toBeTruthy()); // quay lại Hub menu
+  });
+
+  it('người dùng huỷ dialog lưu file (exportBundle trả null) → không đóng modal, không throw', async () => {
+    const exportBundle = vi.fn().mockResolvedValue(null);
+    render(
+      <EventHubModal
+        open
+        onClose={() => {}}
+        eventPort={mockEventPort({ exportBundle })}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={() => {}}
+        initialEvent={sampleEvent()}
+      />,
+    );
+    fireEvent.click(screen.getByText('Xuất đợt lễ này'));
+    fireEvent.click(screen.getByText('Xuất'));
+
+    await waitFor(() => expect(exportBundle).toHaveBeenCalled());
+  });
+});
