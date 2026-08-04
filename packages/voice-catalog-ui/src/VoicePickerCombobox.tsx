@@ -136,10 +136,16 @@ export function VoicePickerCombobox({
             <Loader2 size={13} className="animate-spin" /> {loadingLabel}
           </span>
         ) : selected ? (
+          // Bug thật 2026-08-04: name KHÔNG có flex-shrink-0 trong khi dấu "·" và tagline CÓ —
+          // trong hàng flex chật, name (thứ cần ưu tiên hiển thị, "Hoài My") là phần tử co được
+          // DUY NHẤT nên bị bóp gần như về 0, còn tagline (phụ, "Warm, natural Vietnamese female
+          // voice") lại chiếm hết chỗ vì được bảo vệ khỏi co — ngược hoàn toàn với ưu tiên mong
+          // muốn. Đảo lại: name shrink-0 (luôn hiện đủ, chỉ cắt bớt trong max-w riêng nếu CHÍNH
+          // nó quá dài), tagline min-w-0 + flex-1 (chiếm phần còn lại, tự truncate khi thiếu chỗ).
           <span className="flex min-w-0 items-center gap-1.5 text-foreground">
-            <span className="truncate font-medium">{selected.name}</span>
-            {selected.tagline && <span className="flex-shrink-0 text-muted-foreground">·</span>}
-            {selected.tagline && <span className="flex-shrink-0 truncate text-xs text-muted-foreground">{selected.tagline}</span>}
+            <span className="max-w-[60%] shrink-0 truncate font-medium">{selected.name}</span>
+            {selected.tagline && <span className="shrink-0 text-muted-foreground">·</span>}
+            {selected.tagline && <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{selected.tagline}</span>}
           </span>
         ) : (
           <span className="text-muted-foreground">{placeholder}</span>

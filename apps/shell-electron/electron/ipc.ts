@@ -14,6 +14,7 @@ import {
   buildEventBundle,
   createEvent,
   createLayoutDocument,
+  deleteEvent,
   getCurrentActiveEvent,
   getDataSource,
   getDataSourceRecords,
@@ -243,6 +244,13 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('kernel:event:create', async (_event, doc: Omit<EventDocument, 'createdAt' | 'updatedAt'>) => {
     createEvent(ceremonyStore.getExecutor(), doc);
+  });
+
+  // Xoá Event vĩnh viễn (yêu cầu Sonth, 2026-08-03) — CRUD cơ bản, KHÔNG dọn dẹp socket/backdrop
+  // state đặc biệt kể cả khi xoá Event đang active (giữ đúng triết lý "không tự động bảo vệ" đã
+  // nhất quán trong repo — cổng xác nhận gõ đúng tên ở UI đã đủ chặt).
+  ipcMain.handle('kernel:event:delete', async (_event, id: string) => {
+    deleteEvent(ceremonyStore.getExecutor(), id);
   });
 
   ipcMain.handle('kernel:event:save', async (_event, doc: EventDocument) => {

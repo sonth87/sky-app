@@ -7,7 +7,7 @@
 
 import type { SqlExecutor } from '../sql-executor.js';
 import type { DataSource, EventBundleManifest } from '@sky-app/slide-shared';
-import { getEvent, createEvent } from './event.js';
+import { getEvent, listEvents, createEvent } from './event.js';
 import { getLayoutDocument, getVersion, createLayoutDocument, updateLayoutDocumentMeta, publish } from './layout.js';
 import { getDataSource, insertDataSource, insertDataSourceRecords, listConsumedRecordIds, insertConsumedRecords } from './data-source.js';
 import { listFieldMappingProfiles, saveFieldMappingProfile } from './field-mapping-profile.js';
@@ -78,17 +78,34 @@ export function buildEventBundle(executor: SqlExecutor, eventId: string, opts: {
 
 export interface ApplyEventBundleResult {
   eventId: string;
+  /** Tên THẬT SỰ đã lưu (đã đánh số nếu trùng tên có sẵn) — KHÔNG phải tên gốc trong manifest. */
   eventName: string;
+  /** true nếu tên đã bị đổi (đánh số " - N") do trùng tên Event có sẵn ở máy đích — KHÁC id (id
+   * trùng luôn tự đổi âm thầm, không phản ánh vào field này, xem `uniqueEventName`). */
   renamed: boolean;
   layoutsCreated: string[];
   dataSourceImported: boolean;
 }
 
+/** Tìm tên KHÔNG trùng với bất kỳ Event nào đã có ở máy đích — trùng thì đánh số tăng dần
+ * `"{name} - 1"`, `"{name} - 2"`... (giống git khi clone trùng tên thư mục, yêu cầu Sonth
+ * 2026-08-03 sau khi thử import trùng tên thật, thấy 2 Event cùng tên không phân biệt được). */
+function uniqueEventName(executor: SqlExecutor, desiredName: string): string {
+  const existingNames = new Set(listEvents(executor).map((e) => e.name));
+  if (!existingNames.has(desiredName)) return desiredName;
+  let n = 1;
+  while (existingNames.has(`${desiredName} - ${n}`)) n += 1;
+  return `${desiredName} - ${n}`;
+}
+
 /** Khôi phục 1 bundle vào máy đích — chính sách ĐƠN GIẢN, không diff/merge (đó là phạm vi
  * "re-import DataSource" riêng, chưa làm): layout/DataSource đã tồn tại → GIỮ NGUYÊN, bỏ qua;
- * Event trùng id → sinh id MỚI (không ghi đè). Luôn import Event ở status='draft' bất kể status
- * gốc — tránh vi phạm bất biến "chỉ 1 Event active tại 1 thời điểm" (setActiveEvent's invariant,
- * createEvent không tự kiểm tra điều này). */
+ * Event trùng ID → sinh ID MỚI (không ghi đè, để không vỡ PRIMARY KEY); Event trùng TÊN → đánh số
+ * tăng dần vào tên (để người dùng phân biệt được trong danh sách) — 2 việc TÁCH BIỆT, độc lập
+ * nhau, có thể xảy ra cùng lúc hoặc riêng lẻ (VD import đúng file zip cũ 2 lần → trùng cả 2; đổi
+ * tên Event có sẵn rồi import lại → chỉ trùng id, không trùng tên). Luôn import Event ở
+ * status='draft' bất kể status gốc — tránh vi phạm bất biến "chỉ 1 Event active tại 1 thời điểm"
+ * (setActiveEvent's invariant, createEvent không tự kiểm tra điều này). */
 export function applyEventBundle(executor: SqlExecutor, manifest: EventBundleManifest): ApplyEventBundleResult {
   const layoutsCreated: string[] = [];
   const versionRemap = new Map<string, number>(); // `${layoutId}@${oldVersion}` → version mới tạo ở máy đích
@@ -127,13 +144,14 @@ export function applyEventBundle(executor: SqlExecutor, manifest: EventBundleMan
     saveFieldMappingProfile(executor, manifest.mappingProfile); // upsert sẵn, không cần check tồn tại
   }
 
-  const existingEvent = getEvent(executor, manifest.event.id);
-  const renamed = existingEvent != null;
-  const targetId = renamed ? `event_${crypto.randomUUID()}` : manifest.event.id;
+  const idCollides = getEvent(executor, manifest.event.id) != null;
+  const targetId = idCollides ? `event_${crypto.randomUUID()}` : manifest.event.id;
+  const targetName = uniqueEventName(executor, manifest.event.name);
+  const renamed = targetName !== manifest.event.name;
 
   createEvent(executor, {
     id: targetId,
-    name: manifest.event.name,
+    name: targetName,
     status: 'draft',
     scheduledAt: manifest.event.scheduledAt,
     color: manifest.event.color,
@@ -151,7 +169,7 @@ export function applyEventBundle(executor: SqlExecutor, manifest: EventBundleMan
 
   return {
     eventId: targetId,
-    eventName: manifest.event.name,
+    eventName: targetName,
     renamed,
     layoutsCreated,
     dataSourceImported,

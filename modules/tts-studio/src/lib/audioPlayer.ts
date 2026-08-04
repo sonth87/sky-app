@@ -132,6 +132,13 @@ export async function playUrlAudio(id: string, url: string): Promise<void> {
     }
   };
   audio.onended = clearIfCurrent;
-  audio.onerror = clearIfCurrent;
+  audio.onerror = () => {
+    // Trước đây nuốt lỗi hoàn toàn — bấm nghe thử giọng thiếu file preview (404) trông như
+    // không có tác dụng gì, không cách nào biết vì sao (bug thật 2026-08-04, xem
+    // apps/tts-service/server/generate_previews.py's fix cùng đợt). Log ra console để còn
+    // debug được nếu tái diễn (vd thêm giọng preset mới quên chạy generate_previews.py).
+    console.error(`[audioPlayer] Không phát được audio (url=${url}):`, audio.error);
+    clearIfCurrent();
+  };
   await audio.play();
 }

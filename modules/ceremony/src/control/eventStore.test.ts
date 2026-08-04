@@ -27,6 +27,7 @@ function mockEventPort(overrides: Partial<EventPort> = {}): EventPort {
     get: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue(undefined),
     save: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
     getCurrentActive: vi.fn().mockResolvedValue(null),
     setActive: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -153,7 +154,7 @@ describe('useEventStore — checkGate', () => {
 
 describe('useEventStore — refreshList', () => {
   it('gọi list() và set events', async () => {
-    const summaries: EventSummary[] = [{ id: 'ev1', name: 'Đợt 1', status: 'draft', updatedAt: '2026-01-01' }];
+    const summaries: EventSummary[] = [{ id: 'ev1', name: 'Đợt 1', status: 'draft', createdAt: '2026-01-01', updatedAt: '2026-01-01' }];
     const port = mockEventPort({ list: vi.fn().mockResolvedValue(summaries) });
     await useEventStore.getState().refreshList(port);
     expect(useEventStore.getState().events).toEqual(summaries);

@@ -13,6 +13,7 @@ function mockEventPort(overrides: Partial<EventPort> = {}): EventPort {
     get: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue(undefined),
     save: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
     getCurrentActive: vi.fn().mockResolvedValue(null),
     setActive: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -127,6 +128,26 @@ describe('EventHubModal — Giai đoạn B (Hub, Event đã tồn tại)', () =>
     expect(screen.getByText('Import dữ liệu')).toBeTruthy();
     expect(screen.getByText('Chọn layout')).toBeTruthy();
     expect(screen.queryByPlaceholderText(/Lễ trao bằng đợt/)).toBeNull();
+  });
+
+  it('initialView="info" (nút "Sửa" chính, 2026-08-03 phản hồi thật) → mở THẲNG vào màn Sửa thông tin, bỏ qua Hub menu — thấy ngay nút Xoá', () => {
+    render(
+      <EventHubModal
+        open
+        onClose={() => {}}
+        eventPort={mockEventPort()}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={() => {}}
+        initialEvent={sampleEvent({ name: 'Lễ trao bằng' })}
+        initialView="info"
+      />,
+    );
+    expect(screen.getByText('Sửa thông tin sự kiện')).toBeTruthy();
+    expect(screen.getByDisplayValue('Lễ trao bằng')).toBeTruthy();
+    expect(screen.getByText('Xoá đợt lễ này')).toBeTruthy();
+    expect(screen.queryByText('Import dữ liệu')).toBeNull(); // KHÔNG dừng ở Hub menu
   });
 
   it('Event chưa có dataSourceId/layoutRefs → cả 2 thẻ hiện trạng thái "chưa có", không có dấu tick', () => {
@@ -296,5 +317,118 @@ describe('EventHubModal — Xuất đợt lễ (Giai đoạn 5.3, Export/Import 
     fireEvent.click(screen.getByText('Xuất'));
 
     await waitFor(() => expect(exportBundle).toHaveBeenCalled());
+  });
+});
+
+describe('EventHubModal — Xoá Event (yêu cầu Sonth 2026-08-03, kiểu "gõ tên để xác nhận" như GitHub)', () => {
+  function openDeleteConfirm() {
+    fireEvent.click(screen.getByTitle('Sửa tên/ngày sự kiện'));
+    fireEvent.click(screen.getByText('Xoá đợt lễ này'));
+  }
+
+  it('màn Sửa (info) có nút đỏ "Xoá đợt lễ này", bấm vào mở màn xác nhận với input trống', () => {
+    render(
+      <EventHubModal
+        open
+        onClose={() => {}}
+        eventPort={mockEventPort()}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={() => {}}
+        initialEvent={sampleEvent({ name: 'Lễ trao bằng' })}
+      />,
+    );
+    openDeleteConfirm();
+
+    expect(screen.getByText('Xoá đợt lễ vĩnh viễn?')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Lễ trao bằng')).toBeTruthy();
+  });
+
+  it('gõ SAI tên Event → nút "Xoá vĩnh viễn" vẫn disable', () => {
+    render(
+      <EventHubModal
+        open
+        onClose={() => {}}
+        eventPort={mockEventPort()}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={() => {}}
+        initialEvent={sampleEvent({ name: 'Lễ trao bằng' })}
+      />,
+    );
+    openDeleteConfirm();
+    fireEvent.change(screen.getByPlaceholderText('Lễ trao bằng'), { target: { value: 'sai tên' } });
+
+    expect(screen.getByText('Xoá vĩnh viễn').closest('button')).toBeDisabled();
+  });
+
+  it('gõ ĐÚNG tên Event (phân biệt hoa/thường) → nút enable, bấm vào gọi eventPort.delete(event.id), đóng modal + gọi onChanged', async () => {
+    const del = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    const onChanged = vi.fn();
+    render(
+      <EventHubModal
+        open
+        onClose={onClose}
+        eventPort={mockEventPort({ delete: del })}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={onChanged}
+        initialEvent={sampleEvent({ id: 'ev-del-1', name: 'Lễ trao bằng' })}
+      />,
+    );
+    openDeleteConfirm();
+    fireEvent.change(screen.getByPlaceholderText('Lễ trao bằng'), { target: { value: 'Lễ trao bằng' } });
+
+    const confirmButton = screen.getByText('Xoá vĩnh viễn').closest('button')!;
+    expect(confirmButton).not.toBeDisabled();
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(del).toHaveBeenCalledWith('ev-del-1'));
+    expect(onChanged).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('gõ đúng tên nhưng SAI hoa/thường → vẫn disable (so khớp tuyệt đối)', () => {
+    render(
+      <EventHubModal
+        open
+        onClose={() => {}}
+        eventPort={mockEventPort()}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={() => {}}
+        initialEvent={sampleEvent({ name: 'Lễ trao bằng' })}
+      />,
+    );
+    openDeleteConfirm();
+    fireEvent.change(screen.getByPlaceholderText('Lễ trao bằng'), { target: { value: 'lễ trao bằng' } });
+
+    expect(screen.getByText('Xoá vĩnh viễn').closest('button')).toBeDisabled();
+  });
+
+  it('bấm Huỷ ở màn xác nhận → quay lại màn Sửa (info), KHÔNG gọi delete', () => {
+    const del = vi.fn();
+    render(
+      <EventHubModal
+        open
+        onClose={() => {}}
+        eventPort={mockEventPort({ delete: del })}
+        dataSourcePort={mockDataSourcePort()}
+        layoutPort={mockLayoutPort()}
+        assetPort={undefined}
+        onChanged={() => {}}
+        initialEvent={sampleEvent({ name: 'Lễ trao bằng' })}
+      />,
+    );
+    openDeleteConfirm();
+    fireEvent.click(screen.getByText('Hủy'));
+
+    expect(screen.getByText('Sửa thông tin sự kiện')).toBeTruthy(); // quay lại info view
+    expect(del).not.toHaveBeenCalled();
   });
 });

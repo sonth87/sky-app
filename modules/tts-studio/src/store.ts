@@ -12,6 +12,7 @@ export interface StudioVoice {
   tagline?: string;
   description?: string;
   sourceCatalogId?: string;
+  default?: boolean;
 }
 
 export interface HistoryEntryMeta {

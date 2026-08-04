@@ -19,6 +19,9 @@ export function createElectronEventPort(): EventPort {
     async save(doc) {
       await window.sky.invoke('kernel:event:save', doc);
     },
+    async delete(id) {
+      await window.sky.invoke('kernel:event:delete', id);
+    },
     async getCurrentActive() {
       return (await window.sky.invoke('kernel:event:getCurrentActive')) as Awaited<ReturnType<EventPort['getCurrentActive']>>;
     },

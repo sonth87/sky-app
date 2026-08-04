@@ -79,7 +79,7 @@ function resolveAssetPort(baseUrl: string, available: boolean): AssetPort {
 function resolveEventPort(baseUrl: string, available: boolean): EventPort {
   if (available) return createWebEventPort(baseUrl);
   const unavailable = () => Promise.reject(new Error('EventPort: data-service không khả dụng, WASM fallback chưa implement (Giai đoạn 3)'));
-  return { list: unavailable, get: unavailable, create: unavailable, save: unavailable, getCurrentActive: unavailable, setActive: unavailable };
+  return { list: unavailable, get: unavailable, create: unavailable, save: unavailable, delete: unavailable, getCurrentActive: unavailable, setActive: unavailable };
 }
 
 function resolveDataSourcePort(baseUrl: string, available: boolean): DataSourcePort {

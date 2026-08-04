@@ -3,6 +3,7 @@ import { FileText } from 'lucide-react';
 import { useTtsStudioStore } from '../store';
 import { useTextareaRef } from '../TextareaRefContext';
 import { buildEmotionHighlightedHtml, getCaretCharOffset, setCaretCharOffset } from '../lib/highlightEditor';
+import { SampleTextPicker } from './SampleTextPicker';
 
 export function TextInputPanel() {
   const text = useTtsStudioStore((s) => s.text);
@@ -60,7 +61,10 @@ export function TextInputPanel() {
         <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
           <FileText size={14} /> Trình soạn thảo văn bản
         </div>
-        <span className="text-2xs text-muted-foreground">{text.length} ký tự</span>
+        <div className="flex items-center gap-2">
+          <SampleTextPicker />
+          <span className="text-2xs text-muted-foreground">{text.length} ký tự</span>
+        </div>
       </div>
       <div
         ref={editorRef}

@@ -1140,7 +1140,8 @@
     "importBundleRenamedSuffix": " (đổi tên tránh trùng)",
     "importBundleDataImported": "đã nhập",
     "importBundleDataKept": "giữ nguyên/không có",
-    "importBundleError": "Không nhập được đợt lễ: {{message}}"
+    "importBundleError": "Không nhập được đợt lễ: {{message}}",
+    "createdAtLabel": "Tạo {{date}}"
   },
   "createEventWizard": {
     "step1Title": "Thông tin cơ bản",
@@ -1242,7 +1243,14 @@
     "exportPiiWarning": "File xuất ra chứa thông tin cá nhân — bảo quản/xoá sau khi dùng đúng quy định của đơn vị.",
     "exportConfirmButton": "Xuất",
     "exportSuccess": "Đã xuất đợt lễ ra file: {{filePath}}",
-    "exportError": "Không xuất được: {{message}}"
+    "exportError": "Không xuất được: {{message}}",
+    "deleteButton": "Xoá đợt lễ này",
+    "deleteConfirmTitle": "Xoá đợt lễ vĩnh viễn?",
+    "deleteConfirmWarning": "Hành động này KHÔNG THỂ hoàn tác. Toàn bộ cấu hình layout/biến của đợt lễ này sẽ bị xoá (DataSource và Layout liên quan vẫn được giữ nguyên, không bị xoá theo).",
+    "deleteConfirmInputLabel": "Nhập \"{{name}}\" để xác nhận",
+    "deleteConfirmButton": "Xoá vĩnh viễn",
+    "deleteSuccess": "Đã xoá đợt lễ \"{{name}}\"",
+    "deleteError": "Không xoá được: {{message}}"
   },
   "importDataPanel": {
     "uploadPrompt": "Kéo file vào đây hoặc bấm để chọn — hỗ trợ Excel (.xlsx), CSV",

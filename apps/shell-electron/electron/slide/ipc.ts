@@ -439,7 +439,9 @@ export function registerIpcHandlers() {
     text: string; voiceId?: string; speed?: number;
   }) => {
     if (!text?.trim()) return { ok: false, error: 'Empty text' };
-    return synthesizeTtsStudio(text.trim(), voiceId || 'NF', speed ?? 1.0);
+    // 'NF' (giọng placeholder cũ) đã bị xoá khỏi voice-registry.json 2026-08-04 — Giang
+    // (clone-d0f05071) là giọng mặc định mới khi voiceId trống.
+    return synthesizeTtsStudio(text.trim(), voiceId || 'clone-d0f05071', speed ?? 1.0);
   });
 
   function _saveRealtimeWav(
@@ -690,6 +692,11 @@ export function registerIpcHandlers() {
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
+    // Đã có 1 lượt tải đang chạy dở cho engine này (VD renderer vừa reload, UI chưa kịp nhận
+    // progress event nào nên vẫn hiện nút "Tải model") → getInstaller() ở trên đã gắn lại
+    // callback theo cửa sổ hiện tại rồi, CHỈ cần dừng ở đây — gọi downloadFromHf() lần nữa sẽ
+    // chạy 2 vòng tải chồng lên nhau, cùng ghi 1 file .part → hỏng file (bug thật 2026-08-03).
+    if (inst.isBusy()) return { ok: true };
     // Runtime: bản dev dùng venv python (pip --target) cho nhanh. Packaged → null để
     // installRuntime tự tải Python relocatable về engineDir/runtime (python-runtime.ts).
     inst.setRuntimeInstall(pipPkgs, app.isPackaged ? null : getPythonPath());
@@ -706,11 +713,20 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('tts:engine-install-resume', async (_e, { engineId }: { engineId: string }) => {
     const { getInstaller } = await import('./engine-installer');
+    const { getPythonPath } = await import('./python-server');
     const repo = await getEngineModelRepo(engineId);
     if (!repo) return { ok: false, error: 'Engine không có nguồn model HF' };
+    const pipPkgs = await getEngineRuntimePackages(engineId);
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
+    if (inst.isBusy()) return { ok: true }; // tránh chạy chồng 2 vòng tải, giống tts:engine-install-start
+    // Bug thật 2026-08-04: handler này trước đây KHÔNG gọi setRuntimeInstall() như
+    // tts:engine-install-start — resume 1 lượt tải dở (đặc biệt sau khi app restart, instance
+    // mới tinh nên _pipPackages=null) thì downloadFromHf() tải xong phần MODEL (writeManifest
+    // 'model_ready') nhưng KHÔNG BAO GIỜ chạy installRuntime() → manifest không bao giờ lên
+    // 'installed' → UI mãi hiện "Tải dở"/nút Tiếp tục dù file đã tải xong hoàn toàn trên đĩa.
+    inst.setRuntimeInstall(pipPkgs, app.isPackaged ? null : getPythonPath());
     inst.downloadFromHf(repo);  // resume từ install-state.json
     return { ok: true };
   });

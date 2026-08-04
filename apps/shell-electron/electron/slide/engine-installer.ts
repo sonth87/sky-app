@@ -184,7 +184,12 @@ export interface InstallProgress {
   bytesPerSec: number;
   currentFile: string;
   error?: string;
+  logLines?: string[];
 }
+
+/** Số dòng log pip install tối đa giữ lại (renderer hiện hộp log cuộn) — đủ dài để thấy hết
+ * quá trình cài mà không phình payload IPC cho mỗi event tiến độ. */
+const LOG_BUFFER_MAX = 500;
 
 interface InstallState {
   engineId: string;
@@ -197,10 +202,18 @@ type ProgressEmit = (p: InstallProgress) => void;
 
 const HF_BASE = 'https://huggingface.co';
 
-/** Resolve danh sách file model từ HF API (path + size + sha256 LFS). */
+/** Resolve danh sách file model từ HF API (path + size + sha256 LFS). Timeout riêng (bug thật
+ * 2026-08-03: fetch không timeout → mạng chặn/không phản hồi thì treo vĩnh viễn, im lặng hoàn
+ * toàn, giống hệt download-task.ts's RESPONSE_TIMEOUT_MS — xem comment ở đó). */
 async function resolveHfFiles(repo: string, modelDir: string, signal: AbortSignal): Promise<FileSpec[]> {
   const api = `${HF_BASE}/api/models/${repo}/tree/main?recursive=true`;
-  const res = await fetch(api, { signal });
+  let res: Response;
+  try {
+    res = await fetch(api, { signal: AbortSignal.any([signal, AbortSignal.timeout(20_000)]) });
+  } catch (e) {
+    if (signal.aborted) throw new DownloadError('Đã tạm dừng tải', 'aborted');
+    throw new DownloadError(`Lỗi mạng khi lấy danh sách file HF (không phản hồi sau 20s hoặc lỗi kết nối): ${(e as Error).message}`, 'network');
+  }
   if (!res.ok) throw new DownloadError(`Không lấy được danh sách file HF (HTTP ${res.status})`, 'network');
   const tree = (await res.json()) as Array<{ path: string; type: string; size: number; lfs?: { oid: string } }>;
   const specs: FileSpec[] = [];
@@ -221,11 +234,25 @@ async function resolveHfFiles(repo: string, modelDir: string, signal: AbortSigna
 export class EngineInstaller {
   private ac: AbortController | null = null;
   private paused = false;
+  /** Log dòng lệnh pip install tích luỹ — reset mỗi lượt installRuntime() mới, kể cả retry sau
+   * pause/resume (không phải log liên tục xuyên suốt lifetime của installer). */
+  private logBuffer: string[] = [];
 
   constructor(
     private engineId: string,
     private emit: ProgressEmit,
   ) {}
+
+  /** Gắn lại callback báo tiến độ — CẦN THIẾT vì `getInstaller()` bên dưới tái sử dụng instance
+   * đang chạy cho engineId đó thay vì tạo mới, nên nếu không gắn lại, callback vẫn là callback
+   * GỐC (đóng gói lúc lần đầu `getInstaller` được gọi cho engine này). Bug thật phát hiện
+   * 2026-08-03: bấm "Tải model" trong khi 1 lượt tải TRƯỚC ĐÓ đang chạy dở (VD renderer đã
+   * reload, hoặc mở lại Engine Manager) → tiến độ vẫn gửi về callback CŨ, UI mới hoàn toàn im
+   * lặng dù dữ liệu thật sự vẫn đang tải về đĩa (đã xác nhận: file `.part` tiếp tục lớn dần dù
+   * không có dòng log tiến độ nào xuất hiện cho lần bấm mới). */
+  setEmit(emit: ProgressEmit) {
+    this.emit = emit;
+  }
 
   private dir() { return ttsEngineDir(this.engineId); }
   private modelDir() { return join(this.dir(), 'model'); }
@@ -242,6 +269,16 @@ export class EngineInstaller {
   }
 
   isPaused() { return this.paused; }
+
+  /** Đang thật sự có 1 lượt tải/cài chạy dở (không tính paused) — dùng để tránh gọi
+   * `downloadFromHf` CHỒNG LÊN 1 lượt đang chạy (2 vòng lặp cùng ghi 1 file .part → hỏng file,
+   * bug thật liên quan phát hiện cùng đợt với bug callback cũ ở `getInstaller`). */
+  // Kiểm cả `this.ac.signal.aborted` (KHÔNG chỉ `this.ac !== null`) — `cancel()`/`deleteInstall()`
+  // gọi `abort()` nhưng KHÔNG reset `this.ac` về null hay set `this.paused=true`, nên nếu chỉ
+  // check `ac !== null && !paused` thì sau khi xoá/hủy khi đang tải dở, isBusy() vẫn báo "đang
+  // bận" sai — chặn nhầm lượt tải MỚI ngay sau đó (bug thật phát hiện lúc thêm nút Xoá cho
+  // trạng thái 'partial', 2026-08-03).
+  isBusy() { return this.ac !== null && !this.ac.signal.aborted && !this.paused; }
 
   // Auto-pause khi có SV lên sân khấu (nhường lễ). Phân biệt với pause thủ công:
   // chỉ TỰ resume nếu bị auto-pause (user chủ động pause thì tôn trọng, không tự chạy).
@@ -425,6 +462,7 @@ export class EngineInstaller {
    */
   async installRuntime(pipPackages: string[], pythonBin: string | null): Promise<void> {
     this.ac = new AbortController();
+    const signal = this.ac.signal;
     const runtimeRoot = join(this.dir(), 'runtime');
     const runtimeDir = join(runtimeRoot, 'site-packages');
     mkdirSync(runtimeDir, { recursive: true });
@@ -436,37 +474,57 @@ export class EngineInstaller {
       try {
         const { ensurePythonRuntime } = await import('./python-runtime');
         this.emit(this.prog('installing-runtime', [], [], 0, 0, 0, 'Đang tải runtime Python…'));
-        python = await ensurePythonRuntime(runtimeRoot, this.ac.signal, (p) => {
+        python = await ensurePythonRuntime(runtimeRoot, signal, (p) => {
           this.emit(this.prog('installing-runtime', [], [], p.receivedBytes, p.totalBytes ?? 0,
             p.bytesPerSec, 'runtime Python'));
         });
       } catch (e) {
-        this.emit(this.prog('error', [], [], 0, 0, 0, '', 0,
-          e instanceof Error ? e.message : String(e)));
+        // handleError() tự phân biệt DownloadError kind='aborted' (user bấm Tạm dừng lúc đang
+        // tải Python runtime) → emit 'paused' thay vì 'error' — bug thật 2026-08-04 tương tự bug
+        // pip install bên dưới: trước đây luôn báo 'error' kể cả khi CHÍNH NGƯỜI DÙNG bấm Tạm
+        // dừng, khiến nút Tạm dừng "như không có tác dụng gì" (không có Resume rõ ràng, chỉ thấy
+        // lỗi chung chung).
+        this.handleError(e);
         return;
       }
     }
 
-    this.emit(this.prog('installing-runtime', [], [], 0, 0, 0, 'pip install ' + pipPackages.join(' ')));
+    // Log dòng lệnh pip tích luỹ — renderer hiện hộp log cuộn (không có % chính xác cho pip nên
+    // hộp log thay thế progress bar). Reset mỗi lượt cài MỚI (kể cả retry sau pause/resume).
+    this.logBuffer = [];
+    const emitPipProgress = (phase: InstallProgress['phase']) => {
+      this.emit(this.prog(phase, [], [], 0, 0, 0, this.logBuffer.at(-1) ?? '', undefined, undefined, [...this.logBuffer]));
+    };
+    emitPipProgress('installing-runtime');
 
     const { spawn } = await import('node:child_process');
     const args = ['-m', 'pip', 'install', '--no-cache-dir', '--target', runtimeDir, ...pipPackages];
     const ok = await new Promise<boolean>((resolve) => {
       const proc = spawn(python, args, { windowsHide: true });
-      let tail = '';
       const onData = (d: Buffer) => {
-        tail = (tail + d.toString()).split('\n').slice(-3).join('\n');
-        this.emit(this.prog('installing-runtime', [], [], 0, 0, 0, tail.split('\n').pop() ?? ''));
+        const lines = d.toString().split('\n').filter((l) => l.trim().length > 0);
+        this.logBuffer.push(...lines);
+        if (this.logBuffer.length > LOG_BUFFER_MAX) this.logBuffer = this.logBuffer.slice(-LOG_BUFFER_MAX);
+        emitPipProgress('installing-runtime');
       };
       proc.stdout?.on('data', onData);
       proc.stderr?.on('data', onData);
-      this.ac!.signal.addEventListener('abort', () => proc.kill(), { once: true });
+      signal.addEventListener('abort', () => proc.kill(), { once: true });
       proc.on('error', () => resolve(false));
       proc.on('close', (code) => resolve(code === 0));
     });
 
+    // Bug thật 2026-08-04: trước đây bị kill (Tạm dừng) → code đóng khác 0 → rơi thẳng vào
+    // nhánh lỗi bên dưới ("pip install runtime thất bại") dù người dùng CHỦ ĐỘNG bấm Tạm dừng —
+    // nút Tạm dừng vẫn giết được tiến trình pip thật, nhưng UI báo sai thành lỗi, không có
+    // đường Resume rõ ràng → trông như bấm Tạm dừng "không có tác dụng gì".
+    if (signal.aborted) {
+      emitPipProgress('paused');
+      return;
+    }
+
     if (!ok) {
-      this.emit(this.prog('error', [], [], 0, 0, 0, '', 0, 'pip install runtime thất bại (xem log).'));
+      this.emit(this.prog('error', [], [], 0, 0, 0, '', 0, 'pip install runtime thất bại (xem log).', [...this.logBuffer]));
       return;
     }
     // Runtime xong → đánh dấu manifest 'installed' (đủ model + runtime).
@@ -592,7 +650,7 @@ export class EngineInstaller {
   private prog(
     phase: InstallProgress['phase'], allFiles: string[], done: string[],
     received: number, total: number, bps: number, current: string,
-    filesDone?: number, error?: string,
+    filesDone?: number, error?: string, logLines?: string[],
   ): InstallProgress {
     return {
       engineId: this.engineId,
@@ -604,6 +662,7 @@ export class EngineInstaller {
       bytesPerSec: Math.round(bps),
       currentFile: current,
       error,
+      logLines,
     };
   }
 }
@@ -629,6 +688,7 @@ const _installers = new Map<string, EngineInstaller>();
 export function getInstaller(engineId: string, emit: ProgressEmit): EngineInstaller {
   let inst = _installers.get(engineId);
   if (!inst) { inst = new EngineInstaller(engineId, emit); _installers.set(engineId, inst); }
+  else inst.setEmit(emit); // instance đang chạy dở → gắn lại callback theo cửa sổ/lượt gọi HIỆN TẠI
   return inst;
 }
 

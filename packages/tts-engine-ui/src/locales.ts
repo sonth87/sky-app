@@ -39,6 +39,8 @@ export const ttsEngineLocales = {
       "switchingEngine": "Đang đổi engine (khởi động lại ~30–60s)…",
       "switchSuccess": "Đã đổi engine ✓",
       "switchFailed": "Đổi thất bại: {{error}}",
+      "serviceStarting": "Đang khởi động dịch vụ TTS… danh sách engine sẽ hiện ngay khi xong.",
+      "serviceUnavailable": "Không kết nối được dịch vụ TTS.",
       "status": {
         "ready": "Đã sẵn sàng",
         "partial": "Tải dở",
@@ -143,6 +145,8 @@ export const ttsEngineLocales = {
       "switchingEngine": "Switching engine (restarting, ~30–60s)…",
       "switchSuccess": "Engine switched ✓",
       "switchFailed": "Switch failed: {{error}}",
+      "serviceStarting": "Starting TTS service… the engine list will appear as soon as it's ready.",
+      "serviceUnavailable": "Could not connect to the TTS service.",
       "status": {
         "ready": "Ready",
         "partial": "Partially downloaded",

@@ -12,7 +12,7 @@ import { useVoiceCatalog } from './voiceCatalog';
 
 export { useVoiceCatalog };
 
-const PREVIEW_TEXT = 'Xin chúc mừng tân kỹ sư Nguyễn Văn An.';
+const PREVIEW_TEXT = 'Xin chúc mừng Nguyễn Văn An.';
 
 interface Props {
   value: string;

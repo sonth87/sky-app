@@ -120,6 +120,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
           tagline: v.tagline ?? cat?.tagline,
           description: v.description ?? cat?.description,
           sourceCatalogId: v.sourceCatalogId,
+          default: cat?.default,
         };
       });
 
@@ -137,6 +138,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
           tagline: e.tagline,
           description: e.description,
           sourceCatalogId: e.id,
+          default: e.default,
         }));
 
       const combined = [...registryItems, ...catalogItems];
@@ -153,14 +155,19 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
   // tiên (ngay lúc mount) dễ rơi đúng lúc server chưa kịp nhận connection, resolve lỗi hoặc mảng
   // rỗng tuỳ tầng network. RETRY với backoff thay vì gọi 1 lần rồi im lặng mãi mãi (bug thật: user
   // phải tự F5 mới thấy giọng, 2026-07-23) — không sửa thứ tự khởi tạo bên Python (rủi ro cao hơn,
-  // ảnh hưởng cả /synthesize), chỉ làm UI tự chờ + báo trạng thái rõ ràng. Tổng thời gian retry ~4s
-  // (500ms×4 + 1000ms×2 lần cuối) — đủ cho warm-up thực tế, không để user chờ quá lâu mới thấy lỗi
-  // nếu server thật sự không lên được.
+  // ảnh hưởng cả /synthesize), chỉ làm UI tự chờ + báo trạng thái rõ ràng.
+  //
+  // Bug thật #2 (2026-08-04): tổng thời gian retry cũ chỉ ~4s (500ms×4 + 1000ms×2), nhưng log
+  // thực tế "REF_DIR..." → "Ready." của tts-debug.log đo được ~9s cho lần khởi động BÌNH THƯỜNG
+  // (chưa tính máy chậm hơn hoặc lần đầu chưa cache) — retry cạn trước khi server kịp lên, danh
+  // sách giọng trống VĨNH VIỄN (voicesLoading=false, không tự thử lại nữa) dù server sau đó đã
+  // hoàn toàn khoẻ mạnh (verify bằng curl trực tiếp /voices lúc debug — trả đủ dữ liệu). Nới tổng
+  // thời gian retry lên ~28s (500ms×4 + 1000ms×6 + 2000ms×10), đủ dư cho cold-start thực tế.
   useEffect(() => {
     if (!tts) return;
     let cancelled = false;
     let attempt = 0;
-    const MAX_ATTEMPTS = 6;
+    const MAX_ATTEMPTS = 20;
 
     const tryLoad = () => {
       refreshVoices()
@@ -168,14 +175,15 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
           if (cancelled) return;
           if (combined.length === 0 && attempt < MAX_ATTEMPTS) {
             attempt += 1;
-            setTimeout(tryLoad, attempt <= 4 ? 500 : 1000);
+            setTimeout(tryLoad, attempt <= 4 ? 500 : attempt <= 10 ? 1000 : 2000);
             return;
           }
           if (combined.length > 0) {
             const currentSelected = useTtsStudioStore.getState().selectedVoiceId;
             const exists = combined.some((v) => v.id === currentSelected);
             if (!currentSelected || !exists) {
-              setSelectedVoiceId(combined[0]!.id);
+              const defaultVoice = combined.find((v) => v.default);
+              setSelectedVoiceId((defaultVoice ?? combined[0])!.id);
             }
           }
           setVoicesLoading(false);
@@ -184,7 +192,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
           if (cancelled) return;
           if (attempt < MAX_ATTEMPTS) {
             attempt += 1;
-            setTimeout(tryLoad, attempt <= 4 ? 500 : 1000);
+            setTimeout(tryLoad, attempt <= 4 ? 500 : attempt <= 10 ? 1000 : 2000);
             return;
           }
           setLoadError(err instanceof Error ? err.message : String(err));
@@ -385,12 +393,14 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
             onClose={() => { setShowEngineManager(false); void refreshVoices(); }}
             port={enginePort}
             canInstall={platform.capabilities.has('tts-local')}
+            portalContainer={rootRef.current}
           />
           <DeviceSettingsModal
             open={showDeviceSettings}
             onClose={() => setShowDeviceSettings(false)}
             port={enginePort}
             canInstall={platform.capabilities.has('tts-local')}
+            portalContainer={rootRef.current}
           />
         </>
       )}

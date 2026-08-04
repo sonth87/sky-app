@@ -36,8 +36,13 @@ function Slider({
     >
       <SliderPrimitive.Track
         data-slot="slider-track"
+        // border thêm vào — bug thật 2026-08-04: bg-muted (~96.7% lightness) quá gần
+        // bg-background/bg-card (100% lightness, trắng) ở theme sáng, track 1.5px cao gần như
+        // vô hình trên card trắng, chỉ thấy mỗi thumb. border-border (biến riêng cho viền,
+        // vốn đã tương phản đủ với card/background ở mọi theme) đảm bảo track LUÔN thấy được
+        // dù bg-muted có tương phản thấp ở theme/app cụ thể nào đó.
         className={cn(
-          "relative grow overflow-hidden rounded-full bg-muted data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
+          "relative grow overflow-hidden rounded-full border border-border bg-muted data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
         )}
       >
         <SliderPrimitive.Range

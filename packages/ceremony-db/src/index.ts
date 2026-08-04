@@ -31,6 +31,7 @@ export {
   saveEvent,
   getCurrentActiveEvent,
   setActiveEvent,
+  deleteEvent,
 } from './queries/event.js';
 export {
   getDataSource,

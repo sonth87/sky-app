@@ -263,7 +263,10 @@ function waitForHealth(port: number): Promise<boolean> {
 
 /** Warmup thật sự: gọi /synthesize với text ngắn để load ONNX vào RAM */
 async function warmupSessions(port: number): Promise<void> {
-  const speakers = ['NF', 'NF2', 'SF', 'NM1', 'SM'];
+  // NF/NF2/SF/NM1/SM (giọng placeholder cũ) đã bị xoá khỏi voice-registry.json 2026-08-04 —
+  // dùng giọng mặc định mới (Giang, clone-d0f05071) thay thế, khớp default fallback ở
+  // ipc.ts's synthesizeTtsStudio và platform-web's tts.ts.
+  const speakers = ['clone-d0f05071'];
 
   for (const speaker of speakers) {
     try {

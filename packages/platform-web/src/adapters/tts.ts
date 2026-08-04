@@ -67,7 +67,9 @@ async function fetchSynthesize(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       text,
-      speaker_id: opts?.voiceId ?? 'NF',
+      // 'NF' (giọng placeholder cũ) đã bị xoá khỏi voice-registry.json 2026-08-04 — Giang
+      // (clone-d0f05071) là giọng mặc định mới khi voiceId trống.
+      speaker_id: opts?.voiceId ?? 'clone-d0f05071',
       speed: opts?.speed ?? 1.0,
       temperature: opts?.temperature,
     }),

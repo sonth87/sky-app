@@ -12,7 +12,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Database, LayoutTemplate, Check, Pencil, Download } from 'lucide-react';
+import { Database, LayoutTemplate, Check, Pencil, Download, Trash2 } from 'lucide-react';
 import type { AssetPort, DataSourcePort, EventPort, LayoutPort } from '@sky-app/service-contracts';
 import type { EventDocument } from '@sky-app/slide-shared';
 import { Modal } from './components/ui/Modal.js';
@@ -37,14 +37,14 @@ interface EventHubModalProps {
   onChanged: () => void;
   /** Có giá trị → mở THẲNG vào Giai đoạn B (chế độ Sửa), bỏ qua Giai đoạn A tạo mới. */
   initialEvent?: EventDocument;
-  /** Nhảy thẳng vào panel Import/Layout thay vì dừng ở Hub menu — bấm pill "dữ liệu"/"layout"
-   * ngay trên dòng Event ở EventGate.tsx (2026-07-23, feedback: bấm Sửa không nên phải đi qua
-   * màn trung gian khi ý định đã rõ là muốn sửa đúng 1 mục). Bỏ trống → Hub menu như cũ (nút
-   * "Sửa" chính, không rõ ý định cụ thể). */
-  initialView?: 'import' | 'layout';
+  /** Nhảy thẳng vào panel Import/Layout/Info thay vì dừng ở Hub menu — bấm pill "dữ liệu"/
+   * "layout" hoặc nút "Sửa" chính ngay trên dòng Event ở EventGate.tsx (2026-07-23 + 2026-08-03,
+   * feedback: bấm Sửa không nên phải đi qua màn trung gian khi ý định đã rõ). Bỏ trống → Hub
+   * menu (VD khi mở modal để TẠO Event mới, chưa có ý định cụ thể nào). */
+  initialView?: 'import' | 'layout' | 'info';
 }
 
-type HubView = 'menu' | 'import' | 'layout' | 'info' | 'export-confirm';
+type HubView = 'menu' | 'import' | 'layout' | 'info' | 'export-confirm' | 'delete-confirm';
 
 export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layoutPort, assetPort, onChanged, initialEvent, initialView }: EventHubModalProps) {
   const { t } = useTranslation();
@@ -57,12 +57,15 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
   const [view, setView] = useState<HubView>(initialView ?? 'menu');
   const [exportIncludeData, setExportIncludeData] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const resetAll = () => {
     setEvent(initialEvent ?? null);
     setName(initialEvent?.name ?? '');
     setScheduledAt(initialEvent?.scheduledAt ?? '');
     setColor(initialEvent?.color);
+    setDeleteConfirmInput('');
     setView('menu');
   };
 
@@ -151,6 +154,21 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
       showErrorToast(t('eventHub.exportError', { message: err instanceof Error ? err.message : String(err) }));
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!event || deleteConfirmInput !== event.name) return;
+    setDeleting(true);
+    try {
+      await eventPort.delete(event.id);
+      showSuccessToast(t('eventHub.deleteSuccess', { name: event.name }));
+      onChanged();
+      handleClose();
+    } catch (err) {
+      showErrorToast(t('eventHub.deleteError', { message: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -260,6 +278,37 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
     );
   }
 
+  if (view === 'delete-confirm') {
+    const canDelete = deleteConfirmInput === event.name;
+    return (
+      <Modal open={open} onClose={handleClose} title={t('eventHub.deleteConfirmTitle')} size="md" closeOnBackdrop={false}>
+        <div className="flex flex-col gap-4">
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {t('eventHub.deleteConfirmWarning')}
+          </div>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-muted-foreground">{t('eventHub.deleteConfirmInputLabel', { name: event.name })}</span>
+            <input
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              value={deleteConfirmInput}
+              onChange={(e) => setDeleteConfirmInput(e.target.value)}
+              placeholder={event.name}
+              autoFocus
+            />
+          </label>
+          <div className="mt-2 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => { setDeleteConfirmInput(''); setView('info'); }}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="danger" disabled={!canDelete} loading={deleting} onClick={() => void handleDelete()}>
+              {t('eventHub.deleteConfirmButton')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   if (view === 'info') {
     const canSave = name.trim() !== '';
     return (
@@ -295,13 +344,18 @@ export function EventHubModal({ open, onClose, eventPort, dataSourcePort, layout
               container={portalContainer}
             />
           </div>
-          <div className="mt-2 flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setView('menu')}>
-              {t('common.cancel')}
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <Button variant="danger-ghost" icon={<Trash2 size={14} />} onClick={() => { setDeleteConfirmInput(''); setView('delete-confirm'); }}>
+              {t('eventHub.deleteButton')}
             </Button>
-            <Button variant="primary" disabled={!canSave} loading={submitting} onClick={() => void handleSaveInfo()}>
-              {t('eventHub.saveInfoButton')}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setView('menu')}>
+                {t('common.cancel')}
+              </Button>
+              <Button variant="primary" disabled={!canSave} loading={submitting} onClick={() => void handleSaveInfo()}>
+                {t('eventHub.saveInfoButton')}
+              </Button>
+            </div>
           </div>
         </div>
       </Modal>

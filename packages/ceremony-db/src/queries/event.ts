@@ -81,6 +81,7 @@ export function listEvents(executor: SqlExecutor): EventSummary[] {
     name: r.name,
     status: r.status as EventSummary['status'],
     scheduledAt: r.scheduled_at ?? undefined,
+    createdAt: r.created_at,
     updatedAt: r.updated_at,
   }));
 }
@@ -175,5 +176,19 @@ export function setActiveEvent(executor: SqlExecutor, id: string): void {
     if (!target[0]) throw new Error(`setActiveEvent: event "${id}" không tồn tại`);
     executor.run("UPDATE event SET status = 'scheduled', updated_at = ? WHERE status = 'active' AND id != ?", [now, id]);
     executor.run("UPDATE event SET status = 'active', updated_at = ? WHERE id = ?", [now, id]);
+  });
+}
+
+/** Xoá 1 Event vĩnh viễn (yêu cầu Sonth, phản hồi thật sau khi dùng Export/Import Loại 2,
+ * 2026-08-03) — tự xoá tường minh `event_consumed_record`/`event_layout_ref` TRƯỚC, KHÔNG dựa
+ * vào `ON DELETE CASCADE` khai báo trong schema vì `foreign_keys` pragma chỉ bật ở driver
+ * better-sqlite3 (Electron), KHÔNG bật ở sql-js-executor.ts (Web/WASM) — cascade không đáng tin
+ * cậy xuyên suốt mọi môi trường. KHÔNG đụng `data_source`/`layout_document` liên quan (DataSource
+ * có thể dùng chung nhiều Event, Layout quản lý riêng ở Library). */
+export function deleteEvent(executor: SqlExecutor, id: string): void {
+  executor.transaction(() => {
+    executor.run('DELETE FROM event_consumed_record WHERE event_id = ?', [id]);
+    executor.run('DELETE FROM event_layout_ref WHERE event_id = ?', [id]);
+    executor.run('DELETE FROM event WHERE id = ?', [id]);
   });
 }

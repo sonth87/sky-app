@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { EventDocument } from '@sky-app/slide-shared';
-import { createEvent, getCurrentActiveEvent, getEvent, listEvents, saveEvent, setActiveEvent } from '@sky-app/ceremony-db/node';
+import { createEvent, deleteEvent, getCurrentActiveEvent, getEvent, listEvents, saveEvent, setActiveEvent } from '@sky-app/ceremony-db/node';
 import { getExecutor } from '../store.js';
 
 /**
@@ -24,6 +24,11 @@ export async function eventRoutes(app: FastifyInstance) {
 
   app.put<{ Params: { id: string }; Body: EventDocument }>('/api/events/:id', async (req) => {
     saveEvent(getExecutor(), req.body);
+    return { ok: true };
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/events/:id', async (req) => {
+    deleteEvent(getExecutor(), req.params.id);
     return { ok: true };
   });
 

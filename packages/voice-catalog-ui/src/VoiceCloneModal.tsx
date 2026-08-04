@@ -215,17 +215,24 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
                 </label>
               </div>
 
-              <div className="grid grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-2 gap-3.5">
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-foreground">Vùng miền (Accent)</span>
+                  <span className="text-xs font-medium text-foreground">Ngôn ngữ</span>
                   <select
-                    value={region}
-                    onChange={(e) => setRegion(e.target.value)}
+                    value={language}
+                    onChange={(e) => {
+                      const newLang = e.target.value;
+                      setLanguage(newLang);
+                      if (newLang === 'vi-VN' && !region) {
+                        setRegion('Bắc');
+                      } else if (newLang !== 'vi-VN') {
+                        setRegion('');
+                      }
+                    }}
                     className="text-sm px-2.5 py-2 rounded-lg border border-border bg-card focus:border-primary outline-none transition-all"
                   >
-                    <option value="Bắc">Miền Bắc</option>
-                    <option value="Trung">Miền Trung</option>
-                    <option value="Nam">Miền Nam</option>
+                    <option value="vi-VN">Tiếng Việt (vi-VN)</option>
+                    <option value="en-US">Tiếng Anh (en-US)</option>
                   </select>
                 </label>
                 <label className="flex flex-col gap-1">
@@ -241,18 +248,25 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
                     <option value="senior">Cao tuổi</option>
                   </select>
                 </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-foreground">Ngôn ngữ</span>
-                  <select
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value)}
-                    className="text-sm px-2.5 py-2 rounded-lg border border-border bg-card focus:border-primary outline-none transition-all"
-                  >
-                    <option value="vi-VN">Tiếng Việt (vi-VN)</option>
-                    <option value="en-US">Tiếng Anh (en-US)</option>
-                  </select>
-                </label>
               </div>
+
+              {language === 'vi-VN' && (
+                <div>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-foreground">Vùng miền (Accent)</span>
+                    <select
+                      value={region}
+                      onChange={(e) => setRegion(e.target.value)}
+                      className="text-sm px-2.5 py-2 rounded-lg border border-border bg-card focus:border-primary outline-none transition-all"
+                    >
+                      <option value="">-- Chọn vùng miền --</option>
+                      <option value="Bắc">Miền Bắc</option>
+                      <option value="Trung">Miền Trung</option>
+                      <option value="Nam">Miền Nam</option>
+                    </select>
+                  </label>
+                </div>
+              )}
 
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-foreground">Tagline (Mô tả ngắn)</span>

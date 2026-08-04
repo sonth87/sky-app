@@ -67,7 +67,16 @@ catalog:
   # check kiểu checkbox menu item). Cần cho tính năng bật/tắt "Dùng dữ liệu mẫu" (menu Develop,
   # module-ceremony) phản ánh trạng thái thật ngay trên menu — `apps` trong store đã đọc reactive
   # sẵn (MenuBar.tsx), chỉ thiếu 1 action để patch lại sau registerApps(), không cần cơ chế mới.
-  "@sonth87/device-layout": "github:sonth87/device-layout#v0.5.3"
+  #
+  # v0.5.4 (2026-08-04) — FloatingWindow thêm prop `container` (mặc định document.body): sửa
+  # bug thật phát hiện lúc rà soát dark theme của EngineManager (tts-engine-ui) — createPortal
+  # cũ portal thẳng document.body, NẰM NGOÀI subtree `.tts-studio-root`/`.ceremony-root` nên MẤT
+  # HẾT biến theme (text tối màu, badge/button gần như vô hình ở dark mode) — đúng bug đã cảnh
+  # báo ở docs/guides/app-css-theming.md Rule 4. Kèm 2 thay đổi khác cùng release (không liên
+  # quan): DeviceLayout.macOSAppleIcon/windowsStartIcon (custom icon Apple menu/Start button),
+  # WindowChrome hover polish (traffic-light hiện icon khi hover bất kể focus, nút titlebar mờ
+  # đi khi cửa sổ không focus).
+  "@sonth87/device-layout": "github:sonth87/device-layout#v0.5.4"
 
   # Thêm 2026-07-29 — audit dependency trùng lặp giữa modules/* + packages/*ui (dựng
   # packages/ui dùng chung: cn()/color picker/primitive Radix trùng lặp 3 nơi). lucide-react

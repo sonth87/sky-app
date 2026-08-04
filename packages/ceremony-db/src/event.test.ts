@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { EventDocument } from '@sky-app/slide-shared';
 import { BetterSqlite3Executor } from './drivers/better-sqlite3-executor.js';
 import { runMigrations } from './migrate.js';
-import { createEvent, getCurrentActiveEvent, getEvent, listEvents, saveEvent, setActiveEvent } from './queries/event.js';
-import { getDataSource, getDataSourceRecords, listDataSources } from './queries/data-source.js';
+import { createEvent, deleteEvent, getCurrentActiveEvent, getEvent, listEvents, saveEvent, setActiveEvent } from './queries/event.js';
+import { getDataSource, getDataSourceRecords, listDataSources, insertDataSource, insertDataSourceRecords, insertConsumedRecords, listConsumedRecordIds } from './queries/data-source.js';
 import type { SqlExecutor } from './sql-executor.js';
 
 function draftEvent(overrides: Partial<Omit<EventDocument, 'createdAt' | 'updatedAt'>> = {}): Omit<EventDocument, 'createdAt' | 'updatedAt'> {
@@ -89,6 +89,13 @@ describe('EventStore — CRUD + setActive (chỉ 1 active tại 1 thời điểm
     createEvent(executor, draftEvent({ id: 'ev2', name: 'Đợt 2' }));
     const list = listEvents(executor);
     expect(list.map((e) => e.id).sort()).toEqual(['ev1', 'ev2']);
+  });
+
+  it('listEvents trả đúng createdAt (2026-08-03, hiện ngày tạo trong danh sách để phân biệt Event trùng tên)', () => {
+    createEvent(executor, draftEvent());
+    const summary = listEvents(executor)[0]!;
+    expect(summary.createdAt).toBeTruthy();
+    expect(summary.createdAt).toBe(getEvent(executor, 'ev1')!.createdAt);
   });
 
   it('saveEvent cập nhật đúng, layoutRefs cũ bị thay thế hoàn toàn bởi layoutRefs mới', () => {
@@ -191,6 +198,63 @@ describe('EventStore — CRUD + setActive (chỉ 1 active tại 1 thời điểm
     const updated = getEvent(executor, 'ev1')!;
     expect(updated.layoutRefs).toHaveLength(1);
     expect(updated.layoutRefs[0]!.role).toBe('idle');
+  });
+});
+
+describe('deleteEvent (2026-08-03, yêu cầu Sonth — xoá Event vĩnh viễn)', () => {
+  let executor: SqlExecutor;
+
+  beforeEach(() => {
+    executor = new BetterSqlite3Executor(':memory:');
+    runMigrations(executor);
+  });
+
+  it('xoá Event → getEvent trả null, biến mất khỏi listEvents', () => {
+    createEvent(executor, draftEvent());
+    deleteEvent(executor, 'ev1');
+
+    expect(getEvent(executor, 'ev1')).toBeNull();
+    expect(listEvents(executor)).toEqual([]);
+  });
+
+  it('xoá 1 Event KHÔNG ảnh hưởng Event khác', () => {
+    createEvent(executor, draftEvent({ id: 'ev1', name: 'Đợt 1' }));
+    createEvent(executor, draftEvent({ id: 'ev2', name: 'Đợt 2' }));
+    deleteEvent(executor, 'ev1');
+
+    expect(getEvent(executor, 'ev1')).toBeNull();
+    expect(getEvent(executor, 'ev2')).not.toBeNull();
+  });
+
+  it('xoá Event có layoutRefs → event_layout_ref con cũng bị xoá tường minh (không cần cascade), layout_document liên quan KHÔNG bị xoá', () => {
+    insertLayoutDocument(executor, 'l1');
+    createEvent(executor, draftEvent({ layoutRefs: [{ layoutId: 'l1', layoutVersion: 1, fieldMap: {} }] }));
+    deleteEvent(executor, 'ev1');
+
+    // Tạo lại Event khác trỏ CÙNG layoutId+layoutVersion — nếu row event_layout_ref cũ còn sót
+    // lại (không bị xoá đúng), INSERT này sẽ đụng lại PRIMARY KEY cũ và throw.
+    expect(() =>
+      createEvent(executor, draftEvent({ id: 'ev2', name: 'Đợt 2', layoutRefs: [{ layoutId: 'l1', layoutVersion: 1, fieldMap: {} }] })),
+    ).not.toThrow();
+    const rows = executor.query('SELECT * FROM layout_document WHERE id = ?', ['l1']);
+    expect(rows).toHaveLength(1); // layout_document KHÔNG bị xoá theo
+  });
+
+  it('xoá Event đã có consumedRecord → event_consumed_record con cũng bị xoá, DataSource + record KHÔNG bị xoá', () => {
+    insertDataSource(executor, { id: 'ds1', label: 'SV', mode: 'consumable', naturalKeyField: 'masv' });
+    insertDataSourceRecords(executor, 'ds1', [{ id: 'SV001', full_name: 'A', subjectType: 'student', extra: {} }]);
+    createEvent(executor, draftEvent({ dataSourceId: 'ds1' }));
+    insertConsumedRecords(executor, 'ev1', ['ds1::SV001'], '2026-08-03T00:00:00.000Z');
+
+    deleteEvent(executor, 'ev1');
+
+    expect(listConsumedRecordIds(executor, 'ev1')).toEqual([]);
+    expect(getDataSource(executor, 'ds1')).not.toBeNull(); // DataSource giữ nguyên
+    expect(getDataSource(executor, 'ds1')!.records).toHaveLength(1); // record giữ nguyên
+  });
+
+  it('xoá Event không tồn tại → không throw (no-op)', () => {
+    expect(() => deleteEvent(executor, 'khong-ton-tai')).not.toThrow();
   });
 });
 

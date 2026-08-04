@@ -1140,7 +1140,8 @@
     "importBundleRenamedSuffix": " (renamed to avoid conflict)",
     "importBundleDataImported": "imported",
     "importBundleDataKept": "kept as-is/none",
-    "importBundleError": "Could not import event: {{message}}"
+    "importBundleError": "Could not import event: {{message}}",
+    "createdAtLabel": "Created {{date}}"
   },
   "createEventWizard": {
     "step1Title": "Basic information",
@@ -1242,7 +1243,14 @@
     "exportPiiWarning": "The exported file contains personal information — store/delete it according to your organization's policy after use.",
     "exportConfirmButton": "Export",
     "exportSuccess": "Event exported to: {{filePath}}",
-    "exportError": "Export failed: {{message}}"
+    "exportError": "Export failed: {{message}}",
+    "deleteButton": "Delete this event",
+    "deleteConfirmTitle": "Delete event permanently?",
+    "deleteConfirmWarning": "This action CANNOT be undone. All layout/variable configuration for this event will be deleted (the related DataSource and Layout are kept, not deleted).",
+    "deleteConfirmInputLabel": "Type \"{{name}}\" to confirm",
+    "deleteConfirmButton": "Delete permanently",
+    "deleteSuccess": "Deleted event \"{{name}}\"",
+    "deleteError": "Could not delete: {{message}}"
   },
   "importDataPanel": {
     "uploadPrompt": "Drag a file here or click to browse — Excel (.xlsx), CSV supported",

@@ -103,6 +103,7 @@ export interface EventSummary {
   name: string;
   status: EventDocument['status'];
   scheduledAt?: string;
+  createdAt: string;
   updatedAt: string;
 }
 

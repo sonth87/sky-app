@@ -164,16 +164,41 @@ describe('applyEventBundle', () => {
     expect(getLayoutDocument(target, 'lay1')!.name).toBe('Layout A đã có sẵn'); // KHÔNG bị ghi đè
   });
 
-  it('Event id đã tồn tại ở máy đích → sinh id MỚI, không ghi đè Event cũ', () => {
+  it('Event id đã tồn tại ở máy đích nhưng TÊN không trùng → sinh id MỚI, GIỮ NGUYÊN tên gốc (renamed=false)', () => {
     createEvent(target, { id: 'ev1', name: 'Event đã có ở máy đích', status: 'draft', customVariables: [], layoutRefs: [] });
 
     const bundle = buildEventBundle(source, 'ev1', { includeData: false })!;
     const result = applyEventBundle(target, bundle);
 
-    expect(result.renamed).toBe(true);
-    expect(result.eventId).not.toBe('ev1');
+    expect(result.renamed).toBe(false); // tên không đổi vì không trùng tên nào ở đích
+    expect(result.eventId).not.toBe('ev1'); // id vẫn phải đổi (trùng PRIMARY KEY)
+    expect(result.eventName).toBe('Đợt 1');
     expect(getEvent(target, 'ev1')!.name).toBe('Event đã có ở máy đích'); // Event cũ còn nguyên
-    expect(getEvent(target, result.eventId)!.name).toBe('Đợt 1'); // Event mới nhập vào id khác
+    expect(getEvent(target, result.eventId)!.name).toBe('Đợt 1'); // Event mới nhập vào id khác, tên gốc
+  });
+
+  it('Event TÊN đã tồn tại ở máy đích (đúng kịch bản import trùng file zip) → đánh số " - 1" vào tên, renamed=true', () => {
+    createEvent(target, { id: 'ev1', name: 'Đợt 1', status: 'draft', customVariables: [], layoutRefs: [] });
+
+    const bundle = buildEventBundle(source, 'ev1', { includeData: false })!;
+    const result = applyEventBundle(target, bundle);
+
+    expect(result.renamed).toBe(true);
+    expect(result.eventName).toBe('Đợt 1 - 1');
+    expect(result.eventId).not.toBe('ev1'); // id CŨNG trùng trong kịch bản này (cùng file zip)
+    expect(getEvent(target, 'ev1')!.name).toBe('Đợt 1'); // Event cũ còn nguyên, không bị đổi tên
+    expect(getEvent(target, result.eventId)!.name).toBe('Đợt 1 - 1');
+  });
+
+  it('import CÙNG 1 file zip 2 lần liên tiếp vào cùng máy đích → lần 2 đánh số " - 2" (tăng dần, không lặp lại " - 1")', () => {
+    const bundle = buildEventBundle(source, 'ev1', { includeData: false })!;
+    applyEventBundle(target, bundle); // lần 1 — máy đích trống, giữ nguyên tên "Đợt 1"
+    const secondResult = applyEventBundle(target, bundle); // lần 2 — trùng tên "Đợt 1"
+
+    expect(secondResult.eventName).toBe('Đợt 1 - 1');
+
+    const thirdResult = applyEventBundle(target, bundle); // lần 3 — trùng cả "Đợt 1" lẫn "Đợt 1 - 1"
+    expect(thirdResult.eventName).toBe('Đợt 1 - 2');
   });
 
   it('bundle KHÔNG kèm dataSource (export includeData=false) → Event import KHÔNG gán dataSourceId dù event gốc có', () => {

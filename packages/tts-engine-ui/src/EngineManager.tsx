@@ -10,6 +10,7 @@ import type {
 } from '@sky-app/service-contracts';
 import { FloatingWindow } from '@sonth87/device-layout';
 import { Button, fmtBytes } from './ui.js';
+import { useTtsStatus } from './useTtsStatus.js';
 
 export interface EngineManagerProps {
   open: boolean;
@@ -26,12 +27,22 @@ export interface EngineManagerProps {
    * việc tải tự tạm dừng khi đang hành lễ — thứ không liên quan gì tới TTS Studio.
    */
   notice?: ReactNode;
+  /**
+   * Root DOM của app gọi (vd `.tts-studio-root`/`.ceremony-root`) — truyền vào FloatingWindow
+   * để nó portal VÀO TRONG subtree đó thay vì thẳng ra `document.body`. Bắt buộc nếu app gọi có
+   * biến theme CSS custom property scoped theo root class (xem docs/guides/app-css-theming.md
+   * Rule 4 của app đó) — thiếu prop này thì mọi màu (`text-foreground`, `bg-success`...) rơi về
+   * fallback light-mode bất kể theme thật đang là dark (bug thật 2026-08-04, phát hiện lúc rà
+   * soát dark theme của chính EngineManager: badge/nút gần như vô hình vì lệch màu). Bỏ trống
+   * (undefined) = FloatingWindow tự fallback `document.body` như hành vi cũ.
+   */
+  portalContainer?: HTMLElement | null;
 }
 
 /** Trạng thái UI dẫn xuất cho 1 engine (từ install_status + progress đang chạy). */
 type UiPhase = EngineInstallProgress['phase'] | 'idle';
 
-export function EngineManager({ open, onClose, port, canInstall = false, notice }: EngineManagerProps) {
+export function EngineManager({ open, onClose, port, canInstall = false, notice, portalContainer }: EngineManagerProps) {
   const { t } = useTranslation();
   const [engines, setEngines] = useState<TtsEngines | null>(null);
   const [progress, setProgress] = useState<Record<string, EngineInstallProgress>>({});
@@ -40,6 +51,10 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice 
   const [msg, setMsg] = useState<Record<string, string>>({});
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
   const progressRef = useRef<Record<string, EngineInstallProgress>>({});
+  // Trạng thái tiến trình tts-service (đã có sẵn cho icon menu bar) — dùng ở đây để tự refresh
+  // khi service CHUYỂN sang sẵn sàng, thay vì bắt người dùng đóng/mở lại cửa sổ.
+  const { status: serviceStatus } = useTtsStatus(port);
+  const prevServiceStatusRef = useRef(serviceStatus);
 
   const refresh = useCallback(async () => {
     const e = await port.listEngines();
@@ -55,6 +70,16 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice 
   }, [port]);
 
   useEffect(() => { if (open) void refresh(); }, [open, refresh]);
+
+  // Bug thật 2026-08-04: mở "Quản lý engine TTS" TRƯỚC KHI tts-service kịp start (vd vừa mở
+  // app) → listEngines() trả về null (getPythonPort() chưa có), refresh() ở trên bỏ qua luôn
+  // vì `if (!e) return`, và KHÔNG có cơ chế thử lại — danh sách trống vĩnh viễn cho tới khi
+  // đóng/mở lại cửa sổ. Theo dõi serviceStatus (đã có sẵn, dùng chung icon menu bar) để tự
+  // refresh() ngay khi service chuyển sang 'ok', không cần người dùng đóng/mở lại.
+  useEffect(() => {
+    if (open && serviceStatus === 'ok' && prevServiceStatusRef.current !== 'ok') void refresh();
+    prevServiceStatusRef.current = serviceStatus;
+  }, [open, serviceStatus, refresh]);
 
   // Subscribe tiến độ cài đặt.
   useEffect(() => {
@@ -133,10 +158,22 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice 
       minWidth={420}
       minHeight={360}
       contentClassName="flex w-full flex-1 min-h-0 flex-col gap-3 overflow-y-auto p-5"
+      container={portalContainer}
     >
       <p className="text-xxs text-muted-foreground">{t('engineManager.description')}</p>
 
       {notice}
+
+      {/* engines === null: listEngines() chưa trả được (service chưa start / mất kết nối) —
+          hiện rõ trạng thái thay vì bỏ trống cửa sổ. Tự refresh() khi service chuyển 'ok'
+          (effect ở trên) nên không cần người dùng tự đóng/mở lại. */}
+      {engines === null && (
+        <p className="text-xs text-muted-foreground">
+          {serviceStatus === 'error'
+            ? t('engineManager.serviceUnavailable')
+            : t('engineManager.serviceStarting')}
+        </p>
+      )}
 
       {engines?.engines.map((e) => {
           const phase = phaseOf(e);
@@ -150,12 +187,12 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice 
 
           return (
             <div key={e.id} className="flex flex-col gap-2 rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 flex-col">
+                  <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
                     {e.label}
-                    {isCurrent && <span className="rounded bg-success/15 px-1.5 py-0.5 text-2xs text-success">{t('engineManager.inUse')}</span>}
-                    {e.bundled && <span className="rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">{t('engineManager.bundled')}</span>}
+                    {isCurrent && <span className="shrink-0 whitespace-nowrap rounded bg-success/15 px-1.5 py-0.5 text-2xs text-success">{t('engineManager.inUse')}</span>}
+                    {e.bundled && <span className="shrink-0 whitespace-nowrap rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">{t('engineManager.bundled')}</span>}
                   </span>
                   <span className="text-xxs text-muted-foreground">{e.description}</span>
                 </div>
@@ -170,17 +207,22 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice 
                 </p>
               )}
 
-              {/* Progress khi đang tải */}
+              {/* Progress khi đang tải. Riêng lúc cài thư viện (pip install) không có % chính
+                  xác — hiện hộp log cuộn (logLines) thay vì thanh progress vô nghĩa (luôn 0%). */}
               {(downloading || paused) && p && (
                 <div className="flex flex-col gap-1">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={`h-full rounded-full transition-all ${paused ? 'bg-warning' : 'bg-primary'}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
+                  {p.logLines && p.logLines.length > 0 ? (
+                    <InstallLogBox lines={p.logLines} />
+                  ) : (
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full transition-all ${paused ? 'bg-warning' : 'bg-primary'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  )}
                   <div className="flex justify-between text-2xs text-muted-foreground">
-                    <span>{translatePhase(phase, t)} {p.currentFile ? `· ${p.currentFile.split('/').pop()}` : ''}</span>
+                    <span>{translatePhase(phase, t)} {!p.logLines?.length && p.currentFile ? `· ${p.currentFile.split('/').pop()}` : ''}</span>
                     <span>
                       {p.bytesTotal > 0 && `${fmtBytes(p.bytesReceived)}/${fmtBytes(p.bytesTotal)} `}
                       {p.bytesPerSec > 0 && !paused && `· ${fmtBytes(p.bytesPerSec)}/s`}
@@ -234,6 +276,11 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice 
                           variant="danger-ghost"
                           onClick={async () => {
                             if (!confirm(t('engineManager.deleteConfirm', { label: e.label }))) return;
+                            // Bug thật 2026-08-04: xoá xong (thành công) không dọn `msg[e.id]` —
+                            // thông báo lỗi CŨ (vd "Engine không load được...") từ lần đổi/kiểm
+                            // tra engine trước đó cứ nằm lì mãi dù engine đã bị xoá sạch, trông
+                            // như thao tác xoá "không có tác dụng gì" với dòng lỗi.
+                            setEngineMsg(e.id, '');
                             const r = await port.deleteEngine?.(e.id);
                             if (!r?.ok) setEngineMsg(e.id, r?.error ?? t('engineManager.deleteFailed'));
                             void refresh();
@@ -254,7 +301,11 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice 
                   <Button variant="secondary-outline" onClick={() => void port.installPause?.(e.id)} icon={<Pause size={12} />}>
                     {t('engineManager.pause')}
                   </Button>
-                ) : paused ? (
+                ) : paused || e.install_status === 'partial' ? (
+                  // `paused` = tiến độ trực tiếp trong phiên này. `install_status === 'partial'`
+                  // = có phần dở còn lại trên đĩa nhưng CHƯA có sự kiện progress nào tới (vd vừa
+                  // mở lại cửa sổ trong lúc tải nền vẫn chạy) — cả 2 đều nghĩa "đã có phần dở dang",
+                  // nên chỉ cho Resume, ẩn hẳn Tải model/Import (2 nút đó chỉ dành cho status 'missing').
                   <Button variant="primary" onClick={() => void port.installResume?.(e.id)} icon={<Play size={12} />}>
                     {t('engineManager.resume')}
                   </Button>
@@ -285,12 +336,31 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice 
   );
 }
 
+/** Hộp log cuộn cho phase 'installing-runtime' (pip install stdout/stderr) — không có %
+ * tiến độ chính xác nên thay thanh progress bằng log thật, tự cuộn xuống dòng mới nhất. */
+function InstallLogBox({ lines }: { lines: string[] }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
+  }, [lines.length]);
+  return (
+    <div
+      ref={boxRef}
+      className="max-h-32 overflow-y-auto rounded-lg border border-border bg-muted/40 p-2 font-mono text-2xs text-muted-foreground"
+    >
+      {lines.map((line, i) => (
+        <div key={i} className="whitespace-pre-wrap break-all">{line}</div>
+      ))}
+    </div>
+  );
+}
+
 function StatusBadge({ status, bundled, t }: { status: string; bundled: boolean; t: TFunction }) {
   if (bundled || status === 'installed')
-    return <span className="rounded bg-success/15 px-2 py-0.5 text-2xs text-success">{t('engineManager.status.ready')}</span>;
+    return <span className="shrink-0 whitespace-nowrap rounded bg-success/15 px-2 py-0.5 text-2xs text-success">{t('engineManager.status.ready')}</span>;
   if (status === 'partial')
-    return <span className="rounded bg-warning/15 px-2 py-0.5 text-2xs text-warning-foreground">{t('engineManager.status.partial')}</span>;
-  return <span className="rounded bg-muted px-2 py-0.5 text-2xs text-muted-foreground">{t('engineManager.status.notDownloaded')}</span>;
+    return <span className="shrink-0 whitespace-nowrap rounded bg-warning/15 px-2 py-0.5 text-2xs text-warning-foreground">{t('engineManager.status.partial')}</span>;
+  return <span className="shrink-0 whitespace-nowrap rounded bg-muted px-2 py-0.5 text-2xs text-muted-foreground">{t('engineManager.status.notDownloaded')}</span>;
 }
 
 function translatePhase(p: UiPhase, t: TFunction): string {

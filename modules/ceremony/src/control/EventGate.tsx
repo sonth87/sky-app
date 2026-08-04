@@ -68,8 +68,10 @@ export function EventGate() {
   // initialEvent. Cần fetch full EventDocument (list() chỉ trả EventSummary rút gọn).
   // `view` (2026-07-23) — bấm trực tiếp vào pill "dữ liệu"/"layout" của 1 dòng phải nhảy THẲNG
   // vào panel tương ứng thay vì luôn dừng ở màn Hub trung gian (feedback thật: "ấn nút sửa tại
-  // sao lại ra 2 mục import"). Nút "Sửa" chính vẫn mở Hub menu (initialView undefined).
-  const [editingEvent, setEditingEvent] = useState<{ event: EventDocument; view?: 'import' | 'layout' } | null>(null);
+  // sao lại ra 2 mục import"). Nút "Sửa" chính (2026-08-03, phản hồi thật lần 2) cũng nhảy THẲNG
+  // vào 'info' luôn — trước đó phải qua Hub menu rồi bấm thêm icon bút chì mới thấy nút Xoá,
+  // "phải vào sâu bên trong mới xoá được".
+  const [editingEvent, setEditingEvent] = useState<{ event: EventDocument; view?: 'import' | 'layout' | 'info' } | null>(null);
   const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
   // Trạng thái data/layout mỗi dòng Event (PHỤ LỤC "Event Hub", 2026-07-22) — EventSummary rút
   // gọn không có dataSourceId/layoutRefs, cần fetch full EventDocument riêng cho từng dòng (danh
@@ -192,7 +194,7 @@ export function EventGate() {
     setLoadingEditId(summary.id);
     try {
       const full = await eventPort.get(summary.id);
-      if (full) setEditingEvent({ event: full });
+      if (full) setEditingEvent({ event: full, view: 'info' });
       else showErrorToast(t('eventGate.activateError', { message: 'not found' }));
     } catch (err) {
       showErrorToast(t('eventGate.activateError', { message: err instanceof Error ? err.message : String(err) }));
@@ -266,7 +268,14 @@ export function EventGate() {
                   </span>
                 )}
                 <div className="flex min-w-0 flex-col gap-1.5">
-                  <span className="truncate text-sm font-medium text-foreground">{ev.name}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="truncate text-sm font-medium text-foreground">{ev.name}</span>
+                    {/* Ngày tạo (2026-08-03, phản hồi thật) — import trùng tên trước đây không
+                       phân biệt được, hiện thêm ngày tạo để dễ nhận ra bản nào là bản nào. */}
+                    <span className="flex-none text-xs text-muted-foreground">
+                      {t('eventGate.createdAtLabel', { date: new Date(ev.createdAt).toLocaleDateString() })}
+                    </span>
+                  </div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {/* Không hiện tag trạng thái (VD "Đang hoạt động") cho Event mẫu — đây chỉ là
                        xem thử, status thật trong DB (draft/active/...) không có ý nghĩa vận hành

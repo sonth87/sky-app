@@ -34,6 +34,11 @@ export function createWebEventPort(baseUrl = 'http://localhost:8094'): EventPort
       if (!res.ok) throw new Error(`EventPort save failed: ${res.status}`);
     },
 
+    async delete(id) {
+      const res = await fetch(`${baseUrl}/api/events/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`EventPort delete failed: ${res.status}`);
+    },
+
     async getCurrentActive() {
       const res = await fetch(`${baseUrl}/api/events/active/current`);
       if (!res.ok) throw new Error(`EventPort getCurrentActive failed: ${res.status}`);

@@ -20,6 +20,10 @@ export interface EventPort {
   get(id: string): Promise<EventDocument | null>;
   create(doc: Omit<EventDocument, 'createdAt' | 'updatedAt'>): Promise<void>;
   save(doc: EventDocument): Promise<void>;
+  /** Xoá vĩnh viễn 1 Event (Giai đoạn 5.3 mở rộng, 2026-08-03) — CRUD cơ bản, hoạt động ở CẢ
+   * Web lẫn Electron (khác exportBundle/importBundle bên dưới, vốn Electron-only). Chỉ xoá
+   * Event + layoutRefs/consumedRecord liên quan — KHÔNG đụng DataSource/LayoutDocument. */
+  delete(id: string): Promise<void>;
   getCurrentActive(): Promise<EventDocument | null>;
   setActive(id: string): Promise<void>;
 

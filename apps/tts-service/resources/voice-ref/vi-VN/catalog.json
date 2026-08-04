@@ -187,7 +187,8 @@
     ],
     "file": "giang_narrator.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "default": true
   },
   {
     "id": "giang_podcast",
@@ -949,6 +950,49 @@
       "warm"
     ],
     "file": "viet_linh.mp3",
+    "clonable": true,
+    "source": "vendor"
+  },
+  {
+    "id": "hoai_my",
+    "name": "Hoài My",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Warm, natural Vietnamese female voice",
+    "description": "Hoài My - Natural Vietnamese female voice, well-suited for narration, storytelling, and general-purpose reading.",
+    "tags": [
+      "clear",
+      "natural",
+      "warm"
+    ],
+    "file": "hoai_my.wav",
+    "clonable": true,
+    "source": "vendor"
+  },
+  {
+    "id": "nam_minh",
+    "name": "Nam Minh",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Clear, natural Vietnamese male voice",
+    "description": "Nam Minh - Natural Vietnamese male voice, well-suited for narration, storytelling, and general-purpose reading.",
+    "tags": [
+      "clear",
+      "natural"
+    ],
+    "file": "nam_minh.wav",
     "clonable": true,
     "source": "vendor"
   }

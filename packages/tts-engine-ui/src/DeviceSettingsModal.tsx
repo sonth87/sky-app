@@ -10,6 +10,10 @@ export interface DeviceSettingsModalProps {
   port: TtsEnginePort;
   canInstall?: boolean;
   engineManagerNotice?: ReactNode;
+  /** Root DOM của app gọi (vd `.tts-studio-root`/`.ceremony-root`) — truyền vào FloatingWindow
+   * để portal ở TRONG subtree đó, giữ được biến theme CSS custom property (xem cùng chú thích
+   * ở EngineManagerProps.portalContainer). */
+  portalContainer?: HTMLElement | null;
 }
 
 /**
@@ -27,6 +31,7 @@ export function DeviceSettingsModal({
   port,
   canInstall = false,
   engineManagerNotice,
+  portalContainer,
 }: DeviceSettingsModalProps) {
   const { t } = useTranslation();
   // FloatingWindow không tự gate theo `open` — xem chú thích tương tự trong EngineManager.tsx.
@@ -42,6 +47,7 @@ export function DeviceSettingsModal({
       minWidth={360}
       minHeight={340}
       contentClassName="flex w-full flex-1 min-h-0 flex-col gap-3 overflow-y-auto p-5"
+      container={portalContainer}
     >
       <DeviceConfig
         port={port}
