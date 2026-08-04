@@ -53,7 +53,10 @@ export const ttsEngineLocales = {
         "installingRuntime": "Đang cài thư viện",
         "verifying": "Đang kiểm tra",
         "paused": "Đã tạm dừng"
-      }
+      },
+      "showDetails": "Chi tiết",
+      "hideDetails": "Ẩn chi tiết",
+      "installLog": "Nhật ký cài đặt"
     },
     "deviceConfig": {
       "savedNeedsRestart": "Đã lưu cấu hình. Cần khởi động lại dịch vụ TTS để áp dụng.",
@@ -159,7 +162,10 @@ export const ttsEngineLocales = {
         "installingRuntime": "Installing runtime",
         "verifying": "Verifying",
         "paused": "Paused"
-      }
+      },
+      "showDetails": "Details",
+      "hideDetails": "Hide details",
+      "installLog": "Install log"
     },
     "deviceConfig": {
       "savedNeedsRestart": "Configuration saved. The TTS service must be restarted to apply it.",

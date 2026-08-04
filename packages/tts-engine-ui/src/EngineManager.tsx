@@ -207,28 +207,9 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
                 </p>
               )}
 
-              {/* Progress khi đang tải. Riêng lúc cài thư viện (pip install) không có % chính
-                  xác — hiện hộp log cuộn (logLines) thay vì thanh progress vô nghĩa (luôn 0%). */}
+              {/* Progress khi đang tải/cài. */}
               {(downloading || paused) && p && (
-                <div className="flex flex-col gap-1">
-                  {p.logLines && p.logLines.length > 0 ? (
-                    <InstallLogBox lines={p.logLines} />
-                  ) : (
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full transition-all ${paused ? 'bg-warning' : 'bg-primary'}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  )}
-                  <div className="flex justify-between text-2xs text-muted-foreground">
-                    <span>{translatePhase(phase, t)} {!p.logLines?.length && p.currentFile ? `· ${p.currentFile.split('/').pop()}` : ''}</span>
-                    <span>
-                      {p.bytesTotal > 0 && `${fmtBytes(p.bytesReceived)}/${fmtBytes(p.bytesTotal)} `}
-                      {p.bytesPerSec > 0 && !paused && `· ${fmtBytes(p.bytesPerSec)}/s`}
-                    </span>
-                  </div>
-                </div>
+                <InstallProgressBlock phase={phase} p={p} pct={pct} paused={paused} t={t} />
               )}
 
               {/* Preflight blocks/warnings */}
@@ -336,21 +317,92 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
   );
 }
 
-/** Hộp log cuộn cho phase 'installing-runtime' (pip install stdout/stderr) — không có %
- * tiến độ chính xác nên thay thanh progress bằng log thật, tự cuộn xuống dòng mới nhất. */
-function InstallLogBox({ lines }: { lines: string[] }) {
+/** Label nhấp nháy dấu chấm ("Đang cài đặt" → "Đang cài đặt." → ".." → "..." → lặp lại) —
+ * báo hiệu tiến trình vẫn đang chạy, không đứng hình, trong lúc chờ % ước lượng cập nhật. */
+function AnimatedDotsLabel({ label }: { label: string }) {
+  const [dots, setDots] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setDots((d) => (d + 1) % 4), 450);
+    return () => clearInterval(id);
+  }, []);
+  return <span>{label}{'.'.repeat(dots)}</span>;
+}
+
+/** Khối hiển thị tiến độ tải/cài 1 engine: dòng nhãn (nhấp nháy dấu chấm) + % + nút "Chi tiết",
+ * thanh progress, và log cuộn (đóng mặc định, mở khi bấm "Chi tiết"). Riêng phase
+ * 'installing-runtime' (pip install) dùng `installPct` ước lượng thay vì % byte-based (pip
+ * không báo tổng dung lượng khi chạy ngầm — xem comment installPct's ở slide-api.ts). */
+function InstallProgressBlock({
+  phase, p, pct, paused, t,
+}: {
+  phase: UiPhase;
+  p: EngineInstallProgress;
+  pct: number;
+  paused: boolean;
+  t: TFunction;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasLog = !!p.logLines && p.logLines.length > 0;
+  const displayPct = hasLog ? (p.installPct ?? 0) : pct;
+  const label = translatePhase(phase, t);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2 text-2xs text-muted-foreground">
+        <span className="min-w-0 truncate">
+          {paused ? label : <AnimatedDotsLabel label={label} />}
+          {!hasLog && p.currentFile ? ` · ${p.currentFile.split('/').pop()}` : ''}
+        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="font-semibold tabular-nums text-foreground">{displayPct}%</span>
+          {!hasLog && p.bytesTotal > 0 && (
+            <span>
+              {fmtBytes(p.bytesReceived)}/{fmtBytes(p.bytesTotal)}
+              {p.bytesPerSec > 0 && !paused ? ` · ${fmtBytes(p.bytesPerSec)}/s` : ''}
+            </span>
+          )}
+          {hasLog && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="font-medium text-primary hover:underline"
+            >
+              {expanded ? t('engineManager.hideDetails') : t('engineManager.showDetails')}
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full transition-all ${paused ? 'bg-warning' : 'bg-primary'}`}
+          style={{ width: `${displayPct}%` }}
+        />
+      </div>
+      {hasLog && expanded && <InstallLogBox lines={p.logLines!} t={t} />}
+    </div>
+  );
+}
+
+/** Hộp log cuộn — mở khi bấm "Chi tiết" bên trên (phase 'installing-runtime', pip install
+ * stdout/stderr), tự cuộn xuống dòng mới nhất. */
+function InstallLogBox({ lines, t }: { lines: string[]; t: TFunction }) {
   const boxRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
   }, [lines.length]);
   return (
-    <div
-      ref={boxRef}
-      className="max-h-32 overflow-y-auto rounded-lg border border-border bg-muted/40 p-2 font-mono text-2xs text-muted-foreground"
-    >
-      {lines.map((line, i) => (
-        <div key={i} className="whitespace-pre-wrap break-all">{line}</div>
-      ))}
+    <div className="flex flex-col gap-1">
+      <span className="text-2xs font-semibold text-muted-foreground">
+        {t('engineManager.installLog')} ({lines.length})
+      </span>
+      <div
+        ref={boxRef}
+        className="max-h-40 space-y-px overflow-y-auto rounded-lg bg-foreground p-2 font-mono text-2xs leading-relaxed"
+      >
+        {lines.map((line, i) => (
+          <div key={i} className="whitespace-pre-wrap break-all text-background">{line}</div>
+        ))}
+      </div>
     </div>
   );
 }

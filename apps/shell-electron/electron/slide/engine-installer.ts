@@ -185,6 +185,7 @@ export interface InstallProgress {
   currentFile: string;
   error?: string;
   logLines?: string[];
+  installPct?: number;
 }
 
 /** Số dòng log pip install tối đa giữ lại (renderer hiện hộp log cuộn) — đủ dài để thấy hết
@@ -489,11 +490,20 @@ export class EngineInstaller {
       }
     }
 
-    // Log dòng lệnh pip tích luỹ — renderer hiện hộp log cuộn (không có % chính xác cho pip nên
-    // hộp log thay thế progress bar). Reset mỗi lượt cài MỚI (kể cả retry sau pause/resume).
+    // Log dòng lệnh pip tích luỹ — renderer hiện hộp log cuộn khi mở "Chi tiết". Reset mỗi lượt
+    // cài MỚI (kể cả retry sau pause/resume).
     this.logBuffer = [];
+    // pip không báo tổng dung lượng/tiến độ dạng số khi chạy ngầm (không phải TTY) nên KHÔNG có
+    // % chính xác. Ước lượng bằng cách đếm dòng "Collecting <tên gói>" so với số gói top-level
+    // yêu cầu cài — luôn tăng dần nhưng không chính xác 100% vì pip còn "Collecting" cả gói kéo
+    // theo (dependency), nên chặn ở 95 cho tới khi cài xong hẳn (phase 'done').
+    let collectedCount = 0;
+    const totalPkgs = pipPackages.length;
+    const estimatePct = (): number | undefined =>
+      totalPkgs > 0 ? Math.min(95, Math.round((collectedCount / totalPkgs) * 100)) : undefined;
     const emitPipProgress = (phase: InstallProgress['phase']) => {
-      this.emit(this.prog(phase, [], [], 0, 0, 0, this.logBuffer.at(-1) ?? '', undefined, undefined, [...this.logBuffer]));
+      this.emit(this.prog(phase, [], [], 0, 0, 0, this.logBuffer.at(-1) ?? '', undefined, undefined,
+        [...this.logBuffer], estimatePct()));
     };
     emitPipProgress('installing-runtime');
 
@@ -503,6 +513,9 @@ export class EngineInstaller {
       const proc = spawn(python, args, { windowsHide: true });
       const onData = (d: Buffer) => {
         const lines = d.toString().split('\n').filter((l) => l.trim().length > 0);
+        for (const line of lines) {
+          if (/^Collecting\s+\S/.test(line.trim())) collectedCount += 1;
+        }
         this.logBuffer.push(...lines);
         if (this.logBuffer.length > LOG_BUFFER_MAX) this.logBuffer = this.logBuffer.slice(-LOG_BUFFER_MAX);
         emitPipProgress('installing-runtime');
@@ -650,7 +663,7 @@ export class EngineInstaller {
   private prog(
     phase: InstallProgress['phase'], allFiles: string[], done: string[],
     received: number, total: number, bps: number, current: string,
-    filesDone?: number, error?: string, logLines?: string[],
+    filesDone?: number, error?: string, logLines?: string[], installPct?: number,
   ): InstallProgress {
     return {
       engineId: this.engineId,
@@ -663,6 +676,7 @@ export class EngineInstaller {
       currentFile: current,
       error,
       logLines,
+      installPct,
     };
   }
 }

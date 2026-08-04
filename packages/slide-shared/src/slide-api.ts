@@ -106,10 +106,15 @@ export interface EngineInstallProgress {
   bytesPerSec: number;
   currentFile: string;
   error?: string;
-  /** Log dòng lệnh (pip install...) tích luỹ cho phase 'installing-runtime' — không có % tiến
-   * độ chính xác nên EngineManager hiện hộp log cuộn thay vì thanh progress. Cắt về N dòng gần
+  /** Log dòng lệnh (pip install...) tích luỹ cho phase 'installing-runtime'. Cắt về N dòng gần
    * nhất phía nguồn (engine-installer.ts's LOG_BUFFER_MAX) để tránh phình payload IPC. */
   logLines?: string[];
+  /** % ƯỚC LƯỢNG cho phase 'installing-runtime' — pip không báo tổng dung lượng/tiến độ chính
+   * xác khi chạy ngầm (không phải TTY) nên KHÔNG dùng bytesReceived/bytesTotal được. Suy ra từ
+   * số dòng "Collecting <tên gói>" xuất hiện trong log so với số gói top-level cần cài
+   * (engine-installer.ts's installRuntime) — không chính xác 100% vì còn phụ thuộc kéo theo,
+   * nên chặn ở 95 cho tới khi phase chuyển 'done'. */
+  installPct?: number;
 }
 
 export interface TtsEnginePreflight {
