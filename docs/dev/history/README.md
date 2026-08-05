@@ -6,6 +6,7 @@
 
 ## Mục lục (mới nhất trên cùng)
 
+- [2026-08-05 — MOSS codec stereo (2 kênh) → future conversation/podcast mode (stereo panning L/R)](./2026-08-05-stereo-tts-conversation-mode.md)
 - [2026-07-30 — "Dùng dữ liệu mẫu" thành công tắc bật/tắt, không xoá DB](./2026-07-30-toggle-du-lieu-mau.md)
 - [2026-07-29 — Màn hình chờ chỉ hiển thị từ layout đã chọn, không còn fallback](./2026-07-29-man-hinh-cho-chi-tu-layout-design.md)
 - [2026-07-29 — Dựng packages/ui dùng chung, dọn trùng lặp UI giữa các module](./2026-07-29-package-ui-dung-chung.md)
