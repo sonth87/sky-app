@@ -384,7 +384,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                 {!sidebarCollapsed && <span className="text-sm font-medium text-[#26262e]">Layouts</span>}
               </div>
               {sidebarCollapsed && (
-                <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
                   Layouts
                 </div>
               )}
@@ -400,7 +400,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                 {!sidebarCollapsed && <span className="text-sm font-medium text-[#26262e]">Trash</span>}
               </div>
               {sidebarCollapsed && (
-                <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
                   Trash
                 </div>
               )}
