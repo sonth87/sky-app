@@ -28,4 +28,5 @@ export type {
   FileLibraryConfig,
   DragBoxState,
   ContextMenuState,
+  SizeConfig,
 } from './types';

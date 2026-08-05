@@ -10,6 +10,7 @@ interface FileGridProps {
   dragBoxStyle?: React.CSSProperties;
   containerRef: React.RefObject<HTMLDivElement>;
   cardRectsRef: React.MutableRefObject<Map<string, DOMRect>>;
+  itemSize?: number;
 }
 
 const defaultItemRenderer = (item: FileItem, isSelected: boolean) => (
@@ -56,6 +57,7 @@ export const FileGrid: React.FC<FileGridProps> = ({
   dragBoxStyle,
   containerRef,
   cardRectsRef,
+  itemSize = 180,
 }) => {
   const itemsRef = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -77,7 +79,7 @@ export const FileGrid: React.FC<FileGridProps> = ({
         <div
           className="grid gap-4"
           style={{
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gridTemplateColumns: `repeat(auto-fill, minmax(${itemSize}px, 1fr))`,
           }}
         >
           {items.map((item) => (

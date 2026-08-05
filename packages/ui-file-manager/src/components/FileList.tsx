@@ -8,6 +8,7 @@ interface FileListProps {
   onContextMenu: (id: string, x: number, y: number) => void;
   containerRef: React.RefObject<HTMLDivElement>;
   cardRectsRef: React.MutableRefObject<Map<string, DOMRect>>;
+  itemSize?: number;
 }
 
 export const FileList: React.FC<FileListProps> = ({
@@ -17,6 +18,7 @@ export const FileList: React.FC<FileListProps> = ({
   onContextMenu,
   containerRef,
   cardRectsRef,
+  itemSize = 40,
 }) => {
   const itemsRef = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -65,6 +67,7 @@ export const FileList: React.FC<FileListProps> = ({
                   ? 'bg-blue-50 border-l-4 border-blue-500'
                   : ''
               } group`}
+              style={{ height: `${itemSize}px` }}
             >
               <td className="px-4 py-3">
                 <span

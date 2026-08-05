@@ -32,23 +32,43 @@ export const FileLibraryLayout: React.FC<FileLibraryLayoutProps> = ({
   const dragBox = useDragToSelect();
   const search = useFileSearch(items, config.filterConfig);
 
+  // Helper to get localStorage key with app namespace
+  const getStorageKey = (key: string) => {
+    if (config.appId) {
+      return `file-manager-${config.appId}-${key}`;
+    }
+    return `file-manager-${key}`;
+  };
+
   const [viewMode, setViewMode] = useState(
     config.defaultView || 'grid'
   );
+
+  const [itemSize, setItemSize] = useState<number>(() => {
+    if (typeof window === 'undefined') return config.sizeConfig?.defaultSize ?? 200;
+    const saved = localStorage.getItem(getStorageKey('item-size'));
+    return saved ? parseInt(saved, 10) : (config.sizeConfig?.defaultSize ?? 200);
+  });
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   // Persist view mode
   useEffect(() => {
-    const saved = localStorage.getItem('file-manager-view-mode');
+    const saved = localStorage.getItem(getStorageKey('view-mode'));
     if (saved) {
       setViewMode(saved);
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('file-manager-view-mode', viewMode);
-  }, [viewMode]);
+    localStorage.setItem(getStorageKey('view-mode'), viewMode);
+  }, [viewMode, config.appId]);
+
+  // Persist item size
+  useEffect(() => {
+    localStorage.setItem(getStorageKey('item-size'), String(itemSize));
+    config.onSizeChange?.(itemSize);
+  }, [itemSize, config.appId]);
 
   // Keyboard navigation
   useFileKeyboard({
@@ -154,6 +174,8 @@ export const FileLibraryLayout: React.FC<FileLibraryLayoutProps> = ({
           onQueryChange={search.setQuery}
           viewMode={viewMode}
           onViewChange={handleViewChange}
+          itemSize={itemSize}
+          onSizeChange={setItemSize}
           config={config}
           supportedViews={supportedViews}
         />
@@ -174,6 +196,7 @@ export const FileLibraryLayout: React.FC<FileLibraryLayoutProps> = ({
               dragBoxStyle={dragBox.getDragBoxStyle()}
               containerRef={containerRef}
               cardRectsRef={cardRectsRef}
+              itemSize={itemSize}
             />
           ) : (
             <FileList
@@ -183,6 +206,7 @@ export const FileLibraryLayout: React.FC<FileLibraryLayoutProps> = ({
               onContextMenu={handleContextMenu}
               containerRef={containerRef}
               cardRectsRef={cardRectsRef}
+              itemSize={itemSize}
             />
           )}
         </div>

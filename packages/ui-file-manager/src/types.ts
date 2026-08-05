@@ -57,8 +57,20 @@ export interface SelectionState {
   rangeAnchorId: string | null;
 }
 
+/** Size configuration for items */
+export interface SizeConfig {
+  minSize?: number;   // Minimum size in pixels (default: 120)
+  maxSize?: number;   // Maximum size in pixels (default: 320)
+  defaultSize?: number;  // Default size in pixels (default: 200)
+  step?: number;      // Size increment step (default: 20)
+}
+
 /** Library layout configuration */
 export interface FileLibraryConfig {
+  // App namespace for localStorage isolation (e.g., 'layout-designer', 'template-gallery')
+  // Without this, all apps share the same localStorage keys
+  appId?: string;
+
   // Sidebar
   sidebarItems?: SidebarItem[];
   sidebarCollapsedDefault?: boolean;
@@ -69,6 +81,7 @@ export interface FileLibraryConfig {
   // Header
   showViewToggle?: boolean;
   showSearch?: boolean;
+  showSizeControl?: boolean;  // Show size adjustment button (default: true)
   headerButtons?: Array<{
     id: string;
     label: string;
@@ -84,6 +97,9 @@ export interface FileLibraryConfig {
   // Filter
   filterConfig?: FilterConfig;
 
+  // Size control
+  sizeConfig?: SizeConfig;
+
   // Keyboard
   enableKeyboardNavigation?: boolean;
   enableDragToSelect?: boolean;
@@ -98,6 +114,7 @@ export interface FileLibraryConfig {
   onItemDoubleClick?: (itemId: string) => void;
   onSelectionChange?: (selectedIds: Set<string>) => void;
   onViewChange?: (viewMode: string) => void;
+  onSizeChange?: (size: number) => void;
 }
 
 /** Drag box state */

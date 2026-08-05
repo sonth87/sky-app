@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileFilter } from './FileFilter';
+import { FileSizeControl } from './FileSizeControl';
 import type { FileLibraryConfig, ViewMode } from '../types';
 
 interface FileHeaderProps {
@@ -7,6 +8,8 @@ interface FileHeaderProps {
   onQueryChange: (value: string) => void;
   viewMode: string;
   onViewChange: (mode: string) => void;
+  itemSize: number;
+  onSizeChange: (size: number) => void;
   config?: FileLibraryConfig;
   supportedViews: ViewMode[];
 }
@@ -16,6 +19,8 @@ export const FileHeader: React.FC<FileHeaderProps> = ({
   onQueryChange,
   viewMode,
   onViewChange,
+  itemSize,
+  onSizeChange,
   config,
   supportedViews,
 }) => {
@@ -43,6 +48,14 @@ export const FileHeader: React.FC<FileHeaderProps> = ({
             {button.label}
           </button>
         ))}
+
+        {config?.showSizeControl !== false && (
+          <FileSizeControl
+            size={itemSize}
+            onSizeChange={onSizeChange}
+            config={config?.sizeConfig}
+          />
+        )}
 
         {config?.showViewToggle !== false && supportedViews.length > 1 && (
           <div className="flex gap-1 border border-gray-300 rounded-md p-1">
