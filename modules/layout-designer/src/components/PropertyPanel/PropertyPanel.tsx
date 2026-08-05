@@ -67,6 +67,19 @@ export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenIns
     [editor, item, variantId, editingLoopId],
   );
 
+  // Nhiều item được chọn → hiện thông báo multi-select (GĐ9)
+  if (selection.length > 1) {
+    return (
+      <div className="shrink-0 border-l border-[#e6e6ee] bg-white flex flex-col items-center justify-center p-4" style={{ width, minHeight: '200px' }}>
+        <div className="text-sm font-semibold text-[#5c5d6e] mb-2">Đã chọn {selection.length} mục</div>
+        <div className="text-xs text-[#9a9bab] text-center leading-relaxed">
+          Kéo để di chuyển tất cả<br />
+          Delete để xoá tất cả
+        </div>
+      </div>
+    );
+  }
+
   // Không có item nào đang chọn → hiện thuộc tính CỦA CHÍNH Frame/Canvas (nền màu/gradient/ảnh —
   // review 2026-07-18, trước đó chỉ hiện text hướng dẫn tĩnh "Chọn một thành phần"). KHÔNG hiện
   // khi đang edit-mode (Bước 10) — ngữ cảnh "ô mẫu" không có nền variant thật để chỉnh.

@@ -77,7 +77,19 @@ export function CanvasItemView({
       // giữa variant). setSelection() PHẢI VẪN CHẠY dù locked — nếu khoá cả việc CHỌN, PropertyPanel
       // sẽ không bao giờ hiện được nút mở khoá cho item đó nữa (deadlock UX). Chỉ chặn phần KÉO
       // (không khởi tạo dragRef) — onPointerMove tự no-op vì dragRef.current vẫn null.
-      editor.store.getState().setSelection([item.id]);
+      const state = editor.store.getState();
+      if (e.shiftKey) {
+        // Shift-click: toggle thêm/bớt khỏi selection hiện có
+        const current = state.selection;
+        if (current.includes(item.id)) {
+          state.setSelection(current.filter((id) => id !== item.id));
+        } else {
+          state.setSelection([...current, item.id]);
+        }
+      } else {
+        // Bình thường: thay thế selection
+        state.setSelection([item.id]);
+      }
       if (item.locked) return;
       dragRef.current = { startX: e.clientX, startY: e.clientY, from: item.box, lastTo: item.box };
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
