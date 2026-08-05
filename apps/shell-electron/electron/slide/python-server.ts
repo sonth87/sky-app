@@ -534,9 +534,14 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
       return;
     }
 
-    // Warmup ONNX sessions ngay sau khi server ready
-    await warmupSessions(actualPort);
     pushStatus('ready', `TTS engine sẵn sàng (port ${actualPort})`);
+
+    // Warmup ONNX sessions ngay sau khi server ready — background (không chặn return).
+    // Lần startup đầu sẽ warm model vào RAM; lần restart (đổi engine) có thể load model
+    // engine mới nhưng UI không cần chờ — server đã respond.
+    warmupSessions(actualPort).catch((err) => {
+      console.warn('[Python Server] Background warmup failed:', err);
+    });
   } catch (err) {
     // Re-throw để retry mechanism ở startPythonServer() xử lý
     throw err;
