@@ -115,8 +115,8 @@ const api: SlideApi = {
       return { ok: res.ok, error: res.error };
     }),
   // tts-studio: channel riêng, KHÔNG cache/log/pregen (khác tts:speak dùng bởi Ceremony).
-  synthesizeTts: (text: string, voiceId?: string, speed?: number): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }> =>
-    ipcRenderer.invoke('tts-studio:synthesize', { text, voiceId, speed }).then((res) => {
+  synthesizeTts: (text: string, voiceId?: string, speed?: number, engineOverrides?: Record<string, Record<string, any>>): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }> =>
+    ipcRenderer.invoke('tts-studio:synthesize', { text, voiceId, speed, engine_overrides: engineOverrides }).then((res) => {
       if (res.ok && res.buffer) {
         return {
           ok: true,
@@ -131,6 +131,8 @@ const api: SlideApi = {
     }),
   warmupTts: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('tts:warmup'),
+  getEngineCapabilities: (): Promise<Record<string, any>> =>
+    ipcRenderer.invoke('tts:capabilities'),
   getTtsDebug: (): Promise<{
     port: number; processAlive: boolean; processPid: number | null;
     executableUsed: string; lastStartupError: string | null;

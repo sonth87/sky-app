@@ -6,6 +6,7 @@ import { TextareaRefContext } from './TextareaRefContext';
 import { VoicePicker, previewPlayId } from './components/VoicePicker';
 import { SpeedSlider } from './components/SpeedSlider';
 import { EmotionInsert } from './components/EmotionInsert';
+import { EngineParamsPanel } from './components/EngineParamsPanel';
 import { UsageGuide } from './components/UsageGuide';
 import { TextInputPanel } from './components/TextInputPanel';
 import { GenerateBar, QUICK_PLAY_ID } from './components/GenerateBar';
@@ -260,7 +261,12 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
     setGenError(null);
     try {
       const trimmedText = text.trim();
-      const result = await tts.synthesizeBuffer(trimmedText, { voiceId: selectedVoiceId, speed });
+      const engineOverrides = useTtsStudioStore.getState().engineOverrides;
+      const result = await tts.synthesizeBuffer(trimmedText, {
+        voiceId: selectedVoiceId,
+        speed,
+        engine_overrides: Object.keys(engineOverrides).length > 0 ? engineOverrides : undefined,
+      });
       lastResultRef.current = result;
       setCanQuickPlay(true);
       // Cùng id với nút "Phát nhanh" (GenerateBar) — auto-play sau khi tạo VÀ nút Phát
@@ -355,6 +361,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
             />
             <EmotionInsert />
             <SpeedSlider />
+            <EngineParamsPanel ttsPort={tts} />
             <UsageGuide />
             {loadError && (
               <p className="text-2xs text-destructive">Không tải được danh sách giọng: {loadError}</p>

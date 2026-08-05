@@ -32,6 +32,7 @@ interface TtsStudioState {
   text: string;
   isGenerating: boolean;
   history: HistoryEntryMeta[];
+  engineOverrides: Record<string, Record<string, any>>;  // {engineId: {param: value}}
 
   setVoices: (voices: StudioVoice[]) => void;
   setSelectedVoiceId: (id: string) => void;
@@ -41,6 +42,8 @@ interface TtsStudioState {
   setHistory: (history: HistoryEntryMeta[]) => void;
   prependHistory: (entry: HistoryEntryMeta) => void;
   removeHistory: (id: string) => void;
+  setEngineOverrides: (overrides: Record<string, Record<string, any>>) => void;
+  updateEngineOverride: (engineId: string, param: string, value: any) => void;
 }
 
 export const useTtsStudioStore = create<TtsStudioState>((set) => ({
@@ -50,6 +53,7 @@ export const useTtsStudioStore = create<TtsStudioState>((set) => ({
   text: '',
   isGenerating: false,
   history: [],
+  engineOverrides: {},
 
   setVoices: (voices) => set({ voices }),
   setSelectedVoiceId: (selectedVoiceId) => set({ selectedVoiceId }),
@@ -61,4 +65,15 @@ export const useTtsStudioStore = create<TtsStudioState>((set) => ({
     set((s) => ({ history: [entry, ...s.history].slice(0, 30) })),
   removeHistory: (id) =>
     set((s) => ({ history: s.history.filter((e) => e.id !== id) })),
+  setEngineOverrides: (engineOverrides) => set({ engineOverrides }),
+  updateEngineOverride: (engineId, param, value) =>
+    set((s) => ({
+      engineOverrides: {
+        ...s.engineOverrides,
+        [engineId]: {
+          ...(s.engineOverrides[engineId] || {}),
+          [param]: value,
+        },
+      },
+    })),
 }));

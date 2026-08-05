@@ -81,6 +81,7 @@ export interface SpeakOptions {
   voiceId?: string;
   speed?: number;
   temperature?: number;
+  engine_overrides?: Record<string, Record<string, any>>;  // Engine-specific params
 }
 
 export interface SynthesizeResult {
@@ -95,6 +96,8 @@ export interface TtsPort {
   synthesizeBuffer(text: string, opts?: SpeakOptions): Promise<SynthesizeResult>;
   /** URL để nghe thử 1 giọng trước khi chọn (vd audio tag src). */
   getPreviewUrl(voiceId: string): Promise<string>;
+  /** Lấy capabilities của engine hiện tại (sampling params, emotion support, etc) — để UI render dynamic controls. */
+  getEngineCapabilities?(): Promise<Record<string, any>>;
   /** Thư viện voice mẫu 'hệ thống' — optional: chỉ Electron adapter hỗ trợ hiện nay. */
   listVoiceCatalog?(lang?: string): Promise<VoiceCatalogEntry[]>;
   /** URL nghe thử audio gốc của catalog entry — dùng khi voice này CHƯA từng được

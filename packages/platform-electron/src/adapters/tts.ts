@@ -81,9 +81,12 @@ export function createElectronTtsPort(): TtsPort {
     async synthesizeBuffer(text, opts) {
       // Kênh riêng tts-studio:synthesize (không cache/log/pregen) — khác window.slide.speak
       // dùng bởi Ceremony. Xem apps/shell-electron/electron/slide/tts-studio.ts.
-      const res = await window.slide.synthesizeTts(text, opts?.voiceId, opts?.speed);
+      const res = await window.slide.synthesizeTts(text, opts?.voiceId, opts?.speed, opts?.engine_overrides);
       if (!res.ok || !res.buffer) throw new Error(res.error ?? 'TTS synthesize failed');
       return { buffer: res.buffer, sampleRate: res.sampleRate ?? 48000 };
+    },
+    async getEngineCapabilities?() {
+      return window.slide.getEngineCapabilities?.();
     },
     async getPreviewUrl(voiceId) {
       return window.slide.getTtsPreviewUrl(voiceId);
