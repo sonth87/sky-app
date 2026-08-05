@@ -340,7 +340,17 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             const currentIndex = neighbors.findIndex((n) => n.id === lastSelectedId);
             if (currentIndex >= 0) {
               const offset = e.key === 'ArrowRight' ? 1 : -1;
-              nextId = neighbors[Math.max(0, Math.min(neighbors.length - 1, currentIndex + offset))]?.id;
+              const neighborIndex = Math.max(0, Math.min(neighbors.length - 1, currentIndex + offset));
+              nextId = neighbors[neighborIndex]?.id;
+            } else if (neighbors.length > 0) {
+              // Fallback: wrap to next/prev row (linear navigation)
+              const currentLinearIndex = allIds.indexOf(lastSelectedId);
+              if (currentLinearIndex >= 0) {
+                const nextLinearIndex = currentLinearIndex + (e.key === 'ArrowRight' ? 1 : -1);
+                if (nextLinearIndex >= 0 && nextLinearIndex < allIds.length) {
+                  nextId = allIds[nextLinearIndex];
+                }
+              }
             }
           }
 
