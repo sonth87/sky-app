@@ -45,12 +45,26 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   const [exportLoading, setExportLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!message) return;
     const timeout = setTimeout(() => setMessage(null), 4000);
     return () => clearTimeout(timeout);
   }, [message]);
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function isSelected(id: string) {
+    return selectedIds.has(id);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -139,18 +153,19 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
       setMessage({ type: 'error', text: 'Tính năng xuất layout chỉ khả dụng trên Electron.' });
       return;
     }
-    if (!entries || entries.length === 0) {
-      setMessage({ type: 'error', text: 'Không có layout nào để xuất.' });
+    if (selectedIds.size === 0) {
+      setMessage({ type: 'error', text: 'Chọn ít nhất 1 layout để xuất.' });
       return;
     }
     setExportLoading(true);
     try {
-      const layoutIds = entries.map((e) => e.id);
+      const layoutIds = Array.from(selectedIds);
       const result = await layoutPort.exportBundle(layoutIds);
       if (result === null) {
         setMessage({ type: 'error', text: 'Hủy xuất layout.' });
       } else if (result.ok) {
         setMessage({ type: 'success', text: `Đã xuất ${layoutIds.length} layout thành công.` });
+        setSelectedIds(new Set());
       } else {
         setMessage({ type: 'error', text: result.message });
       }
@@ -200,12 +215,12 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
         </div>
         <button
           onClick={handleExport}
-          disabled={exportLoading || !entries || entries.length === 0}
-          title="Xuất layout"
+          disabled={exportLoading || selectedIds.size === 0}
+          title={selectedIds.size === 0 ? 'Chọn layout để xuất' : 'Xuất layout được chọn'}
           className="flex items-center gap-1.5 px-3 py-[7px] rounded-[8px] border border-[#e6e6ee] bg-white text-[#5c5d6e] font-bold text-[11.5px] cursor-pointer hover:bg-[#f4f5f9] disabled:opacity-50 disabled:cursor-default"
         >
           <Download size={14} />
-          {exportLoading ? 'Đang xuất...' : 'Xuất'}
+          {exportLoading ? 'Đang xuất...' : `Xuất${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
         </button>
         <button
           onClick={handleImport}
@@ -257,8 +272,14 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             {filtered.map((entry) => (
               <div
                 key={entry.id}
-                className="group relative flex flex-col gap-2 rounded-[12px] border border-[#e6e6ee] bg-white p-2 cursor-pointer hover:border-[#4b57e6]/50 hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
-                onClick={() => onOpen(entry.id)}
+                className={cn(
+                  'group relative flex flex-col gap-2 rounded-[12px] border p-2 cursor-pointer transition-all',
+                  isSelected(entry.id)
+                    ? 'border-[#4b57e6] bg-[#f0f2ff] shadow-[0_4px_14px_rgba(75,87,230,0.15)]'
+                    : 'border-[#e6e6ee] bg-white hover:border-[#4b57e6]/50 hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
+                )}
+                onClick={() => toggleSelect(entry.id)}
+                onDoubleClick={() => onOpen(entry.id)}
               >
                 <div style={{ width: THUMB_SIZE.w, height: THUMB_SIZE.h }} className="overflow-hidden rounded-[8px] bg-black">
                   <LayoutRenderer content={entry.content} screen={THUMB_SIZE} record={DEMO_RECORD} resolveAsset={resolveAsset} />
