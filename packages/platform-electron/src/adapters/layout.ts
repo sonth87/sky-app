@@ -40,5 +40,11 @@ export function createElectronLayoutPort(): LayoutPort {
     async listTopVariables(limit) {
       return (await window.sky.invoke('kernel:layout:listTopVariables', limit)) as Awaited<ReturnType<LayoutPort['listTopVariables']>>;
     },
+    async exportBundle(layoutIds) {
+      return (await window.sky.invoke('kernel:layout:exportBundle', layoutIds)) as Awaited<ReturnType<NonNullable<LayoutPort['exportBundle']>>>;
+    },
+    async importBundle(strategy) {
+      return (await window.sky.invoke('kernel:layout:importBundle', strategy)) as Awaited<ReturnType<NonNullable<LayoutPort['importBundle']>>>;
+    },
   };
 }

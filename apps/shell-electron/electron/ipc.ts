@@ -7,11 +7,13 @@ import { randomUUID } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { isUpdateReadyToInstall, getPendingNativeUpdateInfo } from './update-checker';
 import { layoutAssetsDir, ceremonyDataDir, resolveLocalAsset, ttsPregenDir, ttsPregenManifestPath, ttsPregenWavPath } from './slide/data/paths';
-import type { CanonicalGroup, CanonicalSubject, EventBundleManifest, EventDocument, FieldMappingProfile, LayoutContent } from '@sky-app/slide-shared';
+import type { CanonicalGroup, CanonicalSubject, EventBundleManifest, EventDocument, FieldMappingProfile, LayoutContent, LayoutExportBundle } from '@sky-app/slide-shared';
 import type { DataSource } from '@sky-app/slide-shared';
 import {
   applyEventBundle,
   buildEventBundle,
+  applyLayoutBundle,
+  buildLayoutBundle,
   createEvent,
   createLayoutDocument,
   deleteEvent,
@@ -229,6 +231,59 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('kernel:layout:listTopVariables', async (_event, limit?: number) => {
     return listTopVariables(ceremonyStore.getExecutor(), limit);
+  });
+
+  // Layout export/import bundle (GĐ5.4, Electron-only) — xuất/nhập 1+ LayoutDocument kèm assets
+  ipcMain.handle('kernel:layout:exportBundle', async (_event, layoutIds: string[]) => {
+    const bundle = buildLayoutBundle(ceremonyStore.getExecutor(), layoutIds);
+    if (!bundle || bundle.layouts.length === 0) {
+      return { ok: false, message: 'Không có layout nào để xuất.' };
+    }
+
+    const win = getMainWindow();
+    if (!win) return { ok: false, message: 'Không tìm thấy cửa sổ chính.' };
+
+    const slug = bundle.layouts[0]!.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-+|-+$)/g, '') || 'layout';
+
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Xuất layout',
+      defaultPath: `${slug}-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (canceled || !filePath) return null;
+
+    try {
+      writeFileSync(filePath, JSON.stringify(bundle, null, 2));
+      return { ok: true, filePath };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('kernel:layout:importBundle', async (_event, strategy: 'rename' | 'keep' = 'rename') => {
+    const win = getMainWindow();
+    if (!win) return { ok: false, message: 'Không tìm thấy cửa sổ chính.' };
+
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Chọn file layout (.json)',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || filePaths.length === 0) return null;
+
+    try {
+      const bundleData = readFileSync(filePaths[0]!, 'utf-8');
+      const bundle = JSON.parse(bundleData) as LayoutExportBundle;
+      const result = applyLayoutBundle(ceremonyStore.getExecutor(), bundle, strategy);
+      return { ok: true, imported: result.imported, renamed: result.renamed };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   // EventPort/DataSourcePort (packages/service-contracts/src/event.ts, data-source.ts) —

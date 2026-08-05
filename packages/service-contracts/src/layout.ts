@@ -1,4 +1,4 @@
-import type { LayoutContent, LayoutDocument, LayoutVersion } from '@sky-app/slide-shared';
+import type { LayoutContent, LayoutDocument, LayoutVersion, LayoutExportBundle } from '@sky-app/slide-shared';
 
 export interface VariableRegistryEntry {
   key: string;
@@ -36,4 +36,17 @@ export interface LayoutPort {
   recordTokenUsage(key: string): Promise<void>;
   /** Gợi ý autocomplete khi gõ `@` — sắp theo usage_count giảm dần. */
   listTopVariables(limit?: number): Promise<VariableRegistryEntry[]>;
+
+  /**
+   * Export/Import Loại 1 (Giai đoạn 5.4, docs/roadmap/plans/layout-designer/15-import-export.md) —
+   * xuất/nhập 1 hoặc nhiều LayoutDocument thành 1 file .json/.zip tự chứa (kèm assets). CHỈ Electron
+   * implement (cần dialog native) — bỏ trống trên Web, UI tự check `typeof x === 'function'`.
+   * Trả `null` = người dùng huỷ dialog chọn/lưu file.
+   */
+  exportBundle?(layoutIds: string[]): Promise<{ ok: true; filePath: string } | { ok: false; message: string } | null>;
+  /**
+   * Import LayoutExportBundle từ file .json/.zip — chọn chiến lược xử lý ID trùng
+   * ('rename' = tạo ID mới / 'keep' = bỏ qua).
+   */
+  importBundle?(strategy?: 'rename' | 'keep'): Promise<{ ok: true; imported: number; renamed: number } | { ok: false; message: string } | null>;
 }

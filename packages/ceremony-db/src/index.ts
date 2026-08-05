@@ -45,3 +45,5 @@ export {
 export { listFieldMappingProfiles, saveFieldMappingProfile } from './queries/field-mapping-profile.js';
 export { buildEventBundle, applyEventBundle } from './queries/event-bundle.js';
 export type { ApplyEventBundleResult } from './queries/event-bundle.js';
+export { buildLayoutBundle, applyLayoutBundle } from './queries/layout-bundle.js';
+export type { ApplyLayoutBundleResult } from './queries/layout-bundle.js';

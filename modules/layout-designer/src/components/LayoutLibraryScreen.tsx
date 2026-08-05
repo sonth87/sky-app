@@ -6,7 +6,7 @@
 // cache resolveAssetUrl theo batch).
 
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, Info, Plus, Search } from 'lucide-react';
+import { Copy, Info, Plus, Search, Download, Upload } from 'lucide-react';
 import type { LayoutPort } from '@sky-app/service-contracts';
 import { LayoutRenderer, demoCanonicalSubject, type LayoutContent } from '@sky-app/slide-shared';
 import { cn } from '@sky-app/ui';
@@ -42,6 +42,15 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     | null
   >(null);
   const [infoModalEntry, setInfoModalEntry] = useState<LibraryEntry | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!message) return;
+    const timeout = setTimeout(() => setMessage(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [message]);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,6 +134,56 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     setReloadKey((k) => k + 1);
   }
 
+  async function handleExport() {
+    if (!layoutPort.exportBundle) {
+      setMessage({ type: 'error', text: 'Tính năng xuất layout chỉ khả dụng trên Electron.' });
+      return;
+    }
+    if (!entries || entries.length === 0) {
+      setMessage({ type: 'error', text: 'Không có layout nào để xuất.' });
+      return;
+    }
+    setExportLoading(true);
+    try {
+      const layoutIds = entries.map((e) => e.id);
+      const result = await layoutPort.exportBundle(layoutIds);
+      if (result === null) {
+        setMessage({ type: 'error', text: 'Hủy xuất layout.' });
+      } else if (result.ok) {
+        setMessage({ type: 'success', text: `Đã xuất ${layoutIds.length} layout thành công.` });
+      } else {
+        setMessage({ type: 'error', text: result.message });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Lỗi xuất layout.' });
+    } finally {
+      setExportLoading(false);
+    }
+  }
+
+  async function handleImport() {
+    if (!layoutPort.importBundle) {
+      setMessage({ type: 'error', text: 'Tính năng nhập layout chỉ khả dụng trên Electron.' });
+      return;
+    }
+    setImportLoading(true);
+    try {
+      const result = await layoutPort.importBundle('rename');
+      if (result === null) {
+        setMessage({ type: 'error', text: 'Hủy nhập layout.' });
+      } else if (result.ok) {
+        setMessage({ type: 'success', text: `Đã nhập ${result.imported} layout thành công.` });
+        setReloadKey((k) => k + 1);
+      } else {
+        setMessage({ type: 'error', text: result.message });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Lỗi nhập layout.' });
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[#f4f5f9]">
       <div className="h-[52px] shrink-0 flex items-center gap-3 px-[14px] bg-white border-b border-[#e6e6ee]">
@@ -140,6 +199,24 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           />
         </div>
         <button
+          onClick={handleExport}
+          disabled={exportLoading || !entries || entries.length === 0}
+          title="Xuất layout"
+          className="flex items-center gap-1.5 px-3 py-[7px] rounded-[8px] border border-[#e6e6ee] bg-white text-[#5c5d6e] font-bold text-[11.5px] cursor-pointer hover:bg-[#f4f5f9] disabled:opacity-50 disabled:cursor-default"
+        >
+          <Download size={14} />
+          {exportLoading ? 'Đang xuất...' : 'Xuất'}
+        </button>
+        <button
+          onClick={handleImport}
+          disabled={importLoading}
+          title="Nhập layout"
+          className="flex items-center gap-1.5 px-3 py-[7px] rounded-[8px] border border-[#e6e6ee] bg-white text-[#5c5d6e] font-bold text-[11.5px] cursor-pointer hover:bg-[#f4f5f9] disabled:opacity-50 disabled:cursor-default"
+        >
+          <Upload size={14} />
+          {importLoading ? 'Đang nhập...' : 'Nhập'}
+        </button>
+        <button
           onClick={() => setNameModal({ mode: 'create' })}
           className="flex items-center gap-1.5 px-3 py-[7px] rounded-[8px] border-none bg-[#4b57e6] text-white font-bold text-[11.5px] cursor-pointer hover:bg-[#3b47d6]"
         >
@@ -147,6 +224,21 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           Tạo layout mới
         </button>
       </div>
+
+      {message && (
+        <div className={cn(
+          'px-3.5 py-2.5 text-sm flex items-center justify-between',
+          message.type === 'error' ? 'bg-[#fee2e2] text-[#7f1d1d]' : 'bg-[#e6fffa] text-[#134e4a]'
+        )}>
+          <span>{message.text}</span>
+          <button
+            onClick={() => setMessage(null)}
+            className="text-xs cursor-pointer opacity-70 hover:opacity-100"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-auto p-[18px]">
         {entries == null && <div className="py-10 text-center text-sm text-[#9a9bab]">Đang tải...</div>}

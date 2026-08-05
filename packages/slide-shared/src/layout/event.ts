@@ -137,6 +137,28 @@ export interface EventBundleManifest {
 }
 
 /**
+ * LayoutExportBundle — Giai đoạn 5.4 (docs/roadmap/plans/layout-designer/15-import-export.md
+ * "Loại 1"). File tự chứa để sao lưu/chuyển 1 hoặc nhiều LayoutDocument sang máy khác — gồm
+ * layout(s) + asset(s) tham chiếu (ảnh nền, ring...). Định dạng `.json` (ít ảnh, base64) hoặc
+ * `.zip` (nhiều ảnh, thư mục assets/). `assets` là danh sách relativePath từ layout (VD
+ * `assets/bg.jpg`) — bản thân type này KHÔNG chứa byte ảnh, đó là việc của tầng zip/base64.
+ */
+export interface LayoutExportBundle {
+  version: 1;
+  exportedAt: string;
+  layouts: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    color?: string;
+    category?: string;
+    tags?: string[];
+    content: LayoutContent;
+  }>;
+  assets: string[];
+}
+
+/**
  * resolveLayout — 13-ceremony-mo-rong.md §"Trách nhiệm 5". Sort layoutRefs theo priority giảm
  * dần, trả layoutId đầu tiên có 1 group match toàn bộ rule (AND trong group, OR giữa groups).
  * Trả `null` nếu không match gì — fail-soft (KHÔNG throw), caller (ceremony runtime) tự quyết
