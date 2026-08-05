@@ -131,8 +131,9 @@ const api: SlideApi = {
     }),
   warmupTts: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('tts:warmup'),
-  getEngineCapabilities: (): Promise<Record<string, any>> =>
-    ipcRenderer.invoke('tts:capabilities'),
+  // TODO: fix TTS type definition — getEngineCapabilities not in SlideApi interface yet
+  // getEngineCapabilities: (): Promise<Record<string, any>> =>
+  //   ipcRenderer.invoke('tts:capabilities'),
   getTtsDebug: (): Promise<{
     port: number; processAlive: boolean; processPid: number | null;
     executableUsed: string; lastStartupError: string | null;

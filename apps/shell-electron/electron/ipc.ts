@@ -252,13 +252,20 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
       title: 'Xuất layout',
-      defaultPath: `${slug}-${new Date().toISOString().slice(0, 10)}.json`,
-      filters: [{ name: 'JSON', extensions: ['json'] }],
+      defaultPath: `${slug}-${new Date().toISOString().slice(0, 10)}.zip`,
+      filters: [{ name: 'ZIP', extensions: ['zip'] }],
     });
     if (canceled || !filePath) return null;
 
     try {
-      writeFileSync(filePath, JSON.stringify(bundle, null, 2));
+      const zip = new AdmZip();
+      zip.addFile('manifest.json', Buffer.from(JSON.stringify(bundle, null, 2)));
+      for (const relativePath of bundle.assets) {
+        const absPath = resolveLocalAsset(relativePath);
+        if (existsSync(absPath)) zip.addFile(relativePath, readFileSync(absPath));
+        // Thiếu file (VD ảnh đã bị xoá) → bỏ qua, không chặn export
+      }
+      zip.writeZip(filePath);
       return { ok: true, filePath };
     } catch (err) {
       return { ok: false, message: err instanceof Error ? err.message : String(err) };
@@ -270,15 +277,25 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     if (!win) return { ok: false, message: 'Không tìm thấy cửa sổ chính.' };
 
     const { canceled, filePaths } = await dialog.showOpenDialog(win, {
-      title: 'Chọn file layout (.json)',
-      filters: [{ name: 'JSON', extensions: ['json'] }],
+      title: 'Chọn file layout (.zip)',
+      filters: [{ name: 'ZIP', extensions: ['zip'] }],
       properties: ['openFile'],
     });
     if (canceled || filePaths.length === 0) return null;
 
     try {
-      const bundleData = readFileSync(filePaths[0]!, 'utf-8');
-      const bundle = JSON.parse(bundleData) as LayoutExportBundle;
+      const zip = new AdmZip(filePaths[0]!);
+      const manifestEntry = zip.getEntry('manifest.json');
+      if (!manifestEntry) return { ok: false, message: 'File ZIP thiếu manifest.json — không đúng định dạng bundle layout.' };
+      const bundle = JSON.parse(zip.readAsText(manifestEntry)) as LayoutExportBundle;
+
+      for (const entry of zip.getEntries()) {
+        if (entry.isDirectory || entry.entryName === 'manifest.json') continue;
+        const destPath = resolveLocalAsset(entry.entryName);
+        mkdirSync(dirname(destPath), { recursive: true });
+        writeFileSync(destPath, entry.getData());
+      }
+
       const result = applyLayoutBundle(ceremonyStore.getExecutor(), bundle, strategy);
       return { ok: true, imported: result.imported, renamed: result.renamed };
     } catch (err) {
