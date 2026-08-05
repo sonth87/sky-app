@@ -50,6 +50,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ x: number; y: number } | null>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; layoutId: string } | null>(null);
   const cardRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
@@ -378,6 +379,10 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                 )}
                 onClick={(e) => handleCardClick(entry.id, e)}
                 onDoubleClick={() => onOpen(entry.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ x: e.clientX, y: e.clientY, layoutId: entry.id });
+                }}
               >
                 <div style={{ width: THUMB_SIZE.w, height: THUMB_SIZE.h }} className="overflow-hidden rounded-[8px] bg-black">
                   <LayoutRenderer content={entry.content} screen={THUMB_SIZE} record={DEMO_RECORD} resolveAsset={resolveAsset} />
@@ -438,6 +443,73 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
               height: Math.abs(dragEnd.y - dragStart.y),
             }}
           />
+        )}
+
+        {contextMenu && (
+          <>
+            <div
+              className="fixed inset-0"
+              onClick={() => setContextMenu(null)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setContextMenu(null);
+              }}
+            />
+            <div
+              className="fixed bg-white border border-[#e6e6ee] rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.15)] z-50 py-1 min-w-[160px]"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            >
+              <button
+                onClick={() => {
+                  onOpen(contextMenu.layoutId);
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
+              >
+                Open
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedIds(new Set([contextMenu.layoutId]));
+                  handleExport();
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
+              >
+                Download
+              </button>
+              <button
+                onClick={() => {
+                  setInfoModalEntry(
+                    filtered.find((e) => e.id === contextMenu.layoutId) || null
+                  );
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
+              >
+                Info
+              </button>
+              <button
+                onClick={() => {
+                  setNameModal({ mode: 'duplicate', source: filtered.find((e) => e.id === contextMenu.layoutId)! });
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
+              >
+                Duplicate
+              </button>
+              <div className="h-px bg-[#e6e6ee]" />
+              <button
+                onClick={() => {
+                  // TODO: implement trash
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-[#d04343] hover:bg-[#fee2e2] cursor-pointer"
+              >
+                Move to Trash
+              </button>
+            </div>
+          </>
         )}
       </div>
 
