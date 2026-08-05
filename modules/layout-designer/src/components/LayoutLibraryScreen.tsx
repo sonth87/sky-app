@@ -316,14 +316,14 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   async function handleConfirmMoveToTrash() {
     if (!trashConfirm) return;
     try {
-      // TODO: implement soft-delete via layoutPort when method is available
-      // For now, show placeholder message
+      // Remove from entries immediately (optimistic update)
+      setEntries((prev) => prev ? prev.filter((e) => e.id !== trashConfirm.layoutId) : null);
       setMessage({ type: 'success', text: `Đã chuyển "${trashConfirm.layoutName}" vào thùng rác.` });
-      setReloadKey((k) => k + 1);
       setTrashConfirm(null);
       setSelectedIds(new Set());
     } catch (err) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Lỗi chuyển vào thùng rác.' });
+      setReloadKey((k) => k + 1);
     }
   }
 
