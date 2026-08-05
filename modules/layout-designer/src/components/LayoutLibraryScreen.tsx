@@ -314,14 +314,6 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[#f4f5f9]">
       <div className="h-[52px] shrink-0 flex items-center gap-3 px-[14px] bg-white border-b border-[#e6e6ee]">
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          title={sidebarCollapsed ? 'Mở sidebar' : 'Đóng sidebar'}
-          className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[#f4f5f9] text-[#5c5d6e] cursor-pointer"
-        >
-          <ChevronLeft size={18} className={cn('transition-transform', sidebarCollapsed && 'rotate-180')} />
-        </button>
-        <div className="font-semibold text-sm">Thư viện Layout</div>
         <div className="flex-1" />
         <div className="relative w-[240px]">
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9a9bab]" />
@@ -380,30 +372,53 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           'shrink-0 bg-white border-r border-[#e6e6ee] flex flex-col transition-all duration-200',
           sidebarCollapsed ? 'w-[60px]' : 'w-[200px]'
         )}>
-          {/* Layouts item */}
-          <div className="group relative px-3 py-3 hover:bg-[#f4f5f9] cursor-pointer transition-colors">
-            <div className="flex items-center gap-2.5">
-              <Layers size={18} className="shrink-0 text-[#5c5d6e]" />
-              {!sidebarCollapsed && <span className="text-sm font-medium text-[#26262e]">Layouts</span>}
-            </div>
-            {sidebarCollapsed && (
-              <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                Layouts
+          {/* Menu items */}
+          <div className="flex-1 pt-2">
+            {/* Layouts item */}
+            <div className="group relative hover:bg-[#f4f5f9] cursor-pointer transition-colors">
+              <div className={cn(
+                'flex items-center gap-2.5 text-[#5c5d6e]',
+                sidebarCollapsed ? 'justify-center px-3 py-3' : 'px-3 py-3'
+              )}>
+                <Layers size={18} className="shrink-0" />
+                {!sidebarCollapsed && <span className="text-sm font-medium text-[#26262e]">Layouts</span>}
               </div>
-            )}
+              {sidebarCollapsed && (
+                <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                  Layouts
+                </div>
+              )}
+            </div>
+
+            {/* Trash item */}
+            <div className="group relative hover:bg-[#f4f5f9] cursor-pointer transition-colors">
+              <div className={cn(
+                'flex items-center gap-2.5 text-[#5c5d6e]',
+                sidebarCollapsed ? 'justify-center px-3 py-3' : 'px-3 py-3'
+              )}>
+                <Trash2 size={18} className="shrink-0" />
+                {!sidebarCollapsed && <span className="text-sm font-medium text-[#26262e]">Trash</span>}
+              </div>
+              {sidebarCollapsed && (
+                <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                  Trash
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Trash item */}
-          <div className="group relative px-3 py-3 hover:bg-[#f4f5f9] cursor-pointer transition-colors">
-            <div className="flex items-center gap-2.5">
-              <Trash2 size={18} className="shrink-0 text-[#5c5d6e]" />
-              {!sidebarCollapsed && <span className="text-sm font-medium text-[#26262e]">Trash</span>}
-            </div>
-            {sidebarCollapsed && (
-              <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                Trash
-              </div>
-            )}
+          {/* Toggle button - bottom */}
+          <div className="border-t border-[#e6e6ee]">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? 'Mở sidebar' : 'Đóng sidebar'}
+              className={cn(
+                'w-full flex items-center justify-center py-3 hover:bg-[#f4f5f9] text-[#5c5d6e] cursor-pointer transition-colors',
+                sidebarCollapsed ? 'px-3' : 'px-3'
+              )}
+            >
+              <ChevronLeft size={18} className={cn('transition-transform', sidebarCollapsed && 'rotate-180')} />
+            </button>
           </div>
         </div>
 
