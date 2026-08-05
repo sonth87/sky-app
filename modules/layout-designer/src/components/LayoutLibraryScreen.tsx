@@ -31,6 +31,14 @@ interface LibraryEntry {
 const THUMB_SIZE = { w: 220, h: 124 };
 const DEMO_RECORD = demoCanonicalSubject();
 
+function normalizeString(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: LayoutLibraryScreenProps) {
   const [entries, setEntries] = useState<LibraryEntry[] | null>(null);
   const [assetUrlCache, setAssetUrlCache] = useState<Record<string, string>>({});
@@ -235,14 +243,14 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
       ? entries.filter((e) => trashedIds.has(e.id))
       : entries.filter((e) => !trashedIds.has(e.id));
 
-    // Filter by search
-    const q = search.trim().toLowerCase();
+    // Filter by search (diacritic-insensitive)
+    const q = normalizeString(search);
     if (q === '') return viewFiltered;
     return viewFiltered.filter(
       (e) =>
-        e.name.toLowerCase().includes(q) ||
-        (e.category?.toLowerCase().includes(q) ?? false) ||
-        e.tags.some((t) => t.toLowerCase().includes(q)),
+        normalizeString(e.name).includes(q) ||
+        (e.category ? normalizeString(e.category).includes(q) : false) ||
+        e.tags.some((t) => normalizeString(t).includes(q)),
     );
   }, [entries, search, currentView, trashedIds]);
 
