@@ -13,6 +13,7 @@ import { designSize } from './helpers.js';
 import { FrameSurface, LoopEditFrameSurface } from './FrameSurface.js';
 import { LoopEditBreadcrumb } from './LoopEditBreadcrumb.js';
 import { FloatingToolbar, ZOOM_STEP_FACTOR } from './FloatingToolbar.js';
+import { GridOverlay } from './GridOverlay.js';
 import { GuideLine } from './GuideLine.js';
 import { CanvasItemView } from './CanvasItemView.js';
 import { cn } from '@sky-app/ui';
@@ -110,6 +111,7 @@ export function Canvas({
   const handleKeyDown = useCanvasKeyboardShortcuts(editor, variant, onTogglePanels);
 
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
+  const [showGrid, setShowGrid] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -270,6 +272,16 @@ export function Canvas({
         }}
       >
         {isEditingLoop ? <LoopEditFrameSurface /> : <FrameSurface variant={variant} resolvedBackgroundUrl={resolvedBackgroundUrl} />}
+        {showGrid && (
+          <GridOverlay
+            variant={variant}
+            containerWidth={designW}
+            containerHeight={designH}
+            scale={totalScale}
+            offsetX={viewport.panX}
+            offsetY={viewport.panY}
+          />
+        )}
         {effectiveItems.map((item) => (
           <CanvasItemView
             key={item.id}
@@ -354,6 +366,8 @@ export function Canvas({
         zoom={viewport.zoom}
         onZoomChange={(zoom) => editor.store.getState().setViewport({ ...viewport, zoom })}
         containerEl={containerRef.current}
+        showGrid={showGrid}
+        onShowGridChange={setShowGrid}
       />
       {!isEditingLoop && shouldShowMinimap(designW, designH, originX, originY, totalScale, containerSize) && (
         <Minimap

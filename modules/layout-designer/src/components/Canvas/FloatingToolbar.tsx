@@ -1,4 +1,4 @@
-import { MousePointer2, Hand, Undo2, Redo2, Minus, Plus, Maximize } from 'lucide-react';
+import { MousePointer2, Hand, Undo2, Redo2, Minus, Plus, Maximize, Grid3X3 } from 'lucide-react';
 import { MIN_ZOOM, MAX_ZOOM } from '@sky-app/layout-editor-core';
 import { cn } from '@sky-app/ui';
 
@@ -33,6 +33,8 @@ export interface FloatingToolbarProps {
   zoom: number;
   onZoomChange: (zoom: number) => void;
   containerEl: HTMLDivElement | null;
+  showGrid?: boolean;
+  onShowGridChange?: (show: boolean) => void;
 }
 
 export function FloatingToolbar({
@@ -45,6 +47,8 @@ export function FloatingToolbar({
   zoom,
   onZoomChange,
   containerEl,
+  showGrid,
+  onShowGridChange,
 }: FloatingToolbarProps) {
   const zoomIn = () => onZoomChange(Math.min(MAX_ZOOM, zoom * ZOOM_STEP_FACTOR));
   const zoomOut = () => onZoomChange(Math.max(MIN_ZOOM, zoom / ZOOM_STEP_FACTOR));
@@ -90,6 +94,14 @@ export function FloatingToolbar({
         <Plus size={15} />
       </button>
       <Divider />
+      <button
+        onClick={() => onShowGridChange?.(!showGrid)}
+        aria-label="Hiện/ẩn lưới"
+        aria-pressed={showGrid}
+        className={getBtnClass(showGrid ?? false)}
+      >
+        <Grid3X3 size={15} />
+      </button>
       <button onClick={toggleFullscreen} aria-label="Toàn màn hình" className={getBtnClass(false)}>
         <Maximize size={15} />
       </button>
