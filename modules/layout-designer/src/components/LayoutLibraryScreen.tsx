@@ -73,6 +73,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     const saved = localStorage.getItem('layout-library-trashed-ids');
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
+  const [rangeAnchorId, setRangeAnchorId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
     if (typeof window === 'undefined') return 'grid';
     const saved = localStorage.getItem('layout-library-view-mode');
@@ -345,11 +346,23 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
 
           if (nextId) {
             if (e.shiftKey) {
-              // Extend range
-              setSelectedIds((prev) => new Set([...prev, nextId]));
+              // Range selection: start from anchor (or current if first shift)
+              const anchor = rangeAnchorId || lastSelectedId;
+              if (anchor) {
+                const allIds = filtered.map((x) => x.id);
+                const anchorIndex = allIds.indexOf(anchor);
+                const nextIndex = allIds.indexOf(nextId);
+                if (anchorIndex >= 0 && nextIndex >= 0) {
+                  const [start, end] = anchorIndex < nextIndex ? [anchorIndex, nextIndex] : [nextIndex, anchorIndex];
+                  setSelectedIds(new Set(allIds.slice(start, end + 1)));
+                  setRangeAnchorId(anchor);
+                }
+              }
             } else {
+              // Normal selection: single item
               setSelectedIds(new Set([nextId]));
               setLastSelectedId(nextId);
+              setRangeAnchorId(null);
             }
           }
         } else {
@@ -367,12 +380,22 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           const nextId = allIds[nextIndex];
           if (nextId) {
             if (e.shiftKey) {
-              // Extend range
-              const [start, end] = currentIndex < nextIndex ? [currentIndex, nextIndex] : [nextIndex, currentIndex];
-              setSelectedIds(new Set(allIds.slice(start, end + 1)));
+              // Range selection: start from anchor (or current if first shift)
+              const anchor = rangeAnchorId || lastSelectedId;
+              if (anchor) {
+                const anchorIndex = allIds.indexOf(anchor);
+                const nextIndexAdjusted = allIds.indexOf(nextId);
+                if (anchorIndex >= 0 && nextIndexAdjusted >= 0) {
+                  const [start, end] = anchorIndex < nextIndexAdjusted ? [anchorIndex, nextIndexAdjusted] : [nextIndexAdjusted, anchorIndex];
+                  setSelectedIds(new Set(allIds.slice(start, end + 1)));
+                  setRangeAnchorId(anchor);
+                }
+              }
             } else {
+              // Normal selection: single item
               setSelectedIds(new Set([nextId]));
               setLastSelectedId(nextId);
+              setRangeAnchorId(null);
             }
           }
         }
@@ -398,7 +421,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [contextMenu, selectedIds, lastSelectedId, filtered, currentView, onOpen]);
+  }, [contextMenu, selectedIds, lastSelectedId, filtered, currentView, onOpen, rangeAnchorId, viewMode]);
 
   async function handleCreate(name: string) {
     const id = `layout_${crypto.randomUUID()}`;
