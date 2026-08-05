@@ -60,6 +60,20 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     return () => clearTimeout(timeout);
   }, [message]);
 
+  // Close context menu on Escape
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [contextMenu]);
+
   // Track document mousemove/mouseup when dragging (keep drag box visible when mouse leaves grid)
   useEffect(() => {
     if (!dragStart) return;
@@ -457,7 +471,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             />
             <div
               className="fixed bg-white border border-[#e6e6ee] rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.15)] z-50 py-1 min-w-[160px]"
-              style={{ left: contextMenu.x, top: contextMenu.y }}
+              style={{ left: contextMenu.x + 5, top: contextMenu.y - 10 }}
             >
               <button
                 onClick={() => {
