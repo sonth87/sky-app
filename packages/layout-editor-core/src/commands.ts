@@ -292,3 +292,17 @@ export function toggleSyncLockCommand(variantId: string, itemId: string, locked:
     invert: (state) => ({ ...state, doc: patchItem(state.doc, variantId, itemId, { syncLocked: !locked }, loopItemId) }),
   };
 }
+
+/** Gộp N command thành 1 undo/redo step (GĐ9 multi-select: multi-move/multi-delete = 1 undo).
+ * Áp dụng command theo thứ tự apply(), invert theo thứ tự ngược lại. Không hỗ trợ coalesce
+ * (batch là "thao tác nước cờ", không gộp với command khác). */
+export function batchCommand(commands: EditorCommand[]): EditorCommand {
+  if (commands.length === 0) return { type: 'noop', apply: (s) => s, invert: (s) => s };
+  if (commands.length === 1) return commands[0]!;
+
+  return {
+    type: 'batch',
+    apply: (state) => commands.reduce((s, cmd) => cmd.apply(s), state),
+    invert: (state) => [...commands].reverse().reduce((s, cmd) => cmd.invert(s), state),
+  };
+}

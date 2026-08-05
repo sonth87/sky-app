@@ -112,6 +112,9 @@ export function Canvas({
 
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
   const [showGrid, setShowGrid] = useState(false);
+  // GĐ9 rubber-band selection — kéo chuột trên vùng trống để chọn nhiều item cùng lúc
+  const marqueeRef = useRef<{ startX: number; startY: number } | null>(null);
+  const [marqueeBox, setMarqueeBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -162,6 +165,80 @@ export function Canvas({
   const handleDeselect = useCallback(() => {
     editor.store.getState().setSelection([]);
   }, [editor]);
+
+  // GĐ9 rubber-band selection: kéo từ vị trí trên canvas → tính marquee → chọn item giao khung
+  // Deselect ngay trên pointerDown (giống hành vi cũ), nhưng theo dõi marquee nếu user drag.
+  // Nếu drag substantial → chọn items trong marquee (hủy deselect).
+  const handleMarqueePointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return; // Chỉ left-click
+    if (isHandActive) return; // Hand-tool đang active, không marquee
+    // Nếu click đúng vào item, CanvasItemView.onPointerDown sẽ trigger trước (stopPropagation),
+    // không reach tới đây — chỉ click trên canvas nền mới reach đây.
+    editor.store.getState().setSelection([]); // Deselect ngay
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    marqueeRef.current = { startX: clientX, startY: clientY };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [editor, isHandActive]);
+
+  const handleMarqueePointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!marqueeRef.current) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    const start = marqueeRef.current;
+    const x = Math.min(start.startX, clientX);
+    const y = Math.min(start.startY, clientY);
+    const w = Math.abs(clientX - start.startX);
+    const h = Math.abs(clientY - start.startY);
+    setMarqueeBox({ x, y, w, h });
+  }, []);
+
+  const handleMarqueePointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!marqueeRef.current) return;
+    marqueeRef.current = null;
+
+    if (!marqueeBox || marqueeBox.w < 5 || marqueeBox.h < 5) {
+      // Click nhỏ → deselect đã done ở pointerDown, không cần làm gì
+      setMarqueeBox(null);
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      return;
+    }
+
+    // Tính toạ độ canvas từ screen marquee
+    const marqueeCanvasX = (marqueeBox.x - originX) / (layoutScaleX * totalScale);
+    const marqueeCanvasY = (marqueeBox.y - originY) / (layoutScaleY * totalScale);
+    const marqueeCanvasW = marqueeBox.w / (layoutScaleX * totalScale);
+    const marqueeCanvasH = marqueeBox.h / (layoutScaleY * totalScale);
+
+    // Tìm tất cả item giao với marquee (AABB intersection)
+    const selected: string[] = [];
+    for (const item of effectiveItems) {
+      const itemLeft = item.box.x;
+      const itemTop = item.box.y;
+      const itemRight = item.box.x + item.box.w;
+      const itemBottom = item.box.y + item.box.h;
+
+      const marqueeLeft = marqueeCanvasX;
+      const marqueeTop = marqueeCanvasY;
+      const marqueeRight = marqueeCanvasX + marqueeCanvasW;
+      const marqueeBottom = marqueeCanvasY + marqueeCanvasH;
+
+      // AABB intersection check
+      if (itemLeft < marqueeRight && itemRight > marqueeLeft && itemTop < marqueeBottom && itemBottom > marqueeTop) {
+        selected.push(item.id);
+      }
+    }
+
+    setMarqueeBox(null);
+    if (selected.length > 0) {
+      editor.store.getState().setSelection(selected);
+    }
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  }, [editor, marqueeBox, originX, originY, layoutScaleX, layoutScaleY, totalScale, effectiveItems]);
 
   // Pan bằng chuột giữa (mọi lúc) HOẶC chuột trái khi đang ở hand-tool (bấm nút cố định trên
   // toolbar HOẶC giữ Space tạm thời — kiểu Figma). Middle-click luôn preventDefault để tránh
@@ -236,12 +313,19 @@ export function Canvas({
         containerRef.current?.focus();
         if (e.button === 1 || (e.button === 0 && isHandActive)) {
           handlePanPointerDown(e);
-        } else {
-          handleDeselect();
+        } else if (e.button === 0) {
+          // Left-click: bắt đầu marquee (hoặc deselect nếu click nhỏ)
+          handleMarqueePointerDown(e);
         }
       }}
-      onPointerMove={handlePanPointerMove}
-      onPointerUp={handlePanPointerUp}
+      onPointerMove={(e) => {
+        handlePanPointerMove(e);
+        handleMarqueePointerMove(e);
+      }}
+      onPointerUp={(e) => {
+        handlePanPointerUp(e);
+        handleMarqueePointerUp(e);
+      }}
       onWheel={handleWheel}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && isEditingLoop) {
@@ -339,23 +423,69 @@ export function Canvas({
             />
           );
         })()}
-      {selection.length === 1 &&
+      {selection.length >= 1 &&
         (() => {
-          const selectedItem = effectiveItems.find((i) => i.id === selection[0]);
-          if (!selectedItem) return null;
-          return (
-            <ItemToolbar
-              item={selectedItem}
-              editor={editor}
-              variant={variant}
-              loopItemId={isEditingLoop ? editingLoopId : undefined}
-              originX={originX}
-              originY={originY}
-              pointerScaleX={layoutScaleX * totalScale}
-              pointerScaleY={layoutScaleY * totalScale}
-            />
-          );
+          if (selection.length === 1) {
+            const selectedItem = effectiveItems.find((i) => i.id === selection[0]);
+            if (!selectedItem) return null;
+            return (
+              <ItemToolbar
+                item={selectedItem}
+                editor={editor}
+                variant={variant}
+                loopItemId={isEditingLoop ? editingLoopId : undefined}
+                originX={originX}
+                originY={originY}
+                pointerScaleX={layoutScaleX * totalScale}
+                pointerScaleY={layoutScaleY * totalScale}
+              />
+            );
+          } else {
+            // GĐ9 multi-select: hiện toolbar dùng bounding box chứa tất cả selected items
+            const selectedItems = effectiveItems.filter((i) => selection.includes(i.id));
+            if (selectedItems.length === 0) return null;
+
+            // Tính bounding box chứa tất cả selected items
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const item of selectedItems) {
+              minX = Math.min(minX, item.box.x);
+              minY = Math.min(minY, item.box.y);
+              maxX = Math.max(maxX, item.box.x + item.box.w);
+              maxY = Math.max(maxY, item.box.y + item.box.h);
+            }
+
+            const boundingBox = { x: minX, y: minY, w: maxX - minX, h: maxY - minY, z: 0, rotation: 0 };
+            const syntheticItem = { ...selectedItems[0]!, id: 'multi-select-box', box: boundingBox };
+
+            return (
+              <ItemToolbar
+                item={syntheticItem}
+                editor={editor}
+                variant={variant}
+                loopItemId={isEditingLoop ? editingLoopId : undefined}
+                originX={originX}
+                originY={originY}
+                pointerScaleX={layoutScaleX * totalScale}
+                pointerScaleY={layoutScaleY * totalScale}
+              />
+            );
+          }
         })()}
+      {marqueeBox && (
+        <div
+          style={{
+            position: 'absolute',
+            left: marqueeBox.x,
+            top: marqueeBox.y,
+            width: marqueeBox.w,
+            height: marqueeBox.h,
+            border: '2px solid #4b57e6',
+            backgroundColor: 'rgba(75, 87, 230, 0.1)',
+            pointerEvents: 'none',
+            zIndex: 999,
+          }}
+        />
+      )}
       <FloatingToolbar
         toolMode={toolMode}
         onToolModeChange={setToolMode}

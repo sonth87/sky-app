@@ -1,6 +1,6 @@
 import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import type { Box, LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
-import { addItemCommand, patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
+import { addItemCommand, batchCommand, patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
 import { cn } from '@sky-app/ui';
 
@@ -63,17 +63,84 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
   const wantedTop = screenTop - TOOLBAR_HEIGHT - TOOLBAR_GAP;
   const top = wantedTop < 0 ? screenBottom + TOOLBAR_GAP : wantedTop;
 
-  const dispatch = editor.store.getState().dispatch;
+  const state = editor.store.getState();
+  const dispatch = state.dispatch;
+  const isMultiSelect = item.id === 'multi-select-box';
+  const selectedIds = isMultiSelect ? state.selection : [item.id];
 
   const handleDuplicate = () => {
+    if (isMultiSelect) return; // Duplicate không support multi-select
     const duplicated: LayoutItem = { ...item, id: nextDuplicateId(item.type), box: { ...item.box, x: item.box.x + 20, y: item.box.y + 20 } };
     dispatch(addItemCommand(variant.aspect.id, duplicated, loopItemId));
   };
-  const handleDelete = () => dispatch(removeItemCommand(variant.aspect.id, item.id, loopItemId));
-  const handleToggleLock = () => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { locked: !item.locked }, loopItemId));
-  const handleToggleHidden = () => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { hidden: !item.hidden }, loopItemId));
-  const handleZUp = () => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { box: { ...item.box, z: (item.box.z ?? 0) + 1 } }, loopItemId));
-  const handleZDown = () => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { box: { ...item.box, z: (item.box.z ?? 0) - 1 } }, loopItemId));
+
+  const handleDelete = () => {
+    if (isMultiSelect) {
+      const commands = selectedIds.map((id) => removeItemCommand(variant.aspect.id, id, loopItemId));
+      dispatch(commands.length === 1 ? commands[0]! : batchCommand(commands));
+    } else {
+      dispatch(removeItemCommand(variant.aspect.id, item.id, loopItemId));
+    }
+  };
+
+  const handleToggleLock = () => {
+    if (isMultiSelect) {
+      // Toàn bộ selected items lock/unlock cùng lúc (check nếu tất cả locked hay không)
+      const allLocked = selectedIds.every((id) => {
+        const itm = variant.items.find((i) => i.id === id);
+        return itm?.locked === true;
+      });
+      const commands = selectedIds.map((id) => {
+        const itm = variant.items.find((i) => i.id === id);
+        return patchItemCommand<LayoutItem>(variant.aspect.id, id, itm ?? item, { locked: !allLocked }, loopItemId);
+      });
+      dispatch(commands.length === 1 ? commands[0]! : batchCommand(commands));
+    } else {
+      dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { locked: !item.locked }, loopItemId));
+    }
+  };
+
+  const handleToggleHidden = () => {
+    if (isMultiSelect) {
+      const allHidden = selectedIds.every((id) => {
+        const itm = variant.items.find((i) => i.id === id);
+        return itm?.hidden === true;
+      });
+      const commands = selectedIds.map((id) => {
+        const itm = variant.items.find((i) => i.id === id);
+        return patchItemCommand<LayoutItem>(variant.aspect.id, id, itm ?? item, { hidden: !allHidden }, loopItemId);
+      });
+      dispatch(commands.length === 1 ? commands[0]! : batchCommand(commands));
+    } else {
+      dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { hidden: !item.hidden }, loopItemId));
+    }
+  };
+
+  const handleZUp = () => {
+    if (isMultiSelect) {
+      const commands = selectedIds.map((id) => {
+        const itm = variant.items.find((i) => i.id === id);
+        if (!itm) return null;
+        return patchItemCommand<LayoutItem>(variant.aspect.id, id, itm, { box: { ...itm.box, z: (itm.box.z ?? 0) + 1 } }, loopItemId);
+      }).filter((c): c is any => c !== null);
+      if (commands.length > 0) dispatch(commands.length === 1 ? commands[0]! : batchCommand(commands));
+    } else {
+      dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { box: { ...item.box, z: (item.box.z ?? 0) + 1 } }, loopItemId));
+    }
+  };
+
+  const handleZDown = () => {
+    if (isMultiSelect) {
+      const commands = selectedIds.map((id) => {
+        const itm = variant.items.find((i) => i.id === id);
+        if (!itm) return null;
+        return patchItemCommand<LayoutItem>(variant.aspect.id, id, itm, { box: { ...itm.box, z: (itm.box.z ?? 0) - 1 } }, loopItemId);
+      }).filter((c): c is any => c !== null);
+      if (commands.length > 0) dispatch(commands.length === 1 ? commands[0]! : batchCommand(commands));
+    } else {
+      dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { box: { ...item.box, z: (item.box.z ?? 0) - 1 } }, loopItemId));
+    }
+  };
 
   const btnClass = "flex items-center justify-center w6 h-6 border-none bg-transparent text-[#5c5d6e] hover:bg-[#f4f5f9] cursor-pointer rounded-md";
 
@@ -87,9 +154,11 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
       }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <button onClick={handleDuplicate} aria-label="Nhân đôi (thanh công cụ)" title="Nhân đôi" className={btnClass}>
-        <Copy size={14} />
-      </button>
+      {!isMultiSelect && (
+        <button onClick={handleDuplicate} aria-label="Nhân đôi (thanh công cụ)" title="Nhân đôi" className={btnClass}>
+          <Copy size={14} />
+        </button>
+      )}
       <button onClick={handleZUp} aria-label="Lên 1 lớp (thanh công cụ)" title="Lên 1 lớp" className={btnClass}>
         <ChevronUp size={14} />
       </button>

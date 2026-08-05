@@ -1,6 +1,6 @@
 import { useCallback, useRef, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { Box, LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
-import { moveItemCommand, computeSnap } from '@sky-app/layout-editor-core';
+import { batchCommand, moveItemCommand, computeSnap } from '@sky-app/layout-editor-core';
 import type { Editor, Guide } from '@sky-app/layout-editor-core';
 import { SyncBadge } from '../SyncBadge.js';
 import { SelectionHandles, SelectionHandlesStatic, SNAP_THRESHOLD } from './SelectionHandles.js';
@@ -105,12 +105,48 @@ export function CanvasItemView({
       const dy = (e.clientY - drag.startY) / pointerScaleY;
       const rawTo: Box = { ...drag.from, x: drag.from.x + dx, y: drag.from.y + dy };
 
-      const otherBoxes = items.filter((i) => i.id !== item.id).map((i) => i.box);
-      const { snappedBox, guides } = computeSnap(rawTo, otherBoxes, { w: refW, h: refH }, SNAP_THRESHOLD);
-      onGuidesChange(guides);
+      const state = editor.store.getState();
+      const isMultiSelectWithThisItem = state.selection.length > 1 && state.selection.includes(item.id);
 
-      editor.store.getState().dispatch(moveItemCommand(variant.aspect.id, item.id, drag.lastTo, snappedBox, loopItemId));
-      drag.lastTo = snappedBox;
+      if (isMultiSelectWithThisItem) {
+        // GĐ9 multi-move: tất cả item đang chọn di chuyển cùng offset, 1 batch command
+        const offsetX = dx;
+        const offsetY = dy;
+
+        const otherBoxes = items
+          .filter((i) => !state.selection.includes(i.id))
+          .map((i) => i.box);
+        const { snappedBox, guides } = computeSnap(rawTo, otherBoxes, { w: refW, h: refH }, SNAP_THRESHOLD);
+        onGuidesChange(guides);
+
+        // Tính toán offset thật từ snap của item kéo
+        const snappedDx = snappedBox.x - drag.from.x;
+        const snappedDy = snappedBox.y - drag.from.y;
+
+        const commands = state.selection.map((selectedId) => {
+          const selectedItem = items.find((i) => i.id === selectedId);
+          if (!selectedItem) return null;
+          const from = selectedItem.box;
+          const to = { ...from, x: from.x + snappedDx, y: from.y + snappedDy };
+          return moveItemCommand(variant.aspect.id, selectedId, from, to, loopItemId);
+        }).filter((cmd): cmd is any => cmd !== null);
+
+        if (commands.length > 1) {
+          state.dispatch(batchCommand(commands));
+        } else if (commands.length === 1) {
+          state.dispatch(commands[0]!);
+        }
+
+        drag.lastTo = snappedBox;
+      } else {
+        // Single select: di chuyển item này một mình
+        const otherBoxes = items.filter((i) => i.id !== item.id).map((i) => i.box);
+        const { snappedBox, guides } = computeSnap(rawTo, otherBoxes, { w: refW, h: refH }, SNAP_THRESHOLD);
+        onGuidesChange(guides);
+
+        state.dispatch(moveItemCommand(variant.aspect.id, item.id, drag.lastTo, snappedBox, loopItemId));
+        drag.lastTo = snappedBox;
+      }
     },
     [editor, item.id, variant.aspect.id, items, refW, refH, loopItemId, pointerScaleX, pointerScaleY, onGuidesChange],
   );
