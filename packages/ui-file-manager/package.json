@@ -1,0 +1,32 @@
+{
+  "name": "@sky-app/ui-file-manager",
+  "version": "1.0.0",
+  "description": "Reusable file manager UI library with grid/list views, selection, keyboard navigation, drag-to-select, context menus, and full customization support",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "keywords": [
+    "file-manager",
+    "library",
+    "ui",
+    "grid",
+    "list",
+    "selection",
+    "keyboard-navigation",
+    "customizable"
+  ],
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "dependencies": {
+    "@sky-app/ui": "workspace:*"
+  }
+}
