@@ -46,6 +46,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   const [importLoading, setImportLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!message) return;
@@ -53,13 +54,34 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     return () => clearTimeout(timeout);
   }, [message]);
 
-  function toggleSelect(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  function handleCardClick(id: string, event: React.MouseEvent) {
+    event.preventDefault();
+
+    if (event.ctrlKey || event.metaKey) {
+      // Ctrl/Cmd+click: toggle select
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      setLastSelectedId(id);
+    } else if (event.shiftKey && lastSelectedId && filtered.length > 0) {
+      // Shift+click: select range from lastSelectedId to current id
+      const allIds = filtered.map((e) => e.id);
+      const lastIdx = allIds.indexOf(lastSelectedId);
+      const currIdx = allIds.indexOf(id);
+      if (lastIdx >= 0 && currIdx >= 0) {
+        const [start, end] = lastIdx < currIdx ? [lastIdx, currIdx] : [currIdx, lastIdx];
+        const rangeIds = allIds.slice(start, end + 1);
+        setSelectedIds(new Set(rangeIds));
+      }
+      setLastSelectedId(id);
+    } else {
+      // Normal click: single select
+      setSelectedIds(new Set([id]));
+      setLastSelectedId(id);
+    }
   }
 
   function isSelected(id: string) {
@@ -278,7 +300,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                     ? 'border-[#4b57e6] bg-[#f0f2ff] shadow-[0_4px_14px_rgba(75,87,230,0.15)]'
                     : 'border-[#e6e6ee] bg-white hover:border-[#4b57e6]/50 hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
                 )}
-                onClick={() => toggleSelect(entry.id)}
+                onClick={(e) => handleCardClick(entry.id, e)}
                 onDoubleClick={() => onOpen(entry.id)}
               >
                 <div style={{ width: THUMB_SIZE.w, height: THUMB_SIZE.h }} className="overflow-hidden rounded-[8px] bg-black">
