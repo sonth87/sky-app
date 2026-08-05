@@ -570,10 +570,19 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   {entry.color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />}
                   <span className="truncate text-xs font-semibold text-[#26262e]">{entry.name}</span>
                 </div>
-                <div className="truncate px-1 text-[10px] text-[#9a9bab]">
+                {entry.description && (
+                  <div className="px-1 text-[9px] text-[#9a9bab] line-clamp-1">{entry.description}</div>
+                )}
+                <div className="px-1 text-[9px] text-[#9a9bab]">
                   {entry.content.variants.map((v) => v.aspect.id).join(', ')}
                   {entry.category && <span> · {entry.category}</span>}
                 </div>
+                {(entry.createdAt || entry.updatedAt) && (
+                  <div className="px-1 text-[8px] text-[#c5c7d0]">
+                    {entry.updatedAt && <span>Modified: {new Date(entry.updatedAt).toLocaleDateString()}</span>}
+                    {entry.createdAt && !entry.updatedAt && <span>Created: {new Date(entry.createdAt).toLocaleDateString()}</span>}
+                  </div>
+                )}
                 {entry.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 px-1">
                     {entry.tags.map((tag) => (
