@@ -257,12 +257,19 @@ function ImageItemView({
   if (!relPath) {
     return <div style={style}>{item.fallbackText ?? ''}</div>;
   }
+  const focalX = (item.focalX ?? 0.5) * 100;
+  const focalY = (item.focalY ?? 0.5) * 100;
   return (
     <div style={style}>
       <img
         src={resolveAsset(relPath)}
         alt=""
-        style={{ width: '100%', height: '100%', objectFit: item.fit ?? 'cover' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: item.fit ?? 'cover',
+          objectPosition: (item.fit ?? 'cover') === 'cover' ? `${focalX}% ${focalY}%` : undefined,
+        }}
       />
     </div>
   );

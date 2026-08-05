@@ -131,6 +131,10 @@ export interface ImageItem extends BaseItem {
   filter?: 'none' | 'bright' | 'gray' | 'warm';
   fallbackText?: string; // hiện khi không có ảnh — "Không có ảnh"
   shadow?: boolean | TextShadow; // đổ bóng, reuse TextShadow type
+  // Neo điểm crop (focal point) khi fit='cover' — 0..1 (mặc định 0.5/0.5 = center)
+  // Áp dụng CSS object-position, khác với object-fit=contain (không ảnh hưởng)
+  focalX?: number; // 0..1, mặc định 0.5
+  focalY?: number; // 0..1, mặc định 0.5
 }
 
 export interface ShapeItem extends BaseItem {

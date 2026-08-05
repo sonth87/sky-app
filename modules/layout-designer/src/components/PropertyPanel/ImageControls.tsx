@@ -130,6 +130,36 @@ export function ImageControls({
           ))}
         </div>
       </Section>
+      {(item.fit ?? 'cover') === 'cover' && (
+        <Section title="Neo điểm crop">
+          <div className="space-y-2">
+            <div className="flex items-center gap-[10px]">
+              <label className="text-[11px] w-8">X</label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={(item.focalX ?? 0.5) * 100}
+                onChange={(e) => patch({ focalX: Number(e.target.value) / 100 })}
+                className="flex-1"
+              />
+              <span className="text-[11px] w-[34px] text-right">{Math.round((item.focalX ?? 0.5) * 100)}%</span>
+            </div>
+            <div className="flex items-center gap-[10px]">
+              <label className="text-[11px] w-8">Y</label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={(item.focalY ?? 0.5) * 100}
+                onChange={(e) => patch({ focalY: Number(e.target.value) / 100 })}
+                className="flex-1"
+              />
+              <span className="text-[11px] w-[34px] text-right">{Math.round((item.focalY ?? 0.5) * 100)}%</span>
+            </div>
+          </div>
+        </Section>
+      )}
       <ShadowControl value={item.shadow} onChange={(shadow) => patch({ shadow })} />
     </>
   );
