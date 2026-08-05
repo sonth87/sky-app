@@ -580,7 +580,9 @@ export async function getTtsDebugInfo(): Promise<TtsDebugInfo> {
 // load/infer dở nên không xử lý SIGTERM kịp) vẫn sống song song với process mới, giữ nguyên
 // RAM đã cấp phát (quan sát thực tế ~18GB) — đúng như user thấy trong Activity Monitor. Bằng
 // chứng: process mới bị đẩy sang port fallback (8090) vì 8089 vẫn bị process cũ giữ.
-const STOP_TIMEOUT_MS = 8_000;
+// 3s là đủ cho graceful shutdown (app đi qua __del__, release model) — không quá lâu khi
+// engine đang load model nặng (torch, safetensors I/O) không kịp respond trước SIGKILL.
+const STOP_TIMEOUT_MS = 3_000;
 
 export function stopPythonServer(): Promise<void> {
   const proc = pythonProcess;
