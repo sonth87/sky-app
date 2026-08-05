@@ -130,24 +130,29 @@ export interface ImageItem extends BaseItem {
   ring?: string; // ảnh viền overlay (giữ tính năng "ring" cũ)
   filter?: 'none' | 'bright' | 'gray' | 'warm';
   fallbackText?: string; // hiện khi không có ảnh — "Không có ảnh"
+  shadow?: boolean | TextShadow; // đổ bóng, reuse TextShadow type
 }
 
 export interface ShapeItem extends BaseItem {
   type: 'shape';
   shape: 'rect' | 'circle' | 'triangle' | 'diamond' | 'frame' | 'line';
-  fill?: string;
+  fill?: string | { kind: 'gradient'; value: string }; // solid color hoặc gradient CSS
   stroke?: string;
   strokeW?: number;
   radius?: number; // bo góc cho rect
+  shadow?: boolean | TextShadow; // đổ bóng, reuse TextShadow type
 }
 
 export interface RibbonItem extends BaseItem {
   type: 'ribbon';
   content: string; // có thể chứa @var
-  bg?: string;
+  bg?: string | { kind: 'gradient'; value: string }; // solid color hoặc gradient CSS
   color?: string;
   fontSize: number; // px trên canvas chuẩn
   fontWeight?: number;
+  borderW?: number; // px viền
+  borderColor?: string;
+  shadow?: boolean | TextShadow; // đổ bóng, reuse TextShadow type
   // ribbon = 1 dạng text đặc biệt có nền cắt góc; có thể coi là TextItem + style
 }
 

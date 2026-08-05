@@ -1,6 +1,11 @@
 import type { LayoutItem, TextItem } from '@sky-app/slide-shared';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
 
+function getCSSValue(value: string | { kind: 'gradient'; value: string } | undefined): string | undefined {
+  if (!value) return undefined;
+  return typeof value === 'string' ? value : value.value;
+}
+
 export function ItemContent({
   item,
   scaleX,
@@ -42,7 +47,7 @@ export function ItemContent({
             fontSize: item.fontSize * fScale,
             fontWeight: item.fontWeight,
             color: item.color,
-            background: item.bg,
+            background: getCSSValue(item.bg),
             textAlign: 'center',
             padding: '6px 4px',
             width: '100%',
@@ -136,19 +141,20 @@ export function textShadowCss(shadow: TextItem['shadow'], fScale: number): strin
  * fill giữa) / 'line' (1 đường kẻ mảnh ngang giữa box) — 'triangle'/'diamond' GIỮ NGUYÊN như cũ
  * (chưa có style đặc trưng riêng, CHỦ ĐỘNG ngoài phạm vi bước này theo đúng plan). */
 export function ShapeItemContent({ item, fScale }: { item: Extract<LayoutItem, { type: 'shape' }>; fScale: number }) {
+  const fillCSS = getCSSValue(item.fill);
   const border = item.strokeW ? `${item.strokeW * fScale}px solid ${item.stroke ?? '#000'}` : undefined;
   if (item.shape === 'line') {
-    return <div style={{ width: '100%', height: item.strokeW ? item.strokeW * fScale : 2, background: item.stroke ?? item.fill ?? '#000', marginTop: '50%' }} />;
+    return <div style={{ width: '100%', height: item.strokeW ? item.strokeW * fScale : 2, background: item.stroke ?? fillCSS ?? '#000', marginTop: '50%' }} />;
   }
   if (item.shape === 'frame') {
-    return <div style={{ width: '100%', height: '100%', background: 'transparent', border: border ?? `${2 * fScale}px solid ${item.stroke ?? item.fill ?? '#000'}` }} />;
+    return <div style={{ width: '100%', height: '100%', background: 'transparent', border: border ?? `${2 * fScale}px solid ${item.stroke ?? fillCSS ?? '#000'}` }} />;
   }
   return (
     <div
       style={{
         width: '100%',
         height: '100%',
-        background: item.fill,
+        background: fillCSS,
         border,
         borderRadius: item.shape === 'circle' ? '50%' : item.shape === 'rect' ? item.radius : undefined,
       }}

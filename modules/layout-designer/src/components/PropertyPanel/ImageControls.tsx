@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { LayoutItem } from '@sky-app/slide-shared';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
 import { Section } from './CommonControls.js';
+import { ShadowControl } from './ShadowControl.js';
 import { cn } from '@sky-app/ui';
 
 export interface ImageControlsProps {
@@ -129,6 +130,7 @@ export function ImageControls({
           ))}
         </div>
       </Section>
+      <ShadowControl value={item.shadow} onChange={(shadow) => patch({ shadow })} />
     </>
   );
 }

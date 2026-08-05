@@ -165,14 +165,15 @@ describe('PropertyPanel — TextItem field còn thiếu', () => {
   });
 });
 
-describe('PropertyPanel — RibbonItem field còn thiếu (RibbonControls tách riêng)', () => {
-  it('RibbonControls có nút Bold độc lập (KHÁC TextControls, không có Căn dọc/overflow/shadow)', () => {
+describe('PropertyPanel — RibbonItem field (RibbonControls tách riêng)', () => {
+  it('RibbonControls có nút Bold độc lập (KHÁC TextControls, không có Căn dọc/overflow)', () => {
     const { container } = render(<LayoutDesignerApp content={ribbonContent()} />);
     selectFirstItem(container);
 
     expect(screen.getByText('B')).toBeTruthy();
-    expect(screen.queryByText('Bật đổ bóng')).toBeNull();
     expect(screen.queryByText('Giãn dòng')).toBeNull();
+    // GĐ7b: RibbonItem giờ có shadow (Bật đổ bóng) như Shape/Image
+    expect(screen.queryByText('Bật đổ bóng')).toBeTruthy();
   });
 
   it('bấm Bold → fontWeight=700, render đúng trên canvas', () => {

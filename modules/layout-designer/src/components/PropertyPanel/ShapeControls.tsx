@@ -1,5 +1,6 @@
 import type { LayoutItem } from '@sky-app/slide-shared';
 import { Section } from './CommonControls.js';
+import { ShadowControl } from './ShadowControl.js';
 import { cn } from '@sky-app/ui';
 
 export interface ShapeControlsProps {
@@ -28,7 +29,7 @@ export function ShapeControls({ item, patch }: ShapeControlsProps) {
       </Section>
       {item.shape !== 'line' && (
         <Section title="Màu nền">
-          <input type="color" value={item.fill ?? '#4b57e6'} onChange={(e) => patch({ fill: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
+          <input type="color" value={typeof item.fill === 'string' ? (item.fill ?? '#4b57e6') : '#4b57e6'} onChange={(e) => patch({ fill: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
         </Section>
       )}
       {item.shape === 'rect' && (
@@ -46,6 +47,7 @@ export function ShapeControls({ item, patch }: ShapeControlsProps) {
         </div>
         {(item.strokeW ?? 0) > 0 && <input type="color" value={item.stroke ?? '#000000'} onChange={(e) => patch({ stroke: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />}
       </Section>
+      <ShadowControl value={item.shadow} onChange={(shadow) => patch({ shadow })} />
     </>
   );
 }

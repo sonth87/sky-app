@@ -51,6 +51,14 @@ function fontScale(scaleX: number, scaleY: number): number {
   return Math.min(scaleX, scaleY);
 }
 
+function getShadowCSS(shadow: boolean | import('./types.js').TextShadow | undefined): string | undefined {
+  if (!shadow) return undefined;
+  if (typeof shadow === 'boolean') {
+    return '0 2px 4px rgba(0,0,0,0.35)';
+  }
+  return `${shadow.offsetX ?? 0}px ${shadow.offsetY ?? 0}px ${shadow.blur ?? 0}px ${shadow.color ?? 'rgba(0,0,0,0.4)'}`;
+}
+
 export interface LayoutRendererProps {
   content: LayoutContent;
   /** Kích thước thật của khung hiển thị (px), dùng để chọn variant + tính scale-to-fit. */
@@ -201,16 +209,20 @@ function RibbonItemView({
 }) {
   const fScale = fontScale(scaleX, scaleY);
   const text = resolveContent(item.content, record);
+  const bgValue = typeof item.bg === 'string' ? item.bg : (item.bg?.kind === 'gradient' ? item.bg.value : undefined);
+  const shadowCSS = getShadowCSS(item.shadow);
   const style: CSSProperties = {
     ...toRenderBox(item.box, scaleX, scaleY),
     opacity: item.opacity != null ? item.opacity / 100 : undefined,
-    background: item.bg,
+    background: bgValue,
     color: item.color,
     fontSize: item.fontSize * fScale,
     fontWeight: item.fontWeight,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    border: item.borderW ? `${item.borderW * Math.min(scaleX, scaleY)}px solid ${item.borderColor ?? '#000'}` : undefined,
+    boxShadow: shadowCSS,
   };
   return <div style={style}>{text}</div>;
 }
@@ -229,6 +241,7 @@ function ImageItemView({
   resolveAsset: (p: string) => string;
 }) {
   const relPath = item.varKey ? resolveCanonicalField(record as CanonicalSubject, item.varKey) : item.src;
+  const shadowCSS = getShadowCSS(item.shadow);
   const style: CSSProperties = {
     ...toRenderBox(item.box, scaleX, scaleY),
     opacity: item.opacity != null ? item.opacity / 100 : undefined,
@@ -239,6 +252,7 @@ function ImageItemView({
     alignItems: 'center',
     justifyContent: 'center',
     background: '#0002',
+    boxShadow: shadowCSS,
   };
   if (!relPath) {
     return <div style={style}>{item.fallbackText ?? ''}</div>;
@@ -255,12 +269,15 @@ function ImageItemView({
 }
 
 function ShapeItemView({ item, scaleX, scaleY }: { item: Extract<LayoutItem, { type: 'shape' }>; scaleX: number; scaleY: number }) {
+  const fillValue = typeof item.fill === 'string' ? item.fill : (item.fill?.kind === 'gradient' ? item.fill.value : undefined);
+  const shadowCSS = getShadowCSS(item.shadow);
   const style: CSSProperties = {
     ...toRenderBox(item.box, scaleX, scaleY),
     opacity: item.opacity != null ? item.opacity / 100 : undefined,
-    background: item.fill,
+    background: fillValue,
     border: item.strokeW ? `${item.strokeW * Math.min(scaleX, scaleY)}px solid ${item.stroke ?? '#000'}` : undefined,
     borderRadius: item.shape === 'circle' ? '50%' : item.shape === 'rect' ? item.radius : undefined,
+    boxShadow: shadowCSS,
   };
   return <div style={style} />;
 }

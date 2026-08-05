@@ -1,6 +1,7 @@
 import type { LayoutItem } from '@sky-app/slide-shared';
 import { VariableTextarea } from '../VariableTextarea.js';
 import { Section } from './CommonControls.js';
+import { ShadowControl } from './ShadowControl.js';
 import { cn } from '@sky-app/ui';
 
 export interface RibbonControlsProps {
@@ -45,8 +46,16 @@ export function RibbonControls({
         <input type="color" value={item.color ?? '#ffffff'} onChange={(e) => patch({ color: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
       </Section>
       <Section title="Nền dải ruy-băng">
-        <input type="color" value={item.bg ?? '#b9902f'} onChange={(e) => patch({ bg: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
+        <input type="color" value={typeof item.bg === 'string' ? (item.bg ?? '#b9902f') : '#b9902f'} onChange={(e) => patch({ bg: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
       </Section>
+      <Section title="Viền">
+        <div className={cn('flex items-center gap-[10px]', (item.borderW ?? 0) > 0 && 'mb-2')}>
+          <input type="range" min={0} max={16} value={item.borderW ?? 0} onChange={(e) => patch({ borderW: Number(e.target.value) })} className="flex-1" />
+          <span className="text-[11px] w-[34px] text-right">{item.borderW ?? 0}</span>
+        </div>
+        {(item.borderW ?? 0) > 0 && <input type="color" value={item.borderColor ?? '#000000'} onChange={(e) => patch({ borderColor: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />}
+      </Section>
+      <ShadowControl value={item.shadow} onChange={(shadow) => patch({ shadow })} />
     </>
   );
 }
