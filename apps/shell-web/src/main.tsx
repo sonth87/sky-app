@@ -27,6 +27,9 @@ async function main() {
     // xem createWebPlatform's resolveDataPort (health-check data-service → fallback WASM).
     sampleStudentsUrl: '/sample-data/students.json',
     sqlWasmUrl,
+    // Vite serves apps/shell-web/public/ ở gốc '/' — path tuyệt đối (khác Electron, xem
+    // apps/shell-electron/src/main.tsx's assetUrl).
+    assetUrl: (path) => `/${path}`,
   });
 
   createRoot(document.getElementById('root')!).render(

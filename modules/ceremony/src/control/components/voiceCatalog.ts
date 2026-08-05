@@ -8,12 +8,12 @@ const HF_MODEL_URL = 'https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo';
 
 /** Giọng registry (đã sẵn sàng synthesize) khi window.slide chưa trả kịp lúc mount. */
 const FALLBACK_VOICE_ITEMS: VoiceListItem[] = [
-  { source: 'registry', origin: 'system', id: 'vieneu-NF', name: 'Lan Anh', gender: 'female', accent: 'northern', category: [], tags: [] },
-  { source: 'registry', origin: 'system', id: 'vieneu-NF2', name: 'Ngọc Huyền', gender: 'female', accent: 'northern', category: [], tags: [] },
-  { source: 'registry', origin: 'system', id: 'vieneu-SF', name: 'Mai Linh', gender: 'female', accent: 'southern', category: [], tags: [] },
-  { source: 'registry', origin: 'system', id: 'vieneu-NM1', name: 'Minh Quân', gender: 'male', accent: 'northern', category: [], tags: [] },
-  { source: 'registry', origin: 'system', id: 'vieneu-SM', name: 'Gia Huy', gender: 'male', accent: 'southern', category: [], tags: [] },
-  { source: 'registry', origin: 'system', id: 'vieneu-ADAM', name: 'Adam', gender: 'male', accent: 'northern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-NF', name: 'Lan Anh', gender: 'female', language: 'Vietnamese', accent: 'northern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-NF2', name: 'Ngọc Huyền', gender: 'female', language: 'Vietnamese', accent: 'northern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-SF', name: 'Mai Linh', gender: 'female', language: 'Vietnamese', accent: 'southern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-NM1', name: 'Minh Quân', gender: 'male', language: 'Vietnamese', accent: 'northern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-SM', name: 'Gia Huy', gender: 'male', language: 'Vietnamese', accent: 'southern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-ADAM', name: 'Adam', gender: 'male', language: 'Vietnamese', accent: 'northern', category: [], tags: [] },
 ];
 
 /** @deprecated giữ lại tên export cũ cho code chưa migrate — dùng modelUrl cố định của VieNeu. */
@@ -42,6 +42,7 @@ function registryVoiceToItem(v: Voice): VoiceListItem {
     id: v.id.startsWith('vieneu-') ? v.id : `vieneu-${v.id}`,
     name: v.name,
     gender: v.gender === 'male' ? 'male' : 'female',
+    language: v.language,
     accent: v.accent,
     category: v.category ?? [],
     tags: v.tags ?? (v.type === 'preset' ? ['builtin'] : []),

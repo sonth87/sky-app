@@ -17,7 +17,10 @@ Env vars (truyền từ Electron qua python-server.ts):
   HF_HOME              — HuggingFace model cache dir
   HF_HUB_OFFLINE       — '1' để tắt auto-update
   RESOURCES_PATH       — resources/ dir của packaged app
-  VIENEU_REF_DIR       — thư mục chứa ref WAV files
+  VIENEU_REF_DIR       — thư mục chứa ref WAV files (server GHI cloned-ref mới vào đây)
+  VIENEU_CATALOG_DIR   — (optional, dev-only) thư mục CHỈ ĐỌC chứa {lang}/catalog.json —
+                         override riêng cho việc browse catalog, tách khỏi VIENEU_REF_DIR
+                         để dev test không ghi nhầm vào source tree có git track
   VIENEU_PREVIEW_DIR   — thư mục chứa preview WAV files
   LOG_FILE_PATH        — path ghi debug log
   VIENEU_REGISTRY_PATH — (optional) path tới voice-registry.json
@@ -180,7 +183,20 @@ def _pick_ref_dir() -> Path:
 
 
 def _pick_catalog_dir(ref_dir: Path) -> Path:
-    """Resolve catalog dir (read-only system voice library) with fallback to ref_dir."""
+    """Resolve catalog dir (read-only system voice library) with fallback to ref_dir.
+
+    `VIENEU_CATALOG_DIR` (dev-only, xem python-server.ts's getDevVoiceRefDir) ưu tiên cao
+    nhất — trỏ thẳng vào apps/tts-service/resources/voice-ref (nguồn thật có git track) để
+    voice/thư mục ngôn ngữ mới thêm vào đó hiện ra ngay trong /voices/catalog, không cần
+    build.sh sync/copy tay. Tách riêng khỏi VIENEU_REF_DIR (`ref_dir` tham số) vì dir đó còn
+    bị server GHI file mới vào (cloned-ref WAV) — nếu catalog cũng đọc từ đó, mỗi lần dev bấm
+    nghe thử/chọn 1 catalog voice sẽ tự đẻ file + sửa voice-registry.json ngay trong source
+    tree, hiện lên git status ngoài ý muốn.
+    """
+    catalog_env = os.environ.get("VIENEU_CATALOG_DIR", "")
+    if catalog_env and Path(catalog_env).exists():
+        return Path(catalog_env)
+
     resources_env = os.environ.get("RESOURCES_PATH", "")
     if resources_env:
         rp = Path(resources_env)
@@ -190,10 +206,6 @@ def _pick_catalog_dir(ref_dir: Path) -> Path:
         cand_voices = rp / "voices"
         if cand_voices.exists():
             return cand_voices
-
-    # Kiểm tra xem ref_dir có chứa catalog.json không
-    if (ref_dir / "vi-VN" / "catalog.json").exists():
-        return ref_dir
 
     # Fallback khi dev
     base = Path(__file__).resolve().parent.parent.parent.parent
@@ -492,11 +504,16 @@ def _import_catalog_entry(entry: dict, lang: str) -> dict:
         ref_path.unlink(missing_ok=True)
         raise HTTPException(500, f"Không thể encode voice: {e}")
 
+    # region_map chỉ áp dụng cho 3 giọng miền tiếng Việt — entry không có accent (vd mọi
+    # voice en-US hiện tại, hoặc 1 ngôn ngữ mới thêm sau này) để region rỗng thay vì mặc
+    # định "Bắc" như trước (bug thật đã sửa 2026-08-04: khiến voice en-US bị gắn nhãn vùng
+    # miền tiếng Việt vô nghĩa). `region` giờ chỉ còn ý nghĩa hiển thị phụ/legacy — ngôn ngữ
+    # thật lấy từ `source_lang` (xem languageFromSourceLang phía service-contracts).
     region_map = {"northern": "Bắc", "central": "Trung", "southern": "Nam"}
     voice = _registry.add_cloned(
         label=entry.get("name", entry["id"]),
         gender=entry.get("gender", "female"),
-        region=region_map.get(entry.get("accent", ""), "Bắc"),
+        region=region_map.get(entry.get("accent", ""), ""),
         ref_file=ref_filename,
         extra={
             "accent": entry.get("accent"),

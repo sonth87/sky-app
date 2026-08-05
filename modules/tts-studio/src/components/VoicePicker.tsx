@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { VoicePickerCombobox, type PreviewState, type VoiceListItem } from '@sky-app/voice-catalog-ui';
+import { VoicePickerCombobox, getVoiceCoverPath, type PreviewState, type VoiceListItem } from '@sky-app/voice-catalog-ui';
 import { useTtsStudioStore } from '../store';
 import { useAudioPlayingId } from '../lib/audioPlayer';
 
@@ -20,9 +20,12 @@ export interface VoicePickerProps {
   loading?: boolean;
   onAddVoice?: () => void;
   onDeleteVoice?: (id: string) => void;
+  /** platform.assetUrl — resolve path tương đối (vd voice-covers/cover-01.webp) thành URL
+   * đúng môi trường (Web public/ vs Electron resources), xem PlatformContext.assetUrl. */
+  assetUrl: (path: string) => string;
 }
 
-export function VoicePicker({ onPreview, previewingId, loading, onAddVoice, onDeleteVoice }: VoicePickerProps) {
+export function VoicePicker({ onPreview, previewingId, loading, onAddVoice, onDeleteVoice, assetUrl }: VoicePickerProps) {
   const voices = useTtsStudioStore((s) => s.voices);
   const selectedVoiceId = useTtsStudioStore((s) => s.selectedVoiceId);
   const setSelectedVoiceId = useTtsStudioStore((s) => s.setSelectedVoiceId);
@@ -64,6 +67,8 @@ export function VoicePicker({ onPreview, previewingId, loading, onAddVoice, onDe
         onChange={setSelectedVoiceId}
         previewStates={previewStates}
         onPreview={(item, e) => { e.stopPropagation(); onPreview?.(item.id); }}
+        getCoverUrl={(item) => assetUrl(getVoiceCoverPath(item.id))}
+        defaultLanguage="Vietnamese"
         loading={loading}
         loadingLabel="Đang tải giọng đọc..."
         placeholder="Chọn giọng đọc"

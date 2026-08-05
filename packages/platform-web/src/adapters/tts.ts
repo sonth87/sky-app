@@ -1,4 +1,4 @@
-import type { SpeakOptions, SynthesizeResult, TtsPort, Voice, VoiceCatalogEntry } from '@sky-app/service-contracts';
+import { languageFromSourceLang, type SpeakOptions, type SynthesizeResult, type TtsPort, type Voice, type VoiceCatalogEntry } from '@sky-app/service-contracts';
 
 interface RawVoice {
   id: string;
@@ -12,6 +12,8 @@ interface RawVoice {
   tagline?: string;
   description?: string;
   source_catalog_id?: string;
+  /** vd "vi-VN"/"en-US" — xem languageFromSourceLang. */
+  source_lang?: string;
 }
 
 let audioCtx: AudioContext | null = null;
@@ -102,7 +104,7 @@ export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
       return raw.map((v): Voice => ({
         id: v.id,
         name: v.label,
-        language: v.region,
+        language: languageFromSourceLang(v.source_lang),
         gender: v.gender,
         type: v.type,
         accent: v.accent,

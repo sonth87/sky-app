@@ -7,5 +7,6 @@ export { VoiceSearchBar } from './VoiceSearchBar.js';
 export { VoiceRow } from './VoiceRow.js';
 export type { PreviewState } from './VoiceRow.js';
 export { VoicePickerCombobox } from './VoicePickerCombobox.js';
+export { getVoiceCoverPath } from './voiceCovers.js';
 export { VoiceCloneModal } from './VoiceCloneModal.js';
 export type { VoiceCloneModalProps } from './VoiceCloneModal.js';

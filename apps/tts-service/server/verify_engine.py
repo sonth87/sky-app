@@ -8,7 +8,7 @@ TRƯỚC khi cho đổi sang nó. Tránh: tải xong nhưng lỗi → đổi eng
 Usage:
     python verify_engine.py <engine_id>
 
-Exit code 0 = OK (in "VERIFY_OK"); != 0 = lỗi (in "VERIFY_FAIL: <lý do>").
+Exit code 0 = OK; != 0 = lỗi.
 In JSON 1 dòng ra stdout để caller (Electron) parse: {"ok": bool, "error": str|null}.
 
 Đọc env như server chính: VIENEU_ENGINES_DIR (nơi model/runtime), HF_HOME... để
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import sys
+import traceback
 
 
 def main() -> int:
@@ -26,6 +27,7 @@ def main() -> int:
         return 2
 
     engine_id = sys.argv[1]
+
     try:
         from engine_registry import create_engine
         engine = create_engine(engine_id)
@@ -43,7 +45,11 @@ def main() -> int:
         print(json.dumps({"ok": False, "error": f"Engine chưa nối factory: {e}"}, ensure_ascii=False), flush=True)
         return 1
     except Exception as e:
-        print(json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}, ensure_ascii=False), flush=True)
+        # Capture full traceback để debug
+        tb = traceback.format_exc()
+        error_msg = f"{type(e).__name__}: {e}"
+        # Ghi log ngắn (1 dòng) để Electron parse
+        print(json.dumps({"ok": False, "error": error_msg, "trace": tb[:500]}, ensure_ascii=False), flush=True)
         return 1
 
 

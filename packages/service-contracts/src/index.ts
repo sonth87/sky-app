@@ -1,4 +1,5 @@
 export type { TtsPort, Voice, VoiceCatalogEntry, SpeakOptions, SynthesizeResult } from './tts.js';
+export { languageFromSourceLang } from './tts.js';
 export type {
   TtsEnginePort,
   EngineOpResult,

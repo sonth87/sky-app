@@ -245,6 +245,10 @@ export interface SlideApi {
       category?: string[];
       tags?: string[];
       source_catalog_id?: string;
+      /** vd "vi-VN"/"en-US" — chỉ có khi voice import từ catalog vendor (xem
+       * voice_registry.py's add_cloned extra); dùng để suy ra Voice.language đúng thay
+       * vì lẫn với `region` (nhãn vùng miền tiếng Việt, khác khái niệm ngôn ngữ). */
+      source_lang?: string;
     }>
   >;
   getTtsConfig(): Promise<TtsConfig | null>;

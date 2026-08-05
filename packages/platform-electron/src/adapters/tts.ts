@@ -1,4 +1,4 @@
-import type { TtsPort, Voice } from '@sky-app/service-contracts';
+import { languageFromSourceLang, type TtsPort, type Voice } from '@sky-app/service-contracts';
 import type { SlideApi } from '@sky-app/slide-shared';
 
 declare global {
@@ -67,7 +67,7 @@ export function createElectronTtsPort(): TtsPort {
       return voices.map((v): Voice => ({
         id: v.id,
         name: v.label,
-        language: v.region,
+        language: languageFromSourceLang(v.source_lang),
         gender: v.gender,
         type: v.type,
         accent: v.accent,

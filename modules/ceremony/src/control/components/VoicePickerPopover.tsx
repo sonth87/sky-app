@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download } from 'lucide-react';
 import type { TtsPort } from '@sky-app/service-contracts';
-import { VoicePickerCombobox, type PreviewState, type VoiceListItem } from '@sky-app/voice-catalog-ui';
+import { VoicePickerCombobox, getVoiceCoverPath, type PreviewState, type VoiceListItem } from '@sky-app/voice-catalog-ui';
 import { useControlStore } from '../store';
 import { stopPcm } from '../../lib/audio';
 import { usePlatform } from '../PlatformContext';
@@ -159,6 +159,8 @@ export function VoicePickerPopover({ value, onChange, compact, onAddVoice }: Pro
         onChange={handleChange}
         previewStates={previewStates}
         onPreview={handlePreview}
+        getCoverUrl={(item) => platform?.assetUrl(getVoiceCoverPath(item.id)) ?? getVoiceCoverPath(item.id)}
+        defaultLanguage="Vietnamese"
         loading={catalog.length === 0}
         loadingLabel={t('voicePickerPopover.loadingVoiceList')}
         placeholder={t('voicePickerPopover.loadingVoice')}

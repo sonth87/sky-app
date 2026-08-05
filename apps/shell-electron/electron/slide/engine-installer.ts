@@ -586,20 +586,36 @@ export class EngineInstaller {
         },
       });
       let out = '';
-      const to = setTimeout(() => proc.kill(), 120_000); // engine load có thể lâu (30-60s)
+      let err = '';
+      const to = setTimeout(() => {
+        proc.kill();
+      }, 120_000); // engine load có thể lâu (30-60s)
       proc.stdout?.on('data', (d) => { out += d.toString(); });
-      proc.stderr?.on('data', (d) => { out += d.toString(); });
-      proc.on('error', (e) => { clearTimeout(to); resolve({ ok: false, error: e.message }); });
-      proc.on('close', () => {
+      proc.stderr?.on('data', (d) => { err += d.toString(); });
+      proc.on('error', (e) => {
+        clearTimeout(to);
+        resolve({ ok: false, error: `Spawn error: ${e.message}` });
+      });
+      proc.on('close', (code) => {
         clearTimeout(to);
         // Lấy dòng JSON cuối (verify_engine.py in JSON 1 dòng).
         const line = out.split('\n').reverse().find((l) => l.trim().startsWith('{'));
-        if (!line) { resolve({ ok: false, error: 'Không đọc được kết quả verify' }); return; }
+        if (!line) {
+          const msg = code === null
+            ? 'Engine kiểm tra bị timeout (>120s) hoặc crash'
+            : `Không đọc được kết quả verify (exit code: ${code})`;
+          const fullOutput = err ? `stderr: ${err.slice(0, 200)}` : '';
+          resolve({
+            ok: false,
+            error: msg + (fullOutput ? ` — ${fullOutput}` : '')
+          });
+          return;
+        }
         try {
           const r = JSON.parse(line);
           resolve({ ok: !!r.ok, error: r.error ?? undefined, capabilities: r.capabilities });
-        } catch {
-          resolve({ ok: false, error: 'Kết quả verify không hợp lệ' });
+        } catch (e) {
+          resolve({ ok: false, error: `Kết quả verify không hợp lệ: ${e instanceof Error ? e.message : String(e)}` });
         }
       });
     });

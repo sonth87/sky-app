@@ -7,49 +7,53 @@ export interface VoiceRowProps {
   item: VoiceListItem;
   isSelected: boolean;
   previewState: PreviewState;
+  /** Ảnh minh hoạ nhỏ thay cho chữ cái đầu — đã resolve URL đầy đủ (xem getVoiceCoverPath +
+   * platform.assetUrl ở host component, VoiceRow không biết gì về môi trường Web/Electron). */
+  coverUrl: string;
   onSelect: () => void;
   onPreview: (e: React.MouseEvent) => void;
   onDelete?: (e: React.MouseEvent) => void;
 }
 
-function getAvatarColor(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const colors = [
-    'from-rose-400 to-pink-500',
-    'from-indigo-400 to-purple-500',
-    'from-cyan-400 to-blue-500',
-    'from-emerald-400 to-teal-500',
-    'from-amber-400 to-orange-500',
-    'from-red-400 to-orange-500',
-  ];
-  return colors[Math.abs(hash) % colors.length];
-}
-
-function PreviewButton({ state, onClick }: { state: PreviewState; onClick: (e: React.MouseEvent) => void }) {
+/**
+ * Ảnh + nút play chồng lên nhau: bình thường chỉ hiện ảnh, hover cả dòng (class `group` ở
+ * row cha) mới hiện overlay nút play. Đang phát (`playing`)/đang tải (`loading`) thì LUÔN
+ * hiện overlay bất kể còn hover hay không, tới khi phát xong mới ẩn lại theo hover — khớp yêu
+ * cầu "giữ hình play đến khi nào phát xong trừ khi vẫn hover".
+ */
+function CoverThumbnail({ coverUrl, isSystem, state, onClick }: { coverUrl: string; isSystem: boolean; state: PreviewState; onClick: (e: React.MouseEvent) => void }) {
   const isLoading = state === 'loading';
   const isPlaying = state === 'playing';
   const isError = state === 'error';
+  const alwaysVisible = isLoading || isPlaying;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={isLoading}
-      title={isPlaying ? 'Dừng' : isError ? 'Lỗi — thử lại' : 'Nghe thử'}
-      className={
-        isPlaying
-          ? 'flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors'
-          : isLoading
-            ? 'flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground cursor-wait'
-            : isError
-              ? 'flex h-7 w-7 items-center justify-center rounded-full bg-destructive/10 text-destructive hover:bg-destructive/15 transition-colors'
-              : 'flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors'
-      }
-    >
-      {isLoading ? <Loader2 size={13} className="animate-spin" /> : isPlaying ? <Pause size={13} /> : <Play size={13} />}
-    </button>
+    <div className="relative h-10 w-10 flex-shrink-0">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={isLoading}
+        title={isPlaying ? 'Dừng' : isError ? 'Lỗi — thử lại' : 'Nghe thử'}
+        className="relative block h-full w-full overflow-hidden rounded-lg"
+      >
+        <img src={coverUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+        <span
+          className={
+            alwaysVisible
+              ? 'absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-100 transition-opacity'
+              : isError
+                ? 'absolute inset-0 flex items-center justify-center bg-destructive/60 text-white opacity-0 transition-opacity group-hover:opacity-100'
+                : 'absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100'
+          }
+        >
+          {isLoading ? <Loader2 size={16} className="animate-spin" /> : isPlaying ? <Pause size={16} /> : <Play size={16} />}
+        </span>
+      </button>
+      {isSystem && (
+        <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 border border-background shadow-sm" title="Giọng hệ thống">
+          <Check size={9} className="text-white stroke-[3.5px]" />
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -58,17 +62,14 @@ function PreviewButton({ state, onClick }: { state: PreviewState; onClick: (e: R
  * là đủ để dùng giọng đó — không có bước "Clone"/"Import" riêng: nếu đây là voice từ
  * catalog vendor chưa từng dùng, server tự encode+persist ngầm lần synthesize đầu tiên.
  */
-export function VoiceRow({ item, isSelected, previewState, onSelect, onPreview, onDelete }: VoiceRowProps) {
-  const avatarBg = getAvatarColor(item.name);
-  const firstChar = item.name.trim().charAt(0).toUpperCase();
-
+export function VoiceRow({ item, isSelected, previewState, coverUrl, onSelect, onPreview, onDelete }: VoiceRowProps) {
   // Tạo tiêu đề gộp: Name - Tagline nếu có tagline
   const displayTitle = item.tagline ? `${item.name} - ${item.tagline}` : item.name;
   // Detail text là category hoặc tags
-  const detailText = item.category.length > 0 
-    ? item.category.map(c => c.toUpperCase()).join(' · ') 
-    : item.tags.length > 0 
-      ? item.tags.join(' · ') 
+  const detailText = item.category.length > 0
+    ? item.category.map(c => c.toUpperCase()).join(' · ')
+    : item.tags.length > 0
+      ? item.tags.join(' · ')
       : undefined;
 
   return (
@@ -76,24 +77,16 @@ export function VoiceRow({ item, isSelected, previewState, onSelect, onPreview, 
       onClick={onSelect}
       className={
         isSelected
-          ? 'flex items-center gap-3 bg-primary/10 px-4 py-3 cursor-pointer transition-colors'
-          : 'flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/70 transition-colors'
+          ? 'group flex items-center gap-3 bg-primary/10 px-4 py-3 cursor-pointer transition-colors'
+          : 'group flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/70 transition-colors'
       }
     >
       <div className="w-4 flex-shrink-0 flex justify-center">
         {isSelected && <Check size={16} className="text-primary stroke-[3px]" />}
       </div>
 
-      {/* Avatar tròn với gradient và verified badge */}
-      <div className="relative h-9 w-9 flex-shrink-0">
-        <div className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${avatarBg} text-white font-bold text-sm shadow-inner`}>
-          {firstChar}
-        </div>
-        {item.origin === 'system' && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 border border-background shadow-sm" title="Giọng hệ thống">
-            <Check size={9} className="text-white stroke-[3.5px]" />
-          </span>
-        )}
+      <div onClick={(e) => e.stopPropagation()}>
+        <CoverThumbnail coverUrl={coverUrl} isSystem={item.origin === 'system'} state={previewState} onClick={onPreview} />
       </div>
 
       <div className="min-w-0 flex-1">
@@ -113,9 +106,8 @@ export function VoiceRow({ item, isSelected, previewState, onSelect, onPreview, 
         ) : null}
       </div>
 
-      <div className="flex flex-shrink-0 items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-        <PreviewButton state={previewState} onClick={onPreview} />
-        {item.origin === 'custom' && onDelete && (
+      {item.origin === 'custom' && onDelete && (
+        <div className="flex flex-shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             onClick={onDelete}
@@ -124,8 +116,8 @@ export function VoiceRow({ item, isSelected, previewState, onSelect, onPreview, 
           >
             <Trash2 size={13} />
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

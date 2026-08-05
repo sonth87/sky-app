@@ -44,6 +44,37 @@ export interface VoiceCatalogEntry {
   imported: boolean;
 }
 
+/** vd "vi" → "Vietnamese" — khớp tên hiển thị đã dùng trong catalog.json's "language" field
+ * (xem apps/tts-service/resources/voice-ref/{lang}/catalog.json). Thêm 1 ngôn ngữ mới (vd
+ * "ko-KR") chỉ cần thêm 1 dòng ở đây — không phải sửa logic suy luận. */
+const LANGUAGE_NAMES: Record<string, string> = {
+  vi: 'Vietnamese',
+  en: 'English',
+};
+
+/**
+ * Suy ra `Voice.language` hiển thị được (vd "Vietnamese"/"English") từ `sourceLang` thô
+ * lưu trong registry (vd "vi-VN"/"en-US", field `extra.source_lang` — xem voice_registry.py).
+ * Mặc định "Vietnamese" khi thiếu — mọi voice trước khi catalog en-US được thêm (preset
+ * VieNeu, cloned thủ công qua /voices/clone, cloned từ catalog cũ chưa có source_lang) đều
+ * là tiếng Việt, chưa từng có khái niệm ngôn ngữ khác. Prefix lạ (chưa có trong
+ * LANGUAGE_NAMES) trả về nguyên `sourceLang` thay vì đoán bừa — thà hiện mã ngôn ngữ thô
+ * còn hơn gắn nhãn sai (bug thật đã sửa trước đó: mọi thứ không phải "en*" đều bị gán cứng
+ * "Vietnamese", nên "ko-KR" sẽ hiện sai thành tiếng Việt nếu không có nhánh này).
+ *
+ * Bug thật đã sửa (2026-08-04): 2 adapter (platform-electron/platform-web) trước đó gán
+ * thẳng `language: v.region` — `region` là nhãn VÙNG MIỀN tiếng Việt (Bắc/Trung/Nam, xem
+ * voice_registry.py's region_map), khác hẳn khái niệm NGÔN NGỮ. Voice en-US (không có accent)
+ * rơi vào default "Bắc" của region_map ở main.py, khiến bộ lọc "Ngôn ngữ" trên UI lẫn lộn
+ * "Bắc/Nam" (nhãn vùng miền của voice đã import vào registry) với "Vietnamese"/"English"
+ * (giá trị `language` đúng, chỉ có ở voice catalog CHƯA import).
+ */
+export function languageFromSourceLang(sourceLang?: string): string {
+  if (!sourceLang) return 'Vietnamese';
+  const prefix = sourceLang.split('-')[0]?.toLowerCase();
+  return (prefix && LANGUAGE_NAMES[prefix]) || sourceLang;
+}
+
 export interface SpeakOptions {
   voiceId?: string;
   speed?: number;

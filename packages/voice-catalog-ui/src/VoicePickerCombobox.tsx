@@ -13,6 +13,10 @@ export interface VoicePickerComboboxProps {
   /** state === 'idle' nếu không truyền, key = item.id */
   previewStates?: Record<string, PreviewState>;
   onPreview: (item: VoiceListItem, e: React.MouseEvent) => void;
+  /** Resolve ảnh minh hoạ (voice-covers/cover-NN.webp, xem getVoiceCoverPath) thành URL hiển
+   * thị được — path tương đối cần đi qua platform.assetUrl vì khác nhau giữa Web/Electron,
+   * xem VoicePicker.tsx (tts-studio)/VoicePickerPopover.tsx (ceremony) là nơi truyền vào. */
+  getCoverUrl: (item: VoiceListItem) => string;
   loading?: boolean;
   loadingLabel?: string;
   placeholder?: string;
@@ -27,6 +31,8 @@ export interface VoicePickerComboboxProps {
   onAddVoice?: () => void;
   /** Callback khi click nút xóa voice (chỉ hiện trong tab custom). */
   onDeleteVoice?: (id: string) => void;
+  /** Filter "Ngôn ngữ" chọn sẵn khi mở lần đầu (vd "Vietnamese") — xem useVoiceFilter. */
+  defaultLanguage?: string;
 }
 
 /**
@@ -41,6 +47,7 @@ export function VoicePickerCombobox({
   onChange,
   previewStates = {},
   onPreview,
+  getCoverUrl,
   loading,
   loadingLabel = 'Đang tải giọng đọc...',
   placeholder = 'Chọn giọng đọc',
@@ -50,6 +57,7 @@ export function VoicePickerCombobox({
   tabLabels,
   onAddVoice,
   onDeleteVoice,
+  defaultLanguage,
 }: VoicePickerComboboxProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<VoiceListOrigin>('system');
@@ -62,7 +70,7 @@ export function VoicePickerCombobox({
     [items, tab, tabLabels],
   );
 
-  const { filter, filtered, options, setQuery, setLanguage, setAccent, setCategory, setGender } = useVoiceFilter(tabItems);
+  const { filter, filtered, options, setQuery, setLanguage, setAccent, setCategory, setGender } = useVoiceFilter(tabItems, defaultLanguage);
 
   const selected = useMemo(() => items.find((i) => i.id === value) ?? null, [items, value]);
 
@@ -212,6 +220,7 @@ export function VoicePickerCombobox({
                 item={item}
                 isSelected={item.id === value}
                 previewState={previewStates[item.id] ?? 'idle'}
+                coverUrl={getCoverUrl(item)}
                 onSelect={() => handleSelect(item)}
                 onPreview={(e) => onPreview(item, e)}
                 onDelete={onDeleteVoice ? (e) => { e.stopPropagation(); onDeleteVoice(item.id); } : undefined}

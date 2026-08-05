@@ -335,6 +335,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
             <VoicePicker
               onPreview={handlePreview}
               previewingId={previewingId}
+              assetUrl={platform.assetUrl}
               loading={voicesLoading}
               onAddVoice={() => setShowCloneModal(true)}
               onDeleteVoice={async (voiceId) => {

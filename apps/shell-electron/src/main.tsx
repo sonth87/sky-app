@@ -25,6 +25,10 @@ const importWallpaper: ImportWallpaperFn = () =>
 async function main() {
   const platform = await createElectronPlatform({
     licensePublicKeyHex: DEV_LICENSE_PUBLIC_KEY_HEX,
+    // Path tương đối, không phải '/...' — cùng lý do wallpapers.ts (index.html có thể load
+    // từ dist/ gốc hoặc userData/renderer-updates/<version>/ qua OTA, path tuyệt đối bị
+    // Chromium resolve theo gốc ổ đĩa file:///... → 404).
+    assetUrl: (path) => `./${path}`,
   });
 
   createRoot(document.getElementById("root")!).render(

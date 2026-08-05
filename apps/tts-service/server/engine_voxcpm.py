@@ -97,8 +97,19 @@ class VoxCpmEngine:
                 device = "cpu"
         self.device = device
 
-        from voxcpm import VoxCPM
-        self._model = VoxCPM.from_pretrained(str(_model_dir()))
+        try:
+            from voxcpm import VoxCPM
+        except ImportError as e:
+            raise ImportError(f"voxcpm package không được cài đặt: {e}") from e
+
+        model_dir = _model_dir()  # Có thể raise RuntimeError nếu không tìm được
+        try:
+            self._model = VoxCPM.from_pretrained(str(model_dir))
+        except Exception as e:
+            raise RuntimeError(
+                f"Không thể load VoxCPM model từ {model_dir}: {type(e).__name__}: {e}"
+            ) from e
+
         try:
             self._model.to(device)
         except Exception:

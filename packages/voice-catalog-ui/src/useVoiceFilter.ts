@@ -44,9 +44,15 @@ function matchesQuery(item: VoiceListItem, query: string): boolean {
  * Search + filter thuần trên danh sách VoiceListItem hợp nhất (registry + catalog).
  * Không tự fetch dữ liệu — nhận `items` từ caller (mỗi module tự quyết định nguồn:
  * useVoiceCatalog() ở Ceremony, useTtsStudioStore ở TTS Studio, v.v.).
+ *
+ * `defaultLanguage` — filter ngôn ngữ ban đầu (vd "Vietnamese") thay vì rỗng/hiện tất cả.
+ * Package này không tự áp default — hardcode "Vietnamese" ở đây sẽ sai cho 1 sản phẩm
+ * khác nhúng lại component này với catalog ngôn ngữ khác; host tự quyết định qua prop.
  */
-export function useVoiceFilter(items: VoiceListItem[]) {
-  const [filter, setFilter] = useState<VoiceFilterState>(EMPTY_FILTER);
+export function useVoiceFilter(items: VoiceListItem[], defaultLanguage?: string) {
+  const [filter, setFilter] = useState<VoiceFilterState>(
+    defaultLanguage ? { ...EMPTY_FILTER, language: defaultLanguage } : EMPTY_FILTER,
+  );
 
   const options = useMemo(() => collectOptions(items), [items]);
 

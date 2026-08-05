@@ -81,6 +81,21 @@ export function getServerDir(): string {
   return existsSync(cand) ? cand : '';
 }
 
+/**
+ * Dev-only: `apps/tts-service/resources/voice-ref` (nguồn thật — nơi dev thêm voice/ngôn
+ * ngữ mới), thay vì `apps/shell-electron/resources/voice-ref` (bản copy chỉ đồng bộ thủ
+ * công qua `apps/tts-service/build.sh`). Trỏ thẳng vào đây để thêm voice/thư mục ngôn ngữ
+ * mới dưới tts-service ăn ngay lúc dev, không cần chạy build.sh hay copy tay. `null` nếu
+ * không tìm thấy (packaged build, hoặc checkout thiếu apps/tts-service) — caller tự fallback
+ * về resources/voice-ref như trước.
+ */
+function getDevVoiceRefDir(): string | null {
+  if (app.isPackaged) return null;
+  const monoRoot = findMonoRoot(__dirname);
+  const cand = join(monoRoot, 'apps/tts-service/resources/voice-ref');
+  return existsSync(cand) ? cand : null;
+}
+
 export function getPythonPath(): string {
   const isWin = process.platform === 'win32';
   const venvName = isWin ? 'Scripts/python.exe' : 'bin/python';
@@ -220,7 +235,7 @@ function resolveAccelSpawn(providers: string): { cmd: string; args: string[]; si
 
 function logPackagedResources() {
   const resourcesPath = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources');
-  const refDir = join(resourcesPath, 'voice-ref');
+  const refDir = getDevVoiceRefDir() ?? join(resourcesPath, 'voice-ref');
   const previewDir = join(resourcesPath, 'voice-previews');
   console.log(`[Python Server] app.isPackaged=${app.isPackaged}`);
   console.log(`[Python Server] process.resourcesPath=${process.resourcesPath}`);
@@ -378,6 +393,11 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
     // đóng gói). Seed 6 ref mặc định từ bundle sang userData lần đầu để giọng preset
     // hoạt động. Khi dev (!isPackaged): trỏ THẲNG vào resources/ trong repo — sửa
     // catalog.json/voice-registry.json/*.wav ăn ngay, không cần mò userData + restart.
+    // Giữ NGUYÊN ở bundledRefDir (apps/shell-electron/resources/, gitignored) — đây là nơi
+    // ghi cloned-ref WAV mới (server tự tạo khi import catalog voice/user clone), không phải
+    // apps/tts-service/resources/ (có git track): trỏ thẳng chỗ ghi vào đó sẽ khiến mỗi lần
+    // bấm nghe thử/chọn 1 catalog voice mới lại đẻ ra file + sửa voice-registry.json ngay
+    // trong source tree, hiện lên git status ngoài ý muốn.
     const userRefDir = isPackaged ? vieneuRefDir() : bundledRefDir;
     const userRegistryPath = isPackaged ? vieneuRegistryPath() : join(resourcesPath, 'voice-registry.json');
     const userConfigPath = isPackaged ? vieneuConfigPath() : join(resourcesPath, 'vieneu-config.json');
@@ -418,6 +438,14 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
       }
     }
 
+    // Dev-only, read-only: trỏ thẳng vào apps/tts-service/resources/voice-ref (nguồn thật,
+    // có git track) để browse catalog (/voices/catalog) thấy voice/thư mục ngôn ngữ mới thêm
+    // ngay lập tức — không cần build.sh sync hay copy tay. Tách riêng khỏi VIENEU_REF_DIR
+    // (userRefDir ở trên) vì catalog dir CHỈ ĐỌC (xem voice_catalog.py's docstring), còn
+    // VIENEU_REF_DIR còn được server GHI file mới vào (cloned-ref WAV) — nếu dùng chung 1
+    // dir sẽ ghi thẳng vào source tree có git track mỗi lần test nghe thử/chọn catalog voice.
+    const devCatalogDir = getDevVoiceRefDir();
+
     pythonProcess = spawn(cmd, args, {
       stdio: 'pipe',
       windowsHide: true,
@@ -429,6 +457,7 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
         RESOURCES_PATH: resourcesPath,
         VIENEU_PREVIEW_DIR: previewDir,
         VIENEU_REF_DIR: userRefDir,
+        ...(devCatalogDir ? { VIENEU_CATALOG_DIR: devCatalogDir } : {}),
         VIENEU_REGISTRY_PATH: userRegistryPath,
         VIENEU_CONFIG_PATH: userConfigPath,
         VIENEU_ENGINES_DIR: ttsEnginesDir(),
@@ -440,6 +469,7 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
     });
     console.log(`[Python Server] spawn env RESOURCES_PATH=${resourcesPath}`);
     console.log(`[Python Server] spawn env VIENEU_REF_DIR=${userRefDir}`);
+    if (devCatalogDir) console.log(`[Python Server] spawn env VIENEU_CATALOG_DIR=${devCatalogDir}`);
     console.log(`[Python Server] spawn env VIENEU_REGISTRY_PATH=${userRegistryPath}`);
     console.log(`[Python Server] spawn env VIENEU_PREVIEW_DIR=${previewDir}`);
     console.log(`[Python Server] spawn env LOG_FILE_PATH=${logFilePath}`);
