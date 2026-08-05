@@ -49,7 +49,9 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ x: number; y: number } | null>(null);
+  const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
   const cardRectsRef = useRef<Map<string, DOMRect>>(new Map());
+  const gridContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!message) return;
@@ -139,6 +141,13 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   function handleGridMouseDown(e: React.MouseEvent) {
     // Chỉ bắt đầu drag nếu click ở vùng trống (không click vào card)
     if ((e.target as HTMLElement).closest('[data-card]')) return;
+    e.preventDefault();
+
+    // Capture container rect for offset calculation
+    if (gridContainerRef.current) {
+      setContainerRect(gridContainerRef.current.getBoundingClientRect());
+    }
+
     setDragStart({ x: e.clientX, y: e.clientY });
     setDragEnd({ x: e.clientX, y: e.clientY });
   }
@@ -334,6 +343,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
       )}
 
       <div
+        ref={gridContainerRef}
         className="flex-1 overflow-auto p-[18px] relative select-none"
         onMouseDown={handleGridMouseDown}
       >
@@ -418,12 +428,12 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           </div>
         )}
 
-        {dragStart && dragEnd && (
+        {dragStart && dragEnd && containerRect && (
           <div
             className="absolute border-2 border-[#4b57e6] bg-[#4b57e6]/5 pointer-events-none"
             style={{
-              left: Math.min(dragStart.x, dragEnd.x),
-              top: Math.min(dragStart.y, dragEnd.y),
+              left: Math.min(dragStart.x, dragEnd.x) - containerRect.left,
+              top: Math.min(dragStart.y, dragEnd.y) - containerRect.top,
               width: Math.abs(dragEnd.x - dragStart.x),
               height: Math.abs(dragEnd.y - dragStart.y),
             }}
