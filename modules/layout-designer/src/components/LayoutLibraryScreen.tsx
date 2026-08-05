@@ -26,6 +26,8 @@ interface LibraryEntry {
   category?: string;
   tags: string[];
   content: LayoutContent;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 const THUMB_SIZE = { w: 220, h: 124 };
@@ -635,6 +637,11 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   {entry.description && (
                     <div className="text-xs text-[#9a9bab] mt-1">{entry.description}</div>
                   )}
+                  <div className="flex items-center gap-2 mt-1 text-[9px] text-[#9a9bab]">
+                    {entry.updatedAt && <span>Modified: {new Date(entry.updatedAt).toLocaleDateString()}</span>}
+                    {entry.createdAt && <span>·</span>}
+                    {entry.createdAt && <span>Created: {new Date(entry.createdAt).toLocaleDateString()}</span>}
+                  </div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {entry.content.variants.map((v) => (
                       <span key={v.aspect.id} className="rounded-full bg-[#f4f5f9] px-[7px] py-[1px] text-[9.5px] font-semibold text-[#5c5d6e]">
