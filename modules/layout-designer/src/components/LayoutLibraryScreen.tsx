@@ -293,35 +293,88 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
       }
 
       // Arrow navigation (only in layouts view)
-      if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && currentView === 'layouts') {
-        if (filtered.length === 0) return;
+      if ((e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') && currentView === 'layouts') {
+        if (filtered.length === 0 || !lastSelectedId) return;
         e.preventDefault();
 
-        const allIds = filtered.map((x) => x.id);
-        let nextIndex = 0;
+        const currentRect = cardRectsRef.current.get(lastSelectedId);
+        if (!currentRect) return;
 
-        if (lastSelectedId) {
-          const currentIndex = allIds.indexOf(lastSelectedId);
-          if (currentIndex >= 0) {
-            nextIndex = e.key === 'ArrowDown'
-              ? Math.min(currentIndex + 1, allIds.length - 1)
-              : Math.max(currentIndex - 1, 0);
+        // For grid view: find neighbor based on position
+        if (viewMode === 'grid') {
+          const allIds = filtered.map((x) => x.id);
+          let nextId: string | undefined;
+
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            // Vertical: find item at same horizontal position, above/below
+            const centerX = currentRect.left + currentRect.width / 2;
+            const neighbors = allIds
+              .filter((id) => {
+                const rect = cardRectsRef.current.get(id);
+                if (!rect) return false;
+                const rectCenterX = rect.left + rect.width / 2;
+                return Math.abs(rectCenterX - centerX) < rect.width * 0.8; // same column
+              })
+              .map((id) => ({ id, rect: cardRectsRef.current.get(id)! }))
+              .sort((a, b) => a.rect.top - b.rect.top);
+
+            const currentIndex = neighbors.findIndex((n) => n.id === lastSelectedId);
+            if (currentIndex >= 0) {
+              const offset = e.key === 'ArrowDown' ? 1 : -1;
+              nextId = neighbors[Math.max(0, Math.min(neighbors.length - 1, currentIndex + offset))]?.id;
+            }
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            // Horizontal: find item at same vertical position, left/right
+            const centerY = currentRect.top + currentRect.height / 2;
+            const neighbors = allIds
+              .filter((id) => {
+                const rect = cardRectsRef.current.get(id);
+                if (!rect) return false;
+                const rectCenterY = rect.top + rect.height / 2;
+                return Math.abs(rectCenterY - centerY) < rect.height * 0.8; // same row
+              })
+              .map((id) => ({ id, rect: cardRectsRef.current.get(id)! }))
+              .sort((a, b) => a.rect.left - b.rect.left);
+
+            const currentIndex = neighbors.findIndex((n) => n.id === lastSelectedId);
+            if (currentIndex >= 0) {
+              const offset = e.key === 'ArrowRight' ? 1 : -1;
+              nextId = neighbors[Math.max(0, Math.min(neighbors.length - 1, currentIndex + offset))]?.id;
+            }
           }
-        }
 
-        const nextId = allIds[nextIndex];
-        if (!nextId) return;
-
-        // Shift+Arrow: extend range selection
-        if (e.shiftKey && lastSelectedId) {
-          const lastIndex = allIds.indexOf(lastSelectedId);
-          const [start, end] = lastIndex < nextIndex ? [lastIndex, nextIndex] : [nextIndex, lastIndex];
-          const rangeIds = allIds.slice(start, end + 1);
-          setSelectedIds(new Set(rangeIds));
+          if (nextId) {
+            if (e.shiftKey) {
+              // Extend range
+              setSelectedIds((prev) => new Set([...prev, nextId]));
+            } else {
+              setSelectedIds(new Set([nextId]));
+              setLastSelectedId(nextId);
+            }
+          }
         } else {
-          // Normal arrow: single selection
-          setSelectedIds(new Set([nextId]));
-          setLastSelectedId(nextId);
+          // List view: only vertical navigation
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+
+          const allIds = filtered.map((x) => x.id);
+          const currentIndex = allIds.indexOf(lastSelectedId);
+          if (currentIndex < 0) return;
+
+          const nextIndex = e.key === 'ArrowDown'
+            ? Math.min(currentIndex + 1, allIds.length - 1)
+            : Math.max(currentIndex - 1, 0);
+
+          const nextId = allIds[nextIndex];
+          if (nextId) {
+            if (e.shiftKey) {
+              // Extend range
+              const [start, end] = currentIndex < nextIndex ? [currentIndex, nextIndex] : [nextIndex, currentIndex];
+              setSelectedIds(new Set(allIds.slice(start, end + 1)));
+            } else {
+              setSelectedIds(new Set([nextId]));
+              setLastSelectedId(nextId);
+            }
+          }
         }
       }
 
