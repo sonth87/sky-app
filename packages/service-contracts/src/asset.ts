@@ -32,4 +32,8 @@ export interface AssetPort {
    * Ảnh upload TRƯỚC khi tính năng này tồn tại KHÔNG bắt buộc xuất hiện (không backfill/quét
    * file mồ côi — giới hạn đã ghi trong plan). */
   listAssets(): Promise<AssetMeta[]>;
+  /** Xoá 1 ảnh khỏi thư viện (optional, not all platforms may support deletion).
+   * Chỉ xoá record metadata, file vật lý được GC sau (Electron) hoặc không bị xoá hẳn (Web).
+   * Không ảnh hưởng layout đã dùng ảnh này — layout sẽ fallback fallbackText nếu ảnh mất. */
+  deleteAsset?(relativePath: string): Promise<void>;
 }
