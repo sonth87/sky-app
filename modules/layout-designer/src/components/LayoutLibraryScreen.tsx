@@ -386,7 +386,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   }
                 }}
                 className={cn(
-                  'group relative flex flex-col gap-2 rounded-[12px] border p-2 cursor-pointer transition-all',
+                  'group relative flex flex-col gap-1.5 rounded-[12px] border p-1.5 cursor-pointer transition-all',
                   isSelected(entry.id)
                     ? 'border-[#4b57e6] bg-[#f0f2ff] shadow-[0_4px_14px_rgba(75,87,230,0.15)]'
                     : 'border-[#e6e6ee] bg-white hover:border-[#4b57e6]/50 hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
