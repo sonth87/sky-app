@@ -398,7 +398,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   setContextMenu({ x: e.clientX, y: e.clientY, layoutId: entry.id });
                 }}
               >
-                <div style={{ width: THUMB_SIZE.w, height: THUMB_SIZE.h }} className="relative overflow-hidden rounded-[8px] bg-black">
+                <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: `${THUMB_SIZE.w}/${THUMB_SIZE.h}` }}>
                   <LayoutRenderer content={entry.content} screen={THUMB_SIZE} record={DEMO_RECORD} resolveAsset={resolveAsset} />
                   <div className="absolute inset-0 pointer-events-auto" />
                 </div>
