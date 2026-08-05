@@ -24,7 +24,7 @@ export {
 } from './queries/layout.js';
 export { recordTokenUsage, listTopVariables } from './queries/variable-registry.js';
 export type { VariableRegistryEntry } from './queries/variable-registry.js';
-export { insertAsset, listAssets } from './queries/asset.js';
+export { insertAsset, listAssets, deleteAsset } from './queries/asset.js';
 export {
   getEvent,
   listEvents,

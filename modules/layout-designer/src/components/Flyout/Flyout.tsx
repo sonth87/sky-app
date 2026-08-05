@@ -31,6 +31,7 @@ export interface FlyoutProps {
   /** Media Library (Bước 11 kế hoạch resize/rotate, 2026-07-18) — bỏ trống = panel "Ảnh" hiện
    * thông báo chưa khả dụng (hành vi cũ, VD preview độc lập không có AssetPort). */
   listAssets?: () => Promise<AssetMeta[]>;
+  deleteAsset?: (relativePath: string) => Promise<void>;
   resolveAssetUrl?: (path: string) => Promise<string>;
 }
 
@@ -44,6 +45,7 @@ export function Flyout({
   editingRefW,
   editingRefH,
   listAssets,
+  deleteAsset,
   resolveAssetUrl,
 }: FlyoutProps) {
   const spawn = useSpawnDrag(editor, variant, getArtEl, getRootEl, editingLoopId, editingRefW, editingRefH);
@@ -60,6 +62,7 @@ export function Flyout({
           variant={variant}
           loopItemId={editingLoopId}
           listAssets={listAssets}
+          deleteAsset={deleteAsset}
           resolveAssetUrl={resolveAssetUrl}
         />
       )}

@@ -1,5 +1,5 @@
 import type { AssetPort } from '@sky-app/service-contracts';
-import { saveAssetBlob, loadAssetBlob, saveAssetMeta, listAssetMeta } from '../asset-blob-store.js';
+import { saveAssetBlob, loadAssetBlob, saveAssetMeta, listAssetMeta, deleteAssetBlob, deleteAssetMeta } from '../asset-blob-store.js';
 
 /** Mở `<input type="file">` ẩn — đối xứng adapters/asset.ts's pickFile (Web HTTP adapter),
  * trùng lặp có chủ đích: 2 adapter độc lập, không tạo phụ thuộc chéo chỉ vì 1 hàm nhỏ. */
@@ -71,6 +71,18 @@ export function createWasmAssetPort(): AssetPort {
 
     async listAssets() {
       return listAssetMeta();
+    },
+
+    async deleteAsset(relativePath) {
+      // Delete both blob and metadata from IndexedDB
+      await deleteAssetBlob(relativePath);
+      await deleteAssetMeta(relativePath);
+      // Revoke cached object URL if exists (WASM adapter caches object URLs)
+      const cached = objectUrlCache.get(relativePath);
+      if (cached) {
+        URL.revokeObjectURL(cached);
+        objectUrlCache.delete(relativePath);
+      }
     },
   };
 }

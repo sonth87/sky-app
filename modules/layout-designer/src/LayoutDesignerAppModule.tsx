@@ -276,6 +276,7 @@ export function LayoutDesignerAppModule({
       resolveAssetUrl={resolveAssetUrl}
       pickAndSaveImage={pickAndSaveImage}
       listAssets={assetPort?.listAssets}
+      deleteAsset={assetPort?.deleteAsset}
       onBackToLibrary={() => setLayoutId(undefined)}
       onRestoreVersion={handleRestoreVersion}
       documentColor={documentColor}

@@ -16,6 +16,7 @@ import {
   buildLayoutBundle,
   createEvent,
   createLayoutDocument,
+  deleteAsset,
   deleteEvent,
   getCurrentActiveEvent,
   getDataSource,
@@ -639,5 +640,9 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('kernel:layoutAsset:list', async () => {
     return listAssets(ceremonyStore.getExecutor());
+  });
+
+  ipcMain.handle('kernel:layoutAsset:delete', async (_event, relativePath: string) => {
+    deleteAsset(ceremonyStore.getExecutor(), relativePath);
   });
 }

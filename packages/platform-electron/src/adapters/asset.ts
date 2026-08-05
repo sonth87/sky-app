@@ -18,5 +18,8 @@ export function createElectronAssetPort(): AssetPort {
     async listAssets() {
       return (await window.sky.invoke('kernel:layoutAsset:list')) as AssetMeta[];
     },
+    async deleteAsset(relativePath) {
+      await window.sky.invoke('kernel:layoutAsset:delete', relativePath);
+    },
   };
 }

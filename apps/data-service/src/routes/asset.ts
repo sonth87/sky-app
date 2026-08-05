@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
-import { insertAsset, listAssets } from '@sky-app/ceremony-db/node';
+import { insertAsset, listAssets, deleteAsset } from '@sky-app/ceremony-db/node';
 import { getExecutor } from '../store.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -56,5 +56,27 @@ export async function assetRoutes(app: FastifyInstance) {
     const ext = extname(filePath).toLowerCase();
     reply.type(EXT_TO_MIME[ext] ?? 'application/octet-stream');
     return reply.send(readFileSync(filePath));
+  });
+
+  app.delete<{ Params: { filename: string } }>('/api/layout-assets/:filename', async (req, reply) => {
+    // Chặn path traversal như GET
+    if (!/^[a-zA-Z0-9-]+\.[a-zA-Z0-9]+$/.test(req.params.filename)) {
+      return reply.code(400).send({ error: 'invalid_filename' });
+    }
+    const relativePath = `layout-assets/${req.params.filename}`;
+    const filePath = join(ASSETS_DIR, req.params.filename);
+
+    // Xoá file từ hệ thống
+    if (existsSync(filePath)) {
+      try {
+        unlinkSync(filePath);
+      } catch (err) {
+        console.error('Failed to delete asset file:', err);
+      }
+    }
+
+    // Xoá metadata từ DB
+    deleteAsset(getExecutor(), relativePath);
+    return { ok: true };
   });
 }

@@ -76,5 +76,10 @@ export function createWebAssetPort(baseUrl = 'http://localhost:8094'): AssetPort
       if (!res.ok) throw new Error(`AssetPort listAssets failed: ${res.status}`);
       return (await res.json()) as AssetMeta[];
     },
+
+    async deleteAsset(relativePath) {
+      const res = await fetch(`${baseUrl}/api/layout-assets/${encodeURIComponent(relativePath)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`AssetPort deleteAsset failed: ${res.status}`);
+    },
   };
 }

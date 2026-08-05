@@ -89,6 +89,8 @@ export interface LayoutDesignerAppProps {
    * lưới thumbnail trong Flyout's panel "Ảnh". Bỏ trống = panel hiện thông báo chưa khả dụng
    * (hành vi cũ). */
   listAssets?: () => Promise<AssetMeta[]>;
+  /** Xoá 1 ảnh khỏi thư viện (optional, GĐ8a). Bỏ trống = không hiện nút xoá ảnh. */
+  deleteAsset?: (relativePath: string) => Promise<void>;
   /** Màu tag layout (PHỤ LỤC "Event Hub", 2026-07-22) — hiện badge ở danh sách Event. Bỏ trống
    * (cả `documentColor` lẫn `onChangeColor`) = ẩn ColorSwatchPicker hoàn toàn. */
   documentColor?: string;
@@ -107,6 +109,7 @@ export function LayoutDesignerApp({
   pickAndSaveImage,
   resolveAssetUrl,
   listAssets,
+  deleteAsset,
   documentColor,
   onChangeColor,
 }: LayoutDesignerAppProps) {
@@ -256,6 +259,7 @@ export function LayoutDesignerApp({
                   editingRefW={editingItemBox?.w}
                   editingRefH={editingItemBox?.h}
                   listAssets={listAssets}
+                  deleteAsset={deleteAsset}
                   resolveAssetUrl={resolveAssetUrl}
                 />
               </>

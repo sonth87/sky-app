@@ -25,3 +25,7 @@ export function listAssets(executor: SqlExecutor): AssetMeta[] {
   const rows = executor.query<AssetRow>('SELECT relative_path, name, size_bytes, uploaded_at FROM asset ORDER BY uploaded_at DESC');
   return rows.map(rowToAsset);
 }
+
+export function deleteAsset(executor: SqlExecutor, relativePath: string): void {
+  executor.run('DELETE FROM asset WHERE relative_path = ?', [relativePath]);
+}
