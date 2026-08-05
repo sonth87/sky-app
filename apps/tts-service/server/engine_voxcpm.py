@@ -104,7 +104,25 @@ class VoxCpmEngine:
 
         model_dir = _model_dir()  # Có thể raise RuntimeError nếu không tìm được
         try:
-            self._model = VoxCPM.from_pretrained(str(model_dir))
+            # load_denoiser=False: mặc định của voxcpm là True, khởi tạo ZipEnhancer
+            # (modelscope.pipelines.pipeline) — TỰ TẢI một model khử nhiễu riêng từ
+            # ModelScope (không phải HF, nên HF_HUB_OFFLINE=1 không chặn được), model
+            # này KHÔNG nằm trong preflight/download flow của app. Adapter này cũng
+            # không bao giờ dùng denoise=True (xem _run() bên dưới) nên tải là thừa.
+            #
+            # optimize=False khi không phải CUDA: voxcpm/model/voxcpm2.py's optimize()
+            # tự raise ValueError nếu device != "cuda" (torch.compile chỉ chạy được
+            # trên CUDA) — nhưng core.py VẪN chạy 1 lượt generate() "warm up" TRƯỚC KHI
+            # biết optimize có thành công hay không, bất kể device gì. Trên CPU/MPS (mọi
+            # máy không CUDA — vd Mac) lượt warmup này quan sát thực tế mất 5-10+ PHÚT
+            # (RTF cực chậm khi chưa "nóng máy"), vượt xa timeout verify (120s) VÀ timeout
+            # khởi động service (HEALTH_TIMEOUT_MS 120s ở python-server.ts) — treo hẳn,
+            # không có tác dụng gì (không có gì được compile để "warm up" cả). Đây mới là
+            # nguyên nhân chính của bug thật 2026-08-05: "Không đọc được kết quả verify"
+            # khi đổi sang VoxCPM trên máy không CUDA.
+            self._model = VoxCPM.from_pretrained(
+                str(model_dir), load_denoiser=False, optimize=(device == "cuda"),
+            )
         except Exception as e:
             raise RuntimeError(
                 f"Không thể load VoxCPM model từ {model_dir}: {type(e).__name__}: {e}"
