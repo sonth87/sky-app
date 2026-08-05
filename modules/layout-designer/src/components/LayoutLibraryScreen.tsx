@@ -635,20 +635,22 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   {entry.description && (
                     <div className="text-xs text-[#9a9bab] mt-1">{entry.description}</div>
                   )}
-                  <div className="flex flex-col gap-1.5 mt-2 text-xs text-[#5c5d6e]">
-                    <div>
-                      <span className="font-medium text-[#9a9bab]">Aspect:</span> {entry.content.variants.map((v) => `${v.aspect.id} (${v.refW}×${v.refH})`).join(', ')}
-                    </div>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {entry.content.variants.map((v) => (
+                      <span key={v.aspect.id} className="rounded-full bg-[#f4f5f9] px-[7px] py-[1px] text-[9.5px] font-semibold text-[#5c5d6e]">
+                        {v.aspect.id}
+                      </span>
+                    ))}
                     {entry.category && (
-                      <div>
-                        <span className="font-medium text-[#9a9bab]">Category:</span> {entry.category}
-                      </div>
+                      <span className="rounded-full bg-[#e6f2ff] px-[7px] py-[1px] text-[9.5px] font-semibold text-[#4b57e6]">
+                        {entry.category}
+                      </span>
                     )}
-                    {entry.tags.length > 0 && (
-                      <div>
-                        <span className="font-medium text-[#9a9bab]">Tags:</span> {entry.tags.join(', ')}
-                      </div>
-                    )}
+                    {entry.tags.map((tag) => (
+                      <span key={tag} className="rounded-full bg-[#f4f5f9] px-[7px] py-[1px] text-[9.5px] font-semibold text-[#5c5d6e]">
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
