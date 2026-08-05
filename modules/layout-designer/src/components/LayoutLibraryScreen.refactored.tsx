@@ -251,6 +251,10 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
       <FileLibraryLayout
         items={filteredByView}
         config={{
+          // App namespace: isolate preferences from other modules
+          // (layout-designer keeps separate size/view/sidebar state from template-gallery, etc.)
+          appId: 'layout-designer',
+
           // Sidebar: layouts and trash views
           sidebarItems: [
             {
@@ -285,6 +289,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           // Header buttons
           showSearch: true,
           showViewToggle: true,
+          showSizeControl: true,
           headerButtons: [
             {
               id: 'export',
@@ -362,6 +367,14 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           filterConfig: {
             placeholder: 'Search by name, category, or tags...',
             debounceMs: 300,
+          },
+
+          // Size control: customize range for layout thumbnails
+          sizeConfig: {
+            minSize: 140,      // Smallest grid columns
+            maxSize: 280,      // Largest grid columns
+            defaultSize: 200,  // Reset button value
+            step: 20,          // Increment per click
           },
         }}
       />
