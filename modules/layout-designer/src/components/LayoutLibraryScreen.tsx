@@ -398,8 +398,9 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   setContextMenu({ x: e.clientX, y: e.clientY, layoutId: entry.id });
                 }}
               >
-                <div style={{ width: THUMB_SIZE.w, height: THUMB_SIZE.h }} className="overflow-hidden rounded-[8px] bg-black">
+                <div style={{ width: THUMB_SIZE.w, height: THUMB_SIZE.h }} className="relative overflow-hidden rounded-[8px] bg-black">
                   <LayoutRenderer content={entry.content} screen={THUMB_SIZE} record={DEMO_RECORD} resolveAsset={resolveAsset} />
+                  <div className="absolute inset-0 pointer-events-auto" />
                 </div>
                 <div className="flex items-center gap-1.5 px-1 min-w-0">
                   {entry.color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />}
@@ -470,8 +471,8 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
               }}
             />
             <div
-              className="fixed bg-white border border-[#e6e6ee] rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.15)] z-50 py-1 min-w-[160px]"
-              style={{ left: contextMenu.x + 5, top: contextMenu.y - 10 }}
+              className="fixed bg-white border border-[#e6e6ee] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.15)] z-50 py-1 min-w-[160px]"
+              style={{ left: contextMenu.x + 8, top: contextMenu.y - 5 }}
             >
               <button
                 onClick={() => {
