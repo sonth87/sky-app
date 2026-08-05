@@ -6,7 +6,7 @@
 // cache resolveAssetUrl theo batch).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, Info, Plus, Search, Download, Upload } from 'lucide-react';
+import { Copy, Info, Plus, Search, Download, Upload, ChevronLeft, Layers, Trash2 } from 'lucide-react';
 import type { LayoutPort } from '@sky-app/service-contracts';
 import { LayoutRenderer, demoCanonicalSubject, type LayoutContent } from '@sky-app/slide-shared';
 import { cn } from '@sky-app/ui';
@@ -51,6 +51,11 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   const [dragEnd, setDragEnd] = useState<{ x: number; y: number } | null>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; layoutId: string } | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = localStorage.getItem('layout-library-sidebar-collapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
   const cardRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +64,11 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     const timeout = setTimeout(() => setMessage(null), 4000);
     return () => clearTimeout(timeout);
   }, [message]);
+
+  // Persist sidebar collapsed state
+  useEffect(() => {
+    localStorage.setItem('layout-library-sidebar-collapsed', JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   // Close context menu on Escape
   useEffect(() => {
@@ -304,6 +314,13 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[#f4f5f9]">
       <div className="h-[52px] shrink-0 flex items-center gap-3 px-[14px] bg-white border-b border-[#e6e6ee]">
+        <button
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          title={sidebarCollapsed ? 'Mở sidebar' : 'Đóng sidebar'}
+          className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[#f4f5f9] text-[#5c5d6e] cursor-pointer"
+        >
+          <ChevronLeft size={18} className={cn('transition-transform', sidebarCollapsed && 'rotate-180')} />
+        </button>
         <div className="font-semibold text-sm">Thư viện Layout</div>
         <div className="flex-1" />
         <div className="relative w-[240px]">
@@ -357,11 +374,45 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
         </div>
       )}
 
-      <div
-        ref={gridContainerRef}
-        className="flex-1 overflow-auto p-[18px] relative select-none"
-        onMouseDown={handleGridMouseDown}
-      >
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <div className={cn(
+          'shrink-0 bg-white border-r border-[#e6e6ee] flex flex-col transition-all duration-200',
+          sidebarCollapsed ? 'w-[60px]' : 'w-[200px]'
+        )}>
+          {/* Layouts item */}
+          <div className="group relative px-3 py-3 hover:bg-[#f4f5f9] cursor-pointer transition-colors">
+            <div className="flex items-center gap-2.5">
+              <Layers size={18} className="shrink-0 text-[#5c5d6e]" />
+              {!sidebarCollapsed && <span className="text-sm font-medium text-[#26262e]">Layouts</span>}
+            </div>
+            {sidebarCollapsed && (
+              <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                Layouts
+              </div>
+            )}
+          </div>
+
+          {/* Trash item */}
+          <div className="group relative px-3 py-3 hover:bg-[#f4f5f9] cursor-pointer transition-colors">
+            <div className="flex items-center gap-2.5">
+              <Trash2 size={18} className="shrink-0 text-[#5c5d6e]" />
+              {!sidebarCollapsed && <span className="text-sm font-medium text-[#26262e]">Trash</span>}
+            </div>
+            {sidebarCollapsed && (
+              <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                Trash
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Main content */}
+        <div
+          ref={gridContainerRef}
+          className="flex-1 overflow-auto p-[18px] relative select-none"
+          onMouseDown={handleGridMouseDown}
+        >
         {entries == null && <div className="py-10 text-center text-sm text-[#9a9bab]">Đang tải...</div>}
         {entries != null && entries.length === 0 && (
           <div className="rounded-[12px] border border-dashed border-[#d8d9e3] p-10 text-center text-sm text-[#9a9bab]">
@@ -526,6 +577,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             </div>
           </>
         )}
+        </div>
       </div>
 
       {nameModal && (
