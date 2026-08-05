@@ -57,6 +57,47 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     return () => clearTimeout(timeout);
   }, [message]);
 
+  // Track document mousemove/mouseup when dragging (keep drag box visible when mouse leaves grid)
+  useEffect(() => {
+    if (!dragStart) return;
+
+    const handleDocumentMouseMove = (e: MouseEvent) => {
+      setDragEnd({ x: e.clientX, y: e.clientY });
+
+      const minX = Math.min(dragStart.x, e.clientX);
+      const maxX = Math.max(dragStart.x, e.clientX);
+      const minY = Math.min(dragStart.y, e.clientY);
+      const maxY = Math.max(dragStart.y, e.clientY);
+      const dragBox = new DOMRect(minX, minY, maxX - minX, maxY - minY);
+
+      const newSelection = new Set<string>();
+      for (const [id, rect] of cardRectsRef.current) {
+        if (boxesOverlap(dragBox, rect)) {
+          newSelection.add(id);
+        }
+      }
+      setSelectedIds(newSelection);
+    };
+
+    const handleDocumentMouseUp = () => {
+      if (dragStart && dragEnd) {
+        if (selectedIds.size > 0) {
+          setLastSelectedId(Array.from(selectedIds)[selectedIds.size - 1]!);
+        }
+      }
+      setDragStart(null);
+      setDragEnd(null);
+    };
+
+    document.addEventListener('mousemove', handleDocumentMouseMove);
+    document.addEventListener('mouseup', handleDocumentMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleDocumentMouseMove);
+      document.removeEventListener('mouseup', handleDocumentMouseUp);
+    };
+  }, [dragStart]);
+
   function handleCardClick(id: string, event: React.MouseEvent) {
     event.preventDefault();
 
@@ -102,37 +143,6 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     setDragEnd({ x: e.clientX, y: e.clientY });
   }
 
-  function handleGridMouseMove(e: React.MouseEvent) {
-    if (!dragStart) return;
-    setDragEnd({ x: e.clientX, y: e.clientY });
-
-    // Tính drag box
-    const minX = Math.min(dragStart.x, e.clientX);
-    const maxX = Math.max(dragStart.x, e.clientX);
-    const minY = Math.min(dragStart.y, e.clientY);
-    const maxY = Math.max(dragStart.y, e.clientY);
-    const dragBox = new DOMRect(minX, minY, maxX - minX, maxY - minY);
-
-    // Tìm cards trong drag box
-    const newSelection = new Set<string>();
-    for (const [id, rect] of cardRectsRef.current) {
-      if (boxesOverlap(dragBox, rect)) {
-        newSelection.add(id);
-      }
-    }
-    setSelectedIds(newSelection);
-  }
-
-  function handleGridMouseUp() {
-    if (dragStart && dragEnd) {
-      // Set lastSelectedId là item cuối cùng được select (nếu có)
-      if (selectedIds.size > 0) {
-        setLastSelectedId(Array.from(selectedIds)[selectedIds.size - 1]!);
-      }
-    }
-    setDragStart(null);
-    setDragEnd(null);
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -324,11 +334,8 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
       )}
 
       <div
-        className="flex-1 overflow-auto p-[18px] relative"
+        className="flex-1 overflow-auto p-[18px] relative select-none"
         onMouseDown={handleGridMouseDown}
-        onMouseMove={handleGridMouseMove}
-        onMouseUp={handleGridMouseUp}
-        onMouseLeave={handleGridMouseUp}
       >
         {entries == null && <div className="py-10 text-center text-sm text-[#9a9bab]">Đang tải...</div>}
         {entries != null && entries.length === 0 && (
@@ -413,7 +420,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
 
         {dragStart && dragEnd && (
           <div
-            className="fixed border-2 border-[#4b57e6] bg-[#4b57e6]/5 pointer-events-none"
+            className="absolute border-2 border-[#4b57e6] bg-[#4b57e6]/5 pointer-events-none"
             style={{
               left: Math.min(dragStart.x, dragEnd.x),
               top: Math.min(dragStart.y, dragEnd.y),
