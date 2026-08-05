@@ -221,7 +221,14 @@ class VieneuEngine:
             "sample_rate": SAMPLE_RATE,
             "supports_clone": True,
             "supports_preset": True,
-            "supports_emotion": False,  # v3 emotion path chưa expose ổn định
+            "supports_emotion": False,  # v3 emotion path chưa expose ổn định — TODO Phase 3: enable sau khi test kỹ
+            "supports_sampling": True,
+            "sampling_params": {
+                "temperature": {"min": 0.0, "max": 2.0, "default": 0.1},
+                "top_k": {"min": 1, "max": 40, "default": 5},
+                "top_p": {"min": 0.0, "max": 1.0, "default": 0.95},
+                "repetition_penalty": {"min": 1.0, "max": 2.0, "default": 1.3},
+            },
             "providers": self.providers,
         }
 

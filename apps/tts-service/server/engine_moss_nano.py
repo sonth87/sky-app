@@ -150,6 +150,10 @@ class MossNanoEngine:
             "supports_clone": True,          # clone qua prompt_audio
             "supports_preset": supports_preset,
             "supports_emotion": False,
+            "supports_sampling": True,
+            "sampling_params": {
+                "max_new_frames": {"min": 100, "max": 800, "default": None},  # None = auto từ text length
+            },
             "multilingual": True,            # 20 ngôn ngữ, auto-detect
             "providers": self.providers,
         }
@@ -176,6 +180,14 @@ class MossNanoEngine:
         # codec_browser_onnx_meta.json). ravel() thẳng mảng 2D sẽ interleave L/R thành
         # 1 kênh (mono giả) → audio dài gấp đôi + méo (nghe ồm ồm, kéo dài, như hết pin).
         # Downmix trung bình 2 kênh trước khi ravel để về đúng 1 kênh mono thật.
+        #
+        # FUTURE: Nếu thêm conversation/podcast mode (2 speakers với stereo panning —
+        # người A 70% Left 30% Right, người B 30% Left 70% Right, kiểu NotebookLM),
+        # thì GIỮ NGUYÊN stereo thay vì downmix. Lúc đó:
+        #   - Sửa protocol /synthesize trả stereo (N, 2) thay vì mono (N,)
+        #   - Thêm routing logic: speaker A → L channel, speaker B → R channel
+        #   - UI thêm button "Generate conversation"
+        # Stereo là feature của codec MOSS được design cho multi-speaker scenario.
         if wav.ndim == 2 and wav.shape[1] > 1:
             wav = wav.mean(axis=1)
         wav = wav.ravel()

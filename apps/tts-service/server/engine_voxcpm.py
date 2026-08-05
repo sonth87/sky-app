@@ -142,6 +142,7 @@ class VoxCpmEngine:
             "supports_clone": True,
             "supports_preset": False,   # VoxCPM dùng "voice design" bằng mô tả, không có preset cố định
             "supports_emotion": False,
+            "supports_sampling": False,  # VoxCPM dùng diffusion, không có temperature/top_k
             "multilingual": True,       # 30 ngôn ngữ, có tiếng Việt
             "providers": self.providers,
             "device": self.device,

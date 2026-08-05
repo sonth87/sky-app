@@ -708,6 +708,8 @@ class TtsRequest(BaseModel):
     top_p: float | None = None
     repetition_penalty: float | None = None
     max_new_frames: int | None = None
+    # Engine-specific overrides — dict theo engine id (vd {"vieneu": {"emotion": "happy"}, "moss": {"max_new_frames": 500}})
+    engine_overrides: dict | None = None
 
 
 def _run_synthesis(req: TtsRequest, voice: dict) -> np.ndarray:
@@ -729,6 +731,15 @@ def _run_synthesis(req: TtsRequest, voice: dict) -> np.ndarray:
         "repetition_penalty": _pick("repetition_penalty"),
         "max_new_frames": _pick("max_new_frames"),
     }
+
+    # Merge engine-specific overrides (nếu có) — ưu tiên cao nhất
+    if _engine is not None and req.engine_overrides:
+        engine_caps = _engine.capabilities()
+        engine_id = engine_caps.get("id")
+        if engine_id and engine_id in req.engine_overrides:
+            engine_specific = req.engine_overrides[engine_id]
+            if isinstance(engine_specific, dict):
+                overrides.update(engine_specific)
     # LƯU Ý: dùng voice["id"] (id THẬT trong registry), KHÔNG dùng req.speaker_id —
     # khi speaker_id gốc là 1 catalog id vừa được _ensure_voice_ready() auto-import,
     # registry sinh id mới (vd "clone-xxxxx"), khác hẳn catalog id gốc client gửi lên.
