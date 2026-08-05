@@ -33,6 +33,7 @@ import {
   listLayoutDocuments,
   listTopVariables,
   listVersions,
+  moveToTrash,
   publish,
   recordTokenUsage,
   restoreVersion,
@@ -201,6 +202,10 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('kernel:layout:updateDocumentMeta', async (_event, id: string, patch: { name?: string; description?: string; color?: string; category?: string; tags?: string[] }) => {
     updateLayoutDocumentMeta(ceremonyStore.getExecutor(), id, patch);
+  });
+
+  ipcMain.handle('kernel:layout:moveToTrash', async (_event, id: string) => {
+    moveToTrash(ceremonyStore.getExecutor(), id);
   });
 
   ipcMain.handle('kernel:layout:saveDraft', async (_event, id: string, content: LayoutContent) => {

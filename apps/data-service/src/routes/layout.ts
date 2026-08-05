@@ -7,6 +7,7 @@ import {
   listLayoutDocuments,
   listTopVariables,
   listVersions,
+  moveToTrash,
   publish,
   recordTokenUsage,
   restoreVersion,
@@ -37,6 +38,11 @@ export async function layoutRoutes(app: FastifyInstance) {
 
   app.post<{ Params: { id: string }; Body: { name?: string; description?: string; color?: string; category?: string; tags?: string[] } }>('/api/layout/:id/meta', async (req) => {
     updateLayoutDocumentMeta(getExecutor(), req.params.id, req.body);
+    return { ok: true };
+  });
+
+  app.post<{ Params: { id: string } }>('/api/layout/:id/trash', async (req) => {
+    moveToTrash(getExecutor(), req.params.id);
     return { ok: true };
   });
 

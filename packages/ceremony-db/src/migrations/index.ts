@@ -10,6 +10,7 @@ import { SQL_009_DROP_STUDENT_SCHEMA } from './009_drop_student_schema.js';
 import { SQL_010_LAYOUT_DOCUMENT_COLOR } from './010_layout_document_color.js';
 import { SQL_011_EVENT_COLOR } from './011_event_color.js';
 import { SQL_012_LAYOUT_DOCUMENT_CATEGORY_TAGS } from './012_layout_document_category_tags.js';
+import { SQL_013_LAYOUT_DOCUMENT_TRASH } from './013_layout_document_trash.js';
 
 export interface Migration {
   version: number;
@@ -36,4 +37,5 @@ export const MIGRATIONS: Migration[] = [
   { version: 10, name: 'layout_document_color', sql: SQL_010_LAYOUT_DOCUMENT_COLOR },
   { version: 11, name: 'event_color', sql: SQL_011_EVENT_COLOR },
   { version: 12, name: 'layout_document_category_tags', sql: SQL_012_LAYOUT_DOCUMENT_CATEGORY_TAGS },
+  { version: 13, name: 'layout_document_trash', sql: SQL_013_LAYOUT_DOCUMENT_TRASH },
 ];

@@ -513,11 +513,18 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   async function handleConfirmMoveToTrash() {
     if (!trashConfirm) return;
     try {
-      // Add to trashed IDs instead of removing from entries
-      setTrashedIds((prev) => new Set([...prev, trashConfirm.layoutId]));
+      // Call port to update DB (soft delete)
+      if (layoutPort?.moveToTrash) {
+        await layoutPort.moveToTrash(trashConfirm.layoutId);
+      } else {
+        // Fallback to localStorage only if moveToTrash not available
+        setTrashedIds((prev) => new Set([...prev, trashConfirm.layoutId]));
+      }
       setMessage({ type: 'success', text: `Đã chuyển "${trashConfirm.layoutName}" vào thùng rác.` });
       setTrashConfirm(null);
       setSelectedIds(new Set());
+      // Reload entries to reflect deletion from DB
+      setReloadKey((k) => k + 1);
     } catch (err) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Lỗi chuyển vào thùng rác.' });
     }

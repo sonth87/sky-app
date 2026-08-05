@@ -245,6 +245,8 @@ export interface LayoutDocument {
   publishedVersions: LayoutVersion[]; // lịch sử đã publish, mới nhất ở cuối
   createdAt: string;
   updatedAt: string; // lần save draft gần nhất
+  /** Soft delete — ISO datetime khi layout bị xoá vào thùng rác. Undefined = active. */
+  trashedAt?: string;
 }
 
 // ─── Map: 1 bộ layout (VD 1 năm) ────────────────────────────────

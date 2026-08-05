@@ -15,6 +15,7 @@ export {
   listLayoutDocuments,
   createLayoutDocument,
   updateLayoutDocumentMeta,
+  moveToTrash,
   saveDraft,
   publish,
   listVersions,

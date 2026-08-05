@@ -6,6 +6,7 @@ import {
   listLayoutDocuments,
   listTopVariables,
   listVersions,
+  moveToTrash,
   publish,
   recordTokenUsage,
   restoreVersion,
@@ -45,6 +46,12 @@ export function createSqliteWasmLayoutPort(opts: SqliteWasmLayoutPortOptions = {
     async updateDocumentMeta(id, patch) {
       const executor = await getSharedWasmExecutor(wasmUrl);
       updateLayoutDocumentMeta(executor, id, patch);
+      await persistSharedWasmExecutor(executor);
+    },
+
+    async moveToTrash(id) {
+      const executor = await getSharedWasmExecutor(wasmUrl);
+      moveToTrash(executor, id);
       await persistSharedWasmExecutor(executor);
     },
 

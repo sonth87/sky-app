@@ -15,6 +15,7 @@ interface LayoutDocumentRow {
   latest_published_version: number | null;
   created_at: string;
   updated_at: string;
+  trashed_at: string | null;
 }
 
 interface LayoutDraftRow {
@@ -68,11 +69,12 @@ export function getLayoutDocument(executor: SqlExecutor, id: string): LayoutDocu
     publishedVersions: versionRows.map(rowToVersion),
     createdAt: docRow.created_at,
     updatedAt: docRow.updated_at,
+    trashedAt: docRow.trashed_at ?? undefined,
   };
 }
 
 export function listLayoutDocuments(executor: SqlExecutor): Array<{ id: string; name: string; description?: string; color?: string; category?: string; tags?: string[]; latestPublishedVersion: number | null }> {
-  const rows = executor.query<LayoutDocumentRow>('SELECT * FROM layout_document ORDER BY updated_at DESC');
+  const rows = executor.query<LayoutDocumentRow>('SELECT * FROM layout_document WHERE trashed_at IS NULL ORDER BY updated_at DESC');
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -212,4 +214,14 @@ export function restoreVersion(executor: SqlExecutor, layoutDocumentId: string, 
   const target = getVersion(executor, layoutDocumentId, version);
   if (!target) throw new Error(`restoreVersion: layout "${layoutDocumentId}" không có version ${version}`);
   saveDraft(executor, layoutDocumentId, target.content);
+}
+
+/** Xoá layout vào thùng rác (soft delete) — đặt trashed_at timestamp. Layout sẽ không hiện ở
+ * listLayoutDocuments() nhưng dữ liệu vẫn lưu cho khôi phục sau nếu cần. */
+export function moveToTrash(executor: SqlExecutor, layoutDocumentId: string): void {
+  const now = new Date().toISOString();
+  const changes = executor.run('UPDATE layout_document SET trashed_at = ? WHERE id = ?', [now, layoutDocumentId]).changes;
+  if (changes === 0) {
+    throw new Error(`moveToTrash: layout_document "${layoutDocumentId}" không tồn tại`);
+  }
 }

@@ -26,6 +26,9 @@ export interface LayoutPort {
    * "Thông tin layout"). TRUE partial-patch: chỉ field có mặt trong `patch` mới bị đổi, field
    * khác giữ nguyên. KHÔNG đụng currentDraft/publishedVersions. */
   updateDocumentMeta(id: string, patch: { name?: string; description?: string; color?: string; category?: string; tags?: string[] }): Promise<void>;
+  /** Xoá layout vào thùng rác (soft delete) — đặt trashedAt timestamp. Layout sẽ không hiện ở
+   * listDocuments() để ceremony không chọn được, nhưng dữ liệu vẫn lưu cho khôi phục sau. */
+  moveToTrash(id: string): Promise<void>;
   saveDraft(id: string, content: LayoutContent): Promise<void>;
   publish(id: string, note?: string): Promise<LayoutVersion>;
   listVersions(id: string): Promise<LayoutVersion[]>;
