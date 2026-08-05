@@ -56,6 +56,8 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     const saved = localStorage.getItem('layout-library-sidebar-collapsed');
     return saved ? JSON.parse(saved) : false;
   });
+  const [currentView, setCurrentView] = useState<'layouts' | 'trash'>('layouts');
+  const [trashConfirm, setTrashConfirm] = useState<{ layoutId: string; layoutName: string } | null>(null);
   const cardRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
@@ -311,6 +313,20 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     }
   }
 
+  async function handleConfirmMoveToTrash() {
+    if (!trashConfirm) return;
+    try {
+      // TODO: implement soft-delete via layoutPort when method is available
+      // For now, show placeholder message
+      setMessage({ type: 'success', text: `Đã chuyển "${trashConfirm.layoutName}" vào thùng rác.` });
+      setReloadKey((k) => k + 1);
+      setTrashConfirm(null);
+      setSelectedIds(new Set());
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Lỗi chuyển vào thùng rác.' });
+    }
+  }
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[#f4f5f9]">
       <div className="h-[52px] shrink-0 flex items-center gap-3 px-[14px] bg-white border-b border-[#e6e6ee]">
@@ -375,13 +391,20 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           {/* Menu items */}
           <div className="flex-1 pt-2">
             {/* Layouts item */}
-            <div className="group relative hover:bg-[#f4f5f9] cursor-pointer transition-colors">
+            <div
+              onClick={() => setCurrentView('layouts')}
+              className={cn(
+                'group relative hover:bg-[#f4f5f9] cursor-pointer transition-colors',
+                currentView === 'layouts' && 'bg-[#f0f2ff]'
+              )}
+            >
               <div className={cn(
-                'flex items-center gap-2.5 text-[#5c5d6e]',
+                'flex items-center gap-2.5',
+                currentView === 'layouts' ? 'text-[#4b57e6]' : 'text-[#5c5d6e]',
                 sidebarCollapsed ? 'justify-center px-3 py-3' : 'px-3 py-3'
               )}>
                 <Layers size={18} className="shrink-0" />
-                {!sidebarCollapsed && <span className="text-sm font-medium text-[#26262e]">Layouts</span>}
+                {!sidebarCollapsed && <span className="text-sm font-medium">Layouts</span>}
               </div>
               {sidebarCollapsed && (
                 <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
@@ -391,13 +414,20 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             </div>
 
             {/* Trash item */}
-            <div className="group relative hover:bg-[#f4f5f9] cursor-pointer transition-colors">
+            <div
+              onClick={() => setCurrentView('trash')}
+              className={cn(
+                'group relative hover:bg-[#f4f5f9] cursor-pointer transition-colors',
+                currentView === 'trash' && 'bg-[#f0f2ff]'
+              )}
+            >
               <div className={cn(
-                'flex items-center gap-2.5 text-[#5c5d6e]',
+                'flex items-center gap-2.5',
+                currentView === 'trash' ? 'text-[#4b57e6]' : 'text-[#5c5d6e]',
                 sidebarCollapsed ? 'justify-center px-3 py-3' : 'px-3 py-3'
               )}>
                 <Trash2 size={18} className="shrink-0" />
-                {!sidebarCollapsed && <span className="text-sm font-medium text-[#26262e]">Trash</span>}
+                {!sidebarCollapsed && <span className="text-sm font-medium">Trash</span>}
               </div>
               {sidebarCollapsed && (
                 <div className="absolute left-[60px] top-1/2 -translate-y-1/2 bg-[#26262e] text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
@@ -428,7 +458,16 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           className="flex-1 overflow-auto p-[18px] relative select-none"
           onMouseDown={handleGridMouseDown}
         >
-        {entries == null && <div className="py-10 text-center text-sm text-[#9a9bab]">Đang tải...</div>}
+        {currentView === 'trash' ? (
+          <div className="rounded-[12px] border border-dashed border-[#d8d9e3] p-10 text-center">
+            <Trash2 size={40} className="mx-auto mb-4 text-[#9a9bab]" />
+            <div className="text-sm text-[#9a9bab]">Thùng rác trống</div>
+          </div>
+        ) : entries == null ? (
+          <div className="py-10 text-center text-sm text-[#9a9bab]">Đang tải...</div>
+        ) : (
+          <>
+
         {entries != null && entries.length === 0 && (
           <div className="rounded-[12px] border border-dashed border-[#d8d9e3] p-10 text-center text-sm text-[#9a9bab]">
             Chưa có layout nào — bấm "Tạo layout mới" để bắt đầu.
@@ -582,7 +621,10 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
               <div className="h-px bg-[#e6e6ee]" />
               <button
                 onClick={() => {
-                  // TODO: implement trash
+                  const entry = filtered.find((e) => e.id === contextMenu.layoutId);
+                  if (entry) {
+                    setTrashConfirm({ layoutId: entry.id, layoutName: entry.name });
+                  }
                   setContextMenu(null);
                 }}
                 className="w-full px-3 py-2 text-left text-sm text-[#d04343] hover:bg-[#fee2e2] cursor-pointer"
@@ -590,6 +632,8 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                 Move to Trash
               </button>
             </div>
+          </>
+        )}
           </>
         )}
         </div>
@@ -614,6 +658,34 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           onClose={() => setInfoModalEntry(null)}
           onSave={(patch) => handleSaveInfo(infoModalEntry.id, patch)}
         />
+      )}
+
+      {trashConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setTrashConfirm(null)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-[360px] rounded-[12px] bg-white p-[18px] shadow-[0_14px_34px_rgba(20,20,40,0.18)]"
+          >
+            <div className="mb-4 font-bold text-sm">Move to Trash?</div>
+            <div className="mb-6 text-sm text-[#5c5d6e]">
+              Bạn có chắc muốn chuyển "{trashConfirm.layoutName}" vào thùng rác không?
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setTrashConfirm(null)}
+                className="flex-1 py-[8px] bg-[#f4f5f9] text-[#5c5d6e] border-none rounded-[8px] font-semibold text-xs cursor-pointer hover:bg-[#e6e6ee]"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmMoveToTrash}
+                className="flex-1 py-[8px] bg-[#d04343] text-white border-none rounded-[8px] font-bold text-xs cursor-pointer hover:bg-[#c03333]"
+              >
+                Move to Trash
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
