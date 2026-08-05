@@ -364,6 +364,16 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[#f4f5f9]">
       <div className="h-[52px] shrink-0 flex items-center gap-3 px-[14px] bg-white border-b border-[#e6e6ee]">
+        <div className="flex-1" />
+        <div className="relative w-[240px]">
+          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9a9bab]" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm theo tên, phân loại, thẻ..."
+            className="w-full rounded-[8px] border border-[#e6e6ee] bg-[#f4f5f9] py-[7px] pl-8 pr-2 text-xs"
+          />
+        </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setViewMode('grid')}
@@ -389,16 +399,6 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           >
             <List size={16} />
           </button>
-        </div>
-        <div className="flex-1" />
-        <div className="relative w-[240px]">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9a9bab]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo tên, phân loại, thẻ..."
-            className="w-full rounded-[8px] border border-[#e6e6ee] bg-[#f4f5f9] py-[7px] pl-8 pr-2 text-xs"
-          />
         </div>
         <button
           onClick={handleExport}
