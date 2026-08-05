@@ -40,6 +40,7 @@ export function LayoutDesignerAppModule({
   const [globalSuggestions, setGlobalSuggestions] = useState<string[]>([]);
   const [versions, setVersions] = useState<any[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [documentColor, setDocumentColor] = useState<string | undefined>(undefined);
 
   const pendingDocRef = useRef<LayoutContent | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,10 +88,14 @@ export function LayoutDesignerAppModule({
           return emptyContent;
         });
 
-    fetchPromise
-      .then((content: any) => {
+    // Lấy color từ document metadata
+    const colorPromise = layoutPort.getDocument(layoutId).then((doc: any) => doc?.color);
+
+    Promise.all([fetchPromise, colorPromise])
+      .then(([content, color]: any[]) => {
         if (!active) return;
         setState({ status: 'ready', content });
+        setDocumentColor(color);
       })
       .catch((err: unknown) => {
         if (!active) return;
@@ -207,6 +212,15 @@ export function LayoutDesignerAppModule({
     [layoutPort, layoutId, loadVersions]
   );
 
+  const handleColorChange = useCallback(
+    async (color: string | undefined) => {
+      if (!layoutPort || !layoutId) return;
+      setDocumentColor(color);
+      await layoutPort.updateDocumentMeta(layoutId, { color });
+    },
+    [layoutPort, layoutId]
+  );
+
   if (state.status === 'no-port') {
     return (
       <div className="h-full flex items-center justify-center text-[#9a9bab] text-center p-[30px]">
@@ -261,8 +275,11 @@ export function LayoutDesignerAppModule({
       layoutPort={layoutPort}
       resolveAssetUrl={resolveAssetUrl}
       pickAndSaveImage={pickAndSaveImage}
+      listAssets={assetPort?.listAssets}
       onBackToLibrary={() => setLayoutId(undefined)}
       onRestoreVersion={handleRestoreVersion}
+      documentColor={documentColor}
+      onChangeColor={handleColorChange}
       versioning={{
         latestPublishedVersion,
         versions,
