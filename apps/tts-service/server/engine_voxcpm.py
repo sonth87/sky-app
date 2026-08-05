@@ -166,13 +166,14 @@ class VoxCpmEngine:
         if ref_text:
             kwargs["prompt_text"] = ref_text
 
-        ov = overrides or {}
-        if ov.get("temperature") is not None:
-            kwargs["temperature"] = ov["temperature"]
-        if ov.get("top_k") is not None:
-            kwargs["top_k"] = ov["top_k"]
-        if ov.get("top_p") is not None:
-            kwargs["top_p"] = ov["top_p"]
+        # `overrides` (temperature/top_k/top_p/...) là tham số sampling chung của
+        # server, mặc định tuned riêng cho VieNeu (autoregressive — xem config_store.py,
+        # ~0.1/5/0.95 để tránh random bad sample) và LUÔN khác None. VoxCPM sinh audio
+        # bằng diffusion (cfg_value/inference_timesteps ở generate(), không có khái niệm
+        # temperature/top_k/top_p) — package voxcpm cài đặt không nhận các kwargs này
+        # (bug thật 2026-08-05: forward thẳng vào generate() → TypeError mọi lần
+        # synthesize). Bỏ qua có chủ đích, giống synthesize_preset() bên dưới đã khai
+        # rõ VoxCPM không hỗ trợ preset — không phải mọi engine đều cần honor mọi knob.
 
         wav = self._model.generate(**kwargs)
         wav = np.asarray(wav, dtype=np.float32).ravel()
