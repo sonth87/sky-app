@@ -574,11 +574,30 @@ export async function getTtsDebugInfo(): Promise<TtsDebugInfo> {
   };
 }
 
-export function stopPythonServer() {
-  if (pythonProcess) {
-    console.log('[Python Server] Đang tắt...');
-    // SIGKILL không hợp lệ trên Windows — dùng kill() không argument (TerminateProcess)
-    if (!pythonProcess.kill('SIGTERM')) pythonProcess.kill();
-    pythonProcess = null;
-  }
+// Thời gian chờ process cũ tự thoát sau SIGTERM trước khi buộc SIGKILL. Bug thật 2026-08-05:
+// hàm này TRƯỚC ĐÂY gửi tín hiệu rồi return ngay (không đợi exit) → khi tts:restart gọi
+// startPythonServer() gần như đồng thời, engine cũ (vd VoxCPM — torch, model nặng, đang
+// load/infer dở nên không xử lý SIGTERM kịp) vẫn sống song song với process mới, giữ nguyên
+// RAM đã cấp phát (quan sát thực tế ~18GB) — đúng như user thấy trong Activity Monitor. Bằng
+// chứng: process mới bị đẩy sang port fallback (8090) vì 8089 vẫn bị process cũ giữ.
+const STOP_TIMEOUT_MS = 8_000;
+
+export function stopPythonServer(): Promise<void> {
+  const proc = pythonProcess;
+  pythonProcess = null;
+  if (!proc || proc.exitCode !== null || proc.signalCode !== null) return Promise.resolve();
+  console.log('[Python Server] Đang tắt...');
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      console.warn('[Python Server] Process không thoát sau SIGTERM, buộc SIGKILL...');
+      // SIGKILL không hợp lệ trên Windows nhưng Windows bỏ qua tên signal và luôn
+      // TerminateProcess ngay lập tức, nên gọi chung được cả 2 platform.
+      try { proc.kill('SIGKILL'); } catch {}
+    }, STOP_TIMEOUT_MS);
+    proc.once('exit', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    if (!proc.kill('SIGTERM')) proc.kill();
+  });
 }

@@ -242,7 +242,7 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
                 ) : e.install_status === 'installed' ? (
                   <>
                     {!isCurrent && (
-                      <Button variant="primary" onClick={() => doVerifyAndSwitch(e.id)} disabled={busy === e.id}
+                      <Button variant="primary" className="hover:opacity-90" onClick={() => doVerifyAndSwitch(e.id)} disabled={busy === e.id}
                         loading={busy === e.id} icon={<CheckCircle2 size={12} />}>
                         {t('engineManager.switchToThis')}
                       </Button>

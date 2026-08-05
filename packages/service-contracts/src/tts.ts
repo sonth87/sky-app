@@ -42,6 +42,8 @@ export interface VoiceCatalogEntry {
   /** true nếu đã từng được chọn dùng (server đã encode sẵn) — chỉ ảnh hưởng UI biết
    * phát preview qua registry hay qua file catalog gốc, không đổi cách chọn/dùng. */
   imported: boolean;
+  /** true nếu đây là giọng mặc định để chọn lúc app mở (chỉ có tối đa 1 voice/ngôn ngữ). */
+  default?: boolean;
 }
 
 /** vd "vi" → "Vietnamese" — khớp tên hiển thị đã dùng trong catalog.json's "language" field

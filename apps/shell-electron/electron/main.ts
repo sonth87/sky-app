@@ -318,21 +318,21 @@ app.on('before-quit', (event) => {
         defaultId: 0,
         cancelId: 0,
       })
-      .then((result) => {
+      .then(async (result) => {
         if (result.response === 1) {
           closeBackdropWindow();
           stopSocketServer();
           stopHttpServer();
-          stopPythonServer();
+          await stopPythonServer();
           app.exit(0);
         }
       });
   }
 });
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
   stopSocketServer();
   stopHttpServer();
-  stopPythonServer();
+  await stopPythonServer();
   if (process.platform !== 'darwin') app.quit();
 });

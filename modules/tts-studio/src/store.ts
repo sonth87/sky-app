@@ -40,6 +40,7 @@ interface TtsStudioState {
   setIsGenerating: (v: boolean) => void;
   setHistory: (history: HistoryEntryMeta[]) => void;
   prependHistory: (entry: HistoryEntryMeta) => void;
+  removeHistory: (id: string) => void;
 }
 
 export const useTtsStudioStore = create<TtsStudioState>((set) => ({
@@ -58,4 +59,6 @@ export const useTtsStudioStore = create<TtsStudioState>((set) => ({
   setHistory: (history) => set({ history }),
   prependHistory: (entry) =>
     set((s) => ({ history: [entry, ...s.history].slice(0, 30) })),
+  removeHistory: (id) =>
+    set((s) => ({ history: s.history.filter((e) => e.id !== id) })),
 }));

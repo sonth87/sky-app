@@ -1,4 +1,4 @@
-import { Check, Loader2, Pause, Play, Trash2 } from 'lucide-react';
+import { Check, Loader2, Mars, Pause, Play, Trash2, Venus } from 'lucide-react';
 import type { VoiceListItem } from './types.js';
 
 export type PreviewState = 'idle' | 'loading' | 'playing' | 'error';
@@ -39,13 +39,19 @@ function CoverThumbnail({ coverUrl, isSystem, state, onClick }: { coverUrl: stri
         <span
           className={
             alwaysVisible
-              ? 'absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-100 transition-opacity'
+              ? 'absolute inset-0 flex items-center justify-center rounded-lg overflow-hidden bg-white/55 backdrop-blur-sm text-white opacity-100 transition-opacity'
               : isError
-                ? 'absolute inset-0 flex items-center justify-center bg-destructive/60 text-white opacity-0 transition-opacity group-hover:opacity-100'
-                : 'absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100'
+                ? 'absolute inset-0 flex items-center justify-center rounded-lg overflow-hidden bg-destructive/60 backdrop-blur-sm text-white opacity-0 transition-opacity group-hover:opacity-100'
+                : 'absolute inset-0 flex items-center justify-center rounded-lg overflow-hidden bg-white/55 backdrop-blur-sm text-white opacity-0 transition-opacity group-hover:opacity-100'
           }
         >
-          {isLoading ? <Loader2 size={16} className="animate-spin" /> : isPlaying ? <Pause size={16} /> : <Play size={16} />}
+          {isLoading ? (
+            <Loader2 size={16} className="animate-spin drop-shadow" />
+          ) : isPlaying ? (
+            <Pause size={16} className="drop-shadow" />
+          ) : (
+            <Play size={16} className="drop-shadow" />
+          )}
         </span>
       </button>
       {isSystem && (
@@ -96,8 +102,16 @@ export function VoiceRow({ item, isSelected, previewState, coverUrl, onSelect, o
           </span>
         </div>
         {item.description ? (
-          <div className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
-            {item.description}
+          <div className="mt-0.5 flex items-start gap-1">
+            {item.gender && (
+              <div className="flex flex-shrink-0 items-center pt-0.5">
+                {item.gender.toLowerCase() === 'male' && <Mars size={14} className="text-blue-500" />}
+                {item.gender.toLowerCase() === 'female' && <Venus size={14} className="text-pink-500" />}
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground line-clamp-2">
+              {item.description}
+            </div>
           </div>
         ) : detailText ? (
           <div className="mt-0.5 truncate text-3xs font-medium tracking-wider text-muted-foreground opacity-80 uppercase">

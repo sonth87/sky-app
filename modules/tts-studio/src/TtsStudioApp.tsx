@@ -365,7 +365,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
               <TextInputPanel />
             </div>
             <VerticalResizeHandle getStartValue={getEditorHeight} onResize={handleEditorResize} />
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pt-1">
+            <div className="flex flex-none flex-col gap-3 pt-1">
               {genError && (
                 <p className="text-2xs text-destructive" role="alert">{genError}</p>
               )}
@@ -374,6 +374,8 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
                 onQuickPlay={handleQuickPlay}
                 canQuickPlay={canQuickPlay}
               />
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1">
               <HistoryList />
             </div>
           </main>

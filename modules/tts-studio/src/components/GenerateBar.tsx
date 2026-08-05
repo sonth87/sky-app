@@ -20,7 +20,7 @@ export function GenerateBar({ onGenerate, onQuickPlay, canQuickPlay }: GenerateB
   const disabled = isGenerating || !text.trim() || !selectedVoiceId;
 
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex items-center justify-end gap-2 pb-2">
       <ButtonPrimitive
         type="button"
         variant="outline"

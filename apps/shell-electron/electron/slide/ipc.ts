@@ -531,7 +531,7 @@ export function registerIpcHandlers() {
   // Restart Python/VieNeu TTS server
   ipcMain.handle('tts:restart', async () => {
     try {
-      stopPythonServer();
+      await stopPythonServer();
       await startPythonServer(vieneuDir());
       return { ok: true };
     } catch (err) {
@@ -861,7 +861,7 @@ export function registerIpcHandlers() {
 
     // Restart để áp engine mới.
     try {
-      stopPythonServer();
+      await stopPythonServer();
       await startPythonServer(vieneuDir());
     } catch (err) {
       // Restart lỗi → rollback config về vieneu + restart lại.
@@ -895,7 +895,7 @@ export function registerIpcHandlers() {
         cfg.engine = 'vieneu';
         writeFileSync(p, JSON.stringify(cfg, null, 2), 'utf-8');
       }
-      stopPythonServer();
+      await stopPythonServer();
       const { vieneuDir } = await import('./data/paths');
       await startPythonServer(vieneuDir());
     } catch (err) {

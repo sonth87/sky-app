@@ -171,7 +171,14 @@ class MossNanoEngine:
             enable_wetext=self._enable_wetext,
             enable_normalize_tts_text=True,
         )
-        wav = np.asarray(result["waveform"], dtype=np.float32).ravel()
+        wav = np.asarray(result["waveform"], dtype=np.float32)
+        # Codec MOSS-Audio-Tokenizer-Nano xuất (samples, channels) — channels=2 (xem
+        # codec_browser_onnx_meta.json). ravel() thẳng mảng 2D sẽ interleave L/R thành
+        # 1 kênh (mono giả) → audio dài gấp đôi + méo (nghe ồm ồm, kéo dài, như hết pin).
+        # Downmix trung bình 2 kênh trước khi ravel để về đúng 1 kênh mono thật.
+        if wav.ndim == 2 and wav.shape[1] > 1:
+            wav = wav.mean(axis=1)
+        wav = wav.ravel()
         sr = int(result.get("sample_rate", SAMPLE_RATE))
         if sr != SAMPLE_RATE:  # phòng hờ codec đổi SR
             import soxr
