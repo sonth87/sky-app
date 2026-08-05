@@ -551,7 +551,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   'group relative flex flex-col gap-1.5 rounded-[12px] border p-1.5 cursor-pointer transition-all',
                   isSelected(entry.id)
                     ? 'border-[#4b57e6] bg-[#f0f2ff] shadow-[0_4px_14px_rgba(75,87,230,0.15)]'
-                    : 'border-[#e6e6ee] bg-white hover:border-[#4b57e6]/50 hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
+                    : 'border-[#e6e6ee] bg-white hover:border-[#4b57e6] hover:bg-[#f9faff] hover:shadow-[0_4px_14px_rgba(75,87,230,0.1)]'
                 )}
                 onClick={(e) => handleCardClick(entry.id, e)}
                 onDoubleClick={() => onOpen(entry.id)}
@@ -615,8 +615,10 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                 key={entry.id}
                 data-card={entry.id}
                 className={cn(
-                  'group flex items-center justify-between gap-4 px-4 py-3 hover:bg-[#f4f5f9] cursor-pointer transition-colors',
-                  isSelected(entry.id) && 'bg-[#f0f2ff]'
+                  'group flex items-center justify-between gap-4 px-4 py-3 cursor-pointer transition-all rounded-lg',
+                  isSelected(entry.id)
+                    ? 'bg-[#f0f2ff] border border-[#4b57e6]'
+                    : 'border border-transparent hover:bg-[#f9faff] hover:border-[#e6e6ee]'
                 )}
                 onClick={(e) => handleCardClick(entry.id, e)}
                 onDoubleClick={() => onOpen(entry.id)}
@@ -633,10 +635,20 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   {entry.description && (
                     <div className="text-xs text-[#9a9bab] mt-1">{entry.description}</div>
                   )}
-                  <div className="flex items-center gap-2 mt-2 text-xs text-[#5c5d6e]">
-                    <span>{entry.content.variants.map((v) => v.aspect.id).join(', ')}</span>
-                    {entry.category && <span>·</span>}
-                    {entry.category && <span>{entry.category}</span>}
+                  <div className="flex flex-col gap-1.5 mt-2 text-xs text-[#5c5d6e]">
+                    <div>
+                      <span className="font-medium text-[#9a9bab]">Aspect:</span> {entry.content.variants.map((v) => `${v.aspect.id} (${v.refW}×${v.refH})`).join(', ')}
+                    </div>
+                    {entry.category && (
+                      <div>
+                        <span className="font-medium text-[#9a9bab]">Category:</span> {entry.category}
+                      </div>
+                    )}
+                    {entry.tags.length > 0 && (
+                      <div>
+                        <span className="font-medium text-[#9a9bab]">Tags:</span> {entry.tags.join(', ')}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
