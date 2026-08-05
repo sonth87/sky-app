@@ -160,11 +160,23 @@ class VoxCpmEngine:
     def _run(self, text: str, ref: dict, overrides: dict | None) -> np.ndarray:
         kwargs: dict = {"text": text}
         wav_path = ref.get("wav_path")
-        if wav_path:
-            kwargs["prompt_wav_path"] = wav_path
         ref_text = ref.get("ref_text")
-        if ref_text:
+        # voxcpm có 2 cơ chế clone RIÊNG, không trộn tuỳ ý được — generate() tự
+        # raise ValueError nếu chỉ set 1 trong 2 của cặp prompt_*:
+        #   - prompt_wav_path + prompt_text (bắt buộc ĐI CÙNG NHAU): "continuation
+        #     mode" — biết ref nói gì nên tách content/giọng chính xác hơn
+        #     ("Ultimate Cloning", xem docstring module).
+        #   - reference_wav_path (dùng RIÊNG, không kèm text): clone thuần qua
+        #     ref_audio token, chỉ VoxCPM2 hỗ trợ (model đang dùng ở đây).
+        # Bug thật 2026-08-05: trước đây LUÔN set prompt_wav_path khi có file audio
+        # bất kể ref_text có hay không (file .txt transcript là tuỳ chọn, phần lớn
+        # giọng clone không có) → thiếu prompt_text đi kèm → crash mọi lần đọc giọng
+        # clone không kèm transcript.
+        if wav_path and ref_text:
+            kwargs["prompt_wav_path"] = wav_path
             kwargs["prompt_text"] = ref_text
+        elif wav_path:
+            kwargs["reference_wav_path"] = wav_path
 
         # `overrides` (temperature/top_k/top_p/...) là tham số sampling chung của
         # server, mặc định tuned riêng cho VieNeu (autoregressive — xem config_store.py,
