@@ -227,6 +227,8 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             category: d.category,
             tags: d.tags ?? [],
             content: d.currentDraft,
+            createdAt: (d as any).createdAt || (d as any).created_at,
+            updatedAt: (d as any).updatedAt || (d as any).updated_at,
           }),
         );
       if (!cancelled) setEntries(built);
@@ -620,79 +622,88 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             ))}
           </div>
         ) : (
-          <div className="divide-y divide-[#e6e6ee]">
-            {filtered.map((entry) => (
-              <div
-                key={entry.id}
-                data-card={entry.id}
-                className={cn(
-                  'group flex items-center justify-between gap-4 px-4 py-3 cursor-pointer transition-all rounded-lg',
-                  isSelected(entry.id)
-                    ? 'bg-[#f0f2ff] border border-[#4b57e6]'
-                    : 'border border-transparent hover:bg-[#f9faff] hover:border-[#e6e6ee]'
-                )}
-                onClick={(e) => handleCardClick(entry.id, e)}
-                onDoubleClick={() => onOpen(entry.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setContextMenu({ x: e.clientX, y: e.clientY, layoutId: entry.id });
-                }}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    {entry.color && <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />}
-                    <span className="font-semibold text-sm text-[#26262e]">{entry.name}</span>
-                  </div>
-                  {entry.description && (
-                    <div className="text-xs text-[#9a9bab] mt-1">{entry.description}</div>
+          <div className="w-full border border-[#e6e6ee] rounded-lg overflow-hidden">
+            {/* Table header */}
+            <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_120px] gap-4 px-4 py-3 bg-[#f9faff] border-b border-[#e6e6ee] font-semibold text-xs text-[#5c5d6e]">
+              <div>Name</div>
+              <div>Description</div>
+              <div>Category</div>
+              <div>Modified</div>
+              <div className="text-center">Actions</div>
+            </div>
+            {/* Table rows */}
+            <div>
+              {filtered.map((entry) => (
+                <div
+                  key={entry.id}
+                  data-card={entry.id}
+                  className={cn(
+                    'grid grid-cols-[2fr_1.5fr_1fr_1fr_120px] gap-4 px-4 py-3 items-center cursor-pointer transition-all border-b border-[#e6e6ee] hover:bg-[#f9faff]',
+                    isSelected(entry.id) && 'bg-[#f0f2ff]'
                   )}
-                  <div className="flex items-center gap-2 mt-1 text-[9px] text-[#9a9bab]">
-                    {entry.updatedAt && <span>Modified: {new Date(entry.updatedAt).toLocaleDateString()}</span>}
-                    {entry.createdAt && <span>·</span>}
-                    {entry.createdAt && <span>Created: {new Date(entry.createdAt).toLocaleDateString()}</span>}
+                  onClick={(e) => handleCardClick(entry.id, e)}
+                  onDoubleClick={() => onOpen(entry.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, layoutId: entry.id });
+                  }}
+                >
+                  {/* Name */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    {entry.color && <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />}
+                    <span className="font-semibold text-sm text-[#26262e] truncate">{entry.name}</span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {entry.content.variants.map((v) => (
-                      <span key={v.aspect.id} className="rounded-full bg-[#f4f5f9] px-[7px] py-[1px] text-[9.5px] font-semibold text-[#5c5d6e]">
-                        {v.aspect.id}
-                      </span>
-                    ))}
+
+                  {/* Description */}
+                  <div className="text-xs text-[#9a9bab] truncate">
+                    {entry.description || '—'}
+                  </div>
+
+                  {/* Category + Aspects */}
+                  <div className="flex flex-wrap gap-1">
                     {entry.category && (
-                      <span className="rounded-full bg-[#e6f2ff] px-[7px] py-[1px] text-[9.5px] font-semibold text-[#4b57e6]">
+                      <span className="rounded-full bg-[#e6f2ff] px-[6px] py-px text-[8px] font-semibold text-[#4b57e6]">
                         {entry.category}
                       </span>
                     )}
-                    {entry.tags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-[#f4f5f9] px-[7px] py-[1px] text-[9.5px] font-semibold text-[#5c5d6e]">
-                        {tag}
+                    {entry.content.variants.map((v) => (
+                      <span key={v.aspect.id} className="rounded-full bg-[#f4f5f9] px-[6px] py-px text-[8px] font-semibold text-[#5c5d6e]">
+                        {v.aspect.id}
                       </span>
                     ))}
                   </div>
+
+                  {/* Modified Date */}
+                  <div className="text-xs text-[#9a9bab]">
+                    {entry.updatedAt ? new Date(entry.updatedAt).toLocaleDateString() : '—'}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInfoModalEntry(entry);
+                      }}
+                      title="Info"
+                      className="flex items-center justify-center w-7 h-7 rounded-md text-[#5c5d6e] hover:bg-[#f4f5f9]"
+                    >
+                      <Info size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNameModal({ mode: 'duplicate', source: entry });
+                      }}
+                      title="Duplicate"
+                      className="flex items-center justify-center w-7 h-7 rounded-md text-[#5c5d6e] hover:bg-[#f4f5f9]"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setInfoModalEntry(entry);
-                    }}
-                    title="Thông tin"
-                    className="flex items-center justify-center w-8 h-8 rounded-md text-[#5c5d6e] hover:bg-white"
-                  >
-                    <Info size={16} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setNameModal({ mode: 'duplicate', source: entry });
-                    }}
-                    title="Sao chép"
-                    className="flex items-center justify-center w-8 h-8 rounded-md text-[#5c5d6e] hover:bg-white"
-                  >
-                    <Copy size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
