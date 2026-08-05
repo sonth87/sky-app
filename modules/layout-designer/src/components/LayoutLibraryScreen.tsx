@@ -638,7 +638,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   key={entry.id}
                   data-card={entry.id}
                   className={cn(
-                    'grid grid-cols-[2fr_1.5fr_1fr_1fr_120px] gap-4 px-4 py-3 items-center cursor-pointer transition-all border-b border-[#e6e6ee] hover:bg-[#f9faff]',
+                    'group grid grid-cols-[2fr_1.5fr_1fr_1fr_120px] gap-4 px-4 py-3 items-center cursor-pointer transition-all border-b border-[#e6e6ee] hover:bg-[#f9faff]',
                     isSelected(entry.id) && 'bg-[#f0f2ff]'
                   )}
                   onClick={(e) => handleCardClick(entry.id, e)}
