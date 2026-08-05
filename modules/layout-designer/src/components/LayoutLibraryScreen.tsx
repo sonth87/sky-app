@@ -277,6 +277,67 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     );
   }, [entries, search, currentView, trashedIds]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Close context menu & selection on Escape
+      if (e.key === 'Escape') {
+        if (contextMenu) {
+          setContextMenu(null);
+          return;
+        }
+        if (selectedIds.size > 0) {
+          setSelectedIds(new Set());
+          return;
+        }
+      }
+
+      // Arrow navigation (only in layouts view)
+      if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && currentView === 'layouts') {
+        if (filtered.length === 0) return;
+        e.preventDefault();
+
+        const allIds = filtered.map((x) => x.id);
+        let nextIndex = 0;
+
+        if (lastSelectedId) {
+          const currentIndex = allIds.indexOf(lastSelectedId);
+          if (currentIndex >= 0) {
+            nextIndex = e.key === 'ArrowDown'
+              ? Math.min(currentIndex + 1, allIds.length - 1)
+              : Math.max(currentIndex - 1, 0);
+          }
+        }
+
+        const nextId = allIds[nextIndex];
+        if (nextId) {
+          setSelectedIds(new Set([nextId]));
+          setLastSelectedId(nextId);
+        }
+      }
+
+      // Enter to open selected
+      if (e.key === 'Enter' && selectedIds.size === 1 && currentView === 'layouts') {
+        const selectedId = Array.from(selectedIds)[0];
+        if (selectedId) {
+          onOpen(selectedId);
+        }
+      }
+
+      // Delete to move to trash
+      if (e.key === 'Delete' && selectedIds.size === 1 && currentView === 'layouts') {
+        const selectedId = Array.from(selectedIds)[0];
+        const entry = filtered.find((x) => x.id === selectedId);
+        if (entry) {
+          setTrashConfirm({ layoutId: entry.id, layoutName: entry.name });
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [contextMenu, selectedIds, lastSelectedId, filtered, currentView, onOpen]);
+
   async function handleCreate(name: string) {
     const id = `layout_${crypto.randomUUID()}`;
     const emptyContent: LayoutContent = {
@@ -675,7 +736,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
 
                   {/* Modified Date */}
                   <div className="text-xs text-[#9a9bab]">
-                    {entry.updatedAt ? new Date(entry.updatedAt).toLocaleDateString() : '—'}
+                    {entry.updatedAt ? new Date(entry.updatedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                   </div>
 
                   {/* Actions */}
