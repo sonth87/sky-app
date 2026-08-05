@@ -10,6 +10,7 @@ A production-ready, fully customizable file manager UI library for React. Built 
 ✅ **Context Menu** — Right-click menu with customizable items, smart positioning  
 ✅ **Sidebar** — Collapsible with icon-only mode, customizable items, persistent state  
 ✅ **Search/Filter** — Diacritic-insensitive search, debounced, customizable logic  
+✅ **Size Control** — Adjust item size with slider (aA button), per-app persistence, grid/list responsive  
 ✅ **Drag-to-Select** — Visual feedback with drag box, multi-item selection  
 ✅ **Metadata Display** — Timestamps with time, badges for categories/tags, descriptions  
 ✅ **Fully Customizable** — Every UI element, menu, button, and behavior is configurable  
@@ -95,10 +96,19 @@ When using this library, you get these out-of-the-box:
 - Custom filter logic per field
 - Works across all views
 
+### Size Control
+- Interactive slider (aA button in header)
+- Min/max/default size customization
+- Applies to grid column width and list row height
+- Per-app persistence (layout-designer ≠ template-gallery)
+- Reset button to restore default
+
 ### Persistence
-- View mode preference (grid/list)
-- Sidebar collapsed state
+- View mode preference (grid/list) per app
+- Sidebar collapsed state per app
+- Item size preference per app
 - Selection state (localStorage or callback)
+- All settings isolated by appId to prevent cross-app conflicts
 
 ## Installation
 

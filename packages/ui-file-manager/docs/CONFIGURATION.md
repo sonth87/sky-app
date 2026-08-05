@@ -2,6 +2,31 @@
 
 Complete reference for all customization options in FileLibraryConfig.
 
+## App Namespace (appId)
+
+For multi-app environments, use `appId` to isolate localStorage:
+
+```typescript
+{
+  appId: 'layout-designer',  // or 'template-gallery', 'font-manager', etc.
+}
+```
+
+**Without appId**: All apps share the same localStorage keys
+- `file-manager-view-mode` (layout-designer and template-gallery both use this)
+- Closing layout-designer with list view affects template-gallery's stored view
+
+**With appId**: Each app has separate keys
+- `file-manager-layout-designer-view-mode`
+- `file-manager-layout-designer-item-size`
+- `file-manager-template-gallery-view-mode`
+- `file-manager-template-gallery-item-size`
+
+This ensures:
+- Layout-designer remembers grid view + large size
+- Template-gallery remembers list view + small size
+- No interference between apps
+
 ## Sidebar Configuration
 
 ```typescript
@@ -101,6 +126,40 @@ contextMenuItems: [
 }
 ```
 
+## Size Control Configuration
+
+```typescript
+{
+  showSizeControl?: boolean;  // Show size button (default: true)
+  sizeConfig?: SizeConfig;    // Customize size behavior
+}
+```
+
+**SizeConfig shape:**
+```typescript
+{
+  minSize?: number;      // Minimum pixel width (default: 120)
+  maxSize?: number;      // Maximum pixel width (default: 320)
+  defaultSize?: number;  // Initial size (default: 200)
+  step?: number;         // Slider increment (default: 20)
+}
+```
+
+**Example:**
+```typescript
+sizeConfig: {
+  minSize: 100,        // Slider starts at 100px
+  maxSize: 400,        // Slider goes up to 400px
+  defaultSize: 250,    // Reset button sets to 250px
+  step: 10,            // Increment by 10px each step
+}
+```
+
+**Effects:**
+- Grid view: Changes grid column width (minmax(size, 1fr))
+- List view: Changes row height
+- Size persisted per app to localStorage
+
 ## Filter Configuration
 
 ```typescript
@@ -180,6 +239,9 @@ itemRenderer: (item, isSelected) => (
 <FileLibraryLayout
   items={layouts}
   config={{
+    // App namespace for isolated localStorage
+    appId: 'layout-designer',  // Each app keeps separate preferences
+    
     // Sidebar
     sidebarItems: [
       { id: 'all', label: 'All Layouts', isActive: true, onClick: () => {} },
@@ -196,6 +258,7 @@ itemRenderer: (item, isSelected) => (
     // Header
     showViewToggle: true,
     showSearch: true,
+    showSizeControl: true,
     headerButtons: [
       { id: 'create', label: 'New', onClick: handleCreate },
     ],
@@ -213,6 +276,14 @@ itemRenderer: (item, isSelected) => (
       debounceMs: 300,
     },
     
+    // Size control
+    sizeConfig: {
+      minSize: 120,
+      maxSize: 300,
+      defaultSize: 200,
+      step: 20,
+    },
+    
     // Rendering
     itemRenderer: (item, isSelected) => <LayoutCard item={item} selected={isSelected} />,
     emptyState: <div>No layouts found</div>,
@@ -222,6 +293,7 @@ itemRenderer: (item, isSelected) => (
     onItemClick: (id) => handleOpen(id),
     onSelectionChange: (ids) => setSelectedIds(ids),
     onViewChange: (mode) => setViewMode(mode),
+    onSizeChange: (size) => console.log('Size changed to:', size),
   }}
 />
 ```

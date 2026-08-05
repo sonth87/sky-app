@@ -152,6 +152,27 @@ contextMenuItems: [
 - Filters applied before view rendering
 - Empty state when no results
 
+## Item Size Control
+
+### Dynamic Size Adjustment
+- Button with "aA" icon in header
+- Slider to adjust item width (grid) or row height (list)
+- Real-time resize as you drag slider
+- Shows current size in pixels
+- Reset button to restore default size
+
+### Size Range
+- Configurable min/max size (default: 120-320px)
+- Adjustable step increment (default: 20px)
+- Respects configuration bounds
+
+### App-Specific Persistence
+- Each app keeps separate size preferences via `appId` config
+- Layout-designer size doesn't affect template-gallery size
+- View mode, sidebar state, and size all persist per app
+- localStorage keys include app namespace
+- Fully isolated, no cross-app interference
+
 ## Metadata Display
 
 ### Grid View Card
