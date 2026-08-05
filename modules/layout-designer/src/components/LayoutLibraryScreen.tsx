@@ -356,6 +356,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   const [start, end] = anchorIndex < nextIndex ? [anchorIndex, nextIndex] : [nextIndex, anchorIndex];
                   setSelectedIds(new Set(allIds.slice(start, end + 1)));
                   setRangeAnchorId(anchor);
+                  setLastSelectedId(nextId); // Update to allow continuing expansion
                 }
               }
             } else {
@@ -389,6 +390,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   const [start, end] = anchorIndex < nextIndexAdjusted ? [anchorIndex, nextIndexAdjusted] : [nextIndexAdjusted, anchorIndex];
                   setSelectedIds(new Set(allIds.slice(start, end + 1)));
                   setRangeAnchorId(anchor);
+                  setLastSelectedId(nextId); // Update to allow continuing expansion
                 }
               }
             } else {
