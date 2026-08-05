@@ -66,7 +66,11 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   });
   const [currentView, setCurrentView] = useState<'layouts' | 'trash'>('layouts');
   const [trashConfirm, setTrashConfirm] = useState<{ layoutId: string; layoutName: string } | null>(null);
-  const [trashedIds, setTrashedIds] = useState<Set<string>>(new Set());
+  const [trashedIds, setTrashedIds] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    const saved = localStorage.getItem('layout-library-trashed-ids');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
   const cardRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
@@ -80,6 +84,11 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   useEffect(() => {
     localStorage.setItem('layout-library-sidebar-collapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  // Persist trashed IDs
+  useEffect(() => {
+    localStorage.setItem('layout-library-trashed-ids', JSON.stringify([...trashedIds]));
+  }, [trashedIds]);
 
   // Close context menu on Escape
   useEffect(() => {
