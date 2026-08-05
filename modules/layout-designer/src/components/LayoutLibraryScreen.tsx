@@ -58,6 +58,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   });
   const [currentView, setCurrentView] = useState<'layouts' | 'trash'>('layouts');
   const [trashConfirm, setTrashConfirm] = useState<{ layoutId: string; layoutName: string } | null>(null);
+  const [trashedIds, setTrashedIds] = useState<Set<string>>(new Set());
   const cardRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
@@ -228,15 +229,22 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
 
   const filtered = useMemo(() => {
     if (!entries) return [];
+
+    // Filter by view (layouts vs trash)
+    const viewFiltered = currentView === 'trash'
+      ? entries.filter((e) => trashedIds.has(e.id))
+      : entries.filter((e) => !trashedIds.has(e.id));
+
+    // Filter by search
     const q = search.trim().toLowerCase();
-    if (q === '') return entries;
-    return entries.filter(
+    if (q === '') return viewFiltered;
+    return viewFiltered.filter(
       (e) =>
         e.name.toLowerCase().includes(q) ||
         (e.category?.toLowerCase().includes(q) ?? false) ||
         e.tags.some((t) => t.toLowerCase().includes(q)),
     );
-  }, [entries, search]);
+  }, [entries, search, currentView, trashedIds]);
 
   async function handleCreate(name: string) {
     const id = `layout_${crypto.randomUUID()}`;
@@ -316,14 +324,13 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   async function handleConfirmMoveToTrash() {
     if (!trashConfirm) return;
     try {
-      // Remove from entries immediately (optimistic update)
-      setEntries((prev) => prev ? prev.filter((e) => e.id !== trashConfirm.layoutId) : null);
+      // Add to trashed IDs instead of removing from entries
+      setTrashedIds((prev) => new Set([...prev, trashConfirm.layoutId]));
       setMessage({ type: 'success', text: `Đã chuyển "${trashConfirm.layoutName}" vào thùng rác.` });
       setTrashConfirm(null);
       setSelectedIds(new Set());
     } catch (err) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Lỗi chuyển vào thùng rác.' });
-      setReloadKey((k) => k + 1);
     }
   }
 
@@ -458,27 +465,24 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           className="flex-1 overflow-auto p-[18px] relative select-none"
           onMouseDown={handleGridMouseDown}
         >
-        {currentView === 'trash' ? (
-          <div className="rounded-[12px] border border-dashed border-[#d8d9e3] p-10 text-center">
-            <Trash2 size={40} className="mx-auto mb-4 text-[#9a9bab]" />
-            <div className="text-sm text-[#9a9bab]">Thùng rác trống</div>
-          </div>
-        ) : entries == null ? (
+        {entries == null ? (
           <div className="py-10 text-center text-sm text-[#9a9bab]">Đang tải...</div>
+        ) : filtered.length === 0 ? (
+          currentView === 'trash' ? (
+            <div className="rounded-[12px] border border-dashed border-[#d8d9e3] p-10 text-center">
+              <Trash2 size={40} className="mx-auto mb-4 text-[#9a9bab]" />
+              <div className="text-sm text-[#9a9bab]">Thùng rác trống</div>
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="rounded-[12px] border border-dashed border-[#d8d9e3] p-10 text-center text-sm text-[#9a9bab]">
+              Chưa có layout nào — bấm "Tạo layout mới" để bắt đầu.
+            </div>
+          ) : (
+            <div className="rounded-[12px] border border-dashed border-[#d8d9e3] p-10 text-center text-sm text-[#9a9bab]">
+              Không tìm thấy layout khớp "{search}".
+            </div>
+          )
         ) : (
-          <>
-
-        {entries != null && entries.length === 0 && (
-          <div className="rounded-[12px] border border-dashed border-[#d8d9e3] p-10 text-center text-sm text-[#9a9bab]">
-            Chưa có layout nào — bấm "Tạo layout mới" để bắt đầu.
-          </div>
-        )}
-        {entries != null && entries.length > 0 && filtered.length === 0 && (
-          <div className="rounded-[12px] border border-dashed border-[#d8d9e3] p-10 text-center text-sm text-[#9a9bab]">
-            Không tìm thấy layout khớp "{search}".
-          </div>
-        )}
-        {filtered.length > 0 && (
           <div className="grid gap-[14px]" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
             {filtered.map((entry) => (
               <div
@@ -632,8 +636,6 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                 Move to Trash
               </button>
             </div>
-          </>
-        )}
           </>
         )}
         </div>
