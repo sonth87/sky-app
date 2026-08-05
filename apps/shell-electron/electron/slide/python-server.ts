@@ -7,7 +7,12 @@ const DEBUG_LOG_FILE = join(app.getPath('userData'), 'tts-debug.log');
 const DEFAULT_PORT = 8089;
 const MAX_PORT_TRIES = 20;
 const HEALTH_POLL_INTERVAL_MS = 500;
-const HEALTH_TIMEOUT_MS = 120_000; // 120s - VieNeu ONNX model load có thể mất 30-60s
+// 300s: VieNeu ONNX (bundled) load trong 30-60s, nhưng engine mở rộng nặng (vd VoxCPM —
+// torch, model ~4.5GB) đo thực tế đã hết 118s CHỈ để đọc file safetensors từ đĩa (I/O-bound,
+// không phải CPU) — gần sát ngưỡng cũ 120s, chỉ cần máy bận thêm chút (Electron + service cũ
+// còn chạy song song lúc restart) là vượt ngưỡng. Bug thật 2026-08-05: đổi sang VoxCPM báo lỗi
+// timeout dù engine load được, chỉ là chậm hơn khoảng đệm cho phép.
+const HEALTH_TIMEOUT_MS = 300_000;
 
 let pythonProcess: ChildProcess | null = null;
 let actualPort = DEFAULT_PORT;

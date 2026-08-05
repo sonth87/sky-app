@@ -587,9 +587,13 @@ export class EngineInstaller {
       });
       let out = '';
       let err = '';
+      // 300s: engine mở rộng nặng (vd VoxCPM — torch, model ~4.5GB) đo thực tế mất 118s
+      // CHỈ để đọc safetensors từ đĩa (I/O-bound) — sát ngưỡng cũ 120s, dễ vượt khi máy bận
+      // (Electron + service cũ còn chạy song song). Khớp với HEALTH_TIMEOUT_MS ở
+      // python-server.ts (cùng chờ load model y hệt lúc khởi động thật).
       const to = setTimeout(() => {
         proc.kill();
-      }, 120_000); // engine load có thể lâu (30-60s)
+      }, 300_000);
       proc.stdout?.on('data', (d) => { out += d.toString(); });
       proc.stderr?.on('data', (d) => { err += d.toString(); });
       proc.on('error', (e) => {
@@ -602,7 +606,7 @@ export class EngineInstaller {
         const line = out.split('\n').reverse().find((l) => l.trim().startsWith('{'));
         if (!line) {
           const msg = code === null
-            ? 'Engine kiểm tra bị timeout (>120s) hoặc crash'
+            ? 'Engine kiểm tra bị timeout (>300s) hoặc crash'
             : `Không đọc được kết quả verify (exit code: ${code})`;
           const fullOutput = err ? `stderr: ${err.slice(0, 200)}` : '';
           resolve({
