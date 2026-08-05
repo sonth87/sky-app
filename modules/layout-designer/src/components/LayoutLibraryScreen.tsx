@@ -568,7 +568,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
         {contextMenu && (
           <>
             <div
-              className="fixed inset-0"
+              className="absolute inset-0 cursor-default"
               onClick={() => setContextMenu(null)}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -576,8 +576,8 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
               }}
             />
             <div
-              className="fixed bg-white border border-[#e6e6ee] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.15)] z-50 py-1 min-w-[160px]"
-              style={{ left: contextMenu.x, top: contextMenu.y - 5 }}
+              className="absolute bg-white border border-[#e6e6ee] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.15)] z-50 py-1 min-w-[160px]"
+              style={{ left: contextMenu.x - (gridContainerRef.current?.getBoundingClientRect().left ?? 0), top: contextMenu.y - (gridContainerRef.current?.getBoundingClientRect().top ?? 0) - 5 }}
             >
               <button
                 onClick={() => {
