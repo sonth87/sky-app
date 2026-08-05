@@ -150,7 +150,7 @@ export function CanvasItemView({
   );
 
   return (
-    <div onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onDoubleClick={onDoubleClick} style={wrapStyle}>
+    <div onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onDoubleClick={onDoubleClick} style={{...wrapStyle, opacity: item.hidden ? 0.4 : wrapStyle.opacity}}>
       <ItemContent item={item} scaleX={scaleX} scaleY={scaleY} resolveAssetUrl={resolveAssetUrl} />
       {selected && !item.locked && (
         <SelectionHandles

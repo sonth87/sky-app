@@ -1,4 +1,4 @@
-import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown } from 'lucide-react';
+import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import type { Box, LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
 import { addItemCommand, patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
@@ -71,6 +71,7 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
   };
   const handleDelete = () => dispatch(removeItemCommand(variant.aspect.id, item.id, loopItemId));
   const handleToggleLock = () => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { locked: !item.locked }, loopItemId));
+  const handleToggleHidden = () => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { hidden: !item.hidden }, loopItemId));
   const handleZUp = () => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { box: { ...item.box, z: (item.box.z ?? 0) + 1 } }, loopItemId));
   const handleZDown = () => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { box: { ...item.box, z: (item.box.z ?? 0) - 1 } }, loopItemId));
 
@@ -102,6 +103,14 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
         className={cn(btnClass, item.locked && 'text-[#4b57e6]')}
       >
         {item.locked ? <PinOff size={14} /> : <Pin size={14} />}
+      </button>
+      <button
+        onClick={handleToggleHidden}
+        aria-label={item.hidden ? 'Hiển thị (thanh công cụ)' : 'Ẩn (thanh công cụ)'}
+        title={item.hidden ? 'Hiển thị' : 'Ẩn'}
+        className={cn(btnClass, item.hidden && 'text-[#999]')}
+      >
+        {item.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
       </button>
       <button onClick={handleDelete} aria-label="Xoá (thanh công cụ)" title="Xoá" className={cn(btnClass, 'hover:text-red-500')}>
         <Trash2 size={14} />

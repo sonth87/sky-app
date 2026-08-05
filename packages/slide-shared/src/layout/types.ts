@@ -76,6 +76,7 @@ interface BaseItem {
   box: Box;
   opacity?: number; // 0..100
   locked?: boolean; // khoá không cho di chuyển trong editor
+  hidden?: boolean; // ẩn vĩnh viễn (display:none) khi render — khác locked (chỉ ảnh hưởng editor)
   name?: string; // nhãn hiện ở panel Layers
 
   // ─── Đồng bộ item copy giữa các variant (12-thu-vien-layout.md mở rộng 2026-07-18) ──────────

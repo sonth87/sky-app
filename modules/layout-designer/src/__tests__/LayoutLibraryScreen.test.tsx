@@ -101,11 +101,11 @@ describe('LayoutLibraryScreen', () => {
     expect(screen.queryByText('Layout B')).toBeNull();
   });
 
-  it('click 1 card layout → gọi onOpen đúng id', async () => {
+  it('double-click 1 card layout → gọi onOpen đúng id', async () => {
     const onOpen = vi.fn();
     render(<LayoutLibraryScreen layoutPort={mockLayoutPort()} onOpen={onOpen} />);
     await waitFor(() => screen.getByText('Layout A'));
-    fireEvent.click(screen.getByText('Layout A'));
+    fireEvent.doubleClick(screen.getByText('Layout A'));
 
     expect(onOpen).toHaveBeenCalledWith('layout-a');
   });

@@ -112,6 +112,8 @@ interface ItemRendererProps {
 }
 
 function ItemRenderer({ item, scaleX, scaleY, record, resolveAsset }: ItemRendererProps) {
+  if (item.hidden) return null;
+
   switch (item.type) {
     case 'text':
       return <TextItemView item={item} scaleX={scaleX} scaleY={scaleY} record={record} />;

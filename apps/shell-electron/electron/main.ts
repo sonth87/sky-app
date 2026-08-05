@@ -197,6 +197,9 @@ protocol.registerSchemesAsPrivileged([
 const wallpaperImportDir = () => join(app.getPath('userData'), 'wallpapers');
 
 app.whenReady().then(() => {
+  // Set app name — displays in macOS menu bar, dock, and About dialog
+  app.setName('Sky-App');
+
   // Dock icon lúc dev:app (macOS) — packaged app đã có icon riêng qua Info.plist (electron-
   // builder.yml's icon:), không cần gọi lại. app.dock chỉ tồn tại trên macOS (undefined ở
   // Windows/Linux, optional chain xử lý sẵn).
