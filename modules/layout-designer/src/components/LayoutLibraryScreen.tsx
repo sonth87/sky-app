@@ -47,6 +47,9 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragEnd, setDragEnd] = useState<{ x: number; y: number } | null>(null);
+  const [cardRects, setCardRects] = useState<Map<string, DOMRect>>(new Map());
 
   useEffect(() => {
     if (!message) return;
@@ -86,6 +89,49 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
 
   function isSelected(id: string) {
     return selectedIds.has(id);
+  }
+
+  function boxesOverlap(box1: DOMRect, box2: DOMRect): boolean {
+    return !(box2.right < box1.left || box2.left > box1.right || box2.bottom < box1.top || box2.top > box1.bottom);
+  }
+
+  function handleGridMouseDown(e: React.MouseEvent) {
+    // Chỉ bắt đầu drag nếu click ở vùng trống (không click vào card)
+    if ((e.target as HTMLElement).closest('[data-card]')) return;
+    setDragStart({ x: e.clientX, y: e.clientY });
+    setDragEnd({ x: e.clientX, y: e.clientY });
+  }
+
+  function handleGridMouseMove(e: React.MouseEvent) {
+    if (!dragStart) return;
+    setDragEnd({ x: e.clientX, y: e.clientY });
+
+    // Tính drag box
+    const minX = Math.min(dragStart.x, e.clientX);
+    const maxX = Math.max(dragStart.x, e.clientX);
+    const minY = Math.min(dragStart.y, e.clientY);
+    const maxY = Math.max(dragStart.y, e.clientY);
+    const dragBox = new DOMRect(minX, minY, maxX - minX, maxY - minY);
+
+    // Tìm cards trong drag box
+    const newSelection = new Set<string>();
+    for (const [id, rect] of cardRects) {
+      if (boxesOverlap(dragBox, rect)) {
+        newSelection.add(id);
+      }
+    }
+    setSelectedIds(newSelection);
+  }
+
+  function handleGridMouseUp() {
+    if (dragStart && dragEnd) {
+      // Set lastSelectedId là item cuối cùng được select (nếu có)
+      if (selectedIds.size > 0) {
+        setLastSelectedId(Array.from(selectedIds)[selectedIds.size - 1]!);
+      }
+    }
+    setDragStart(null);
+    setDragEnd(null);
   }
 
   useEffect(() => {
@@ -277,7 +323,13 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
         </div>
       )}
 
-      <div className="flex-1 overflow-auto p-[18px]">
+      <div
+        className="flex-1 overflow-auto p-[18px] relative"
+        onMouseDown={handleGridMouseDown}
+        onMouseMove={handleGridMouseMove}
+        onMouseUp={handleGridMouseUp}
+        onMouseLeave={handleGridMouseUp}
+      >
         {entries == null && <div className="py-10 text-center text-sm text-[#9a9bab]">Đang tải...</div>}
         {entries != null && entries.length === 0 && (
           <div className="rounded-[12px] border border-dashed border-[#d8d9e3] p-10 text-center text-sm text-[#9a9bab]">
@@ -294,6 +346,13 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             {filtered.map((entry) => (
               <div
                 key={entry.id}
+                data-card={entry.id}
+                ref={(el) => {
+                  if (el) {
+                    const rect = el.getBoundingClientRect();
+                    setCardRects((prev) => new Map(prev).set(entry.id, rect));
+                  }
+                }}
                 className={cn(
                   'group relative flex flex-col gap-2 rounded-[12px] border p-2 cursor-pointer transition-all',
                   isSelected(entry.id)
@@ -350,6 +409,18 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
               </div>
             ))}
           </div>
+        )}
+
+        {dragStart && dragEnd && (
+          <div
+            className="fixed border-2 border-[#4b57e6] bg-[#4b57e6]/5 pointer-events-none"
+            style={{
+              left: Math.min(dragStart.x, dragEnd.x),
+              top: Math.min(dragStart.y, dragEnd.y),
+              width: Math.abs(dragEnd.x - dragStart.x),
+              height: Math.abs(dragEnd.y - dragStart.y),
+            }}
+          />
         )}
       </div>
 
