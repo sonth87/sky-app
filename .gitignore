@@ -40,3 +40,5 @@ apps/data-service/data/bundle.json
 apps/data-service/data/*.db
 apps/data-service/data/*.db-shm
 apps/data-service/data/*.db-wal
+# Generated audio outputs (test/debug)
+apps/tts-service/server/moss_runtime/generated_audio/*.wav
