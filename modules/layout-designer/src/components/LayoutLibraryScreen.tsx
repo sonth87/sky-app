@@ -5,7 +5,7 @@
 // Thumbnail dùng lại đúng pattern LayoutPickerModal (LayoutRenderer + demoCanonicalSubject +
 // cache resolveAssetUrl theo batch).
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Info, Plus, Search, Download, Upload } from 'lucide-react';
 import type { LayoutPort } from '@sky-app/service-contracts';
 import { LayoutRenderer, demoCanonicalSubject, type LayoutContent } from '@sky-app/slide-shared';
@@ -49,7 +49,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ x: number; y: number } | null>(null);
-  const [cardRects, setCardRects] = useState<Map<string, DOMRect>>(new Map());
+  const cardRectsRef = useRef<Map<string, DOMRect>>(new Map());
 
   useEffect(() => {
     if (!message) return;
@@ -115,7 +115,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
 
     // Tìm cards trong drag box
     const newSelection = new Set<string>();
-    for (const [id, rect] of cardRects) {
+    for (const [id, rect] of cardRectsRef.current) {
       if (boxesOverlap(dragBox, rect)) {
         newSelection.add(id);
       }
@@ -350,7 +350,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                 ref={(el) => {
                   if (el) {
                     const rect = el.getBoundingClientRect();
-                    setCardRects((prev) => new Map(prev).set(entry.id, rect));
+                    cardRectsRef.current.set(entry.id, rect);
                   }
                 }}
                 className={cn(
