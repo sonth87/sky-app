@@ -11,6 +11,7 @@ import { TextControls } from './TextControls.js';
 import { RibbonControls } from './RibbonControls.js';
 import { ImageControls } from './ImageControls.js';
 import { ShapeControls } from './ShapeControls.js';
+import { LoopControls } from './LoopControls.js';
 import { RotationControl, OpacityControl } from './CommonControls.js';
 
 export interface PropertyPanelProps {
@@ -99,6 +100,7 @@ export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenIns
         <ImageControls item={item} patch={patch} pickAndSaveImage={pickAndSaveImage} resolveAssetUrl={resolveAssetUrl} />
       )}
       {item.type === 'shape' && <ShapeControls item={item} patch={patch} />}
+      {item.type === 'loop' && <LoopControls item={item} patch={patch} />}
       <RotationControl value={item.box.rotation ?? 0} onChange={(v) => patch({ box: { ...item.box, rotation: v } })} />
       <OpacityControl value={item.opacity ?? 100} onChange={(v) => patch({ opacity: v })} />
     </div>
