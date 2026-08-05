@@ -310,7 +310,16 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
         }
 
         const nextId = allIds[nextIndex];
-        if (nextId) {
+        if (!nextId) return;
+
+        // Shift+Arrow: extend range selection
+        if (e.shiftKey && lastSelectedId) {
+          const lastIndex = allIds.indexOf(lastSelectedId);
+          const [start, end] = lastIndex < nextIndex ? [lastIndex, nextIndex] : [nextIndex, lastIndex];
+          const rangeIds = allIds.slice(start, end + 1);
+          setSelectedIds(new Set(rangeIds));
+        } else {
+          // Normal arrow: single selection
           setSelectedIds(new Set([nextId]));
           setLastSelectedId(nextId);
         }
@@ -699,8 +708,10 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   key={entry.id}
                   data-card={entry.id}
                   className={cn(
-                    'group grid grid-cols-[2fr_1.5fr_1fr_1fr_120px] gap-4 px-4 py-3 items-center cursor-pointer transition-all border-b border-[#e6e6ee] hover:bg-[#f9faff]',
-                    isSelected(entry.id) && 'bg-[#f0f2ff]'
+                    'group grid grid-cols-[2fr_1.5fr_1fr_1fr_120px] gap-4 px-4 py-3 items-center cursor-pointer transition-all border-b',
+                    isSelected(entry.id)
+                      ? 'bg-[#f0f2ff] border-[#4b57e6] border-l-4'
+                      : 'border-[#e6e6ee] hover:bg-[#f9faff]'
                   )}
                   onClick={(e) => handleCardClick(entry.id, e)}
                   onDoubleClick={() => onOpen(entry.id)}
