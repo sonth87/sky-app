@@ -6,7 +6,7 @@
 // cache resolveAssetUrl theo batch).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, Info, Plus, Search, Download, Upload, ChevronLeft, Layers, Trash2 } from 'lucide-react';
+import { Copy, Info, Plus, Search, Download, Upload, ChevronLeft, Layers, Trash2, Grid3X3, List } from 'lucide-react';
 import type { LayoutPort } from '@sky-app/service-contracts';
 import { LayoutRenderer, demoCanonicalSubject, type LayoutContent } from '@sky-app/slide-shared';
 import { cn } from '@sky-app/ui';
@@ -71,6 +71,11 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     const saved = localStorage.getItem('layout-library-trashed-ids');
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    if (typeof window === 'undefined') return 'grid';
+    const saved = localStorage.getItem('layout-library-view-mode');
+    return (saved as 'grid' | 'list') || 'grid';
+  });
   const cardRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
@@ -89,6 +94,11 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   useEffect(() => {
     localStorage.setItem('layout-library-trashed-ids', JSON.stringify([...trashedIds]));
   }, [trashedIds]);
+
+  // Persist view mode
+  useEffect(() => {
+    localStorage.setItem('layout-library-view-mode', viewMode);
+  }, [viewMode]);
 
   // Close context menu on Escape
   useEffect(() => {
@@ -354,6 +364,32 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[#f4f5f9]">
       <div className="h-[52px] shrink-0 flex items-center gap-3 px-[14px] bg-white border-b border-[#e6e6ee]">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setViewMode('grid')}
+            title="Grid view"
+            className={cn(
+              'flex items-center justify-center w-8 h-8 rounded-md cursor-pointer transition-colors',
+              viewMode === 'grid'
+                ? 'bg-[#4b57e6] text-white'
+                : 'text-[#5c5d6e] hover:bg-[#f4f5f9]'
+            )}
+          >
+            <Grid3X3 size={16} />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            title="List view"
+            className={cn(
+              'flex items-center justify-center w-8 h-8 rounded-md cursor-pointer transition-colors',
+              viewMode === 'list'
+                ? 'bg-[#4b57e6] text-white'
+                : 'text-[#5c5d6e] hover:bg-[#f4f5f9]'
+            )}
+          >
+            <List size={16} />
+          </button>
+        </div>
         <div className="flex-1" />
         <div className="relative w-[240px]">
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9a9bab]" />
@@ -499,7 +535,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
               Không tìm thấy layout khớp "{search}".
             </div>
           )
-        ) : (
+        ) : viewMode === 'grid' ? (
           <div className="grid gap-[14px]" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
             {filtered.map((entry) => (
               <div
@@ -567,6 +603,62 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                     )}
                   >
                     <Copy size={13} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="divide-y divide-[#e6e6ee]">
+            {filtered.map((entry) => (
+              <div
+                key={entry.id}
+                data-card={entry.id}
+                className={cn(
+                  'group flex items-center justify-between gap-4 px-4 py-3 hover:bg-[#f4f5f9] cursor-pointer transition-colors',
+                  isSelected(entry.id) && 'bg-[#f0f2ff]'
+                )}
+                onClick={(e) => handleCardClick(entry.id, e)}
+                onDoubleClick={() => onOpen(entry.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ x: e.clientX, y: e.clientY, layoutId: entry.id });
+                }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    {entry.color && <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />}
+                    <span className="font-semibold text-sm text-[#26262e]">{entry.name}</span>
+                  </div>
+                  {entry.description && (
+                    <div className="text-xs text-[#9a9bab] mt-1">{entry.description}</div>
+                  )}
+                  <div className="flex items-center gap-2 mt-2 text-xs text-[#5c5d6e]">
+                    <span>{entry.content.variants.map((v) => v.aspect.id).join(', ')}</span>
+                    {entry.category && <span>·</span>}
+                    {entry.category && <span>{entry.category}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInfoModalEntry(entry);
+                    }}
+                    title="Thông tin"
+                    className="flex items-center justify-center w-8 h-8 rounded-md text-[#5c5d6e] hover:bg-white"
+                  >
+                    <Info size={16} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNameModal({ mode: 'duplicate', source: entry });
+                    }}
+                    title="Sao chép"
+                    className="flex items-center justify-center w-8 h-8 rounded-md text-[#5c5d6e] hover:bg-white"
+                  >
+                    <Copy size={16} />
                   </button>
                 </div>
               </div>
