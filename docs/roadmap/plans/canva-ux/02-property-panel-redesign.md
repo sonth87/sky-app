@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: completed
 target_version: layout-designer-v0.15.0
+completed_date: 2026-08-06
 ---
 
 # GĐ11 — Property Panel: áp dụng primitive mới + màu Colorful + section thu gọn

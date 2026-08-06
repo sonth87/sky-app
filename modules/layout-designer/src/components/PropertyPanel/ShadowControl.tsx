@@ -1,6 +1,6 @@
 import type { TextShadow } from '@sky-app/slide-shared';
 import { Section } from './CommonControls.js';
-import { cn } from '@sky-app/ui';
+import { ColorfulSwatchButton, cn } from '@sky-app/ui';
 
 export interface ShadowControlProps {
   value: TextShadow | boolean | undefined;
@@ -25,7 +25,11 @@ export function ShadowControl({ value, onChange }: ShadowControlProps) {
       </div>
       {enabled && (
         <div className="flex flex-col gap-2">
-          <input type="color" value={obj.color ?? '#000000'} onChange={(e) => onChange({ ...obj, color: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
+          <ColorfulSwatchButton
+            color={obj.color ?? '#000000'}
+            onChange={(color) => onChange({ ...obj, color })}
+            title="Màu bóng"
+          />
           <div className="flex gap-2">
             <label className="text-[10.5px] text-[#9a9bab] flex-1">
               Lệch X

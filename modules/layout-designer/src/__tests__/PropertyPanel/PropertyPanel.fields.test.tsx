@@ -246,7 +246,8 @@ describe('PropertyPanel — ShapeItem field còn thiếu', () => {
     const { container } = render(<LayoutDesignerApp content={shapeContent()} />);
     selectFirstItem(container);
 
-    const strokeSection = [...container.querySelectorAll('div')].find((d) => d.textContent === 'Viền')?.parentElement;
+    const button = [...container.querySelectorAll('button')].find((b) => b.textContent.includes('Viền'));
+    const strokeSection = button?.closest('div');
     const slider = strokeSection?.querySelector('input[type="range"]') as HTMLInputElement;
     fireEvent.change(slider, { target: { value: '3' } });
 

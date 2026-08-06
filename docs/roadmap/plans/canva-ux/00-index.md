@@ -101,7 +101,29 @@ bộ này, không tự sáng tạo màu/spacing mới:
   vào canvas". `ImagePanel`/`MediaLibraryModal` vẫn giữ click-chọn (vì đó là "áp dụng cho item
   ĐANG chọn" hoặc "chọn rồi bấm Xác nhận", ngữ nghĩa khác hẳn "thêm mới").
 
-## Danh sách 10 phase + quan hệ phụ thuộc
+## Tài liệu nội dung tham khảo (content-spec) — đọc TRƯỚC khi code GĐ15/16/17/19's TextPresetsPanel
+
+4 file MÔ TẢ CHI TIẾT BẰNG LỜI (không phải outline/tóm tắt) toàn bộ nội dung/UI/UX/logic cho 4
+nhóm palette dựa trực tiếp trên ảnh chụp UI Canva thật (Sonth cung cấp 2026-08-06) — viết để 1
+session chat mới/1 AI Agent khác đọc vào KHÔNG CẦN xem lại ảnh gốc vẫn hình dung được đầy đủ có
+những nhóm/nhóm-con/loại nào, hoạt động ra sao, UI/UX thế nào, cấu hình cơ bản gì:
+
+- [`content-spec-van-ban.md`](./content-spec-van-ban.md) — nhóm Văn bản (Titles/Paragraphs/Text
+  Mask/Text Marquee/Themed Text, quyết định GIỮ Text Marquee vì phù hợp LED không cần tương tác)
+- [`content-spec-do-hoa.md`](./content-spec-do-hoa.md) — nhóm Đồ họa (Shapes mở rộng enum,
+  Arrows, Icon minh hoạ theo chủ đề — quyết định BỎ nhóm Video, tự sưu tầm icon thay vì Canva's
+  Animals&Nature không hợp ngữ cảnh ceremony)
+- [`content-spec-khung.md`](./content-spec-khung.md) — nhóm Khung (Giấy/Hoa/Đốm màu/Retro/Thư
+  chữ cái A-Z/Hình dạng cơ bản/Phim và ảnh/Thiết bị — phân loại theo độ khó kỹ thuật: polygon đơn
+  giản vs path vẽ tay vs cần asset overlay PNG)
+- [`content-spec-luoi.md`](./content-spec-luoi.md) — nhóm Lưới (mở rộng khái niệm ra ngoài "N ô
+  đều" ban đầu: Pro Galleries không đều/Grid Galleries đều/Slider Galleries gồm 6 kiểu con khác
+  hẳn nhau — slideshow tự động, dải ảnh tròn, mosaic thoi/tam giác, thẻ chữ-ảnh, chồng ảnh xoay)
+
+Mỗi file đều có mục "Tổng kết... kèm mức ưu tiên triển khai" ở cuối — xếp hạng NÊN làm trước/sau
+theo độ khó kỹ thuật + giá trị sử dụng thực tế cho ngữ cảnh ceremony, không phải chỉ mô tả suông.
+
+## Danh sách 13 phase + quan hệ phụ thuộc
 
 | # | File | Version | Phụ thuộc | Rủi ro |
 |---|---|---|---|---|
@@ -110,22 +132,47 @@ bộ này, không tự sáng tạo màu/spacing mới:
 | GĐ12 | `03-text-autofit.md` | v0.16.0 | không | Trung bình-Cao |
 | GĐ13 | `04-item-toolbar-per-type.md` | v0.17.0 | GĐ10 | Thấp-Trung bình |
 | GĐ14 | `05-media-library-modal.md` | v0.18.0 | GĐ10 | Trung bình |
+| GĐ14.5 | `05.5-media-advanced.md` | v0.185.0 | GĐ14 | Trung bình |
+| GĐ14.6 | `05.6-gallery-item.md` | v0.186.0 | GĐ14 (MediaLibraryModal), GĐ10 (icon), GĐ11 (IconToggleGroup) | Trung bình |
+| GĐ14.7 | `05.7-media-scoped-by-layout.md` | v0.187.0 | GĐ14 (MediaLibraryModal) | Trung bình |
 | GĐ15 | `06-graphics-library.md` | v0.19.0 | GĐ10, GĐ11 (shape fix) | Thấp-Trung bình |
 | GĐ16 | `07-frames-mask-shapes.md` | v0.20.0 | GĐ15 (`overrides`) | Thấp |
 | GĐ17 | `08-grid-presets.md` | v0.21.0 | GĐ15 (`overrides`), GĐ9 (`batchCommand`) | Trung bình |
 | GĐ18 | `09-personal-templates.md` | v0.22.0 | GĐ17 (spawn `'preset'`) | Thấp |
 | GĐ19 | `10-rail-assembly.md` | v0.23.0 | TẤT CẢ trên | Thấp kỹ thuật/Cao UX |
 
-GĐ12 (text autofit) và GĐ14 (media modal) độc lập kỹ thuật, có thể làm SONG SONG với nhánh
-GĐ10→GĐ11→GĐ13 nếu Sonth muốn — không có phụ thuộc chéo giữa 2 nhánh này.
+GĐ12 (text autofit) và GĐ14/GĐ14.5/GĐ14.6/GĐ14.7 (media + gallery) độc lập kỹ thuật, có thể làm
+SONG SONG với nhánh GĐ10→GĐ11→GĐ13 nếu Sonth muốn — không có phụ thuộc chéo giữa 2 nhánh này.
+Riêng GĐ14.6 cần tile spawn đặt trong `GraphicsPanel.tsx` (GĐ15) — nếu làm GĐ14.6 TRƯỚC GĐ15,
+tile "Bộ ảnh trống" tạm chưa có nơi hiện (GalleryItem vẫn spawn được qua code/test, chỉ chưa có
+UI kéo-thả tới khi GĐ15 xong). GĐ14.7 nên làm SAU GĐ14.6 nếu cả 2 cùng làm (để
+`collectUsedAssetPaths` xử lý đúng luôn nhánh `GalleryItem.images`), nhưng không BẮT BUỘC thứ
+tự — làm GĐ14.7 trước vẫn chạy đúng, chỉ thiếu 1 nhánh quét (bổ sung sau, tách biệt rõ trong file
+14.7). GĐ14.7 KHÔNG còn phụ thuộc GĐ19 (đã bỏ ý tưởng tái dùng EmptyState của "Mẫu" — Media dùng
+mô hình tách riêng "Trong layout"/"Toàn bộ", không liên quan "Mẫu"/"Cá nhân" của Templates).
 
 ## Backlog (không đánh số, không chặn gì)
 
 - **Group/Ungroup thật** (khối di chuyển/resize/xoay CỐ ĐỊNH lâu dài) — dùng lại nguyên phân
   tích `GroupItem`/5 dispatch-site của roadmap cũ khi cần, không thiết kế lại.
 - **Tô màu (tint) icon/SVG trong Đồ họa** — hoãn tới khi có nhu cầu thật.
-- **`AssetMeta` mở rộng field** (type/dimensions/tags, hỗ trợ video...) — hoãn tới khi Media
-  Library cần loại asset khác ngoài ảnh.
+- **Tag system cho assets** (GĐ14.5) — field `tags?: string[]` tồn tại trong type nhưng KHÔNG
+  có UI editor/filter (đúng thực tế my-builder, không phải thiếu sót) — thêm tag editor + filter
+  UI riêng khi có nhu cầu thật, không đánh số trước.
+- **AssetProvider extensibility** (GĐ14.5) — v1 chỉ có local/url/WASM sources, AWS S3/Cloudinary
+  thêm sau khi có nhu cầu thật.
+- **Pagination thật cho Media Library** (GĐ14.5) — v1 scroll hết danh sách (giống my-builder),
+  chỉ thêm khi thư viện thật vượt ngưỡng gây chậm UI.
+- **Focal point UI cho ảnh trong GalleryItem** (GĐ14.6) — field `focalX/focalY` per-ảnh đã có
+  trong `GalleryImageEntry`, nhưng `GalleryManagerModal` v1 không có slider chỉnh — tái dùng
+  `FocalPointControl` (GĐ8b) khi cần.
+- **Tuỳ biến tỷ lệ từng ô ảnh trong GalleryItem** (GĐ14.6) — v1 cố định `aspectRatio: 1` mọi ô,
+  thêm field `aspectRatio?: number` per-entry nếu cần ô chữ nhật/tỷ lệ khác sau này.
+- **Global asset-usage index xuyên MỌI layout** (rủi ro có từ GĐ14, không riêng GĐ14.7) — hiện
+  KHÔNG có cách biết 1 asset có đang được layout KHÁC dùng hay không trước khi xoá (nút xoá ở tab
+  "Thư viện"/"Cá nhân" xoá thẳng, không cảnh báo) → xoá 1 ảnh dùng chung (VD logo trường) có thể
+  âm thầm phá layout khác. Cần bảng DB mới (asset ↔ layout nào dùng) để cảnh báo chính xác trước
+  khi xoá — làm khi có sự cố thật xảy ra, không xây trước khi có bằng chứng cần.
 - **Migrate `LayoutInfoModal.tsx`/`CrossLayoutVariantPickerModal.tsx` sang Radix Dialog** — 2
   modal này ĐANG CHẠY ĐÚNG, không có bug báo cáo — không refactor lại chỉ vì công nghệ mới đẹp
   hơn (rủi ro thuần, không lợi ích cụ thể). Chỉ modal MỚI (GĐ14) dùng Radix từ đầu.
@@ -134,7 +181,7 @@ GĐ10→GĐ11→GĐ13 nếu Sonth muốn — không có phụ thuộc chéo gi�
 
 `pnpm typecheck` toàn repo + `pnpm --filter @sky-app/layout-editor-core test` +
 `pnpm --filter module-layout-designer test` sạch (baseline 255/255 sau GĐ9), cộng
-`pnpm --filter @sky-app/ceremony-db test`/`data-service test` cho phase đụng DB/asset (GĐ14,
+`pnpm --filter @sky-app/ceremony-db test`/`data-service test` cho phase đụng DB/asset (GĐ14/14.5,
 GĐ18). Runtime thật (`dev:app`) Sonth xác nhận riêng cho phase chạm `renderer.tsx` (GĐ11's shape
-fix, GĐ12, GĐ16) và phase lắp ráp cuối (GĐ19).
+fix, GĐ12, GĐ16, GĐ14.6's GalleryItem) và phase lắp ráp cuối (GĐ19).
 

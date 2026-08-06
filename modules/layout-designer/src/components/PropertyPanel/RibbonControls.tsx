@@ -1,7 +1,7 @@
 import type { LayoutItem } from '@sky-app/slide-shared';
 import { Bold } from 'lucide-react';
 import { VariableTextarea } from '../VariableTextarea.js';
-import { Section } from './CommonControls.js';
+import { Section, CollapsibleSection } from './CommonControls.js';
 import { IconToggleButton, ColorfulSwatchButton } from '@sky-app/ui';
 import { ShadowControl } from './ShadowControl.js';
 
@@ -54,7 +54,7 @@ export function RibbonControls({
           title="Màu nền"
         />
       </Section>
-      <Section title="Viền">
+      <CollapsibleSection title="Viền" defaultOpen={true}>
         <div className="flex items-center gap-[10px] mb-2">
           <input type="range" min={0} max={16} value={item.borderW ?? 0} onChange={(e) => patch({ borderW: Number(e.target.value) })} className="flex-1" />
           <span className="text-[11px] w-[34px] text-right">{item.borderW ?? 0}</span>
@@ -66,7 +66,7 @@ export function RibbonControls({
             title="Màu viền"
           />
         )}
-      </Section>
+      </CollapsibleSection>
       <ShadowControl value={item.shadow} onChange={(shadow) => patch({ shadow })} />
     </>
   );

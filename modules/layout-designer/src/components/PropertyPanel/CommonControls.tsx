@@ -1,4 +1,5 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export function pickerBtnStyle(active: boolean, extra?: React.CSSProperties): React.CSSProperties {
   return {
@@ -14,6 +15,23 @@ export function Section({ title, children }: { title: string; children: ReactNod
     <div className="border-t border-[#f0f0f5] p-[13px_15px]">
       <div className="font-semibold text-[11px] tracking-[.04em] uppercase text-[#9a9bab] mb-[10px]">{title}</div>
       {children}
+    </div>
+  );
+}
+
+export function CollapsibleSection({ title, defaultOpen, children }: { title: string; defaultOpen: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-t border-[#f0f0f5]">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between p-[13px_15px] cursor-pointer hover:bg-[#f8f8fa]"
+      >
+        <span className="font-semibold text-[11px] tracking-[.04em] uppercase text-[#9a9bab]">{title}</span>
+        {open ? <ChevronDown size={14} className="text-[#9a9bab]" /> : <ChevronRight size={14} className="text-[#9a9bab]" />}
+      </button>
+      {open && <div className="p-[0_15px_13px]">{children}</div>}
     </div>
   );
 }

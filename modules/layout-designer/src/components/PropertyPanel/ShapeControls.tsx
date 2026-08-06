@@ -1,6 +1,6 @@
 import type { LayoutItem } from '@sky-app/slide-shared';
 import { Square, Circle, Triangle, Diamond, Frame, Minus } from 'lucide-react';
-import { Section } from './CommonControls.js';
+import { Section, CollapsibleSection } from './CommonControls.js';
 import { IconToggleGroup, ColorfulSwatchButton } from '@sky-app/ui';
 import { ShadowControl } from './ShadowControl.js';
 import { cn } from '@sky-app/ui';
@@ -52,7 +52,7 @@ export function ShapeControls({ item, patch }: ShapeControlsProps) {
           </div>
         </Section>
       )}
-      <Section title={item.shape === 'frame' ? 'Viền (bắt buộc — đây là khung viền)' : 'Viền'}>
+      <CollapsibleSection title={item.shape === 'frame' ? 'Viền (bắt buộc — đây là khung viền)' : 'Viền'} defaultOpen={true}>
         <div className={cn('flex items-center gap-[10px]', (item.strokeW ?? 0) > 0 && 'mb-2')}>
           <input type="range" min={0} max={16} value={item.strokeW ?? 0} onChange={(e) => patch({ strokeW: Number(e.target.value) })} className="flex-1" />
           <span className="text-[11px] w-[34px] text-right">{item.strokeW ?? 0}</span>
@@ -64,7 +64,7 @@ export function ShapeControls({ item, patch }: ShapeControlsProps) {
             title="Màu viền"
           />
         )}
-      </Section>
+      </CollapsibleSection>
       <ShadowControl value={item.shadow} onChange={(shadow) => patch({ shadow })} />
     </>
   );

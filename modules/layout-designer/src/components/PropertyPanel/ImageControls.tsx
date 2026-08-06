@@ -3,7 +3,7 @@ import type { LayoutItem } from '@sky-app/slide-shared';
 import type { AssetPort } from '@sky-app/service-contracts';
 import { Square, Circle } from 'lucide-react';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
-import { Section } from './CommonControls.js';
+import { Section, CollapsibleSection } from './CommonControls.js';
 import { IconToggleGroup, ColorfulSwatchButton } from '@sky-app/ui';
 import { ShadowControl } from './ShadowControl.js';
 import { MediaLibraryModal } from '../MediaLibraryModal.js';
@@ -123,34 +123,50 @@ export function ImageControls({
           ))}
         </div>
       </Section>
-      <Section title="Hình dạng & viền">
-        <IconToggleGroup
-          options={[
-            { value: 'rect' as const, icon: Square, title: 'Vuông' },
-            {
-              value: 'round' as const,
-              icon: Square,
-              title: 'Vuông tròn',
-            },
-            { value: 'circle' as const, icon: Circle, title: 'Tròn' },
-          ]}
-          value={item.shape ?? 'rect'}
-          onChange={(shape) => patch({ shape })}
-        />
-        <div className="mt-3 flex items-center gap-2">
-          <span className="text-[11.5px] flex-shrink-0">Viền</span>
+      <Section title="Hình dạng">
+        <div className="flex gap-[7px]">
+          {(
+            [
+              { value: 'rect' as const, icon: Square, title: 'Vuông' },
+              {
+                value: 'round' as const,
+                icon: Square,
+                title: 'Vuông tròn',
+                className: 'rounded-md',
+              },
+              { value: 'circle' as const, icon: Circle, title: 'Tròn' },
+            ] as const
+          ).map((opt) => {
+            const Icon = opt.icon;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => patch({ shape: opt.value })}
+                className={cn(
+                  'flex items-center justify-center w-8 h-8 rounded-[7px] border cursor-pointer transition-colors',
+                  item.shape === opt.value ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]' : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e] hover:bg-[#f4f5f9]'
+                )}
+                title={opt.title}
+              >
+                <Icon size={15} className={opt.className} />
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+      <CollapsibleSection title="Viền" defaultOpen={true}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[11.5px] flex-shrink-0">Độ dày</span>
           <input type="range" min={0} max={16} value={item.borderW ?? 0} onChange={(e) => patch({ borderW: Number(e.target.value) })} className="flex-1" />
         </div>
         {(item.borderW ?? 0) > 0 && (
-          <div className="mt-2">
-            <ColorfulSwatchButton
-              color={item.borderColor ?? '#000000'}
-              onChange={(borderColor) => patch({ borderColor })}
-              title="Màu viền"
-            />
-          </div>
+          <ColorfulSwatchButton
+            color={item.borderColor ?? '#000000'}
+            onChange={(borderColor) => patch({ borderColor })}
+            title="Màu viền"
+          />
         )}
-      </Section>
+      </CollapsibleSection>
       <Section title="Bộ lọc">
         <div className="grid grid-cols-4 gap-2">
           {(

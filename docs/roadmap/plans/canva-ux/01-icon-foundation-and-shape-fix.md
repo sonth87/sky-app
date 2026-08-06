@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: completed
 target_version: layout-designer-v0.14.0
+completed_date: 2026-08-06
 ---
 
 # GĐ10 — Icon foundation + sửa bug render ShapeItem (4/6 hình dạng "chết")
