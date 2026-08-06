@@ -22,6 +22,37 @@ export interface AssetMeta {
   uploadedAt: string;
 }
 
+export type AssetType = 'image' | 'video' | 'font' | 'file' | 'icon';
+
+/** Full Asset with metadata — GĐ14.5 mở rộng */
+export interface Asset {
+  id: string;
+  type: AssetType;
+  name: string;
+  relativePath: string; /** Giống AssetMeta.relativePath — lưu trong LayoutItem.src */
+  size?: number;
+  dimensions?: { width: number; height: number };
+  mimeType?: string;
+  uploadedAt?: string;
+  tags?: string[];
+  source: 'local' | 'url' | string;
+}
+
+export interface AssetQuery {
+  type?: AssetType;
+  search?: string;
+  tags?: string[];
+  page?: number;
+  pageSize?: number;
+}
+
+export interface AssetListResult {
+  assets: Asset[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface AssetPort {
   /** Mở file picker, copy/upload ảnh đã chọn, trả về relativePath để lưu vào LayoutItem/Background.
    * `null` nếu user huỷ chọn file. */
@@ -39,4 +70,12 @@ export interface AssetPort {
   /** Lưu Blob (từ drag-drop/file input) thành ảnh, trả về relativePath. Dùng bởi Media Library
    * upload tab. (optional, Media Library modal không visible nếu không có). */
   saveImageBlob?(file: Blob, filename: string): Promise<{ relativePath: string }>;
+
+  /** GĐ14.5 — query assets với filter + pagination (thay thế listAssets).
+   * Adapter có thể mặc định trả toàn bộ client-side, pagination chỉ implement khi cần thật. */
+  queryAssets?(query: AssetQuery): Promise<AssetListResult>;
+
+  /** GĐ14.5 — thêm asset từ URL ngoài. KHÁC my-builder: TẢI VỀ + LƯU LOCAL ngay vì sky-app
+   * offline-first. Trả về Asset đã lưu với relativePath là local, không phải URL gốc. */
+  addAssetFromUrl?(url: string): Promise<Asset>;
 }
