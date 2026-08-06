@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown, Eye, EyeOff, Bold, Circle, Square, Triangle, Diamond, Frame, Minus, Edit2 } from 'lucide-react';
+import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown, Eye, EyeOff, Bold, Circle, Square, Triangle, Diamond, Frame, Minus, Edit2, Bookmark } from 'lucide-react';
 import type { Box, LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
 import { addItemCommand, batchCommand, patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
@@ -53,9 +53,10 @@ export interface ItemToolbarProps {
   pointerScaleY: number;
   pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
   onEnterLoopEdit?: (id: string) => void;
+  onSaveTemplate?: (items: LayoutItem[]) => void;
 }
 
-export function ItemToolbar({ item, editor, variant, loopItemId, originX, originY, pointerScaleX, pointerScaleY, pickAndSaveImage, onEnterLoopEdit }: ItemToolbarProps) {
+export function ItemToolbar({ item, editor, variant, loopItemId, originX, originY, pointerScaleX, pointerScaleY, pickAndSaveImage, onEnterLoopEdit, onSaveTemplate }: ItemToolbarProps) {
   const [shapeOpen, setShapeOpen] = useState(false);
   const aabb = computeRotatedAABB(item.box);
   const screenLeft = originX + aabb.minX * pointerScaleX;
@@ -147,6 +148,33 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
   };
 
   const btnClass = "flex items-center justify-center w6 h-6 border-none bg-transparent text-[#5c5d6e] hover:bg-[#f4f5f9] cursor-pointer rounded-md";
+
+  const handleSaveTemplate = () => {
+    if (!onSaveTemplate || !isMultiSelect) return;
+    // Get selected items and compute bounding box
+    const selectedItems = selectedIds.map((id) => variant.items.find((i) => i.id === id)).filter((i): i is LayoutItem => i !== undefined);
+    if (selectedItems.length === 0) return;
+
+    // Compute bounding box
+    let minX = Infinity, minY = Infinity;
+    selectedItems.forEach((itm) => {
+      minX = Math.min(minX, itm.box.x ?? 0);
+      minY = Math.min(minY, itm.box.y ?? 0);
+    });
+
+    // Deep clone and adjust coordinates relative to bounding box top-left
+    const templateItems = selectedItems.map((itm) => ({
+      ...itm,
+      id: itm.id, // Keep original IDs temporarily (will be replaced on spawn)
+      box: { ...itm.box, x: (itm.box.x ?? 0) - minX, y: (itm.box.y ?? 0) - minY },
+      // Strip sync fields
+      syncKey: undefined,
+      syncRef: undefined,
+      syncOverrides: undefined,
+    })) as LayoutItem[];
+
+    onSaveTemplate(templateItems);
+  };
 
   const renderExtraButtons = () => {
     if (isMultiSelect) return null;
@@ -252,6 +280,11 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
       {!isMultiSelect && (
         <button onClick={handleDuplicate} aria-label="Nhân đôi (thanh công cụ)" title="Nhân đôi" className={btnClass}>
           <Copy size={14} />
+        </button>
+      )}
+      {isMultiSelect && onSaveTemplate && (
+        <button onClick={handleSaveTemplate} aria-label="Lưu thành mẫu (thanh công cụ)" title="Lưu thành mẫu" className={btnClass}>
+          <Bookmark size={14} />
         </button>
       )}
       {renderExtraButtons()}

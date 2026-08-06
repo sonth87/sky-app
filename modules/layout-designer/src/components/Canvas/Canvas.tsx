@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
 import type { LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
+import type { LayoutComponentPort } from '@sky-app/service-contracts';
 import { zoomAt, resolveEditingItems, patchItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor, Guide } from '@sky-app/layout-editor-core';
 import { useEditorState } from '../../hooks/useEditor.js';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
 import { useCanvasKeyboardShortcuts } from '../../hooks/useCanvasKeyboardShortcuts.js';
 import { ItemToolbar } from '../ItemToolbar.js';
+import { SaveTemplateModal } from '../SaveTemplateModal.js';
 import { Minimap, shouldShowMinimap } from '../Minimap.js';
 import { TiptapTextEditor } from '../TiptapTextEditor.js';
 import { collectUsedTokenKeys } from '../Flyout/helpers.js';
@@ -45,6 +47,8 @@ export interface CanvasProps {
   pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
   /** Callback khi click nút "Sửa mẫu" trên LoopItem toolbar. */
   onEnterLoopEdit?: (id: string) => void;
+  /** Port để lưu personal templates (multi-select → Lưu thành mẫu). */
+  layoutComponentPort?: LayoutComponentPort;
 }
 
 export function Canvas({
@@ -61,6 +65,7 @@ export function Canvas({
   onTokenInserted,
   pickAndSaveImage,
   onEnterLoopEdit,
+  layoutComponentPort,
 }: CanvasProps) {
   const selection = useEditorState(editor, (s) => s.selection);
   const viewport = useEditorState(editor, (s) => s.viewport);
@@ -121,6 +126,8 @@ export function Canvas({
   // GĐ9 rubber-band selection — kéo chuột trên vùng trống để chọn nhiều item cùng lúc
   const marqueeRef = useRef<{ startX: number; startY: number } | null>(null);
   const [marqueeBox, setMarqueeBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  // GĐ18 save template modal state — hiện khi click nút "Lưu thành mẫu" trên multi-select toolbar
+  const [saveTemplateItems, setSaveTemplateItems] = useState<LayoutItem[] | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -446,6 +453,7 @@ export function Canvas({
                 pointerScaleY={layoutScaleY * totalScale}
                 pickAndSaveImage={pickAndSaveImage}
                 onEnterLoopEdit={onEnterLoopEdit}
+                onSaveTemplate={layoutComponentPort ? setSaveTemplateItems : undefined}
               />
             );
           } else {
@@ -477,10 +485,19 @@ export function Canvas({
                 pointerScaleY={layoutScaleY * totalScale}
                 pickAndSaveImage={pickAndSaveImage}
                 onEnterLoopEdit={onEnterLoopEdit}
+                onSaveTemplate={layoutComponentPort ? setSaveTemplateItems : undefined}
               />
             );
           }
         })()}
+      {saveTemplateItems && layoutComponentPort && (
+        <SaveTemplateModal
+          onSave={async (name) => {
+            await layoutComponentPort.save(name, saveTemplateItems);
+          }}
+          onClose={() => setSaveTemplateItems(null)}
+        />
+      )}
       {marqueeBox && (
         <div
           style={{

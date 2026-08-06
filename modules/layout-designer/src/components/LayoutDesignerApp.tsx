@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type { AspectRatio, LayoutContent, LayoutVariant, LayoutVersion } from '@sky-app/slide-shared';
-import type { AssetMeta, AssetPort, LayoutPort } from '@sky-app/service-contracts';
+import type { AssetMeta, AssetPort, LayoutComponentPort, LayoutPort } from '@sky-app/service-contracts';
 import {
   addVariantCommand,
   changeVariantAspectCommand,
@@ -91,6 +91,9 @@ export interface LayoutDesignerAppProps {
   listAssets?: () => Promise<AssetMeta[]>;
   /** Xoá 1 ảnh khỏi thư viện (optional, GĐ8a). Bỏ trống = không hiện nút xoá ảnh. */
   deleteAsset?: (relativePath: string) => Promise<void>;
+  /** Personal templates (GĐ18) — save/list/delete nhóm item tự tạo. Bỏ trống = ẩn "Lưu thành
+   * mẫu" trong ItemToolbar multi-select. */
+  layoutComponentPort?: LayoutComponentPort;
   /** Màu tag layout (PHỤ LỤC "Event Hub", 2026-07-22) — hiện badge ở danh sách Event. Bỏ trống
    * (cả `documentColor` lẫn `onChangeColor`) = ẩn ColorSwatchPicker hoàn toàn. */
   documentColor?: string;
@@ -110,6 +113,7 @@ export function LayoutDesignerApp({
   resolveAssetUrl,
   listAssets,
   deleteAsset,
+  layoutComponentPort,
   documentColor,
   onChangeColor,
 }: LayoutDesignerAppProps) {
@@ -287,6 +291,7 @@ export function LayoutDesignerApp({
               onUndo={() => editor.store.getState().undo()}
               onRedo={() => editor.store.getState().redo()}
               onTokenInserted={onTokenInserted}
+              layoutComponentPort={layoutComponentPort}
               topLeftOverlay={
                 <VariantTabs
                   variants={doc.variants}

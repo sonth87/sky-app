@@ -11,6 +11,7 @@ import { SQL_010_LAYOUT_DOCUMENT_COLOR } from './010_layout_document_color.js';
 import { SQL_011_EVENT_COLOR } from './011_event_color.js';
 import { SQL_012_LAYOUT_DOCUMENT_CATEGORY_TAGS } from './012_layout_document_category_tags.js';
 import { SQL_013_LAYOUT_DOCUMENT_TRASH } from './013_layout_document_trash.js';
+import { SQL_014_LAYOUT_COMPONENT } from './014_layout_component.js';
 
 export interface Migration {
   version: number;
@@ -38,4 +39,5 @@ export const MIGRATIONS: Migration[] = [
   { version: 11, name: 'event_color', sql: SQL_011_EVENT_COLOR },
   { version: 12, name: 'layout_document_category_tags', sql: SQL_012_LAYOUT_DOCUMENT_CATEGORY_TAGS },
   { version: 13, name: 'layout_document_trash', sql: SQL_013_LAYOUT_DOCUMENT_TRASH },
+  { version: 14, name: 'layout_component', sql: SQL_014_LAYOUT_COMPONENT },
 ];
