@@ -7,8 +7,8 @@ settings:
 catalogs:
   default:
     '@sonth87/device-layout':
-      specifier: github:sonth87/device-layout#v0.5.4
-      version: 0.5.4
+      specifier: github:sonth87/device-layout#v0.5.10
+      version: 0.5.10
     lucide-react:
       specifier: ^1.24.0
       version: 1.25.0
@@ -93,7 +93,7 @@ importers:
         version: link:../../packages/slide-shared
       '@sonth87/device-layout':
         specifier: 'catalog:'
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/916aacb36746a95db600eb5cf9caf6868696a58c(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/5b2204fca8d1b2d97e5a6423e75a04cd76331a7f(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
       adm-zip:
         specifier: ^0.6.0
         version: 0.6.0
@@ -190,7 +190,7 @@ importers:
         version: link:../../packages/platform-web
       '@sonth87/device-layout':
         specifier: 'catalog:'
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/916aacb36746a95db600eb5cf9caf6868696a58c(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(esbuild@0.28.1)(lightningcss@1.33.0))
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/5b2204fca8d1b2d97e5a6423e75a04cd76331a7f(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(esbuild@0.28.1)(lightningcss@1.33.0))
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -259,7 +259,7 @@ importers:
         version: link:../../packages/voice-catalog-ui
       '@sonth87/device-layout':
         specifier: 'catalog:'
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/916aacb36746a95db600eb5cf9caf6868696a58c(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/5b2204fca8d1b2d97e5a6423e75a04cd76331a7f(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
       '@tanstack/react-virtual':
         specifier: ^3.14.5
         version: 3.14.7(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -454,7 +454,7 @@ importers:
         version: link:../../packages/voice-catalog-ui
       '@sonth87/device-layout':
         specifier: 'catalog:'
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/916aacb36746a95db600eb5cf9caf6868696a58c(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/5b2204fca8d1b2d97e5a6423e75a04cd76331a7f(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
       i18next:
         specifier: ^26.3.6
         version: 26.3.6(typescript@5.9.3)
@@ -552,7 +552,7 @@ importers:
         version: link:../tts-engine-ui
       '@sonth87/device-layout':
         specifier: 'catalog:'
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/916aacb36746a95db600eb5cf9caf6868696a58c(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/5b2204fca8d1b2d97e5a6423e75a04cd76331a7f(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
       lucide-react:
         specifier: 'catalog:'
         version: 1.25.0(react@19.2.8)
@@ -771,7 +771,7 @@ importers:
         version: link:../tsconfig
       '@sonth87/device-layout':
         specifier: 'catalog:'
-        version: https://codeload.github.com/sonth87/device-layout/tar.gz/916aacb36746a95db600eb5cf9caf6868696a58c(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
+        version: https://codeload.github.com/sonth87/device-layout/tar.gz/5b2204fca8d1b2d97e5a6423e75a04cd76331a7f(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
       '@types/react':
         specifier: ^19.2.17
         version: 19.2.17
@@ -839,6 +839,18 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/ui-file-manager:
+    dependencies:
+      '@sky-app/ui':
+        specifier: workspace:*
+        version: link:../ui
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
 
   packages/voice-catalog-ui:
     dependencies:
@@ -3209,9 +3221,9 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
-  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/916aacb36746a95db600eb5cf9caf6868696a58c':
-    resolution: {tarball: https://codeload.github.com/sonth87/device-layout/tar.gz/916aacb36746a95db600eb5cf9caf6868696a58c}
-    version: 0.5.4
+  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/5b2204fca8d1b2d97e5a6423e75a04cd76331a7f':
+    resolution: {tarball: https://codeload.github.com/sonth87/device-layout/tar.gz/5b2204fca8d1b2d97e5a6423e75a04cd76331a7f}
+    version: 0.5.10
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -9790,7 +9802,7 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/916aacb36746a95db600eb5cf9caf6868696a58c(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(esbuild@0.28.1)(lightningcss@1.33.0))':
+  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/5b2204fca8d1b2d97e5a6423e75a04cd76331a7f(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(esbuild@0.28.1)(lightningcss@1.33.0))':
     dependencies:
       '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(webpack@5.109.2(esbuild@0.28.1)(lightningcss@1.33.0))
       '@radix-ui/react-context-menu': 2.3.4(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -9854,7 +9866,7 @@ snapshots:
       - use-sync-external-store
       - webpack
 
-  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/916aacb36746a95db600eb5cf9caf6868696a58c(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))':
+  '@sonth87/device-layout@https://codeload.github.com/sonth87/device-layout/tar.gz/5b2204fca8d1b2d97e5a6423e75a04cd76331a7f(@babel/core@7.29.7)(@floating-ui/dom@1.8.0)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))':
     dependencies:
       '@ducanh2912/next-pwa': 10.2.9(@types/babel__core@7.20.5)(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
       '@radix-ui/react-context-menu': 2.3.4(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

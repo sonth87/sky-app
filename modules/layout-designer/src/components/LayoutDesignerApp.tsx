@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type { AspectRatio, LayoutContent, LayoutVariant, LayoutVersion } from '@sky-app/slide-shared';
-import type { AssetMeta, LayoutPort } from '@sky-app/service-contracts';
+import type { AssetMeta, AssetPort, LayoutPort } from '@sky-app/service-contracts';
 import {
   addVariantCommand,
   changeVariantAspectCommand,
@@ -228,6 +228,17 @@ export function LayoutDesignerApp({
     }
   }
 
+  const assetPort: AssetPort | undefined = useMemo(() => {
+    if (!listAssets) return undefined;
+    return {
+      pickAndSaveImage,
+      resolveAssetUrl,
+      listAssets,
+      deleteAsset,
+      saveImageBlob: undefined, // Optional, not implemented in LayoutDesignerApp (delegates to platform)
+    };
+  }, [pickAndSaveImage, resolveAssetUrl, listAssets, deleteAsset]);
+
   return (
     // position:relative — containing block CỤC BỘ cho ghost label (position:absolute, xem
     // Flyout.tsx). Ghost KHÔNG dùng position:fixed vì @sonth87/device-layout's Window.tsx bọc
@@ -311,6 +322,7 @@ export function LayoutDesignerApp({
                   onTokenInserted={onTokenInserted}
                   pickAndSaveImage={pickAndSaveImage}
                   resolveAssetUrl={resolveAssetUrl}
+                  assetPort={assetPort}
                   width={rightPanelWidth}
                 />
                 <button

@@ -4,6 +4,8 @@ import type { Editor } from '@sky-app/layout-editor-core';
 import type { RailGroup } from '../Rail.js';
 import { useSpawnDrag } from './useSpawnDrag.js';
 import { ComponentsPanel } from './ComponentsPanel.js';
+import { GraphicsPanel } from './GraphicsPanel.js';
+import { FramesPanel } from './FramesPanel.js';
 import { TemplatesPanel } from './TemplatesPanel.js';
 import { CollectionsPanel } from './CollectionsPanel.js';
 import { VariablesPanel } from './VariablesPanel.js';

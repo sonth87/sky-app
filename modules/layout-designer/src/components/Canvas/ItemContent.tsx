@@ -106,7 +106,8 @@ export function ImageItemContent({
       style={{
         width: '100%',
         height: '100%',
-        borderRadius: item.shape === 'circle' ? '50%' : item.shape === 'round' ? 16 : 2,
+        borderRadius: item.clipPath ? undefined : (item.shape === 'circle' ? '50%' : item.shape === 'round' ? 16 : 2),
+        clipPath: item.clipPath ?? undefined,
         background: resolvedUrl ? `center/${item.fit ?? 'cover'} url(${resolvedUrl})` : 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
         border: item.borderW ? `${item.borderW * fScale}px solid ${item.borderColor ?? '#000'}` : undefined,
         overflow: 'hidden',

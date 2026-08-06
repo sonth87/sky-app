@@ -645,4 +645,25 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   ipcMain.handle('kernel:layoutAsset:delete', async (_event, relativePath: string) => {
     deleteAsset(ceremonyStore.getExecutor(), relativePath);
   });
+
+  ipcMain.handle('kernel:layoutAsset:saveBlob', async (_event, arrayBuffer: ArrayBuffer, filename: string) => {
+    const destDir = layoutAssetsDir();
+    await mkdir(destDir, { recursive: true });
+    const destName = `${randomUUID()}${extname(filename)}`;
+    const destPath = join(destDir, destName);
+
+    const buffer = Buffer.from(arrayBuffer);
+    await writeFile(destPath, buffer);
+
+    const relativePath = `assets/layout/${destName}`;
+    const size = buffer.length;
+    insertAsset(ceremonyStore.getExecutor(), {
+      relativePath,
+      name: filename,
+      sizeBytes: size,
+      uploadedAt: new Date().toISOString(),
+    });
+
+    return { relativePath };
+  });
 }

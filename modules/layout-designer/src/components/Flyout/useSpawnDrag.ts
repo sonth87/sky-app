@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
-import { addItemCommand } from '@sky-app/layout-editor-core';
+import { addItemCommand, batchCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
 import { screenPointToCanvas } from '../Canvas/helpers.js';
 
-export type SpawnKind = { kind: 'itemType'; type: LayoutItem['type']; label: string } | { kind: 'var'; key: string; label: string };
+export type SpawnKind =
+  | { kind: 'itemType'; type: LayoutItem['type']; label: string; overrides?: Partial<LayoutItem> }
+  | { kind: 'var'; key: string; label: string }
+  | { kind: 'preset'; items: LayoutItem[]; label: string };
 
 let spawnIdCounter = 0;
 export function nextSpawnId(prefix: string): string {
@@ -12,15 +15,13 @@ export function nextSpawnId(prefix: string): string {
   return `${prefix}_${spawnIdCounter}`;
 }
 
-export function createSpawnedItem(spawnKind: SpawnKind, center: { x: number; y: number }, registry: Editor['itemTypes']): LayoutItem | null {
+export function createSpawnedItem(spawnKind: SpawnKind, center: { x: number; y: number }, registry: Editor['itemTypes']): LayoutItem | LayoutItem[] | null {
   if (spawnKind.kind === 'var') {
     const id = nextSpawnId('var');
     const w = 260;
     return {
       id,
       type: 'text',
-      // KHÔNG còn Math.max(0, ...) clamp về biên (bỏ 2026-07-18) — cho phép spawn item ở toạ độ
-      // âm khi thả NGOÀI Frame (Canvas cho kéo tự do, xem comment đầu Canvas.tsx).
       box: { x: Math.round(center.x - w / 2), y: Math.round(center.y - 20), w, h: 50 },
       content: `@${spawnKind.key}`,
       fontSize: 26,
@@ -28,7 +29,25 @@ export function createSpawnedItem(spawnKind: SpawnKind, center: { x: number; y: 
       color: '#2E3A5B',
       align: 'center',
       shadow: true,
-    };
+    } as LayoutItem;
+  }
+
+  if (spawnKind.kind === 'preset') {
+    // Multi-item preset: adjust positions relative to drop point
+    const dropBox = spawnKind.items[0];
+    if (!dropBox) return null;
+    const offsetX = center.x - dropBox.box.x;
+    const offsetY = center.y - dropBox.box.y;
+
+    return spawnKind.items.map((template) => ({
+      ...template,
+      id: nextSpawnId(template.type.slice(0, 4)),
+      box: {
+        ...template.box,
+        x: Math.round(template.box.x + offsetX),
+        y: Math.round(template.box.y + offsetY),
+      },
+    }));
   }
 
   const def = registry.get(spawnKind.type);
@@ -37,8 +56,13 @@ export function createSpawnedItem(spawnKind: SpawnKind, center: { x: number; y: 
   const item = def.createDefault(id);
   const w = item.box.w,
     h = item.box.h;
-  // KHÔNG còn Math.max(0, ...) clamp về biên (bỏ 2026-07-18) — xem comment ở nhánh 'var' ở trên.
   item.box = { ...item.box, x: Math.round(center.x - w / 2), y: Math.round(center.y - h / 2) };
+
+  // Apply overrides if provided
+  if (spawnKind.overrides) {
+    return { ...item, ...spawnKind.overrides, id: item.id, box: item.box } as LayoutItem;
+  }
+
   return item;
 }
 
@@ -87,7 +111,14 @@ export function useSpawnDrag(
       const registry = editor.itemTypes;
       const newItem = createSpawnedItem(spawnKind, point, registry);
       if (!newItem) return;
-      editor.store.getState().dispatch(addItemCommand(variant.aspect.id, newItem, editingLoopId));
+
+      const state = editor.store.getState();
+      if (Array.isArray(newItem)) {
+        const commands = newItem.map((item) => addItemCommand(variant.aspect.id, item, editingLoopId));
+        state.dispatch(commands.length === 1 ? commands[0]! : batchCommand(commands));
+      } else {
+        state.dispatch(addItemCommand(variant.aspect.id, newItem, editingLoopId));
+      }
     }
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);

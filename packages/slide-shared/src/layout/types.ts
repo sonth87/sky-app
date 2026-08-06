@@ -135,6 +135,9 @@ export interface ImageItem extends BaseItem {
   // Áp dụng CSS object-position, khác với object-fit=contain (không ảnh hưởng)
   focalX?: number; // 0..1, mặc định 0.5
   focalY?: number; // 0..1, mặc định 0.5
+  // Cắt ảnh theo hình dạng trang trí (GĐ16 kế hoạch Canva-style) — CSS clip-path value
+  // VD: 'polygon(50% 0%, 0% 100%, 100% 100%)' cho tam giác
+  clipPath?: string;
 }
 
 export interface ShapeItem extends BaseItem {
