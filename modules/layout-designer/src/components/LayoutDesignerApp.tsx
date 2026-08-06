@@ -229,13 +229,12 @@ export function LayoutDesignerApp({
   }
 
   const assetPort: AssetPort | undefined = useMemo(() => {
-    if (!listAssets) return undefined;
+    if (!listAssets || !pickAndSaveImage || !resolveAssetUrl) return undefined;
     return {
       pickAndSaveImage,
       resolveAssetUrl,
       listAssets,
       deleteAsset,
-      saveImageBlob: undefined, // Optional, not implemented in LayoutDesignerApp (delegates to platform)
     };
   }, [pickAndSaveImage, resolveAssetUrl, listAssets, deleteAsset]);
 

@@ -6,6 +6,7 @@ import { useSpawnDrag } from './useSpawnDrag.js';
 import { ComponentsPanel } from './ComponentsPanel.js';
 import { GraphicsPanel } from './GraphicsPanel.js';
 import { FramesPanel } from './FramesPanel.js';
+import { GridPresetsPanel } from './GridPresetsPanel.js';
 import { TemplatesPanel } from './TemplatesPanel.js';
 import { CollectionsPanel } from './CollectionsPanel.js';
 import { VariablesPanel } from './VariablesPanel.js';
