@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: completed
 target_version: layout-designer-v0.18.0
+completed_date: 2026-08-06
 ---
 
 # GĐ14 — Media Library modal đầy đủ + mở rộng AssetPort
