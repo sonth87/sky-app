@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: completed
 target_version: layout-designer-v0.16.0
+completed_date: 2026-08-06
 ---
 
 # GĐ12 — Text tự co chữ khi tràn khung (`overflow: 'shrink'`) — cài thật
