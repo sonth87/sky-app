@@ -44,7 +44,8 @@ Sky-App là nền tảng multi-app (Web + Electron, Online + Offline, có licens
 |---|---|---|
 | [platform-architecture-ga1-7.md](./plans/platform-architecture-ga1-7.md) | `done` | Kế hoạch kiến trúc gốc dựng nền tảng — nay là [architecture/overview.md](../architecture/overview.md) |
 | [ota-update-strategy.md](./plans/ota-update-strategy.md) | `in_progress` | Chiến lược cập nhật OTA cho renderer (không cần cài lại, Loại 1a — code xong, verify end-to-end) và main process (electron-updater + GitHub Releases, Loại 2a — code xong, chờ GitHub repo thật để test full flow) |
-| [layout-designer-completion.md](./plans/layout-designer-completion.md) | `proposed` | GĐ6→GĐ12: hoàn thiện tính năng `modules/layout-designer` (dọn nợ wiring, property panel LoopItem, hiệu ứng shadow/border/gradient, media library, multi-select, group/ungroup, custom component tái dùng, bộ sưu tập dựng sẵn) — tiếp nối GĐ0-5 của kế hoạch Layout Designer + Event (ngoài repo, `~/.claude/plans/lazy-tinkering-goblet.md`) |
+| [layout-designer-completion.md](./plans/layout-designer-completion.md) | `in_progress` | GĐ6→GĐ9 xong (dọn nợ wiring, property panel LoopItem, hiệu ứng shadow/border/gradient, media library, multi-select+batch-command). GĐ10-12 (group/ungroup, custom component, bộ sưu tập) đã thay bởi `canva-ux/00-index.md` |
+| [canva-ux/00-index.md](./plans/canva-ux/00-index.md) | `proposed` | GĐ10→GĐ19: palette trái kiểu Canva (Mẫu/Văn bản/Media/Đồ họa/Khung/Lưới), property panel + toolbar theo từng loại item, sửa bug render Shape/text auto-fit, Media Library modal, saved templates — 11 file con chi tiết UI/UX/kỹ thuật từng phase |
 
 **GĐ7.5 (audit port Trao Bằng → sky-app)** đã hoàn thành, xem `docs/roadmap/plans/ga7.5-audit.md`.
 

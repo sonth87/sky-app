@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Lock, Pin, PinOff, Unlock } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lock, Pin, PinOff, Trash2, Unlock } from 'lucide-react';
 import type { LayoutItem } from '@sky-app/slide-shared';
 import { SyncBadge } from '../SyncBadge.js';
 import { cn } from '@sky-app/ui';
@@ -53,9 +53,9 @@ export function PanelHeader({
             {item.syncLocked ? <Unlock size={13} /> : <Lock size={13} />}
           </button>
         )}
-        <span onClick={onDelete} className={iconBtnClass}>
-          🗑
-        </span>
+        <button onClick={onDelete} aria-label="Xoá" className={cn(iconBtnClass, 'hover:text-red-500')}>
+          <Trash2 size={13} />
+        </button>
       </div>
       <input
         type="text"

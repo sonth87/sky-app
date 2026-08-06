@@ -1,8 +1,9 @@
-import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
+import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown, Eye, EyeOff, Bold, Circle, Square, Triangle, Diamond, Frame, Minus, Edit2 } from 'lucide-react';
 import type { Box, LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
 import { addItemCommand, batchCommand, patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
-import { cn } from '@sky-app/ui';
+import { cn, IconToggleButton, ColorfulSwatchButton } from '@sky-app/ui';
 
 const TOOLBAR_HEIGHT = 34;
 const TOOLBAR_GAP = 10;
@@ -50,9 +51,12 @@ export interface ItemToolbarProps {
   originY: number;
   pointerScaleX: number;
   pointerScaleY: number;
+  pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
+  onEnterLoopEdit?: (id: string) => void;
 }
 
-export function ItemToolbar({ item, editor, variant, loopItemId, originX, originY, pointerScaleX, pointerScaleY }: ItemToolbarProps) {
+export function ItemToolbar({ item, editor, variant, loopItemId, originX, originY, pointerScaleX, pointerScaleY, pickAndSaveImage, onEnterLoopEdit }: ItemToolbarProps) {
+  const [shapeOpen, setShapeOpen] = useState(false);
   const aabb = computeRotatedAABB(item.box);
   const screenLeft = originX + aabb.minX * pointerScaleX;
   const screenRight = originX + aabb.maxX * pointerScaleX;
@@ -144,6 +148,97 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
 
   const btnClass = "flex items-center justify-center w6 h-6 border-none bg-transparent text-[#5c5d6e] hover:bg-[#f4f5f9] cursor-pointer rounded-md";
 
+  const renderExtraButtons = () => {
+    if (isMultiSelect) return null;
+
+    if (item.type === 'text') {
+      const boldActive = (item.fontWeight ?? 400) >= 700;
+      return (
+        <IconToggleButton
+          icon={Bold}
+          title="Đậm"
+          active={boldActive}
+          onClick={() => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { fontWeight: boldActive ? 400 : 700 }, loopItemId))}
+        />
+      );
+    }
+
+    if (item.type === 'image' && pickAndSaveImage) {
+      return (
+        <button onClick={pickAndSaveImage} title="Đổi ảnh" className={btnClass}>
+          <Edit2 size={14} />
+        </button>
+      );
+    }
+
+    if (item.type === 'shape') {
+      const getShapeIcon = (shape: Extract<LayoutItem, { type: 'shape' }>['shape']) => {
+        switch (shape) {
+          case 'rect': return Square;
+          case 'circle': return Circle;
+          case 'triangle': return Triangle;
+          case 'diamond': return Diamond;
+          case 'frame': return Frame;
+          case 'line': return Minus;
+        }
+      };
+      const ShapeIcon = getShapeIcon(item.shape);
+      return (
+        <div className="relative">
+          <button title="Đổi hình dạng" onClick={() => setShapeOpen(!shapeOpen)} className={btnClass}>
+            <ShapeIcon size={14} />
+          </button>
+          {shapeOpen && (
+            <>
+              <div className="fixed inset-0 z-[999]" onClick={() => setShapeOpen(false)} />
+              <div className="absolute top-full mt-1 left-0 z-[1001] rounded-[11px] bg-white p-[10px] shadow-[0_14px_34px_rgba(20,20,40,0.18)] flex gap-[7px]">
+                {(['rect', 'circle', 'triangle', 'diamond', 'frame', 'line'] as const).map((shape) => {
+                  const Icon = getShapeIcon(shape);
+                  return (
+                    <button
+                      key={shape}
+                      onClick={() => {
+                        if (shape === 'frame' && !(item.strokeW ?? 0)) {
+                          dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { shape, strokeW: 2, stroke: item.stroke ?? '#000000' }, loopItemId));
+                        } else {
+                          dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { shape }, loopItemId));
+                        }
+                        setShapeOpen(false);
+                      }}
+                      className={cn(btnClass, item.shape === shape && 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]', 'border')}
+                    >
+                      <Icon size={14} />
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    if (item.type === 'ribbon') {
+      return (
+        <ColorfulSwatchButton
+          color={typeof item.bg === 'string' ? item.bg : '#b9902f'}
+          onChange={(bg) => dispatch(patchItemCommand<LayoutItem>(variant.aspect.id, item.id, item, { bg }, loopItemId))}
+          title="Đổi màu nền"
+        />
+      );
+    }
+
+    if (item.type === 'loop' && onEnterLoopEdit) {
+      return (
+        <button onClick={() => onEnterLoopEdit(item.id)} title="Sửa mẫu" className={btnClass}>
+          <Edit2 size={14} />
+        </button>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div
       data-testid="item-toolbar"
@@ -159,6 +254,7 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
           <Copy size={14} />
         </button>
       )}
+      {renderExtraButtons()}
       <button onClick={handleZUp} aria-label="Lên 1 lớp (thanh công cụ)" title="Lên 1 lớp" className={btnClass}>
         <ChevronUp size={14} />
       </button>

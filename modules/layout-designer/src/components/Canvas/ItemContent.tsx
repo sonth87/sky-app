@@ -1,4 +1,6 @@
+import { useRef, type CSSProperties } from 'react';
 import type { LayoutItem, TextItem } from '@sky-app/slide-shared';
+import { SHAPE_CLIP_PATHS, useAutoFitFontSize } from '@sky-app/slide-shared';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
 
 function getCSSValue(value: string | { kind: 'gradient'; value: string } | undefined): string | undefined {
@@ -18,12 +20,27 @@ export function ItemContent({
   resolveAssetUrl?: (path: string) => Promise<string>;
 }) {
   const fScale = Math.min(scaleX, scaleY);
+  const textRef = useRef<HTMLDivElement>(null);
+
   switch (item.type) {
     case 'text': {
       // vAlign dùng flexbox trên WRAPPER ngoài (item.box đã là 100% width/height của div này) —
       // textAlign (align) là CSS riêng biệt cho căn NGANG dòng chữ, vAlign căn theo trục DỌC.
       const justify = item.vAlign === 'top' ? 'flex-start' : item.vAlign === 'bottom' ? 'flex-end' : 'center';
-      const textStyle = computeTextStyle(item, fScale);
+      const requestedPx = item.fontSize * fScale;
+      const fittedPx = useAutoFitFontSize(textRef, {
+        text: typeof item.content === 'string' ? item.content : item.content.html,
+        boxWidthPx: item.box.w * scaleX,
+        boxHeightPx: item.box.h * scaleY,
+        requestedFontSizePx: requestedPx,
+        minFontSizePx: requestedPx * 0.4,
+        wrap: false,
+        enabled: item.overflow === 'shrink',
+      });
+      const textStyle: CSSProperties = {
+        ...computeTextStyle(item, fScale),
+        fontSize: fittedPx,
+      };
       return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: justify, overflow: item.overflow === 'clip' ? 'hidden' : undefined }}>
           {/* content string (layout cũ/chưa qua rich-text editor) → render trực tiếp qua
@@ -33,9 +50,9 @@ export function ItemContent({
              process khi bundle, xem RichTextContent's comment ở slide-shared/types.ts), read-only
              preview khi KHÔNG đang double-click sửa trực tiếp (xem TiptapTextEditor.tsx). */}
           {typeof item.content === 'string' ? (
-            <div style={textStyle}>{item.content}</div>
+            <div ref={textRef} style={textStyle}>{item.content}</div>
           ) : (
-            <div style={textStyle} dangerouslySetInnerHTML={{ __html: item.content.html }} />
+            <div ref={textRef} style={textStyle} dangerouslySetInnerHTML={{ __html: item.content.html }} />
           )}
         </div>
       );
@@ -137,9 +154,9 @@ export function textShadowCss(shadow: TextItem['shadow'], fScale: number): strin
   return `${offsetX * fScale}px ${offsetY * fScale}px ${blur * fScale}px ${color}`;
 }
 
-/** Bước 5 kế hoạch — thêm stroke/strokeW (mọi shape) + 2 dạng mới 'frame' (viền rỗng, không
- * fill giữa) / 'line' (1 đường kẻ mảnh ngang giữa box) — 'triangle'/'diamond' GIỮ NGUYÊN như cũ
- * (chưa có style đặc trưng riêng, CHỦ ĐỘNG ngoài phạm vi bước này theo đúng plan). */
+/** Bước 5 kế hoạch — 'frame' (viền rỗng, không fill giữa) / 'line' (1 đường kẻ mảnh ngang giữa
+ * box). GĐ10 (2026-08-06) — thêm clip-path cho 'triangle'/'diamond' (trước đó render giống rect,
+ * bug đã audit — xem SHAPE_CLIP_PATHS's comment). */
 export function ShapeItemContent({ item, fScale }: { item: Extract<LayoutItem, { type: 'shape' }>; fScale: number }) {
   const fillCSS = getCSSValue(item.fill);
   const border = item.strokeW ? `${item.strokeW * fScale}px solid ${item.stroke ?? '#000'}` : undefined;
@@ -157,6 +174,7 @@ export function ShapeItemContent({ item, fScale }: { item: Extract<LayoutItem, {
         background: fillCSS,
         border,
         borderRadius: item.shape === 'circle' ? '50%' : item.shape === 'rect' ? item.radius : undefined,
+        clipPath: SHAPE_CLIP_PATHS[item.shape],
       }}
     />
   );

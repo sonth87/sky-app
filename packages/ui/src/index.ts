@@ -19,3 +19,16 @@ export {
   SelectTrigger,
   SelectValue,
 } from './primitives/select.js';
+export { IconToggleButton, IconToggleGroup, type IconToggleButtonProps, type IconToggleGroupProps, type IconToggleOption } from './primitives/icon-toggle.js';
+export {
+  Dialog,
+  DialogTrigger,
+  DialogPortal,
+  DialogClose,
+  DialogOverlay,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+} from './primitives/dialog.js';
+export { Tabs, TabsList, TabsTrigger, TabsContent } from './primitives/tabs.js';

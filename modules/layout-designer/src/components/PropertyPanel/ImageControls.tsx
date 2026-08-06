@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import type { LayoutItem } from '@sky-app/slide-shared';
+import type { AssetPort } from '@sky-app/service-contracts';
+import { Square, Circle } from 'lucide-react';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
 import { Section } from './CommonControls.js';
+import { IconToggleGroup, ColorfulSwatchButton } from '@sky-app/ui';
 import { ShadowControl } from './ShadowControl.js';
+import { MediaLibraryModal } from '../MediaLibraryModal.js';
 import { cn } from '@sky-app/ui';
 
 export interface ImageControlsProps {
@@ -10,6 +14,7 @@ export interface ImageControlsProps {
   patch: (p: Partial<LayoutItem>) => void;
   pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
   resolveAssetUrl?: (path: string) => Promise<string>;
+  assetPort?: AssetPort;
 }
 
 export function ImageControls({
@@ -17,9 +22,11 @@ export function ImageControls({
   patch,
   pickAndSaveImage,
   resolveAssetUrl,
+  assetPort,
 }: ImageControlsProps) {
   const previewUrl = useResolvedAssetUrl(item.src, resolveAssetUrl);
   const [picking, setPicking] = useState(false);
+  const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
 
   async function handlePickImage() {
     if (!pickAndSaveImage) return;
@@ -32,15 +39,15 @@ export function ImageControls({
     }
   }
 
-  const btnClass = (active: boolean) =>
-    cn(
-      'flex-1 py-[6px] rounded-lg border text-[10px] font-semibold cursor-pointer transition-colors duration-100',
-      active ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]' : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e] hover:bg-neutral-50'
-    );
-
   return (
     <>
-      {pickAndSaveImage && (
+      <MediaLibraryModal
+        open={mediaLibraryOpen}
+        onOpenChange={setMediaLibraryOpen}
+        assetPort={assetPort}
+        onSelect={(relativePath) => patch({ src: relativePath })}
+      />
+      {(pickAndSaveImage || assetPort) && (
         <Section title="Nguồn ảnh">
           <div className="flex gap-[10px] items-center">
             {previewUrl ? (
@@ -50,16 +57,28 @@ export function ImageControls({
                 ẢNH
               </div>
             )}
-            <button
-              onClick={handlePickImage}
-              disabled={picking}
-              className={cn(
-                'flex-1 py-2 border-none rounded-lg font-bold text-[11.5px]',
-                picking ? 'bg-[#c9c9d3] text-white cursor-default' : 'bg-[#4b57e6] text-white cursor-pointer hover:bg-[#3b47d6]'
+            <div className="flex-1 flex gap-2">
+              {pickAndSaveImage && (
+                <button
+                  onClick={handlePickImage}
+                  disabled={picking}
+                  className={cn(
+                    'flex-1 py-2 border-none rounded-lg font-bold text-[11.5px]',
+                    picking ? 'bg-[#c9c9d3] text-white cursor-default' : 'bg-[#4b57e6] text-white cursor-pointer hover:bg-[#3b47d6]'
+                  )}
+                >
+                  {picking ? 'Đang chọn…' : 'Tải ảnh mới'}
+                </button>
               )}
-            >
-              {picking ? 'Đang chọn…' : 'Đổi ảnh'}
-            </button>
+              {assetPort && (
+                <button
+                  onClick={() => setMediaLibraryOpen(true)}
+                  className="flex-1 py-2 border border-[#4b57e6] rounded-lg font-bold text-[11.5px] bg-white text-[#4b57e6] cursor-pointer hover:bg-[#4b57e6]/5"
+                >
+                  Thư viện
+                </button>
+              )}
+            </div>
           </div>
         </Section>
       )}
@@ -89,43 +108,78 @@ export function ImageControls({
               { value: 'contain', label: 'Vừa khung (giữ nguyên)' },
             ] as const
           ).map((opt) => (
-            <button key={opt.value} onClick={() => patch({ fit: opt.value })} className={btnClass((item.fit ?? 'cover') === opt.value)}>
+            <button
+              key={opt.value}
+              onClick={() => patch({ fit: opt.value })}
+              className={cn(
+                'flex-1 py-[6px] rounded-lg border text-[10px] font-semibold cursor-pointer transition-colors duration-100',
+                (item.fit ?? 'cover') === opt.value
+                  ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]'
+                  : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e] hover:bg-neutral-50'
+              )}
+            >
               {opt.label}
             </button>
           ))}
         </div>
       </Section>
       <Section title="Hình dạng & viền">
-        <div className="flex gap-2 items-center mb-2">
-          {(['rect', 'round', 'circle'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => patch({ shape: s })}
-              className={cn(
-                'w-[30px] h-[30px] rounded-[7px] border flex items-center justify-center cursor-pointer',
-                item.shape === s ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]' : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e]'
-              )}
-            >
-              {s === 'circle' ? '●' : '▢'}
-            </button>
-          ))}
-          <span className="text-[11.5px] ml-1.5">Viền</span>
+        <IconToggleGroup
+          options={[
+            { value: 'rect' as const, icon: Square, title: 'Vuông' },
+            {
+              value: 'round' as const,
+              icon: Square,
+              title: 'Vuông tròn',
+            },
+            { value: 'circle' as const, icon: Circle, title: 'Tròn' },
+          ]}
+          value={item.shape ?? 'rect'}
+          onChange={(shape) => patch({ shape })}
+        />
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-[11.5px] flex-shrink-0">Viền</span>
           <input type="range" min={0} max={16} value={item.borderW ?? 0} onChange={(e) => patch({ borderW: Number(e.target.value) })} className="flex-1" />
         </div>
-        {(item.borderW ?? 0) > 0 && <input type="color" value={item.borderColor ?? '#000000'} onChange={(e) => patch({ borderColor: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />}
+        {(item.borderW ?? 0) > 0 && (
+          <div className="mt-2">
+            <ColorfulSwatchButton
+              color={item.borderColor ?? '#000000'}
+              onChange={(borderColor) => patch({ borderColor })}
+              title="Màu viền"
+            />
+          </div>
+        )}
       </Section>
       <Section title="Bộ lọc">
-        <div className="flex gap-2">
-          {(['none', 'bright', 'gray', 'warm'] as const).map((f) => (
+        <div className="grid grid-cols-4 gap-2">
+          {(
+            [
+              { value: 'none' as const, label: 'Gốc', filter: 'none' },
+              { value: 'bright' as const, label: 'Sáng', filter: 'brightness(1.3)' },
+              { value: 'gray' as const, label: 'Đen trắng', filter: 'grayscale(1)' },
+              { value: 'warm' as const, label: 'Ấm', filter: 'sepia(0.4) saturate(1.3)' },
+            ] as const
+          ).map((f) => (
             <button
-              key={f}
-              onClick={() => patch({ filter: f })}
+              key={f.value}
+              onClick={() => patch({ filter: f.value })}
               className={cn(
-                'text-[10.5px] p-[4px_8px] rounded-md border cursor-pointer',
-                item.filter === f ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]' : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e]'
+                'flex flex-col items-center gap-1 p-1 rounded-[7px] border cursor-pointer transition-colors',
+                item.filter === f.value ? 'border-[#4b57e6] bg-[#4b57e6]/10' : 'border-[#e6e6ee] bg-[#fcfcfd] hover:bg-[#f4f5f9]'
               )}
             >
-              {f}
+              <div
+                className="w-8 h-8 rounded border border-[#d4d4dd]"
+                style={{
+                  backgroundImage: previewUrl ? `url(${previewUrl})` : undefined,
+                  backgroundColor: !previewUrl ? '#e6e6ee' : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  filter: f.filter === 'none' ? undefined : f.filter,
+                }}
+              />
+              <span className={cn('text-[9px] font-medium', item.filter === f.value ? 'text-[#4b57e6]' : 'text-[#5c5d6e]')}>{f.label}</span>
             </button>
           ))}
         </div>

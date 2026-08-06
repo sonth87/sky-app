@@ -3,12 +3,14 @@
 // document.md (resolveVariant/computeScale/toRenderBox) + 11-canonical-da-loai-va-loop.md
 // (render LoopItem theo CanonicalGroup.members).
 
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo, useRef, type CSSProperties } from 'react';
 import type { Background, Box, LayoutContent, LayoutItem, LayoutVariant, RichTextContent } from './types.js';
 import type { CanonicalGroup, CanonicalRecord, CanonicalSubject } from './canonical.js';
 import { isCanonicalGroup, resolveCanonicalField } from './canonical.js';
 import { computeLoopLayout, renderOverflowMoreText } from './loop.js';
 import { resolveTokens, resolveContentTokens } from './tokens.js';
+import { SHAPE_CLIP_PATHS } from './shapeClipPaths.js';
+import { useAutoFitFontSize } from './useAutoFitFontSize.js';
 
 /** Chọn variant khớp tỷ lệ màn hình gần nhất (04-schema-layout-document.md). */
 export function resolveVariant(content: LayoutContent, screen: { w: number; h: number }): LayoutVariant | null {
@@ -158,13 +160,24 @@ function TextItemView({
   scaleY: number;
   record: CanonicalRecord;
 }) {
+  const textRef = useRef<HTMLElement>(null);
   const fScale = fontScale(scaleX, scaleY);
   const resolved = resolveContent(item.content, record);
+  const requestedPx = item.fontSize * fScale;
+  const fittedPx = useAutoFitFontSize(textRef, {
+    text: typeof resolved === 'string' ? resolved : resolved.html,
+    boxWidthPx: item.box.w * scaleX,
+    boxHeightPx: item.box.h * scaleY,
+    requestedFontSizePx: requestedPx,
+    minFontSizePx: requestedPx * 0.4,
+    wrap: false,
+    enabled: item.overflow === 'shrink',
+  });
   const style: CSSProperties = {
     ...toRenderBox(item.box, scaleX, scaleY),
     opacity: item.opacity != null ? item.opacity / 100 : undefined,
     fontFamily: item.fontFamily,
-    fontSize: item.fontSize * fScale,
+    fontSize: fittedPx,
     fontWeight: item.fontWeight,
     color: item.color,
     textAlign: item.align,
@@ -182,18 +195,10 @@ function TextItemView({
         : `${item.shadow.offsetX ?? 0}px ${item.shadow.offsetY ?? 0}px ${item.shadow.blur ?? 0}px ${item.shadow.color ?? 'rgba(0,0,0,0.4)'}`
       : undefined,
   };
-  // string (layout cũ hoặc TextItem chưa qua rich-text editor) → render nguyên văn qua children,
-  // KHÔNG dùng dangerouslySetInnerHTML (không cần thiết, tránh rủi ro XSS không đáng có).
-  // RichTextContent → dùng THẲNG content.html (đã sinh sẵn lúc soạn qua editor.getHTML(), KHÔNG
-  // gọi generateHTML() ở đây — quyết định sửa lại 2026-07-19: generateHTML cần @tiptap/html +
-  // happy-dom, kéo theo `ws`, vỡ build Electron main process khi bundle slide-shared, xem
-  // RichTextContent's comment ở types.ts). Nguồn content luôn xuất phát từ chính editor nội bộ
-  // (không phải input người dùng ngoài từ internet), rủi ro XSS ở mức chấp nhận được tương tự
-  // mọi editor rich-text khác.
   if (typeof resolved === 'string') {
-    return <div style={style}>{resolved}</div>;
+    return <div ref={textRef as any} style={style}>{resolved}</div>;
   }
-  return <div style={style} dangerouslySetInnerHTML={{ __html: resolved.html }} />;
+  return <div ref={textRef as any} style={style} dangerouslySetInnerHTML={{ __html: resolved.html }} />;
 }
 
 function RibbonItemView({
@@ -276,14 +281,36 @@ function ImageItemView({
 }
 
 function ShapeItemView({ item, scaleX, scaleY }: { item: Extract<LayoutItem, { type: 'shape' }>; scaleX: number; scaleY: number }) {
+  const fScale = Math.min(scaleX, scaleY);
   const fillValue = typeof item.fill === 'string' ? item.fill : (item.fill?.kind === 'gradient' ? item.fill.value : undefined);
   const shadowCSS = getShadowCSS(item.shadow);
+  const outerStyle = toRenderBox(item.box, scaleX, scaleY);
+  const opacity = item.opacity != null ? item.opacity / 100 : undefined;
+
+  // 'line' — không phải "cắt hình", là 1 đường kẻ mảnh nằm giữa box (khớp ItemContent.tsx's
+  // ShapeItemContent, GĐ10 2026-08-06 — trước đó renderer.tsx THIẾU HẲN nhánh này, chỉ editor
+  // preview có, gây lệch WYSIWYG editor-vs-backdrop thật).
+  if (item.shape === 'line') {
+    return (
+      <div style={{ ...outerStyle, opacity }}>
+        <div style={{ width: '100%', height: item.strokeW ? item.strokeW * fScale : 2, background: item.stroke ?? fillValue ?? '#000', marginTop: '50%' }} />
+      </div>
+    );
+  }
+  // 'frame' — khung viền RỖNG (không fill giữa), mặc định viền 2px nếu strokeW chưa set (chọn
+  // hình này mà không viền thì vô hình, không có ý nghĩa).
+  if (item.shape === 'frame') {
+    const border = item.strokeW ? `${item.strokeW * fScale}px solid ${item.stroke ?? '#000'}` : `${2 * fScale}px solid ${item.stroke ?? fillValue ?? '#000'}`;
+    return <div style={{ ...outerStyle, opacity, background: 'transparent', border, boxShadow: shadowCSS }} />;
+  }
+
   const style: CSSProperties = {
-    ...toRenderBox(item.box, scaleX, scaleY),
-    opacity: item.opacity != null ? item.opacity / 100 : undefined,
+    ...outerStyle,
+    opacity,
     background: fillValue,
-    border: item.strokeW ? `${item.strokeW * Math.min(scaleX, scaleY)}px solid ${item.stroke ?? '#000'}` : undefined,
+    border: item.strokeW ? `${item.strokeW * fScale}px solid ${item.stroke ?? '#000'}` : undefined,
     borderRadius: item.shape === 'circle' ? '50%' : item.shape === 'rect' ? item.radius : undefined,
+    clipPath: SHAPE_CLIP_PATHS[item.shape],
     boxShadow: shadowCSS,
   };
   return <div style={style} />;

@@ -1,8 +1,9 @@
 import type { LayoutItem } from '@sky-app/slide-shared';
+import { Bold, Italic, CaseUpper, AlignLeft, AlignCenter, AlignRight, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, WrapText, Minimize2, Scissors } from 'lucide-react';
 import { VariableTextarea } from '../VariableTextarea.js';
 import { Section } from './CommonControls.js';
+import { IconToggleButton, IconToggleGroup, ColorfulSwatchButton } from '@sky-app/ui';
 import { ShadowControl } from './ShadowControl.js';
-import { cn } from '@sky-app/ui';
 
 export interface TextControlsProps {
   item: Extract<LayoutItem, { type: 'text' }>;
@@ -18,12 +19,6 @@ export function TextControls({
   onTokenInserted,
 }: TextControlsProps) {
   const boldActive = (item.fontWeight ?? 400) >= 700;
-
-  const btnClass = (active: boolean) =>
-    cn(
-      'flex-1 py-[7px] rounded-lg border text-xs font-semibold cursor-pointer transition-colors duration-100',
-      active ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]' : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e] hover:bg-neutral-50'
-    );
 
   return (
     <>
@@ -55,15 +50,24 @@ export function TextControls({
       </Section>
       <Section title="Kiểu">
         <div className="flex gap-[7px]">
-          <button onClick={() => patch({ fontWeight: boldActive ? 400 : 700 })} className={cn(btnClass(boldActive), 'font-bold')}>
-            B
-          </button>
-          <button onClick={() => patch({ italic: !item.italic })} className={cn(btnClass(Boolean(item.italic)), 'italic')}>
-            I
-          </button>
-          <button onClick={() => patch({ uppercase: !item.uppercase })} className={btnClass(Boolean(item.uppercase))}>
-            AA
-          </button>
+          <IconToggleButton
+            icon={Bold}
+            title="Đậm"
+            active={boldActive}
+            onClick={() => patch({ fontWeight: boldActive ? 400 : 700 })}
+          />
+          <IconToggleButton
+            icon={Italic}
+            title="Nghiêng"
+            active={!!item.italic}
+            onClick={() => patch({ italic: !item.italic })}
+          />
+          <IconToggleButton
+            icon={CaseUpper}
+            title="Chữ hoa"
+            active={!!item.uppercase}
+            onClick={() => patch({ uppercase: !item.uppercase })}
+          />
         </div>
       </Section>
       <Section title="Giãn dòng">
@@ -73,44 +77,44 @@ export function TextControls({
         </div>
       </Section>
       <Section title="Màu chữ">
-        <input type="color" value={item.color ?? '#ffffff'} onChange={(e) => patch({ color: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
+        <ColorfulSwatchButton
+          color={item.color ?? '#ffffff'}
+          onChange={(color) => patch({ color })}
+          title="Màu chữ"
+        />
       </Section>
       <Section title="Căn ngang">
-        <div className="flex gap-[7px]">
-          {(['left', 'center', 'right'] as const).map((a) => (
-            <button key={a} onClick={() => patch({ align: a })} className={btnClass(item.align === a)}>
-              {a === 'left' ? '◧' : a === 'center' ? '▣' : '◨'}
-            </button>
-          ))}
-        </div>
+        <IconToggleGroup
+          options={[
+            { value: 'left' as const, icon: AlignLeft, title: 'Căn trái' },
+            { value: 'center' as const, icon: AlignCenter, title: 'Căn giữa' },
+            { value: 'right' as const, icon: AlignRight, title: 'Căn phải' },
+          ]}
+          value={item.align ?? 'left'}
+          onChange={(align) => patch({ align })}
+        />
       </Section>
       <Section title="Căn dọc">
-        <div className="flex gap-[7px]">
-          {(['top', 'center', 'bottom'] as const).map((v) => (
-            <button key={v} onClick={() => patch({ vAlign: v })} className={cn(btnClass((item.vAlign ?? 'center') === v), 'text-[10.5px]')}>
-              {v === 'top' ? 'Trên' : v === 'center' ? 'Giữa' : 'Dưới'}
-            </button>
-          ))}
-        </div>
+        <IconToggleGroup
+          options={[
+            { value: 'top' as const, icon: AlignVerticalJustifyStart, title: 'Căn trên' },
+            { value: 'center' as const, icon: AlignVerticalJustifyCenter, title: 'Căn giữa' },
+            { value: 'bottom' as const, icon: AlignVerticalJustifyEnd, title: 'Căn dưới' },
+          ]}
+          value={item.vAlign ?? 'center'}
+          onChange={(vAlign) => patch({ vAlign })}
+        />
       </Section>
       <Section title="Khi tràn khung">
-        <div className="flex gap-[7px]">
-          {(
-            [
-              { value: 'wrap', label: 'Xuống dòng' },
-              { value: 'shrink', label: 'Co chữ' },
-              { value: 'clip', label: 'Cắt' },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => patch({ overflow: opt.value })}
-              className={cn(btnClass((item.overflow ?? 'wrap') === opt.value), 'text-[10px] py-[6px]')}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        <IconToggleGroup
+          options={[
+            { value: 'wrap' as const, icon: WrapText, title: 'Xuống dòng', label: 'Xuống dòng' },
+            { value: 'shrink' as const, icon: Minimize2, title: 'Co chữ', label: 'Co chữ' },
+            { value: 'clip' as const, icon: Scissors, title: 'Cắt', label: 'Cắt' },
+          ]}
+          value={item.overflow ?? 'wrap'}
+          onChange={(overflow) => patch({ overflow })}
+        />
       </Section>
       <ShadowControl value={item.shadow} onChange={(v) => patch({ shadow: v })} />
     </>

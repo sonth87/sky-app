@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import type { LayoutItem } from '@sky-app/slide-shared';
+import type { AssetPort } from '@sky-app/service-contracts';
 import { patchItemCommand, patchVariantBackgroundCommand, removeItemCommand, resolveEditingItems, toggleSyncLockCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
 import { useEditorState } from '../../hooks/useEditor.js';
@@ -27,13 +28,15 @@ export interface PropertyPanelProps {
    * Bỏ trống = ẩn nút "Đổi ảnh" (VD preview độc lập không có AssetPort). */
   pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
   resolveAssetUrl?: (path: string) => Promise<string>;
+  /** AssetPort dùng bởi Media Library modal (ImageControls). */
+  assetPort?: AssetPort;
   /** Bỏ trống = rộng mặc định 302px (hành vi cũ). Truyền vào khi caller cho phép resize panel
    * (LayoutDesignerApp.tsx — review 2026-07-18 "panel property nên cho to thêm 1 chút, và có thể
    * drag để resize được"). */
   width?: number;
 }
 
-export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenInserted, pickAndSaveImage, resolveAssetUrl, width = 302 }: PropertyPanelProps) {
+export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenInserted, pickAndSaveImage, resolveAssetUrl, assetPort, width = 302 }: PropertyPanelProps) {
   const selection = useEditorState(editor, (s) => s.selection);
   const doc = useEditorState(editor, (s) => s.doc);
   // editingLoopId (Bước 10 kế hoạch resize/rotate, 2026-07-18) — khi có giá trị, lookup item
@@ -91,6 +94,7 @@ export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenIns
         onChange={(background) => editor.store.getState().dispatch(patchVariantBackgroundCommand(variantId, variant.background, background))}
         pickAndSaveImage={pickAndSaveImage}
         resolveAssetUrl={resolveAssetUrl}
+        assetPort={assetPort}
         width={width}
       />
     );
@@ -99,7 +103,7 @@ export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenIns
   const isSyncParent = !editingLoopId && Boolean(item.syncKey && doc.variants.some((v) => v.items.some((i) => i.syncRef === item.syncKey)));
 
   return (
-    <div className="shrink-0 border-l border-[#e6e6ee] bg-white flex flex-col overflow-y-auto" style={{ width }}>
+    <div data-testid="property-panel" className="shrink-0 border-l border-[#e6e6ee] bg-white flex flex-col overflow-y-auto" style={{ width }}>
       <PanelHeader
         item={item}
         isSyncParent={isSyncParent}
@@ -110,7 +114,7 @@ export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenIns
       {item.type === 'text' && <TextControls item={item} patch={patch} tokenSuggestions={tokenSuggestions} onTokenInserted={onTokenInserted} />}
       {item.type === 'ribbon' && <RibbonControls item={item} patch={patch} tokenSuggestions={tokenSuggestions} onTokenInserted={onTokenInserted} />}
       {item.type === 'image' && (
-        <ImageControls item={item} patch={patch} pickAndSaveImage={pickAndSaveImage} resolveAssetUrl={resolveAssetUrl} />
+        <ImageControls item={item} patch={patch} pickAndSaveImage={pickAndSaveImage} resolveAssetUrl={resolveAssetUrl} assetPort={assetPort} />
       )}
       {item.type === 'shape' && <ShapeControls item={item} patch={patch} />}
       {item.type === 'loop' && <LoopControls item={item} patch={patch} />}

@@ -41,6 +41,10 @@ export interface CanvasProps {
   /** Gọi khi user CHỌN 1 token từ dropdown mention-suggestion trong TiptapTextEditor (Bước 12) —
    * chuyển tiếp lên LayoutDesignerAppModule để ghi nhận variable_registry, giống PropertyPanel. */
   onTokenInserted?: (key: string) => void;
+  /** Callback để chọn & lưu ảnh từ native file picker (ItemToolbar's Image button). */
+  pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
+  /** Callback khi click nút "Sửa mẫu" trên LoopItem toolbar. */
+  onEnterLoopEdit?: (id: string) => void;
 }
 
 export function Canvas({
@@ -55,6 +59,8 @@ export function Canvas({
   onRedo,
   topLeftOverlay,
   onTokenInserted,
+  pickAndSaveImage,
+  onEnterLoopEdit,
 }: CanvasProps) {
   const selection = useEditorState(editor, (s) => s.selection);
   const viewport = useEditorState(editor, (s) => s.viewport);
@@ -438,6 +444,8 @@ export function Canvas({
                 originY={originY}
                 pointerScaleX={layoutScaleX * totalScale}
                 pointerScaleY={layoutScaleY * totalScale}
+                pickAndSaveImage={pickAndSaveImage}
+                onEnterLoopEdit={onEnterLoopEdit}
               />
             );
           } else {
@@ -467,6 +475,8 @@ export function Canvas({
                 originY={originY}
                 pointerScaleX={layoutScaleX * totalScale}
                 pointerScaleY={layoutScaleY * totalScale}
+                pickAndSaveImage={pickAndSaveImage}
+                onEnterLoopEdit={onEnterLoopEdit}
               />
             );
           }

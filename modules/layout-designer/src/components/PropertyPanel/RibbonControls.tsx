@@ -1,8 +1,9 @@
 import type { LayoutItem } from '@sky-app/slide-shared';
+import { Bold } from 'lucide-react';
 import { VariableTextarea } from '../VariableTextarea.js';
 import { Section } from './CommonControls.js';
+import { IconToggleButton, ColorfulSwatchButton } from '@sky-app/ui';
 import { ShadowControl } from './ShadowControl.js';
-import { cn } from '@sky-app/ui';
 
 export interface RibbonControlsProps {
   item: Extract<LayoutItem, { type: 'ribbon' }>;
@@ -32,28 +33,39 @@ export function RibbonControls({
           <input type="range" min={10} max={72} value={item.fontSize} onChange={(e) => patch({ fontSize: Number(e.target.value) })} className="flex-1" />
           <span className="text-[11px] w-[34px] text-right">{item.fontSize}</span>
         </div>
-        <button
+        <IconToggleButton
+          icon={Bold}
+          title="Đậm"
+          active={boldActive}
           onClick={() => patch({ fontWeight: boldActive ? 400 : 700 })}
-          className={cn(
-            'p-[7px_14px] rounded-lg border text-xs font-bold cursor-pointer transition-colors duration-100',
-            boldActive ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]' : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e] hover:bg-neutral-50'
-          )}
-        >
-          B
-        </button>
+        />
       </Section>
       <Section title="Màu chữ">
-        <input type="color" value={item.color ?? '#ffffff'} onChange={(e) => patch({ color: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
+        <ColorfulSwatchButton
+          color={item.color ?? '#ffffff'}
+          onChange={(color) => patch({ color })}
+          title="Màu chữ"
+        />
       </Section>
       <Section title="Nền dải ruy-băng">
-        <input type="color" value={typeof item.bg === 'string' ? (item.bg ?? '#b9902f') : '#b9902f'} onChange={(e) => patch({ bg: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />
+        <ColorfulSwatchButton
+          color={typeof item.bg === 'string' ? (item.bg ?? '#b9902f') : '#b9902f'}
+          onChange={(bg) => patch({ bg })}
+          title="Màu nền"
+        />
       </Section>
       <Section title="Viền">
-        <div className={cn('flex items-center gap-[10px]', (item.borderW ?? 0) > 0 && 'mb-2')}>
+        <div className="flex items-center gap-[10px] mb-2">
           <input type="range" min={0} max={16} value={item.borderW ?? 0} onChange={(e) => patch({ borderW: Number(e.target.value) })} className="flex-1" />
           <span className="text-[11px] w-[34px] text-right">{item.borderW ?? 0}</span>
         </div>
-        {(item.borderW ?? 0) > 0 && <input type="color" value={item.borderColor ?? '#000000'} onChange={(e) => patch({ borderColor: e.target.value })} className="w-10 h-8 p-0 border-none rounded cursor-pointer" />}
+        {(item.borderW ?? 0) > 0 && (
+          <ColorfulSwatchButton
+            color={item.borderColor ?? '#000000'}
+            onChange={(borderColor) => patch({ borderColor })}
+            title="Màu viền"
+          />
+        )}
       </Section>
       <ShadowControl value={item.shadow} onChange={(shadow) => patch({ shadow })} />
     </>

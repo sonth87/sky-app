@@ -164,7 +164,7 @@ describe('Canvas — thao tác item trong itemTemplate khi đang edit-mode', () 
     fireEvent.pointerDown(childEl);
     fireEvent.pointerUp(childEl);
 
-    fireEvent.click(screen.getByText('🗑'));
+    fireEvent.click(screen.getByLabelText('Xoá'));
 
     expect(screen.queryByText('@ten')).toBeNull();
   });

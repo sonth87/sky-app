@@ -77,7 +77,7 @@ describe('LayoutDesignerApp — undo/redo qua toolbar', () => {
     render(<LayoutDesignerApp content={sampleContent()} />);
     await user.pointer({ keys: '[MouseLeft]', target: screen.getByText('Xin chào') });
 
-    await user.click(screen.getByText('🗑'));
+    await user.click(screen.getByLabelText('Xoá'));
     expect(screen.queryAllByText('Xin chào')).toHaveLength(0);
 
     await user.click(screen.getByLabelText('Hoàn tác'));
@@ -96,7 +96,7 @@ describe('LayoutDesignerApp — undo/redo qua toolbar', () => {
     const user = userEvent.setup();
     render(<LayoutDesignerApp content={sampleContent()} />);
     await user.pointer({ keys: '[MouseLeft]', target: screen.getByText('Xin chào') });
-    await user.click(screen.getByText('🗑'));
+    await user.click(screen.getByLabelText('Xoá'));
     await user.click(screen.getByLabelText('Hoàn tác'));
     expect(screen.getAllByText('Xin chào').length).toBeGreaterThan(0);
 

@@ -1,11 +1,16 @@
 ---
-status: proposed
+status: in_progress
 owner: sonth87
 created: 2026-08-05
 target_version: layout-designer-v0.7.0 → v0.13.0 (GĐ6 → GĐ12)
 supersedes: null
 implemented_doc: null
 ---
+
+> **Cập nhật 2026-08-06:** GĐ6→GĐ9 đã hoàn thành (xem lịch sử commit). GĐ10/GĐ11/GĐ12 (Group/
+> Ungroup, custom component, bộ sưu tập) đã bị thay thế bởi
+> [`docs/roadmap/plans/canva-ux/00-index.md`](./canva-ux/00-index.md) — xem ghi chú tại chỗ ở
+> Giai đoạn 10 dưới đây.
 
 # Kế hoạch: Hoàn thiện tính năng Layout Designer (GĐ6 → GĐ12)
 
@@ -415,6 +420,15 @@ CHÍNH object command (không phải diff đã tính sẵn) trong `past`/`future
 ---
 
 ## Giai đoạn 10 — Group / Ungroup
+
+> **ĐÃ THAY THẾ (2026-08-06):** GĐ10 (điều kiện bắt buộc cho GĐ11)/GĐ11 (custom component)/GĐ12
+> (bộ sưu tập) dưới đây bị thay thế hoàn toàn bởi
+> [`docs/roadmap/plans/canva-ux/00-index.md`](./canva-ux/00-index.md) — phát hiện quan trọng lúc
+> thiết kế lại: "lưu nhóm item đã chọn" KHÔNG cần `GroupItem`/Group-Ungroup trước, chỉ cần
+> snapshot `LayoutItem[]` + `batchCommand` (GĐ9, đã xong) là đủ. Group/Ungroup THẬT (khối di
+> chuyển CỐ ĐỊNH lâu dài, không chỉ lúc multi-select tạm) vẫn còn giá trị riêng nhưng hạ xuống
+> backlog không đánh số trong doc mới — nội dung 3 giai đoạn dưới đây GIỮ LÀM LỊCH SỬ QUYẾT ĐỊNH
+> (không xoá), không triển khai theo đúng như viết ở đây nữa.
 
 **Mục tiêu:** Gộp nhiều item đã chọn (GĐ9) thành 1 khối di chuyển/resize/xoay như 1 đơn vị — câu
 hỏi mở blueprint gốc chưa từng trả lời (`04-schema-layout-document.md`: *"Có cần 'layout con

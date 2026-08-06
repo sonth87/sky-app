@@ -81,5 +81,16 @@ export function createWebAssetPort(baseUrl = 'http://localhost:8094'): AssetPort
       const res = await fetch(`${baseUrl}/api/layout-assets/${encodeURIComponent(relativePath)}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`AssetPort deleteAsset failed: ${res.status}`);
     },
+
+    async saveImageBlob(file: Blob, filename: string) {
+      const dataBase64 = await fileToBase64(file as File);
+      const res = await fetch(`${baseUrl}/api/layout-assets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, dataBase64 }),
+      });
+      if (!res.ok) throw new Error(`AssetPort saveImageBlob failed: ${res.status}`);
+      return res.json();
+    },
   };
 }

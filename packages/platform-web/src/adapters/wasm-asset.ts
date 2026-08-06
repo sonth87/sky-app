@@ -84,5 +84,12 @@ export function createWasmAssetPort(): AssetPort {
         objectUrlCache.delete(relativePath);
       }
     },
+
+    async saveImageBlob(file: Blob, filename: string) {
+      const key = `blob:${crypto.randomUUID()}`;
+      await saveAssetBlob(key, file);
+      await saveAssetMeta({ relativePath: key, name: filename, sizeBytes: file.size, uploadedAt: new Date().toISOString() });
+      return { relativePath: key };
+    },
   };
 }

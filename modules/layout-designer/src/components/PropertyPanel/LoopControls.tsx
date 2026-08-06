@@ -1,6 +1,7 @@
 import type { LayoutItem } from '@sky-app/slide-shared';
+import { Rows3, Columns3, Grid3X3, Minimize2, Scissors } from 'lucide-react';
 import { Section } from './CommonControls.js';
-import { cn } from '@sky-app/ui';
+import { IconToggleGroup } from '@sky-app/ui';
 
 export interface LoopControlsProps {
   item: Extract<LayoutItem, { type: 'loop' }>;
@@ -11,22 +12,15 @@ export function LoopControls({ item, patch }: LoopControlsProps) {
   return (
     <>
       <Section title="Hướng sắp xếp">
-        <div className="flex gap-2">
-          {(['row', 'column', 'grid'] as const).map((d) => (
-            <button
-              key={d}
-              onClick={() => patch({ direction: d, columns: d === 'grid' ? (item.columns ?? 2) : undefined })}
-              className={cn(
-                'flex-1 py-[6px] rounded-[6px] border text-xs font-semibold cursor-pointer transition-colors',
-                item.direction === d
-                  ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]'
-                  : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e] hover:bg-[#f8f8fa]'
-              )}
-            >
-              {d === 'row' ? 'Hàng' : d === 'column' ? 'Cột' : 'Lưới'}
-            </button>
-          ))}
-        </div>
+        <IconToggleGroup
+          options={[
+            { value: 'row' as const, icon: Rows3, title: 'Hàng' },
+            { value: 'column' as const, icon: Columns3, title: 'Cột' },
+            { value: 'grid' as const, icon: Grid3X3, title: 'Lưới' },
+          ]}
+          value={item.direction}
+          onChange={(direction) => patch({ direction, columns: direction === 'grid' ? (item.columns ?? 2) : undefined })}
+        />
       </Section>
 
       {item.direction === 'grid' && (
@@ -89,22 +83,14 @@ export function LoopControls({ item, patch }: LoopControlsProps) {
       </Section>
 
       <Section title="Tràn dữ liệu">
-        <div className="flex gap-2">
-          {(['shrink', 'truncate'] as const).map((o) => (
-            <button
-              key={o}
-              onClick={() => patch({ overflow: o, maxItems: o === 'truncate' ? (item.maxItems ?? 5) : undefined })}
-              className={cn(
-                'flex-1 py-[6px] rounded-[6px] border text-xs font-semibold cursor-pointer transition-colors',
-                item.overflow === o
-                  ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]'
-                  : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e] hover:bg-[#f8f8fa]'
-              )}
-            >
-              {o === 'shrink' ? 'Thu nhỏ' : 'Cắt bớt'}
-            </button>
-          ))}
-        </div>
+        <IconToggleGroup
+          options={[
+            { value: 'shrink' as const, icon: Minimize2, title: 'Thu nhỏ', label: 'Thu nhỏ' },
+            { value: 'truncate' as const, icon: Scissors, title: 'Cắt bớt', label: 'Cắt bớt' },
+          ]}
+          value={item.overflow}
+          onChange={(overflow) => patch({ overflow, maxItems: overflow === 'truncate' ? (item.maxItems ?? 5) : undefined })}
+        />
       </Section>
 
       {item.overflow === 'truncate' && (

@@ -36,4 +36,7 @@ export interface AssetPort {
    * Chỉ xoá record metadata, file vật lý được GC sau (Electron) hoặc không bị xoá hẳn (Web).
    * Không ảnh hưởng layout đã dùng ảnh này — layout sẽ fallback fallbackText nếu ảnh mất. */
   deleteAsset?(relativePath: string): Promise<void>;
+  /** Lưu Blob (từ drag-drop/file input) thành ảnh, trả về relativePath. Dùng bởi Media Library
+   * upload tab. (optional, Media Library modal không visible nếu không có). */
+  saveImageBlob?(file: Blob, filename: string): Promise<{ relativePath: string }>;
 }

@@ -21,5 +21,9 @@ export function createElectronAssetPort(): AssetPort {
     async deleteAsset(relativePath) {
       await window.sky.invoke('kernel:layoutAsset:delete', relativePath);
     },
+    async saveImageBlob(file, filename) {
+      const arrayBuffer = await file.arrayBuffer();
+      return (await window.sky.invoke('kernel:layoutAsset:saveBlob', arrayBuffer, filename)) as { relativePath: string };
+    },
   };
 }

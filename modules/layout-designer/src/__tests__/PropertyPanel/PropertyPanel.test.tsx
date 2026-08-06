@@ -18,14 +18,15 @@ function imageContent(): LayoutContent {
 }
 
 describe('PropertyPanel — Đổi ảnh (AssetPort)', () => {
-  it('không truyền pickAndSaveImage → KHÔNG hiện nút Đổi ảnh', async () => {
+  it('không truyền pickAndSaveImage hay assetPort → KHÔNG hiện nút ảnh', async () => {
     const user = userEvent.setup();
     render(<LayoutDesignerApp content={imageContent()} />);
     await user.click(screen.getByText('ẢNH'));
-    expect(screen.queryByText('Đổi ảnh')).toBeNull();
+    expect(screen.queryByText('Tải ảnh mới')).toBeNull();
+    expect(screen.queryByText('Thư viện')).toBeNull();
   });
 
-  it('bấm Đổi ảnh → gọi pickAndSaveImage, gán relativePath vào item.src', async () => {
+  it('bấm Tải ảnh mới → gọi pickAndSaveImage, gán relativePath vào item.src', async () => {
     const user = userEvent.setup();
     const pickAndSaveImage = vi.fn().mockResolvedValue({ relativePath: 'assets/layout/abc.png' });
     const resolveAssetUrl = vi.fn().mockResolvedValue('ceremony-asset://local/assets/layout/abc.png');
@@ -34,7 +35,7 @@ describe('PropertyPanel — Đổi ảnh (AssetPort)', () => {
       <LayoutDesignerApp content={imageContent()} pickAndSaveImage={pickAndSaveImage} resolveAssetUrl={resolveAssetUrl} />,
     );
     await user.click(screen.getByText('ẢNH'));
-    await user.click(screen.getByText('Đổi ảnh'));
+    await user.click(screen.getByText('Tải ảnh mới'));
 
     expect(pickAndSaveImage).toHaveBeenCalled();
     await waitFor(() => expect(resolveAssetUrl).toHaveBeenCalledWith('assets/layout/abc.png'));
@@ -51,7 +52,7 @@ describe('PropertyPanel — Đổi ảnh (AssetPort)', () => {
     const pickAndSaveImage = vi.fn().mockResolvedValue(null);
     render(<LayoutDesignerApp content={imageContent()} pickAndSaveImage={pickAndSaveImage} />);
     await user.click(screen.getByText('ẢNH'));
-    await user.click(screen.getByText('Đổi ảnh'));
+    await user.click(screen.getByText('Tải ảnh mới'));
 
     expect(pickAndSaveImage).toHaveBeenCalled();
     // Vẫn hiện placeholder "ẢNH" (không có src) — không bị crash, không đổi state sai.

@@ -4,11 +4,8 @@ import type { LayoutItem, LayoutVariant, RichTextContent, TiptapJSONDoc } from '
 import { patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
 import { useEditorState } from '../../hooks/useEditor.js';
+import { getItemTypeIcon } from '../../itemTypeIcons.js';
 import { cn } from '@sky-app/ui';
-
-export function iconOf(t: LayoutItem['type']) {
-  return t === 'text' ? 'T' : t === 'image' ? '▦' : t === 'ribbon' ? '⚑' : t === 'loop' ? '⟲' : '◆';
-}
 
 export function plainTextOf(content: string | RichTextContent): string {
   if (typeof content === 'string') return content;
@@ -82,6 +79,7 @@ export function LayersPanel({ editor, variant }: { editor: Editor; variant: Layo
           const isTopLevel = path.length === 1;
           const on = isTopLevel && selection.includes(it.id);
           const isExpanded = expanded.has(key);
+          const TypeIcon = getItemTypeIcon(it.type);
           return (
             <div
               key={key}
@@ -114,7 +112,7 @@ export function LayersPanel({ editor, variant }: { editor: Editor; variant: Layo
               ) : (
                 <span className="w-3.5" />
               )}
-              <span className="w-[22px] text-center">{iconOf(it.type)}</span>
+              <span className="w-[22px] flex items-center justify-center text-[#9a9bab]"><TypeIcon size={13} /></span>
               <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-semibold text-[11.5px]">{labelOf(it)}</span>
               {isTopLevel && (
                 <>
