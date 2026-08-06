@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: completed
 target_version: layout-designer-v0.17.0
+completed_date: 2026-08-06
 ---
 
 # GĐ13 — Toolbar riêng theo loại item
