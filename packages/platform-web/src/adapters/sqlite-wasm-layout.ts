@@ -4,9 +4,12 @@ import {
   getLayoutDocument,
   getVersion,
   listLayoutDocuments,
+  listAllLayoutDocuments,
   listTopVariables,
   listVersions,
   moveToTrash,
+  deleteLayoutPermanently,
+  restoreFromTrash,
   publish,
   recordTokenUsage,
   restoreVersion,
@@ -32,6 +35,11 @@ export function createSqliteWasmLayoutPort(opts: SqliteWasmLayoutPortOptions = {
       return listLayoutDocuments(executor);
     },
 
+    async listAllDocuments() {
+      const executor = await getSharedWasmExecutor(wasmUrl);
+      return listAllLayoutDocuments(executor);
+    },
+
     async getDocument(id) {
       const executor = await getSharedWasmExecutor(wasmUrl);
       return getLayoutDocument(executor, id);
@@ -52,6 +60,18 @@ export function createSqliteWasmLayoutPort(opts: SqliteWasmLayoutPortOptions = {
     async moveToTrash(id) {
       const executor = await getSharedWasmExecutor(wasmUrl);
       moveToTrash(executor, id);
+      await persistSharedWasmExecutor(executor);
+    },
+
+    async deleteLayoutPermanently(id) {
+      const executor = await getSharedWasmExecutor(wasmUrl);
+      deleteLayoutPermanently(executor, id);
+      await persistSharedWasmExecutor(executor);
+    },
+
+    async restoreFromTrash(id) {
+      const executor = await getSharedWasmExecutor(wasmUrl);
+      restoreFromTrash(executor, id);
       await persistSharedWasmExecutor(executor);
     },
 

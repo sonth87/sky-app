@@ -20,6 +20,8 @@ export interface VariableRegistryEntry {
  */
 export interface LayoutPort {
   listDocuments(): Promise<Array<{ id: string; name: string; description?: string; color?: string; category?: string; tags?: string[]; latestPublishedVersion: number | null }>>;
+  /** Lấy TẤT CẢ layout (kể cả trashed) — dùng cho layout library UI show cả active và trash tabs */
+  listAllDocuments?(): Promise<Array<{ id: string; name: string; description?: string; color?: string; category?: string; tags?: string[]; latestPublishedVersion: number | null; trashedAt?: string }>>;
   getDocument(id: string): Promise<LayoutDocument | null>;
   createDocument(id: string, name: string, initialContent: LayoutContent, description?: string): Promise<void>;
   /** Cập nhật metadata layout — name/description/color/category/tags (Giai đoạn 5.2, panel
@@ -29,6 +31,11 @@ export interface LayoutPort {
   /** Xoá layout vào thùng rác (soft delete) — đặt trashedAt timestamp. Layout sẽ không hiện ở
    * listDocuments() để ceremony không chọn được, nhưng dữ liệu vẫn lưu cho khôi phục sau. */
   moveToTrash(id: string): Promise<void>;
+  /** Xoá layout vĩnh viễn (hard delete) — xoá hoàn toàn khỏi DB, không thể khôi phục.
+   * Dùng khi xoá từ thùng rác. */
+  deleteLayoutPermanently(id: string): Promise<void>;
+  /** Khôi phục layout từ thùng rác về danh sách hoạt động. */
+  restoreFromTrash(id: string): Promise<void>;
   saveDraft(id: string, content: LayoutContent): Promise<void>;
   publish(id: string, note?: string): Promise<LayoutVersion>;
   listVersions(id: string): Promise<LayoutVersion[]>;

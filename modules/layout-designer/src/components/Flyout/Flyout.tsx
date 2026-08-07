@@ -3,7 +3,6 @@ import type { AssetMeta } from '@sky-app/service-contracts';
 import type { Editor } from '@sky-app/layout-editor-core';
 import type { RailGroup } from '../Rail.js';
 import { useSpawnDrag } from './useSpawnDrag.js';
-import { ComponentsPanel } from './ComponentsPanel.js';
 import { GraphicsPanel } from './GraphicsPanel.js';
 import { FramesPanel } from './FramesPanel.js';
 import { GridPresetsPanel } from './GridPresetsPanel.js';
@@ -55,7 +54,7 @@ export function Flyout({
 
   return (
     <div className="w-[242px] shrink-0 border-r border-[#e6e6ee] bg-white flex flex-col min-h-0">
-      {group === 'comp' && <ComponentsPanel editor={editor} onSpawnDown={spawn.onDown} />}
+      {group === 'comp' && <GraphicsPanel editor={editor} variant={variant} loopItemId={editingLoopId} />}
       {group === 'tpl' && <TemplatesPanel />}
       {group === 'coll' && <CollectionsPanel />}
       {group === 'var' && <VariablesPanel variant={variant} onSpawnDown={spawn.onDown} />}

@@ -13,9 +13,12 @@ export { getAppConfig, upsertAppConfig } from './queries/config.js';
 export {
   getLayoutDocument,
   listLayoutDocuments,
+  listAllLayoutDocuments,
   createLayoutDocument,
   updateLayoutDocumentMeta,
   moveToTrash,
+  deleteLayoutPermanently,
+  restoreFromTrash,
   saveDraft,
   publish,
   listVersions,

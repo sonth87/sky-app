@@ -86,6 +86,21 @@ export function listLayoutDocuments(executor: SqlExecutor): Array<{ id: string; 
   }));
 }
 
+/** Lấy TẤT CẢ layout (kể cả trashed) — dùng cho layout library UI, filter trashed status trên client */
+export function listAllLayoutDocuments(executor: SqlExecutor): Array<{ id: string; name: string; description?: string; color?: string; category?: string; tags?: string[]; latestPublishedVersion: number | null; trashedAt?: string }> {
+  const rows = executor.query<LayoutDocumentRow>('SELECT * FROM layout_document ORDER BY updated_at DESC');
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description ?? undefined,
+    color: r.color ?? undefined,
+    category: r.category ?? undefined,
+    tags: JSON.parse(r.tags_json) as string[],
+    latestPublishedVersion: r.latest_published_version,
+    trashedAt: r.trashed_at ?? undefined,
+  }));
+}
+
 /** Tạo layout mới — draft khởi tạo bằng `initialContent`, chưa có version nào đã publish.
  * category/tags luôn rỗng lúc tạo — set sau qua updateDocumentMeta (panel "Thông tin layout"). */
 export function createLayoutDocument(executor: SqlExecutor, id: string, name: string, initialContent: LayoutContent, description?: string): void {
@@ -223,5 +238,27 @@ export function moveToTrash(executor: SqlExecutor, layoutDocumentId: string): vo
   const changes = executor.run('UPDATE layout_document SET trashed_at = ? WHERE id = ?', [now, layoutDocumentId]).changes;
   if (changes === 0) {
     throw new Error(`moveToTrash: layout_document "${layoutDocumentId}" không tồn tại`);
+  }
+}
+
+/** Xoá layout vĩnh viễn (hard delete) — xoá hoàn toàn khỏi DB, không thể khôi phục.
+ * Dùng khi xoá từ thùng rác. */
+export function deleteLayoutPermanently(executor: SqlExecutor, layoutDocumentId: string): void {
+  executor.transaction(() => {
+    // Xoá cascade: draft, versions, rồi document
+    executor.run('DELETE FROM layout_draft WHERE layout_document_id = ?', [layoutDocumentId]);
+    executor.run('DELETE FROM layout_version WHERE layout_document_id = ?', [layoutDocumentId]);
+    const changes = executor.run('DELETE FROM layout_document WHERE id = ?', [layoutDocumentId]).changes;
+    if (changes === 0) {
+      throw new Error(`deleteLayoutPermanently: layout_document "${layoutDocumentId}" không tồn tại`);
+    }
+  });
+}
+
+/** Khôi phục layout từ thùng rác — xoá trashed_at để quay lại danh sách hoạt động. */
+export function restoreFromTrash(executor: SqlExecutor, layoutDocumentId: string): void {
+  const changes = executor.run('UPDATE layout_document SET trashed_at = NULL WHERE id = ?', [layoutDocumentId]).changes;
+  if (changes === 0) {
+    throw new Error(`restoreFromTrash: layout_document "${layoutDocumentId}" không tồn tại`);
   }
 }

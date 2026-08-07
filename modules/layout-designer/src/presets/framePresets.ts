@@ -25,14 +25,4 @@ export const FRAME_PRESETS: FramePreset[] = [
     clipPath: 'polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%)',
     suggestedBox: { w: 240, h: 220 },
   },
-  {
-    label: 'Hình tròn cắt góc',
-    clipPath: 'circle(45% at 50% 50%)',
-    suggestedBox: { w: 240, h: 240 },
-  },
-  {
-    label: 'Inset 20%',
-    clipPath: 'inset(20%)',
-    suggestedBox: { w: 240, h: 240 },
-  },
 ];

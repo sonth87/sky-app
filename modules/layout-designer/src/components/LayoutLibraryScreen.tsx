@@ -28,6 +28,7 @@ interface LibraryEntry {
   content: LayoutContent;
   createdAt?: number;
   updatedAt?: number;
+  trashedAt?: string; // DB source of truth cho trash status
 }
 
 const THUMB_SIZE = { w: 220, h: 124 };
@@ -67,12 +68,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     return saved ? JSON.parse(saved) : false;
   });
   const [currentView, setCurrentView] = useState<'layouts' | 'trash'>('layouts');
-  const [trashConfirm, setTrashConfirm] = useState<{ layoutId: string; layoutName: string } | null>(null);
-  const [trashedIds, setTrashedIds] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set();
-    const saved = localStorage.getItem('layout-library-trashed-ids');
-    return saved ? new Set(JSON.parse(saved)) : new Set();
-  });
+  const [trashConfirm, setTrashConfirm] = useState<{ layoutIds: string[]; layoutNames: string[]; isPermanentDelete?: boolean } | null>(null);
   const [rangeAnchorId, setRangeAnchorId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
     if (typeof window === 'undefined') return 'grid';
@@ -92,11 +88,6 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   useEffect(() => {
     localStorage.setItem('layout-library-sidebar-collapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
-
-  // Persist trashed IDs
-  useEffect(() => {
-    localStorage.setItem('layout-library-trashed-ids', JSON.stringify([...trashedIds]));
-  }, [trashedIds]);
 
   // Persist view mode
   useEffect(() => {
@@ -215,7 +206,9 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     let cancelled = false;
     setEntries(null);
     void (async () => {
-      const summaries = await layoutPort.listDocuments();
+      const summaries = layoutPort.listAllDocuments
+        ? await layoutPort.listAllDocuments()
+        : await layoutPort.listDocuments();
       const docs = await Promise.all(summaries.map((s) => layoutPort.getDocument(s.id)));
       const built = docs
         .filter((d): d is NonNullable<typeof d> => d != null)
@@ -230,6 +223,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             content: d.currentDraft,
             createdAt: (d as any).createdAt || (d as any).created_at,
             updatedAt: (d as any).updatedAt || (d as any).updated_at,
+            trashedAt: (d as any).trashedAt || (d as any).trashed_at,
           }),
         );
       if (!cancelled) setEntries(built);
@@ -245,7 +239,19 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
     const paths = new Set<string>();
     for (const entry of entries) {
       for (const variant of entry.content.variants) {
-        if (variant.background?.kind === 'image' && variant.background.src) paths.add(variant.background.src);
+        // Collect background images
+        if (variant.background?.kind === 'image' && variant.background.src) {
+          paths.add(variant.background.src);
+        }
+        // Collect image items and gallery items
+        for (const item of variant.items) {
+          if (item.type === 'image' && item.src) paths.add(item.src);
+          else if (item.type === 'gallery') {
+            for (const img of item.images) {
+              if (img.src) paths.add(img.src);
+            }
+          }
+        }
       }
     }
     void (async () => {
@@ -262,10 +268,10 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   const filtered = useMemo(() => {
     if (!entries) return [];
 
-    // Filter by view (layouts vs trash)
+    // Filter by view (layouts vs trash) — dùng DB trashedAt thay localStorage
     const viewFiltered = currentView === 'trash'
-      ? entries.filter((e) => trashedIds.has(e.id))
-      : entries.filter((e) => !trashedIds.has(e.id));
+      ? entries.filter((e) => !!e.trashedAt)
+      : entries.filter((e) => !e.trashedAt);
 
     // Filter by search (diacritic-insensitive)
     const q = normalizeString(search);
@@ -276,7 +282,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
         (e.category ? normalizeString(e.category).includes(q) : false) ||
         e.tags.some((t) => normalizeString(t).includes(q)),
     );
-  }, [entries, search, currentView, trashedIds]);
+  }, [entries, search, currentView]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -422,11 +428,18 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
       }
 
       // Delete to move to trash
-      if (e.key === 'Delete' && selectedIds.size === 1 && currentView === 'layouts') {
-        const selectedId = Array.from(selectedIds)[0];
-        const entry = filtered.find((x) => x.id === selectedId);
-        if (entry) {
-          setTrashConfirm({ layoutId: entry.id, layoutName: entry.name });
+      if (e.key === 'Delete' && selectedIds.size > 0 && currentView === 'layouts') {
+        if (selectedIds.size === 1) {
+          const selectedId = Array.from(selectedIds)[0];
+          const entry = filtered.find((x) => x.id === selectedId);
+          if (entry) {
+            setTrashConfirm({ layoutIds: [entry.id], layoutNames: [entry.name] });
+          }
+        } else {
+          const selectedEntries = filtered.filter((x) => selectedIds.has(x.id));
+          const layoutIds = selectedEntries.map((e) => e.id);
+          const layoutNames = selectedEntries.map((e) => e.name);
+          setTrashConfirm({ layoutIds, layoutNames });
         }
       }
     };
@@ -513,20 +526,24 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
   async function handleConfirmMoveToTrash() {
     if (!trashConfirm) return;
     try {
-      // Call port to update DB (soft delete)
-      if (layoutPort?.moveToTrash) {
-        await layoutPort.moveToTrash(trashConfirm.layoutId);
-      } else {
-        // Fallback to localStorage only if moveToTrash not available
-        setTrashedIds((prev) => new Set([...prev, trashConfirm.layoutId]));
+      const isPermanent = trashConfirm.isPermanentDelete;
+      for (const id of trashConfirm.layoutIds) {
+        if (isPermanent) {
+          await layoutPort.deleteLayoutPermanently(id);
+        } else {
+          await layoutPort.moveToTrash(id);
+        }
       }
-      setMessage({ type: 'success', text: `Đã chuyển "${trashConfirm.layoutName}" vào thùng rác.` });
+      const count = trashConfirm.layoutIds.length;
+      const names = count === 1 ? `"${trashConfirm.layoutNames[0]}"` : `${count} layout`;
+      const action = isPermanent ? 'xoá' : 'chuyển vào thùng rác';
+      setMessage({ type: 'success', text: `Đã ${action} ${names}.` });
       setTrashConfirm(null);
       setSelectedIds(new Set());
       // Reload entries to reflect deletion from DB
       setReloadKey((k) => k + 1);
     } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Lỗi chuyển vào thùng rác.' });
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Lỗi xử lý yêu cầu.' });
     }
   }
 
@@ -731,7 +748,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
               >
                 <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: `${THUMB_SIZE.w}/${THUMB_SIZE.h}` }}>
                   <LayoutRenderer content={entry.content} screen={THUMB_SIZE} record={DEMO_RECORD} resolveAsset={resolveAsset} />
-                  <div className="absolute inset-0 pointer-events-auto" />
+                  <div className="absolute inset-0 pointer-events-none" />
                 </div>
                 <div className="flex items-center gap-1.5 px-1 min-w-0">
                   {entry.color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />}
@@ -760,28 +777,44 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                   </div>
                 )}
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setInfoModalEntry(entry);
-                    }}
-                    title="Thông tin layout"
-                    className="flex items-center justify-center w-[26px] h-[26px] rounded-[7px] border border-[#e6e6ee] bg-white text-[#5c5d6e] cursor-pointer hover:bg-[#f4f5f9]"
-                  >
-                    <Info size={13} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setNameModal({ mode: 'duplicate', source: entry });
-                    }}
-                    title="Sao chép cả layout"
-                    className={cn(
-                      'flex items-center justify-center w-[26px] h-[26px] rounded-[7px] border border-[#e6e6ee] bg-white text-[#5c5d6e] cursor-pointer hover:bg-[#f4f5f9]',
-                    )}
-                  >
-                    <Copy size={13} />
-                  </button>
+                  {currentView === 'trash' ? (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await layoutPort.restoreFromTrash(entry.id);
+                        setReloadKey((k) => k + 1);
+                      }}
+                      title="Restore"
+                      className="flex items-center justify-center w-[26px] h-[26px] rounded-[7px] border border-[#e6e6ee] bg-white text-[#5c5d6e] cursor-pointer hover:bg-[#f4f5f9]"
+                    >
+                      <Trash2 size={13} style={{ transform: 'scaleX(-1)' }} />
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInfoModalEntry(entry);
+                        }}
+                        title="Thông tin layout"
+                        className="flex items-center justify-center w-[26px] h-[26px] rounded-[7px] border border-[#e6e6ee] bg-white text-[#5c5d6e] cursor-pointer hover:bg-[#f4f5f9]"
+                      >
+                        <Info size={13} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNameModal({ mode: 'duplicate', source: entry });
+                        }}
+                        title="Sao chép cả layout"
+                        className={cn(
+                          'flex items-center justify-center w-[26px] h-[26px] rounded-[7px] border border-[#e6e6ee] bg-white text-[#5c5d6e] cursor-pointer hover:bg-[#f4f5f9]',
+                        )}
+                      >
+                        <Copy size={13} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -847,26 +880,61 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
 
                   {/* Actions */}
                   <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setInfoModalEntry(entry);
-                      }}
-                      title="Info"
-                      className="flex items-center justify-center w-7 h-7 rounded-md text-[#5c5d6e] hover:bg-[#f4f5f9]"
-                    >
-                      <Info size={14} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setNameModal({ mode: 'duplicate', source: entry });
-                      }}
-                      title="Duplicate"
-                      className="flex items-center justify-center w-7 h-7 rounded-md text-[#5c5d6e] hover:bg-[#f4f5f9]"
-                    >
-                      <Copy size={14} />
-                    </button>
+                    {currentView === 'trash' ? (
+                      <>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await layoutPort.restoreFromTrash(entry.id);
+                            setReloadKey((k) => k + 1);
+                          }}
+                          title="Put back"
+                          className="flex items-center justify-center w-7 h-7 rounded-md text-[#5c5d6e] hover:bg-[#f4f5f9]"
+                        >
+                          <Trash2 size={14} style={{ transform: 'scaleX(-1)' }} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const entriesToDelete = [entry];
+                            if (entriesToDelete.length > 0) {
+                              setTrashConfirm({
+                                layoutIds: entriesToDelete.map((e) => e.id),
+                                layoutNames: entriesToDelete.map((e) => e.name),
+                                isPermanentDelete: true
+                              });
+                            }
+                          }}
+                          title="Delete"
+                          className="flex items-center justify-center w-7 h-7 rounded-md text-[#d04343] hover:bg-[#fee2e2]"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInfoModalEntry(entry);
+                          }}
+                          title="Info"
+                          className="flex items-center justify-center w-7 h-7 rounded-md text-[#5c5d6e] hover:bg-[#f4f5f9]"
+                        >
+                          <Info size={14} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setNameModal({ mode: 'duplicate', source: entry });
+                          }}
+                          title="Duplicate"
+                          className="flex items-center justify-center w-7 h-7 rounded-md text-[#5c5d6e] hover:bg-[#f4f5f9]"
+                        >
+                          <Copy size={14} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -896,63 +964,123 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                 setContextMenu(null);
               }}
             />
-            <div
-              className="absolute bg-white border border-[#e6e6ee] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.15)] z-50 py-1 min-w-[160px]"
-              style={{ left: contextMenu.x - (gridContainerRef.current?.getBoundingClientRect().left ?? 0), top: contextMenu.y - (gridContainerRef.current?.getBoundingClientRect().top ?? 0) - 5 }}
-            >
-              <button
-                onClick={() => {
-                  onOpen(contextMenu.layoutId);
-                  setContextMenu(null);
-                }}
-                className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
-              >
-                Open
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedIds(new Set([contextMenu.layoutId]));
-                  handleExport();
-                  setContextMenu(null);
-                }}
-                className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
-              >
-                Download
-              </button>
-              <button
-                onClick={() => {
-                  setInfoModalEntry(
-                    filtered.find((e) => e.id === contextMenu.layoutId) || null
-                  );
-                  setContextMenu(null);
-                }}
-                className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
-              >
-                Info
-              </button>
-              <button
-                onClick={() => {
-                  setNameModal({ mode: 'duplicate', source: filtered.find((e) => e.id === contextMenu.layoutId)! });
-                  setContextMenu(null);
-                }}
-                className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
-              >
-                Duplicate
-              </button>
-              <div className="h-px bg-[#e6e6ee]" />
-              <button
-                onClick={() => {
-                  const entry = filtered.find((e) => e.id === contextMenu.layoutId);
-                  if (entry) {
-                    setTrashConfirm({ layoutId: entry.id, layoutName: entry.name });
-                  }
-                  setContextMenu(null);
-                }}
-                className="w-full px-3 py-2 text-left text-sm text-[#d04343] hover:bg-[#fee2e2] cursor-pointer"
-              >
-                Move to Trash
-              </button>
-            </div>
+            {(() => {
+              const containerRect = gridContainerRef.current?.getBoundingClientRect();
+              if (!containerRect) return null;
+
+              let left = contextMenu.x - containerRect.left;
+              let top = contextMenu.y - containerRect.top - 5;
+
+              // Measure menu width (160px min, but could be wider with content)
+              const menuWidth = 160;
+              const menuHeight = 220; // estimated height
+
+              // Check right boundary
+              if (left + menuWidth > containerRect.width) {
+                left = Math.max(0, containerRect.width - menuWidth - 8);
+              }
+
+              // Check bottom boundary
+              if (top + menuHeight > containerRect.height) {
+                top = Math.max(0, contextMenu.y - containerRect.top - menuHeight - 5);
+              }
+
+              return (
+                <div
+                  className="absolute bg-white border border-[#e6e6ee] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.15)] z-50 py-1 min-w-40"
+                  style={{ left, top }}
+                >
+                  {currentView !== 'trash' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          onOpen(contextMenu.layoutId);
+                          setContextMenu(null);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
+                      >
+                        Open
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedIds(new Set([contextMenu.layoutId]));
+                          handleExport();
+                          setContextMenu(null);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
+                      >
+                        Download
+                      </button>
+                      <button
+                        onClick={() => {
+                          setInfoModalEntry(
+                            filtered.find((e) => e.id === contextMenu.layoutId) || null
+                          );
+                          setContextMenu(null);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
+                      >
+                        Info
+                      </button>
+                      <button
+                        onClick={() => {
+                          setNameModal({ mode: 'duplicate', source: filtered.find((e) => e.id === contextMenu.layoutId)! });
+                          setContextMenu(null);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
+                      >
+                        Duplicate
+                      </button>
+                      <div className="h-px bg-[#e6e6ee]" />
+                    </>
+                  )}
+                  {currentView === 'trash' && (
+                    <>
+                      <button
+                        onClick={async () => {
+                          await layoutPort.restoreFromTrash(contextMenu.layoutId);
+                          setReloadKey((k) => k + 1);
+                          setContextMenu(null);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
+                      >
+                        Put Back
+                      </button>
+                      <button
+                        onClick={() => {
+                          setInfoModalEntry(
+                            filtered.find((e) => e.id === contextMenu.layoutId) || null
+                          );
+                          setContextMenu(null);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-[#26262e] hover:bg-[#f4f5f9] cursor-pointer"
+                      >
+                        Info
+                      </button>
+                      <div className="h-px bg-[#e6e6ee]" />
+                    </>
+                  )}
+                  <button
+                    onClick={() => {
+                      // If clicked item is in selection, delete all selected; otherwise delete only clicked
+                      const toDelete = selectedIds.has(contextMenu.layoutId) ? selectedIds : new Set([contextMenu.layoutId]);
+                      const entriesToDelete = filtered.filter((e) => toDelete.has(e.id));
+                      if (entriesToDelete.length > 0) {
+                        setTrashConfirm({
+                          layoutIds: entriesToDelete.map((e) => e.id),
+                          layoutNames: entriesToDelete.map((e) => e.name),
+                          isPermanentDelete: currentView === 'trash'
+                        });
+                      }
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm text-[#d04343] hover:bg-[#fee2e2] cursor-pointer"
+                  >
+                    {currentView === 'trash' ? 'Delete Permanently' : 'Move to Trash'}
+                  </button>
+                </div>
+              );
+            })()}
           </>
         )}
         </div>
@@ -976,6 +1104,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
           initial={{ name: infoModalEntry.name, description: infoModalEntry.description, category: infoModalEntry.category, tags: infoModalEntry.tags }}
           onClose={() => setInfoModalEntry(null)}
           onSave={(patch) => handleSaveInfo(infoModalEntry.id, patch)}
+          readOnly={currentView === 'trash'}
         />
       )}
 
@@ -985,9 +1114,25 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
             onClick={(e) => e.stopPropagation()}
             className="w-[360px] rounded-[12px] bg-white p-[18px] shadow-[0_14px_34px_rgba(20,20,40,0.18)]"
           >
-            <div className="mb-4 font-bold text-sm">Move to Trash?</div>
+            <div className="mb-4 font-bold text-sm">
+              {trashConfirm.isPermanentDelete ? 'Delete Permanently?' : 'Move to Trash?'}
+            </div>
             <div className="mb-6 text-sm text-[#5c5d6e]">
-              Bạn có chắc muốn chuyển "{trashConfirm.layoutName}" vào thùng rác không?
+              {trashConfirm.isPermanentDelete ? (
+                <>
+                  {trashConfirm.layoutIds.length === 1
+                    ? `Bạn có chắc muốn xoá vĩnh viễn "${trashConfirm.layoutNames[0]}" không? Hành động này không thể hoàn tác.`
+                    : `Bạn có chắc muốn xoá vĩnh viễn ${trashConfirm.layoutIds.length} layout không? Hành động này không thể hoàn tác.`
+                  }
+                </>
+              ) : (
+                <>
+                  {trashConfirm.layoutIds.length === 1
+                    ? `Bạn có chắc muốn chuyển "${trashConfirm.layoutNames[0]}" vào thùng rác không?`
+                    : `Bạn có chắc muốn chuyển ${trashConfirm.layoutIds.length} layout vào thùng rác không?`
+                  }
+                </>
+              )}
             </div>
             <div className="flex gap-2">
               <button
@@ -1000,7 +1145,7 @@ export function LayoutLibraryScreen({ layoutPort, resolveAssetUrl, onOpen }: Lay
                 onClick={handleConfirmMoveToTrash}
                 className="flex-1 py-[8px] bg-[#d04343] text-white border-none rounded-[8px] font-bold text-xs cursor-pointer hover:bg-[#c03333]"
               >
-                Move to Trash
+                {trashConfirm.isPermanentDelete ? 'Delete' : 'Move to Trash'}
               </button>
             </div>
           </div>

@@ -18,9 +18,10 @@ export interface LayoutInfoModalProps {
   initial: LayoutInfoModalInitial;
   onClose: () => void;
   onSave: (patch: { name: string; description?: string; category?: string; tags: string[] }) => void | Promise<void>;
+  readOnly?: boolean;
 }
 
-export function LayoutInfoModal({ initial, onClose, onSave }: LayoutInfoModalProps) {
+export function LayoutInfoModal({ initial, onClose, onSave, readOnly }: LayoutInfoModalProps) {
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description ?? '');
   const [category, setCategory] = useState(initial.category ?? '');
@@ -76,27 +77,30 @@ export function LayoutInfoModal({ initial, onClose, onSave }: LayoutInfoModalPro
         <label className="mb-1 block text-[11px] font-bold text-[#9a9bab] uppercase tracking-[.04em]">Tên</label>
         <input
           autoFocus
+          disabled={readOnly}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Tên layout"
-          className="mb-3 w-full rounded-[8px] border border-[#e6e6ee] p-[8px_10px] text-sm"
+          placeholder={readOnly ? '' : 'Tên layout'}
+          className="mb-3 w-full rounded-[8px] border border-[#e6e6ee] p-[8px_10px] text-sm disabled:bg-[#f4f5f9] disabled:cursor-default"
         />
 
         <label className="mb-1 block text-[11px] font-bold text-[#9a9bab] uppercase tracking-[.04em]">Mô tả</label>
         <textarea
+          disabled={readOnly}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Mô tả (tuỳ chọn)"
+          placeholder={readOnly ? '' : 'Mô tả (tuỳ chọn)'}
           rows={2}
-          className="mb-3 w-full resize-none rounded-[8px] border border-[#e6e6ee] p-[8px_10px] text-sm"
+          className="mb-3 w-full resize-none rounded-[8px] border border-[#e6e6ee] p-[8px_10px] text-sm disabled:bg-[#f4f5f9] disabled:cursor-default"
         />
 
         <label className="mb-1 block text-[11px] font-bold text-[#9a9bab] uppercase tracking-[.04em]">Phân loại</label>
         <input
+          disabled={readOnly}
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          placeholder="VD: Trao bằng, Khen thưởng..."
-          className="mb-3 w-full rounded-[8px] border border-[#e6e6ee] p-[8px_10px] text-sm"
+          placeholder={readOnly ? '' : 'VD: Trao bằng, Khen thưởng...'}
+          className="mb-3 w-full rounded-[8px] border border-[#e6e6ee] p-[8px_10px] text-sm disabled:bg-[#f4f5f9] disabled:cursor-default"
         />
 
         <label className="mb-1 block text-[11px] font-bold text-[#9a9bab] uppercase tracking-[.04em]">Thẻ (tags)</label>
@@ -108,21 +112,23 @@ export function LayoutInfoModal({ initial, onClose, onSave }: LayoutInfoModalPro
             >
               {tag}
               <button
+                disabled={readOnly}
                 onClick={() => removeTag(tag)}
                 aria-label={`Xoá thẻ ${tag}`}
-                className="flex items-center justify-center border-none bg-transparent p-0 text-[#9a9bab] cursor-pointer hover:text-[#e05656]"
+                className="flex items-center justify-center border-none bg-transparent p-0 text-[#9a9bab] cursor-pointer hover:text-[#e05656] disabled:cursor-default disabled:hover:text-[#9a9bab]"
               >
                 <X size={11} />
               </button>
             </span>
           ))}
           <input
+            disabled={readOnly}
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={handleTagInputKeyDown}
             onBlur={addTagFromInput}
-            placeholder={tags.length === 0 ? 'Gõ rồi nhấn Enter để thêm thẻ' : ''}
-            className="min-w-[80px] flex-1 border-none p-[3px] text-[11.5px] outline-none"
+            placeholder={readOnly || tags.length > 0 ? '' : 'Gõ rồi nhấn Enter để thêm thẻ'}
+            className="min-w-[80px] flex-1 border-none p-[3px] text-[11.5px] outline-none disabled:bg-transparent disabled:cursor-default"
           />
         </div>
 
@@ -131,18 +137,20 @@ export function LayoutInfoModal({ initial, onClose, onSave }: LayoutInfoModalPro
             onClick={onClose}
             className="flex-1 py-[8px] bg-[#f4f5f9] text-[#5c5d6e] border-none rounded-[8px] font-semibold text-xs cursor-pointer"
           >
-            Huỷ
+            {readOnly ? 'Đóng' : 'Huỷ'}
           </button>
-          <button
-            onClick={() => void handleSave()}
-            disabled={!trimmedName || saving}
-            className={cn(
-              'flex-1 py-[8px] border-none rounded-[8px] font-bold text-xs',
-              trimmedName && !saving ? 'bg-[#4b57e6] text-white cursor-pointer hover:bg-[#3b47d6]' : 'bg-[#e6e6ee] text-[#9a9bab] cursor-default',
-            )}
-          >
-            {saving ? 'Đang lưu...' : 'Lưu'}
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => void handleSave()}
+              disabled={!trimmedName || saving}
+              className={cn(
+                'flex-1 py-[8px] border-none rounded-[8px] font-bold text-xs',
+                trimmedName && !saving ? 'bg-[#4b57e6] text-white cursor-pointer hover:bg-[#3b47d6]' : 'bg-[#e6e6ee] text-[#9a9bab] cursor-default',
+              )}
+            >
+              {saving ? 'Đang lưu...' : 'Lưu'}
+            </button>
+          )}
         </div>
       </div>
     </div>

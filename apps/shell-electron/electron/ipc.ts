@@ -32,9 +32,12 @@ import {
   listEvents,
   listFieldMappingProfiles,
   listLayoutDocuments,
+  listAllLayoutDocuments,
   listTopVariables,
   listVersions,
   moveToTrash,
+  deleteLayoutPermanently,
+  restoreFromTrash,
   publish,
   recordTokenUsage,
   restoreVersion,
@@ -190,6 +193,10 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     return listLayoutDocuments(ceremonyStore.getExecutor());
   });
 
+  ipcMain.handle('kernel:layout:listAllDocuments', async () => {
+    return listAllLayoutDocuments(ceremonyStore.getExecutor());
+  });
+
   ipcMain.handle('kernel:layout:getDocument', async (_event, id: string) => {
     return getLayoutDocument(ceremonyStore.getExecutor(), id);
   });
@@ -207,6 +214,14 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('kernel:layout:moveToTrash', async (_event, id: string) => {
     moveToTrash(ceremonyStore.getExecutor(), id);
+  });
+
+  ipcMain.handle('kernel:layout:deleteLayoutPermanently', async (_event, id: string) => {
+    deleteLayoutPermanently(ceremonyStore.getExecutor(), id);
+  });
+
+  ipcMain.handle('kernel:layout:restoreFromTrash', async (_event, id: string) => {
+    restoreFromTrash(ceremonyStore.getExecutor(), id);
   });
 
   ipcMain.handle('kernel:layout:saveDraft', async (_event, id: string, content: LayoutContent) => {

@@ -10,6 +10,9 @@ export function createElectronLayoutPort(): LayoutPort {
     async listDocuments() {
       return (await window.sky.invoke('kernel:layout:listDocuments')) as Awaited<ReturnType<LayoutPort['listDocuments']>>;
     },
+    async listAllDocuments() {
+      return (await window.sky.invoke('kernel:layout:listAllDocuments')) as Awaited<ReturnType<NonNullable<LayoutPort['listAllDocuments']>>>;
+    },
     async getDocument(id) {
       return (await window.sky.invoke('kernel:layout:getDocument', id)) as Awaited<ReturnType<LayoutPort['getDocument']>>;
     },
@@ -21,6 +24,12 @@ export function createElectronLayoutPort(): LayoutPort {
     },
     async moveToTrash(id) {
       await window.sky.invoke('kernel:layout:moveToTrash', id);
+    },
+    async deleteLayoutPermanently(id) {
+      await window.sky.invoke('kernel:layout:deleteLayoutPermanently', id);
+    },
+    async restoreFromTrash(id) {
+      await window.sky.invoke('kernel:layout:restoreFromTrash', id);
     },
     async saveDraft(id, content) {
       await window.sky.invoke('kernel:layout:saveDraft', id, content);
