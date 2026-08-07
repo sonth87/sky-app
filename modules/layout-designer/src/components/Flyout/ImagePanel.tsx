@@ -1,39 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
-import type { AssetMeta } from '@sky-app/service-contracts';
+import { collectUsedAssetPaths } from '@sky-app/slide-shared';
+import type { AssetPort, AssetMeta } from '@sky-app/service-contracts';
 import { addItemCommand, patchItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
 import { useEditorState } from '../../hooks/useEditor.js';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
 import { nextSpawnId } from './useSpawnDrag.js';
-import { Search, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@sky-app/ui';
+import { MediaLibraryModal } from '../MediaLibraryModal.js';
 
 export interface ImagePanelProps {
   editor: Editor;
   variant: LayoutVariant;
   loopItemId?: string;
+  assetPort?: AssetPort;
   listAssets?: () => Promise<AssetMeta[]>;
-  resolveAssetUrl?: (path: string) => Promise<string>;
   deleteAsset?: (path: string) => Promise<void>;
+  resolveAssetUrl?: (path: string) => Promise<string>;
 }
 
-export function ImagePanel({
-  editor,
-  variant,
-  loopItemId,
-  listAssets,
-  resolveAssetUrl,
-  deleteAsset,
-}: ImagePanelProps) {
+export function ImagePanel({ editor, variant, loopItemId, assetPort, listAssets, deleteAsset, resolveAssetUrl }: ImagePanelProps) {
+  // Support both assetPort (preferred) and individual callbacks (backward compat)
+  const finalAssetPort = assetPort || (listAssets ? {
+    listAssets,
+    deleteAsset,
+    resolveAssetUrl,
+  } as AssetPort : undefined);
+  const doc = useEditorState(editor, (s) => s.doc);
   const selection = useEditorState(editor, (s) => s.selection);
+  const usedPaths = useMemo(() => new Set(collectUsedAssetPaths(doc)), [doc]);
+
+  const [activeTab, setActiveTab] = useState<'current' | 'all'>('all');
   const [assets, setAssets] = useState<AssetMeta[] | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [search, setSearch] = useState('');
+  const [modalOpen, setModalOpen] = useState<'library' | 'upload' | false>(false);
 
   useEffect(() => {
-    if (!listAssets) return;
+    if (!finalAssetPort) return;
     let cancelled = false;
-    listAssets()
+    finalAssetPort
+      .listAssets?.()
       .then((list) => {
         if (!cancelled) setAssets(list);
       })
@@ -43,14 +51,14 @@ export function ImagePanel({
     return () => {
       cancelled = true;
     };
-  }, [listAssets]);
+  }, [finalAssetPort]);
 
-  if (!listAssets) {
+  if (!finalAssetPort) {
     return (
       <>
-        <div className="px-[15px] pt-[15px] pb-[10px] font-bold text-[13px]">Ảnh</div>
+        <div className="px-[15px] pt-[15px] pb-[10px] font-bold text-[13px]">Media</div>
         <div className="px-[14px] text-[11px] text-[#9a9bab] leading-[1.45]">
-          Tải ảnh — nối tầng lưu trữ thật (Electron file / data-service upload / WASM blob) ở phần asset ảnh 3 tầng.
+          Nối AssetPort để sử dụng thư viện ảnh.
         </div>
       </>
     );
@@ -72,42 +80,103 @@ export function ImagePanel({
     editor.store.getState().dispatch(addItemCommand(variant.aspect.id, newItem, loopItemId));
   };
 
-  const filteredAssets = (assets ?? []).filter((a) => a.name.toLowerCase().includes(search.toLowerCase()));
+  const handleDelete = async (path: string) => {
+    if (!assetPort?.deleteAsset) return;
+    await assetPort.deleteAsset(path);
+    setAssets((prev) => prev?.filter((a) => a.relativePath !== path) ?? null);
+  };
+
+  const currentAssets = (assets ?? []).filter((a) => usedPaths.has(a.relativePath));
+  const allAssets = (assets ?? []).slice(0, 20);
 
   return (
     <>
-      <div className="px-[15px] pt-[15px] pb-[10px] font-bold text-[13px]">Ảnh</div>
-      <div className="px-[14px] pb-[8px] text-[11px] text-[#9a9bab] leading-[1.45]">Nhấp để gán vào ảnh đang chọn, hoặc thêm ảnh mới.</div>
-      {assets && (
-        <div className="px-[14px] pb-[8px] relative">
-          <Search size={14} className="absolute left-[22px] top-[10px] text-[#9a9bab] pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Tìm ảnh..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-[32px] pr-2 py-[6px] border border-[#e6e6ee] rounded-[6px] text-[11px] placeholder:text-[#9a9bab]"
-          />
-        </div>
-      )}
-      {loadError && <div className="px-[14px] text-[11px] text-[#c0521e]">Không tải được danh sách ảnh.</div>}
-      {assets && assets.length === 0 && !loadError && (
-        <div className="px-[14px] text-[11px] text-[#9a9bab]">Chưa có ảnh nào — dùng nút &quot;Đổi ảnh&quot; ở panel thuộc tính để tải lên.</div>
-      )}
-      {assets && filteredAssets.length === 0 && assets.length > 0 && (
-        <div className="px-[14px] text-[11px] text-[#9a9bab]">Không tìm thấy ảnh nào phù hợp &quot;{search}&quot;.</div>
-      )}
-      <div className="p-[4px_14px_14px] overflow-y-auto grid grid-cols-2 gap-2">
-        {filteredAssets.map((asset) => (
-          <AssetThumbnail
-            key={asset.relativePath}
-            asset={asset}
-            resolveAssetUrl={resolveAssetUrl}
-            onClick={() => handlePick(asset)}
-            onDelete={deleteAsset}
-          />
-        ))}
+      <div className="px-[15px] pt-[15px] pb-[10px] flex items-center justify-between">
+        <span className="font-bold text-[13px]">Media</span>
+        {finalAssetPort && (
+          <button
+            onClick={() => setModalOpen('upload')}
+            title="Thêm ảnh"
+            className="w-6 h-6 flex items-center justify-center rounded-[7px] hover:bg-[#f4f5f9] text-[#5c5d6e]"
+          >
+            <Plus size={16} />
+          </button>
+        )}
       </div>
+
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+        <TabsList className="px-[15px] mt-2">
+          <TabsTrigger value="current">Trong layout{currentAssets.length > 0 ? ` (${currentAssets.length})` : ''}</TabsTrigger>
+          <TabsTrigger value="all">Toàn bộ</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="current" className="flex-1 overflow-hidden flex flex-col m-0">
+          {currentAssets.length === 0 ? (
+            <div className="px-[14px] text-[11px] text-[#9a9bab] text-center py-6">
+              Layout này chưa dùng ảnh nào — bấm <strong>+</strong> hoặc chuyển tab "Toàn bộ" để chọn ảnh có sẵn.
+            </div>
+          ) : (
+            <div className="p-[8px_14px] grid grid-cols-2 gap-2 overflow-y-auto">
+              {currentAssets.map((asset) => (
+                <AssetThumbnail
+                  key={asset.relativePath}
+                  asset={asset}
+                  resolveAssetUrl={finalAssetPort?.resolveAssetUrl}
+                  onClick={() => handlePick(asset)}
+                  onDelete={() => handleDelete(asset.relativePath)}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="all" className="flex-1 overflow-hidden flex flex-col m-0">
+          {!finalAssetPort ? (
+            <div className="px-[14px] text-[11px] text-[#9a9bab]">Chưa nối AssetPort.</div>
+          ) : loadError ? (
+            <div className="px-[14px] text-[11px] text-[#c0521e]">Không tải được danh sách ảnh.</div>
+          ) : !assets ? (
+            <div className="px-[14px] text-[11px] text-[#9a9bab] text-center py-6">Đang tải...</div>
+          ) : allAssets.length === 0 ? (
+            <div className="px-[14px] text-[11px] text-[#9a9bab] text-center py-6">Chưa có ảnh nào.</div>
+          ) : (
+            <>
+              <div className="p-[8px_14px] grid grid-cols-2 gap-2 overflow-y-auto flex-1">
+                {allAssets.map((asset) => (
+                  <AssetThumbnail
+                    key={asset.relativePath}
+                    asset={asset}
+                    resolveAssetUrl={finalAssetPort?.resolveAssetUrl}
+                    onClick={() => handlePick(asset)}
+                    onDelete={() => handleDelete(asset.relativePath)}
+                  />
+                ))}
+              </div>
+              {(assets?.length ?? 0) > 20 && (
+                <div className="p-[8px_14px]">
+                  <button
+                    onClick={() => setModalOpen('library')}
+                    className="w-full py-2 text-[11.5px] font-semibold rounded-lg border border-[#e6e6ee] hover:bg-[#f4f5f9] text-[#5c5d6e]"
+                  >
+                    Xem thêm ({assets!.length - 20} ảnh nữa)
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <MediaLibraryModal
+        open={modalOpen !== false}
+        onOpenChange={(o) => !o && setModalOpen(false)}
+        assetPort={finalAssetPort}
+        usedAssetPaths={Array.from(usedPaths)}
+        initialTab={modalOpen === 'library' ? 'library' : modalOpen === 'upload' ? 'upload' : undefined}
+        onSelect={(path) => {
+          handlePick({ relativePath: path, name: path.split('/').pop() ?? 'image', sizeBytes: 0, uploadedAt: new Date().toISOString() });
+        }}
+      />
     </>
   );
 }
@@ -127,7 +196,7 @@ function AssetThumbnail({
   asset: AssetMeta;
   resolveAssetUrl?: (path: string) => Promise<string>;
   onClick: () => void;
-  onDelete?: (path: string) => Promise<void>;
+  onDelete?: () => Promise<void>;
 }) {
   const url = useResolvedAssetUrl(asset.relativePath, resolveAssetUrl);
   const [deleting, setDeleting] = useState(false);
@@ -137,7 +206,7 @@ function AssetThumbnail({
     if (!onDelete) return;
     setDeleting(true);
     try {
-      await onDelete(asset.relativePath);
+      await onDelete();
     } finally {
       setDeleting(false);
     }
@@ -157,10 +226,9 @@ function AssetThumbnail({
         <button
           onClick={handleDelete}
           disabled={deleting}
-          className="absolute top-1 right-1 p-1 bg-[#c03333]/90 rounded opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 cursor-pointer"
-          title="Xoá ảnh"
+          className="absolute top-1 left-1 bg-red-500 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
         >
-          <Trash2 size={12} className="text-white" />
+          <Trash2 size={12} />
         </button>
       )}
     </div>

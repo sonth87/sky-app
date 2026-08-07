@@ -24,6 +24,7 @@ export function PanelHeader({
     image: 'Hình ảnh',
     shape: 'Hình khối',
     loop: 'Khung lặp',
+    gallery: 'Bộ ảnh',
   };
   
   const iconBtnClass = "cursor-pointer text-[#9a9bab] border border-[#e6e6ee] rounded-[7px] w-[26px] h-[26px] flex items-center justify-center bg-transparent hover:bg-[#f4f5f9]";

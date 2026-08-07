@@ -20,6 +20,7 @@ export * from './layout/useAutoFitFontSize.js';
 export * from './layout/renderer.js';
 export * from './layout/preload.js';
 export * from './layout/canonical-to-student.js';
+export * from './layout/asset-usage.js';
 export { BackdropView } from './BackdropView.js';
 export type { BackdropViewProps } from './BackdropView.js';
 export { DynamicBackdropView } from './DynamicBackdropView.js';

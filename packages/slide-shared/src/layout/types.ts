@@ -191,8 +191,26 @@ export interface LoopItem extends BaseItem {
   overflowMoreText?: string; // "+@count_more" — @count_more là biến LOCAL tự động
 }
 
+export interface GalleryImageEntry {
+  id: string;
+  src?: string;
+  caption?: string;
+  focalX?: number;
+  focalY?: number;
+}
+
+export interface GalleryItem extends BaseItem {
+  type: 'gallery';
+  images: GalleryImageEntry[];
+  layout: 'grid' | 'row' | 'column';
+  columns?: number;
+  gap?: number;
+  fit: 'cover' | 'contain';
+  showCaption: boolean;
+}
+
 // Union LayoutItem — nguồn chân lý DUY NHẤT (không lặp lại ở file khác)
-export type LayoutItem = TextItem | ImageItem | ShapeItem | RibbonItem | LoopItem;
+export type LayoutItem = TextItem | ImageItem | ShapeItem | RibbonItem | LoopItem | GalleryItem;
 
 export interface Background {
   kind: 'image' | 'color' | 'gradient';

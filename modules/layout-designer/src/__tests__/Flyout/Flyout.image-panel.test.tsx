@@ -40,7 +40,7 @@ describe('ImagePanel — không có listAssets (hành vi cũ)', () => {
     render(<LayoutDesignerApp content={twoItemsContent()} />);
     switchToImagePanel();
 
-    expect(screen.getByText(/Tải ảnh — nối tầng lưu trữ thật/)).toBeTruthy();
+    expect(screen.getByText(/Nối AssetPort để sử dụng thư viện ảnh/)).toBeTruthy();
   });
 });
 

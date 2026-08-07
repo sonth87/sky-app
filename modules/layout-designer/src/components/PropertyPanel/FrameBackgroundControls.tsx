@@ -14,6 +14,7 @@ export interface FrameBackgroundControlsProps {
   pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
   resolveAssetUrl?: (path: string) => Promise<string>;
   assetPort?: AssetPort;
+  usedAssetPaths?: string[];
   width?: number;
 }
 
@@ -23,6 +24,7 @@ export function FrameBackgroundControls({
   pickAndSaveImage,
   resolveAssetUrl,
   assetPort,
+  usedAssetPaths,
   width = 302,
 }: FrameBackgroundControlsProps) {
   const background = variant.background;
@@ -48,6 +50,8 @@ export function FrameBackgroundControls({
         open={mediaLibraryOpen}
         onOpenChange={setMediaLibraryOpen}
         assetPort={assetPort}
+        usedAssetPaths={usedAssetPaths}
+        initialTab="library"
         onSelect={(relativePath) => onChange({ kind: 'image', src: relativePath })}
       />
       <div className="p-[13px_15px] border-b border-[#e6e6ee]">

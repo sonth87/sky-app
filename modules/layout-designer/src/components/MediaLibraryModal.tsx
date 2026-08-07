@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, Trash2, CheckCircle2, XCircle, Loader2, CloudUpload, Ban, Palette, Sparkles, Image as ImageIcon } from 'lucide-react';
-import type { AssetMeta } from '@sky-app/service-contracts';
-import type { AssetPort } from '@sky-app/service-contracts';
+import { Search, Trash2, CheckCircle2, XCircle, Loader2, CloudUpload, Image as ImageIcon } from 'lucide-react';
+import type { Asset, AssetPort, AssetType } from '@sky-app/service-contracts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogFooter, Tabs, TabsList, TabsTrigger, TabsContent, cn } from '@sky-app/ui';
 
 export interface MediaLibraryModalProps {
@@ -9,6 +8,8 @@ export interface MediaLibraryModalProps {
   onOpenChange: (open: boolean) => void;
   assetPort?: AssetPort;
   onSelect: (relativePath: string) => void;
+  usedAssetPaths?: string[];
+  initialTab?: 'current' | 'library' | 'upload' | 'url';
 }
 
 interface UploadItem {
@@ -20,25 +21,67 @@ interface UploadItem {
   relativePath?: string;
 }
 
-export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect }: MediaLibraryModalProps) {
-  const [assets, setAssets] = useState<AssetMeta[]>([]);
-  const [selectedAsset, setSelectedAsset] = useState<AssetMeta | null>(null);
+export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect, usedAssetPaths, initialTab }: MediaLibraryModalProps) {
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('library');
+  const [activeTab, setActiveTab] = useState<'current' | 'library' | 'upload' | 'url'>('library');
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [isAddingUrl, setIsAddingUrl] = useState(false);
+  const [urlError, setUrlError] = useState('');
+  const [typeFilter, setTypeFilter] = useState<AssetType | 'all'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const usedAssetSet = new Set(usedAssetPaths ?? []);
 
-  const filteredAssets = assets.filter((a) => a.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredAssets = assets.filter((a) => {
+    const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = typeFilter === 'all' || a.type === typeFilter;
+    return matchesSearch && matchesType;
+  });
 
   useEffect(() => {
     if (!open || !assetPort) return;
-    assetPort.listAssets().then((list) => {
-      setAssets(list);
+    (assetPort.queryAssets?.({ type: 'image' }) || assetPort.listAssets?.().then(list => ({
+      assets: (list || []).map(a => ({
+        id: a.relativePath,
+        type: 'image' as const,
+        name: a.name,
+        relativePath: a.relativePath,
+        size: a.sizeBytes,
+        uploadedAt: a.uploadedAt,
+        source: 'local' as const,
+      })),
+      total: (list || []).length,
+      page: 1,
+      pageSize: (list || []).length,
+    }))).then((result) => {
+      if (result && 'assets' in result) {
+        setAssets(result.assets);
+      }
       setSelectedAsset(null);
-      setActiveTab(list.length > 0 ? 'library' : 'upload');
+      if (initialTab) setActiveTab(initialTab);
+      else setActiveTab(result && 'assets' in result && result.assets.length > 0 ? 'library' : 'upload');
     });
-  }, [open, assetPort]);
+  }, [open, assetPort, initialTab]);
+
+  const handleAddUrl = async () => {
+    if (!urlInput.trim() || !assetPort?.addAssetFromUrl) return;
+    setIsAddingUrl(true);
+    setUrlError('');
+    try {
+      const asset = await assetPort.addAssetFromUrl(urlInput);
+      setAssets(prev => [asset, ...prev]);
+      setUrlInput('');
+      setActiveTab('library');
+      setSelectedAsset(asset);
+    } catch (err) {
+      setUrlError(err instanceof Error ? err.message : 'Failed to add image from URL');
+    } finally {
+      setIsAddingUrl(false);
+    }
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -110,7 +153,15 @@ export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect }: M
       if (allDone && items.some((i) => i.status === 'done')) {
         // Reload assets and switch to library tab
         assetPort.listAssets().then((list) => {
-          setAssets(list);
+          setAssets(list.map((a) => ({
+            id: a.relativePath,
+            type: 'image' as const,
+            name: a.name,
+            relativePath: a.relativePath,
+            size: a.sizeBytes,
+            uploadedAt: a.uploadedAt,
+            source: 'local' as const,
+          })));
           setUploadItems([]);
           setActiveTab('library');
         });
@@ -147,14 +198,53 @@ export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect }: M
           <DialogClose />
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
           <TabsList>
-            <TabsTrigger value="library">Thư viện</TabsTrigger>
+            <TabsTrigger value="current">Trong layout{usedAssetPaths && usedAssetPaths.length > 0 ? ` (${usedAssetPaths.length})` : ''}</TabsTrigger>
+            <TabsTrigger value="library">Toàn bộ</TabsTrigger>
             <TabsTrigger value="upload">Tải lên</TabsTrigger>
+            <TabsTrigger value="url">URL</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="current" className="flex-1 flex flex-col overflow-y-auto">
+            <div className="px-4 pb-2 text-[10px] text-[#9a9bab]">
+              Xoá ảnh ở đây xoá khỏi TOÀN BỘ thư viện, có thể ảnh hưởng layout khác dùng chung ảnh này.
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {!usedAssetPaths || usedAssetPaths.length === 0 ? (
+                <div className="text-center text-sm text-[#9a9bab] py-8">
+                  Layout này chưa dùng ảnh nào
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-3">
+                  {assets
+                    .filter(a => usedAssetSet.has(a.relativePath))
+                    .map((asset) => (
+                      <div key={asset.id} className="relative group rounded-lg overflow-hidden border border-[#e6e6ee] hover:border-[#4b57e6] transition-colors">
+                        <img src={asset.relativePath} alt={asset.name} className="w-full aspect-square object-cover" />
+                        <button
+                          onClick={() => handleDeleteAsset(asset.relativePath)}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedAsset(asset);
+                            onSelect(asset.relativePath);
+                            onOpenChange(false);
+                          }}
+                          className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors"
+                        />
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
           <TabsContent value="library" className="flex-1 flex flex-col overflow-y-auto">
-            <div className="p-4 border-b border-[#f0f0f5]">
+            <div className="p-4 border-b border-[#f0f0f5] space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 size-4 text-[#9a9bab]" />
                 <input
@@ -164,6 +254,22 @@ export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect }: M
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-3 py-2 rounded-[7px] border border-[#e6e6ee] bg-[#fcfcfd] text-sm"
                 />
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {(['all', 'image', 'video', 'font', 'file'] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setTypeFilter(type)}
+                    className={cn(
+                      'text-xs font-medium px-3 py-1.5 rounded-[6px] transition-colors',
+                      typeFilter === type
+                        ? 'bg-[#4b57e6] text-white'
+                        : 'bg-[#f0f0f5] text-[#5c5d6e] hover:bg-[#e6e6ee]'
+                    )}
+                  >
+                    {type === 'all' ? 'Tất cả' : type === 'image' ? 'Ảnh' : type === 'video' ? 'Video' : type === 'font' ? 'Font' : 'File'}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -271,6 +377,33 @@ export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect }: M
                   </div>
                 </div>
               )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="url" className="flex-1 flex flex-col p-6">
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-semibold block mb-2">Dán URL ảnh</label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/image.jpg"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddUrl()}
+                  className="w-full px-3 py-2 border border-[#e6e6ee] rounded-lg bg-[#fcfcfd] text-sm focus:outline-none focus:border-[#4b57e6]"
+                />
+              </div>
+              <div className="text-xs text-[#9a9bab]">
+                Hỗ trợ: JPEG, PNG, SVG, GIF, WebP. Ảnh sẽ được TẢI VỀ VÀ LƯU LOCAL ngay (cần mạng lúc thêm, không cần mạng lúc trình chiếu ceremony).
+              </div>
+              <button
+                onClick={handleAddUrl}
+                disabled={!urlInput.trim() || isAddingUrl}
+                className="w-full px-4 py-2 bg-[#4b57e6] text-white rounded-lg hover:bg-[#3d47cc] disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
+              >
+                {isAddingUrl ? 'Đang tải về...' : 'Tải về & Thêm vào thư viện'}
+              </button>
+              {urlError && <div className="text-xs text-red-500">{urlError}</div>}
             </div>
           </TabsContent>
         </Tabs>

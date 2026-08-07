@@ -47,6 +47,8 @@ export interface CanvasProps {
   pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
   /** Callback khi click nút "Sửa mẫu" trên LoopItem toolbar. */
   onEnterLoopEdit?: (id: string) => void;
+  /** Callback khi click nút "Quản lý bộ ảnh" trên GalleryItem toolbar. */
+  onOpenGalleryManager?: (id: string) => void;
   /** Port để lưu personal templates (multi-select → Lưu thành mẫu). */
   layoutComponentPort?: LayoutComponentPort;
 }
@@ -65,6 +67,7 @@ export function Canvas({
   onTokenInserted,
   pickAndSaveImage,
   onEnterLoopEdit,
+  onOpenGalleryManager,
   layoutComponentPort,
 }: CanvasProps) {
   const selection = useEditorState(editor, (s) => s.selection);
@@ -453,6 +456,7 @@ export function Canvas({
                 pointerScaleY={layoutScaleY * totalScale}
                 pickAndSaveImage={pickAndSaveImage}
                 onEnterLoopEdit={onEnterLoopEdit}
+                onOpenGalleryManager={onOpenGalleryManager}
                 onSaveTemplate={layoutComponentPort ? setSaveTemplateItems : undefined}
               />
             );
@@ -485,6 +489,7 @@ export function Canvas({
                 pointerScaleY={layoutScaleY * totalScale}
                 pickAndSaveImage={pickAndSaveImage}
                 onEnterLoopEdit={onEnterLoopEdit}
+                onOpenGalleryManager={onOpenGalleryManager}
                 onSaveTemplate={layoutComponentPort ? setSaveTemplateItems : undefined}
               />
             );

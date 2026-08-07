@@ -135,6 +135,8 @@ function ItemRenderer({ item, scaleX, scaleY, record, resolveAsset }: ItemRender
       return <ShapeItemView item={item} scaleX={scaleX} scaleY={scaleY} />;
     case 'loop':
       return <LoopItemView item={item} scaleX={scaleX} scaleY={scaleY} record={record} resolveAsset={resolveAsset} />;
+    case 'gallery':
+      return <GalleryItemView item={item} scaleX={scaleX} scaleY={scaleY} resolveAsset={resolveAsset} />;
     default: {
       const _exhaustive: never = item;
       return _exhaustive;
@@ -376,6 +378,62 @@ function LoopItemView({
         >
           {renderOverflowMoreText(item.overflowMoreText, result.overflowCount)}
         </div>
+      )}
+    </div>
+  );
+}
+
+function GalleryItemView({ item, scaleX, scaleY, resolveAsset }: { item: Extract<LayoutItem, { type: 'gallery' }>; scaleX: number; scaleY: number; resolveAsset: (p: string) => string }) {
+  const gap = (item.gap ?? 8) * Math.min(scaleX, scaleY);
+  const gridStyle: CSSProperties = item.layout === 'grid'
+    ? { display: 'grid', gridTemplateColumns: `repeat(${item.columns ?? 3}, 1fr)`, gap }
+    : { display: 'flex', flexDirection: item.layout === 'row' ? 'row' : 'column', gap };
+
+  if (item.images.length === 0) {
+    return (
+      <div style={{
+        ...toRenderBox(item.box, scaleX, scaleY),
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#7c7c8c',
+        fontSize: 12 * Math.min(scaleX, scaleY),
+        background: 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
+      }}>
+        Bộ ảnh trống
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...toRenderBox(item.box, scaleX, scaleY), ...gridStyle }}>
+      {item.images.map((img) => (
+        <GalleryImageCell key={img.id} entry={img} fit={item.fit} showCaption={item.showCaption} resolveAsset={resolveAsset} scaleX={scaleX} scaleY={scaleY} />
+      ))}
+    </div>
+  );
+}
+
+function GalleryImageCell({ entry, fit, showCaption, resolveAsset, scaleX, scaleY }: { entry: any; fit: 'cover' | 'contain'; showCaption: boolean; resolveAsset: (p: string) => string; scaleX: number; scaleY: number }) {
+  const resolvedUrl = entry.src ? resolveAsset(entry.src) : null;
+  const focalX = (entry.focalX ?? 0.5) * 100;
+  const focalY = (entry.focalY ?? 0.5) * 100;
+  const minScale = Math.min(scaleX, scaleY);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 * minScale }}>
+      <div style={{
+        aspectRatio: '1',
+        background: resolvedUrl
+          ? `url(${resolvedUrl})`
+          : 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
+        backgroundSize: fit === 'cover' ? 'cover' : 'contain',
+        backgroundPosition: fit === 'cover' ? `${focalX}% ${focalY}%` : 'center',
+        backgroundRepeat: 'no-repeat',
+        borderRadius: 4 * minScale,
+      }} />
+      {showCaption && entry.caption && (
+        <div style={{ fontSize: 11 * minScale, color: '#5c5d6e', textAlign: 'center' }}>{entry.caption}</div>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { Square, Circle, Triangle, Diamond, Frame, Minus, Type, Image as ImageIcon, Flag, Repeat } from 'lucide-react';
+import { Square, Circle, Triangle, Diamond, Frame, Minus, Type, Image as ImageIcon, Flag, Repeat, Images } from 'lucide-react';
 import type { SpawnKind } from './useSpawnDrag.js';
 
 interface GraphicsTile {
@@ -27,6 +27,11 @@ const BASIC_COMPONENT_TILES: GraphicsTile[] = [
     label: 'Khung lặp',
     icon: Repeat,
     spawnKind: { kind: 'itemType', type: 'loop', label: 'Khung lặp' },
+  },
+  {
+    label: 'Bộ ảnh',
+    icon: Images,
+    spawnKind: { kind: 'itemType', type: 'gallery', label: 'Bộ ảnh' },
   },
 ];
 

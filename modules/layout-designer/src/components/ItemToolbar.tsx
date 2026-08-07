@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown, Eye, EyeOff, Bold, Circle, Square, Triangle, Diamond, Frame, Minus, Edit2, Bookmark } from 'lucide-react';
+import { Copy, Trash2, Pin, PinOff, ChevronUp, ChevronDown, Eye, EyeOff, Bold, Circle, Square, Triangle, Diamond, Frame, Minus, Edit2, Bookmark, Images } from 'lucide-react';
 import type { Box, LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
 import { addItemCommand, batchCommand, patchItemCommand, removeItemCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
@@ -53,10 +53,11 @@ export interface ItemToolbarProps {
   pointerScaleY: number;
   pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
   onEnterLoopEdit?: (id: string) => void;
+  onOpenGalleryManager?: (id: string) => void;
   onSaveTemplate?: (items: LayoutItem[]) => void;
 }
 
-export function ItemToolbar({ item, editor, variant, loopItemId, originX, originY, pointerScaleX, pointerScaleY, pickAndSaveImage, onEnterLoopEdit, onSaveTemplate }: ItemToolbarProps) {
+export function ItemToolbar({ item, editor, variant, loopItemId, originX, originY, pointerScaleX, pointerScaleY, pickAndSaveImage, onEnterLoopEdit, onOpenGalleryManager, onSaveTemplate }: ItemToolbarProps) {
   const [shapeOpen, setShapeOpen] = useState(false);
   const aabb = computeRotatedAABB(item.box);
   const screenLeft = originX + aabb.minX * pointerScaleX;
@@ -260,6 +261,14 @@ export function ItemToolbar({ item, editor, variant, loopItemId, originX, origin
       return (
         <button onClick={() => onEnterLoopEdit(item.id)} title="Sửa mẫu" className={btnClass}>
           <Edit2 size={14} />
+        </button>
+      );
+    }
+
+    if (item.type === 'gallery' && onOpenGalleryManager) {
+      return (
+        <button onClick={() => onOpenGalleryManager(item.id)} title="Quản lý bộ ảnh" className={btnClass}>
+          <Images size={14} />
         </button>
       );
     }

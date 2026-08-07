@@ -18,7 +18,7 @@ export type { CardReaderPort, CardScanEvent } from './card-reader.js';
 export type { FsPort } from './fs.js';
 export type { LicensePort, LicensePayload } from './license.js';
 export type { LayoutPort, VariableRegistryEntry } from './layout.js';
-export type { AssetPort, AssetMeta } from './asset.js';
+export type { AssetPort, AssetMeta, AssetQuery, AssetListResult, Asset, AssetType } from './asset.js';
 export type { LayoutComponentPort, LayoutComponentMeta } from './layoutComponent.js';
 export type { EventPort } from './event.js';
 export type { DataSourcePort } from './data-source.js';

@@ -34,6 +34,7 @@ const DEFAULT_IMAGE_BOX: Box = { x: 100, y: 100, w: 300, h: 300 };
 const DEFAULT_SHAPE_BOX: Box = { x: 100, y: 100, w: 200, h: 200 };
 const DEFAULT_RIBBON_BOX: Box = { x: 100, y: 100, w: 400, h: 60 };
 const DEFAULT_LOOP_BOX: Box = { x: 100, y: 100, w: 800, h: 400 };
+const DEFAULT_GALLERY_BOX: Box = { x: 100, y: 100, w: 600, h: 400 };
 
 /** Đăng ký sẵn 5 loại item chuẩn (04-schema-layout-document.md) — dùng cho registry mặc định. */
 export function registerDefaultItemTypes(registry: ItemTypeRegistry): void {
@@ -108,6 +109,23 @@ export function registerDefaultItemTypes(registry: ItemTypeRegistry): void {
       direction: 'grid',
       source: 'members',
       overflow: 'shrink',
+    }),
+  });
+
+  registry.register<Extract<LayoutItem, { type: 'gallery' }>>({
+    type: 'gallery',
+    label: 'Bộ ảnh',
+    defaultBox: DEFAULT_GALLERY_BOX,
+    createDefault: (id, box = DEFAULT_GALLERY_BOX) => ({
+      id,
+      type: 'gallery',
+      box,
+      images: [],
+      layout: 'grid',
+      columns: 3,
+      gap: 8,
+      fit: 'cover',
+      showCaption: false,
     }),
   });
 }

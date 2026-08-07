@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { LayoutItem } from '@sky-app/slide-shared';
+import { collectUsedAssetPaths } from '@sky-app/slide-shared';
 import type { AssetPort } from '@sky-app/service-contracts';
 import { patchItemCommand, patchVariantBackgroundCommand, removeItemCommand, resolveEditingItems, toggleSyncLockCommand } from '@sky-app/layout-editor-core';
 import type { Editor } from '@sky-app/layout-editor-core';
@@ -13,6 +14,9 @@ import { RibbonControls } from './RibbonControls.js';
 import { ImageControls } from './ImageControls.js';
 import { ShapeControls } from './ShapeControls.js';
 import { LoopControls } from './LoopControls.js';
+import { GalleryControls } from './GalleryControls.js';
+import { GalleryManagerModal } from '../GalleryManagerModal.js';
+import { MediaLibraryModal } from '../MediaLibraryModal.js';
 import { RotationControl, OpacityControl } from './CommonControls.js';
 
 export interface PropertyPanelProps {
@@ -37,11 +41,16 @@ export interface PropertyPanelProps {
 }
 
 export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenInserted, pickAndSaveImage, resolveAssetUrl, assetPort, width = 302 }: PropertyPanelProps) {
+  const [galleryManagerOpen, setGalleryManagerOpen] = useState(false);
+  const [mediaLibraryForGalleryOpen, setMediaLibraryForGalleryOpen] = useState(false);
+  const [galleryMediaLibraryCallback, setGalleryMediaLibraryCallback] = useState<((path: string) => void) | null>(null);
   const selection = useEditorState(editor, (s) => s.selection);
   const doc = useEditorState(editor, (s) => s.doc);
   // editingLoopId (Bước 10 kế hoạch resize/rotate, 2026-07-18) — khi có giá trị, lookup item
   // trong itemTemplate của LoopItem đó thay vì variant.items top-level (resolveEditingItems).
   const editingLoopId = useEditorState(editor, (s) => s.editingLoopId);
+
+  const usedAssetPaths = useMemo(() => collectUsedAssetPaths(doc), [doc]);
 
   const variant = doc.variants.find((v) => v.aspect.id === variantId);
   const editingItems = variant ? resolveEditingItems(variant, editingLoopId) : [];
@@ -95,6 +104,7 @@ export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenIns
         pickAndSaveImage={pickAndSaveImage}
         resolveAssetUrl={resolveAssetUrl}
         assetPort={assetPort}
+        usedAssetPaths={usedAssetPaths}
         width={width}
       />
     );
@@ -114,12 +124,49 @@ export function PropertyPanel({ editor, variantId, globalSuggestions, onTokenIns
       {item.type === 'text' && <TextControls item={item} patch={patch} tokenSuggestions={tokenSuggestions} onTokenInserted={onTokenInserted} />}
       {item.type === 'ribbon' && <RibbonControls item={item} patch={patch} tokenSuggestions={tokenSuggestions} onTokenInserted={onTokenInserted} />}
       {item.type === 'image' && (
-        <ImageControls item={item} patch={patch} pickAndSaveImage={pickAndSaveImage} resolveAssetUrl={resolveAssetUrl} assetPort={assetPort} />
+        <ImageControls item={item} patch={patch} pickAndSaveImage={pickAndSaveImage} resolveAssetUrl={resolveAssetUrl} assetPort={assetPort} usedAssetPaths={usedAssetPaths} />
       )}
       {item.type === 'shape' && <ShapeControls item={item} patch={patch} />}
       {item.type === 'loop' && <LoopControls item={item} patch={patch} />}
+      {item.type === 'gallery' && (
+        <>
+          <GalleryControls
+            item={item}
+            patch={patch}
+            onOpenGalleryManager={() => setGalleryManagerOpen(true)}
+          />
+        </>
+      )}
       <RotationControl value={item.box.rotation ?? 0} onChange={(v) => patch({ box: { ...item.box, rotation: v } })} />
       <OpacityControl value={item.opacity ?? 100} onChange={(v) => patch({ opacity: v })} />
+
+      {item.type === 'gallery' && (
+        <>
+          <MediaLibraryModal
+            open={mediaLibraryForGalleryOpen}
+            onOpenChange={setMediaLibraryForGalleryOpen}
+            assetPort={assetPort}
+            onSelect={(path) => {
+              if (galleryMediaLibraryCallback) {
+                galleryMediaLibraryCallback(path);
+                setGalleryMediaLibraryCallback(null);
+                setMediaLibraryForGalleryOpen(false);
+              }
+            }}
+          />
+          <GalleryManagerModal
+            open={galleryManagerOpen}
+            onOpenChange={setGalleryManagerOpen}
+            images={item.images}
+            onImagesChange={(images) => patch({ images })}
+            showCaption={item.showCaption}
+            onOpenMediaLibrary={(onSelect) => {
+              setGalleryMediaLibraryCallback(() => onSelect);
+              setMediaLibraryForGalleryOpen(true);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

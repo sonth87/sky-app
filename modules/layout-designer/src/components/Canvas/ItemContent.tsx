@@ -84,6 +84,8 @@ export function ItemContent({
           Khung lặp (nhóm)
         </div>
       );
+    case 'gallery':
+      return <GalleryItemContent item={item} fScale={fScale} resolveAssetUrl={resolveAssetUrl} />;
     default: {
       const _exhaustive: never = item;
       return _exhaustive;
@@ -158,6 +160,80 @@ export function textShadowCss(shadow: TextItem['shadow'], fScale: number): strin
 /** Bước 5 kế hoạch — 'frame' (viền rỗng, không fill giữa) / 'line' (1 đường kẻ mảnh ngang giữa
  * box). GĐ10 (2026-08-06) — thêm clip-path cho 'triangle'/'diamond' (trước đó render giống rect,
  * bug đã audit — xem SHAPE_CLIP_PATHS's comment). */
+export function GalleryItemContent({
+  item,
+  fScale,
+  resolveAssetUrl,
+}: {
+  item: Extract<LayoutItem, { type: 'gallery' }>;
+  fScale: number;
+  resolveAssetUrl?: (path: string) => Promise<string>;
+}) {
+  const gap = (item.gap ?? 8) * fScale;
+  const gridStyle: CSSProperties = item.layout === 'grid'
+    ? { display: 'grid', gridTemplateColumns: `repeat(${item.columns ?? 3}, 1fr)`, gap }
+    : { display: 'flex', flexDirection: item.layout === 'row' ? 'row' : 'column', gap };
+
+  if (item.images.length === 0) {
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#7c7c8c',
+        fontSize: 12 * fScale,
+        background: 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
+      }}>
+        Bộ ảnh trống
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%', ...gridStyle }}>
+      {item.images.map((img) => (
+        <GalleryImageCellContent key={img.id} entry={img} fit={item.fit} showCaption={item.showCaption} resolveAssetUrl={resolveAssetUrl} fScale={fScale} />
+      ))}
+    </div>
+  );
+}
+
+function GalleryImageCellContent({
+  entry,
+  fit,
+  showCaption,
+  resolveAssetUrl,
+  fScale,
+}: {
+  entry: any;
+  fit: 'cover' | 'contain';
+  showCaption: boolean;
+  resolveAssetUrl?: (path: string) => Promise<string>;
+  fScale: number;
+}) {
+  const resolvedUrl = useResolvedAssetUrl(entry.src, resolveAssetUrl);
+  const focalX = (entry.focalX ?? 0.5) * 100;
+  const focalY = (entry.focalY ?? 0.5) * 100;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 * fScale }}>
+      <div style={{
+        aspectRatio: '1',
+        background: resolvedUrl
+          ? `center/${fit} url(${resolvedUrl})`
+          : 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
+        backgroundPosition: fit === 'cover' ? `${focalX}% ${focalY}%` : undefined,
+        borderRadius: 4 * fScale,
+      }} />
+      {showCaption && entry.caption && (
+        <div style={{ fontSize: 11 * fScale, color: '#5c5d6e', textAlign: 'center' }}>{entry.caption}</div>
+      )}
+    </div>
+  );
+}
+
 export function ShapeItemContent({ item, fScale }: { item: Extract<LayoutItem, { type: 'shape' }>; fScale: number }) {
   const fillCSS = getCSSValue(item.fill);
   const border = item.strokeW ? `${item.strokeW * fScale}px solid ${item.stroke ?? '#000'}` : undefined;

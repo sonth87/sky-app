@@ -15,6 +15,7 @@ export interface ImageControlsProps {
   pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
   resolveAssetUrl?: (path: string) => Promise<string>;
   assetPort?: AssetPort;
+  usedAssetPaths?: string[];
 }
 
 export function ImageControls({
@@ -23,6 +24,7 @@ export function ImageControls({
   pickAndSaveImage,
   resolveAssetUrl,
   assetPort,
+  usedAssetPaths,
 }: ImageControlsProps) {
   const previewUrl = useResolvedAssetUrl(item.src, resolveAssetUrl);
   const [picking, setPicking] = useState(false);
@@ -45,6 +47,8 @@ export function ImageControls({
         open={mediaLibraryOpen}
         onOpenChange={setMediaLibraryOpen}
         assetPort={assetPort}
+        usedAssetPaths={usedAssetPaths}
+        initialTab="library"
         onSelect={(relativePath) => patch({ src: relativePath })}
       />
       {(pickAndSaveImage || assetPort) && (
@@ -127,14 +131,14 @@ export function ImageControls({
         <div className="flex gap-[7px]">
           {(
             [
-              { value: 'rect' as const, icon: Square, title: 'Vuông' },
+              { value: 'rect' as const, icon: Square, title: 'Vuông', className: '' },
               {
                 value: 'round' as const,
                 icon: Square,
                 title: 'Vuông tròn',
                 className: 'rounded-md',
               },
-              { value: 'circle' as const, icon: Circle, title: 'Tròn' },
+              { value: 'circle' as const, icon: Circle, title: 'Tròn', className: '' },
             ] as const
           ).map((opt) => {
             const Icon = opt.icon;
@@ -148,7 +152,7 @@ export function ImageControls({
                 )}
                 title={opt.title}
               >
-                <Icon size={15} className={opt.className} />
+                <Icon size={15} className={opt.className || undefined} />
               </button>
             );
           })}

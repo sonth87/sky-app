@@ -23,6 +23,7 @@ export function labelOf(it: LayoutItem): string {
   if (it.type === 'image') return it.varKey ? `Ảnh · @${it.varKey}` : 'Ảnh';
   if (it.type === 'shape') return 'Shape';
   if (it.type === 'loop') return 'Khung lặp';
+  if (it.type === 'gallery') return `Bộ ảnh · ${it.images.length} ảnh`;
   return plainTextOf(it.content) || '—';
 }
 
