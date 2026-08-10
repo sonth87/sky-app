@@ -39,6 +39,16 @@ export function createWebLayoutPort(baseUrl = 'http://localhost:8094'): LayoutPo
       if (!res.ok) throw new Error(`LayoutPort moveToTrash failed: ${res.status}`);
     },
 
+    async deleteLayoutPermanently(id) {
+      const res = await fetch(`${baseUrl}/api/layout/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`LayoutPort deleteLayoutPermanently failed: ${res.status}`);
+    },
+
+    async restoreFromTrash(id) {
+      const res = await fetch(`${baseUrl}/api/layout/${id}/restore`, { method: 'POST' });
+      if (!res.ok) throw new Error(`LayoutPort restoreFromTrash failed: ${res.status}`);
+    },
+
     async saveDraft(id, content) {
       const res = await fetch(`${baseUrl}/api/layout/${id}/draft`, {
         method: 'POST',

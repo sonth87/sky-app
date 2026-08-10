@@ -102,7 +102,8 @@ describe('LayersPanel — treeview (LoopItem.itemTemplate)', () => {
     expect(() => fireEvent.click(list.getByText('@ten'))).not.toThrow();
 
     // PropertyPanel vẫn hiện đúng item ĐANG chọn trước đó (title, "Văn bản"), không đổi/không vỡ.
-    expect(screen.getByText('Văn bản')).toBeTruthy();
+    // getAllByText (không getByText) — Rail cũng có tab "Văn bản" (GĐ19, 8 nhóm) nên có ≥2 khớp.
+    expect(screen.getAllByText('Văn bản').length).toBeGreaterThan(0);
   });
 
   it('node lồng hiện tooltip hướng dẫn double-click canvas', () => {

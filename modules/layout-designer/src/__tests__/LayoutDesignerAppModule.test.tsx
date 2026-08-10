@@ -126,8 +126,9 @@ describe('LayoutDesignerAppModule — debounce save draft', () => {
     render(<LayoutDesignerAppModule {...baseProps(platform)} />);
     await vi.waitFor(() => expect(screen.getByText('Layout Designer')).toBeTruthy());
 
-    // Spawn 1 item text từ palette để tạo thay đổi doc thật (xương sống 2.3 đã có sẵn).
-    const tile = screen.getByText('Chữ').closest('div')!;
+    // Spawn 1 item text từ palette để tạo thay đổi doc thật (xương sống 2.3 đã có sẵn). Panel mặc
+    // định giờ là "Văn bản" (TextPresetsPanel, GĐ19), tile là <button> không phải <div>.
+    const tile = screen.getByText('Business Title').closest('button')!;
     act(() => {
       fireEvent.mouseDown(tile, { clientX: 10, clientY: 10 });
     });

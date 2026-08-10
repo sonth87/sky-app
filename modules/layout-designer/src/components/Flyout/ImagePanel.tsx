@@ -22,12 +22,16 @@ export interface ImagePanelProps {
 }
 
 export function ImagePanel({ editor, variant, loopItemId, assetPort, listAssets, deleteAsset, resolveAssetUrl }: ImagePanelProps) {
-  // Support both assetPort (preferred) and individual callbacks (backward compat)
-  const finalAssetPort = assetPort || (listAssets ? {
-    listAssets,
-    deleteAsset,
-    resolveAssetUrl,
-  } as AssetPort : undefined);
+  // Support both assetPort (preferred) and individual callbacks (backward compat). useMemo BẮT
+  // BUỘC ở nhánh fallback — object literal trần tạo MỚI mỗi render sẽ làm MediaLibraryModal's
+  // useEffect (dep [open, assetPort, initialTab]) refire liên tục mỗi khi ImagePanel re-render vì
+  // BẤT KỲ lý do gì (doc/selection đổi...), gọi lại setActiveTab GHI ĐÈ tab user vừa bấm tay —
+  // bug thật "chuyển tab bị nháy nháy" (2026-08-10), vì assetPort mới mỗi lần khiến effect coi
+  // đó là "asset port đổi" dù bản chất vẫn cùng listAssets/deleteAsset/resolveAssetUrl.
+  const finalAssetPort = useMemo(
+    () => assetPort || (listAssets ? ({ listAssets, deleteAsset, resolveAssetUrl } as AssetPort) : undefined),
+    [assetPort, listAssets, deleteAsset, resolveAssetUrl],
+  );
   const doc = useEditorState(editor, (s) => s.doc);
   const selection = useEditorState(editor, (s) => s.selection);
   const usedPaths = useMemo(() => new Set(collectUsedAssetPaths(doc)), [doc]);
@@ -116,7 +120,7 @@ export function ImagePanel({ editor, variant, loopItemId, assetPort, listAssets,
               Layout này chưa dùng ảnh nào — bấm <strong>+</strong> hoặc chuyển tab "Toàn bộ" để chọn ảnh có sẵn.
             </div>
           ) : (
-            <div className="p-[8px_14px] grid grid-cols-2 gap-2 overflow-y-auto">
+            <div className="p-[8px_14px] grid grid-cols-2 gap-2 overflow-y-auto flex-1">
               {currentAssets.map((asset) => (
                 <AssetThumbnail
                   key={asset.relativePath}

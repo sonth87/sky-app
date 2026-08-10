@@ -16,6 +16,8 @@ export * from './layout/apply-field-map.js';
 export * from './layout/field-mapping.js';
 export * from './layout/loop.js';
 export * from './layout/shapeClipPaths.js';
+export * from './layout/imageFilters.js';
+export * from './layout/imageFrames.js';
 export * from './layout/useAutoFitFontSize.js';
 export * from './layout/renderer.js';
 export * from './layout/preload.js';

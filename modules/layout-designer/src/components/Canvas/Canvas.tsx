@@ -51,6 +51,8 @@ export interface CanvasProps {
   onOpenGalleryManager?: (id: string) => void;
   /** Port để lưu personal templates (multi-select → Lưu thành mẫu). */
   layoutComponentPort?: LayoutComponentPort;
+  /** AssetPort đầy đủ cho ItemToolbar's MediaLibraryModal + filter/frame/link panels. */
+  assetPort?: any;
 }
 
 export function Canvas({
@@ -69,6 +71,7 @@ export function Canvas({
   onEnterLoopEdit,
   onOpenGalleryManager,
   layoutComponentPort,
+  assetPort,
 }: CanvasProps) {
   const selection = useEditorState(editor, (s) => s.selection);
   const viewport = useEditorState(editor, (s) => s.viewport);
@@ -455,6 +458,8 @@ export function Canvas({
                 pointerScaleX={layoutScaleX * totalScale}
                 pointerScaleY={layoutScaleY * totalScale}
                 pickAndSaveImage={pickAndSaveImage}
+                assetPort={assetPort}
+                resolveAssetUrl={resolveAssetUrl}
                 onEnterLoopEdit={onEnterLoopEdit}
                 onOpenGalleryManager={onOpenGalleryManager}
                 onSaveTemplate={layoutComponentPort ? setSaveTemplateItems : undefined}
@@ -488,6 +493,8 @@ export function Canvas({
                 pointerScaleX={layoutScaleX * totalScale}
                 pointerScaleY={layoutScaleY * totalScale}
                 pickAndSaveImage={pickAndSaveImage}
+                assetPort={assetPort}
+                resolveAssetUrl={resolveAssetUrl}
                 onEnterLoopEdit={onEnterLoopEdit}
                 onOpenGalleryManager={onOpenGalleryManager}
                 onSaveTemplate={layoutComponentPort ? setSaveTemplateItems : undefined}

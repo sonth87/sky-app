@@ -27,7 +27,10 @@ describe('Spawn item từ palette — vị trí item PHẢI căn giữa đúng t
     const { container } = render(<LayoutDesignerApp content={emptyContent()} />);
     mockArtRect(container);
 
-    const tile = screen.getByText('Shape').closest('div')!;
+    // Nhóm "Shape" (Hình khối) nằm trong panel "Đồ họa" — không phải panel mặc định "Văn bản"
+    // nữa (đổi mặc định GĐ19). Chuyển nhóm trước khi tìm tile.
+    fireEvent.click(screen.getByText('Đồ họa'));
+    const tile = screen.getByTitle('Vuông').closest('button')!;
     fireEvent.mouseDown(tile, { clientX: 10, clientY: 10 });
     fireEvent.mouseUp(window, { clientX: 380, clientY: 214 });
 
@@ -48,7 +51,9 @@ describe('Spawn item từ palette — vị trí item PHẢI căn giữa đúng t
     const { container } = render(<LayoutDesignerApp content={emptyContent()} />);
     mockArtRect(container);
 
-    const tile = screen.getByText('Chữ').closest('div')!;
+    // Panel mặc định giờ là "Văn bản" (TextPresetsPanel, GĐ19) — dùng 1 preset Titles bất kỳ,
+    // box mặc định vẫn là DEFAULT_TEXT_BOX (w:400,h:80) vì SpawnKind.overrides không đụng tới box.
+    const tile = screen.getByText('Business Title').closest('button')!;
     fireEvent.mouseDown(tile, { clientX: 10, clientY: 10 });
     fireEvent.mouseUp(window, { clientX: 0, clientY: 0 });
 

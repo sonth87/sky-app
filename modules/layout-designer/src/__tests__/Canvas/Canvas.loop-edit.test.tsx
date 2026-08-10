@@ -117,7 +117,8 @@ describe('Canvas — thao tác item trong itemTemplate khi đang edit-mode', () 
     fireEvent.pointerDown(childEl);
     fireEvent.pointerUp(childEl);
 
-    expect(screen.getByText('Văn bản')).toBeTruthy();
+    // getAllByText (không getByText) — Rail cũng có tab "Văn bản" (GĐ19, 8 nhóm) nên có ≥2 khớp.
+    expect(screen.getAllByText('Văn bản').length).toBeGreaterThan(0);
   });
 
   it('sửa content item con qua PropertyPanel → cập nhật đúng vào itemTemplate (không đụng variant.items)', () => {

@@ -1,16 +1,22 @@
 import { useMemo } from 'react';
-import type { LayoutItem, LayoutVariant } from '@sky-app/slide-shared';
+import type { LayoutItem } from '@sky-app/slide-shared';
 import { ICON_PRESETS } from '@sky-app/slide-shared';
 import type { Editor, ItemTypeDefinition } from '@sky-app/layout-editor-core';
-import { useSpawnDrag, type SpawnKind } from './useSpawnDrag.js';
+import type { SpawnKind } from './useSpawnDrag.js';
 import { FRAME_PRESETS } from '../../presets/framePresets.js';
 import { getItemTypeIcon } from '../../itemTypeIcons.js';
 import { cn } from '@sky-app/ui';
 
 export interface GraphicsPanelProps {
   editor: Editor;
-  variant: LayoutVariant;
-  loopItemId?: string;
+  /** Bắt đầu kéo — dùng CHUNG 1 instance useSpawnDrag từ Flyout.tsx (đã có getArtEl/getRootEl
+   * THẬT qua props, xem LayoutDesignerApp.tsx's artElRef/rootElRef) — KHÔNG tự tạo useSpawnDrag
+   * riêng trong panel này. Bugfix 2026-08-10: bản cũ tự gọi useSpawnDrag với getArtEl/getRootEl
+   * tra qua `document.querySelector('[data-art]'/'[data-layout-designer-root]')` — 2 attribute
+   * này KHÔNG TỒN TẠI ở bất kỳ đâu trong DOM thật, nên querySelector luôn trả null, khiến
+   * useSpawnDrag's onUp bail-out sớm (`if (!artEl) return`) — kéo thả hiện ghost nhưng thả ra
+   * KHÔNG BAO GIỜ tạo item (bug "kéo component ra canvas không có tác dụng gì"). */
+  onSpawnDown: (k: SpawnKind) => (e: React.MouseEvent) => void;
 }
 
 interface ShapePreset {
@@ -34,11 +40,7 @@ const BASIC_COMPONENT_TILES: { type: LayoutItem['type']; label: string }[] = [
   { type: 'loop', label: 'Khung lặp' },
 ];
 
-export function GraphicsPanel({ editor, variant, loopItemId }: GraphicsPanelProps) {
-  const getArtEl = () => document.querySelector('[data-art]') as HTMLDivElement | null;
-  const getRootEl = () => document.querySelector('[data-layout-designer-root]') as HTMLDivElement | null;
-  const { ghost, onDown } = useSpawnDrag(editor, variant, getArtEl, getRootEl, loopItemId);
-
+export function GraphicsPanel({ editor, onSpawnDown }: GraphicsPanelProps) {
   const basicComponentKinds: SpawnKind[] = useMemo(
     () =>
       BASIC_COMPONENT_TILES.map((t) => {
@@ -99,25 +101,26 @@ export function GraphicsPanel({ editor, variant, loopItemId }: GraphicsPanelProp
 
   return (
     <>
-      <div className="px-[15px] pt-[15px] pb-[10px] font-bold text-[13px]">Graphics</div>
-
+      <div className="px-[15px] pt-[15px] pb-[10px] font-bold text-[13px]">Đồ họa</div>
+      <div className="flex-1 overflow-y-auto">
       {/* Basic components section */}
       <div className="px-[15px] pb-3">
         <div className="text-[11px] font-semibold uppercase text-[#9a9bab] px-0 pt-2 pb-1.5">Thành phần cơ bản</div>
         <div className="p-[8px_0] grid grid-cols-2 gap-[9px]">
-          {basicComponentKinds.map((kind) => {
-            const Icon = getItemTypeIcon((kind as any).type);
+          {BASIC_COMPONENT_TILES.map((tile, idx) => {
+            const kind = basicComponentKinds[idx]!;
+            const Icon = getItemTypeIcon(tile.type);
             return (
               <button
-                key={(kind as any).type}
-                onMouseDown={onDown(kind)}
+                key={tile.type}
+                onMouseDown={onSpawnDown(kind)}
                 className={cn(
                   'h-[60px] border border-[#e6e6ee] rounded-[11px] flex flex-col items-center justify-center gap-[5px]',
                   'font-semibold text-[11px] text-[#5c5d6e] cursor-grab bg-[#fcfcfd] hover:bg-neutral-50',
                 )}
               >
                 <Icon size={18} />
-                {kind.label}
+                {tile.label}
               </button>
             );
           })}
@@ -131,7 +134,8 @@ export function GraphicsPanel({ editor, variant, loopItemId }: GraphicsPanelProp
           {shapeSpawnKinds.map((kind, idx) => (
             <button
               key={idx}
-              onMouseDown={onDown(kind)}
+              title={kind.label}
+              onMouseDown={onSpawnDown(kind)}
               className={cn(
                 'w-full h-[60px] rounded-lg border-2 cursor-move transition-all',
                 'border-[#e6e6ee] bg-white hover:border-[#4b57e6] hover:bg-[#f9faff]',
@@ -150,7 +154,7 @@ export function GraphicsPanel({ editor, variant, loopItemId }: GraphicsPanelProp
           {iconSpawnKinds.map((kind, idx) => (
             <button
               key={idx}
-              onMouseDown={onDown(kind)}
+              onMouseDown={onSpawnDown(kind)}
               className={cn(
                 'w-full h-[48px] rounded-lg border-2 cursor-move transition-all',
                 'border-[#e6e6ee] bg-white hover:border-[#4b57e6] hover:bg-[#f9faff]',
@@ -178,7 +182,7 @@ export function GraphicsPanel({ editor, variant, loopItemId }: GraphicsPanelProp
             return (
               <button
                 key={idx}
-                onMouseDown={onDown(kind)}
+                onMouseDown={onSpawnDown(kind)}
                 className={cn(
                   'w-full h-[70px] rounded-lg border-2 cursor-move transition-all',
                   'border-[#e6e6ee] bg-white hover:border-[#4b57e6] hover:bg-[#f9faff]',
@@ -197,19 +201,7 @@ export function GraphicsPanel({ editor, variant, loopItemId }: GraphicsPanelProp
           })}
         </div>
       </div>
-
-      {/* Ghost during drag */}
-      {ghost && (
-        <div
-          className="fixed pointer-events-none text-[11px] font-semibold text-[#5c5d6e] bg-white px-2 py-1 rounded border border-[#e6e6ee] shadow-md z-50"
-          style={{
-            left: `${ghost.x + 10}px`,
-            top: `${ghost.y + 10}px`,
-          }}
-        >
-          {ghost.label}
-        </div>
-      )}
+      </div>
     </>
   );
 }

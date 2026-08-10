@@ -30,9 +30,10 @@ function sampleAssets(): AssetMeta[] {
 }
 
 function switchToImagePanel() {
-  // "Ảnh" khớp CẢ tab Rail lẫn tiêu đề panel (nếu đã mở lần trước) — tab Rail luôn xuất hiện
-  // TRƯỚC panel trong DOM order (Rail render trước Flyout), chọn phần tử ĐẦU chắc chắn là tab.
-  fireEvent.click(screen.getAllByText('Ảnh')[0]!);
+  // "Media" khớp tab Rail (nhóm đổi tên từ "Ảnh" → "Media" ở GĐ19, xem Rail.tsx) — tab Rail luôn
+  // xuất hiện TRƯỚC panel trong DOM order (Rail render trước Flyout), chọn phần tử ĐẦU chắc chắn
+  // là tab.
+  fireEvent.click(screen.getAllByText('Media')[0]!);
 }
 
 describe('ImagePanel — không có listAssets (hành vi cũ)', () => {

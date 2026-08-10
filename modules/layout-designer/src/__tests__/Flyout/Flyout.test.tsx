@@ -19,9 +19,9 @@ function sampleContent(): LayoutContent {
 }
 
 describe('Rail — đổi group hiện đúng panel', () => {
-  it('mặc định hiện panel Thành phần', () => {
+  it('mặc định hiện panel Văn bản (TextPresetsPanel)', () => {
     render(<LayoutDesignerApp content={sampleContent()} />);
-    expect(screen.getByText('Kéo từng khối ra canvas.')).toBeTruthy();
+    expect(screen.getByText('Titles')).toBeTruthy();
   });
 
   it('click nhóm Lớp → hiện panel Lớp với item hiện có', async () => {
@@ -51,7 +51,8 @@ describe('Flyout — panel Lớp', () => {
     // cùng vì Flyout Lớp render SAU Canvas trong cây component — dùng getAllByText[cuối].
     const matches = screen.getAllByText('Xin chào @full_name');
     await user.click(matches[matches.length - 1]!);
-    expect(screen.getByText('Văn bản')).toBeTruthy();
+    // getAllByText (không getByText) — Rail cũng có tab "Văn bản" (GĐ19, 8 nhóm) nên có ≥2 khớp.
+    expect(screen.getAllByText('Văn bản').length).toBeGreaterThan(0);
   });
 
   it('bấm nút xoá trên layer → xoá item khỏi canvas', async () => {
@@ -63,15 +64,15 @@ describe('Flyout — panel Lớp', () => {
   });
 });
 
-describe('Flyout — spawn item mới từ palette (Thành phần)', () => {
-  it('kéo tile "Chữ" từ palette thả vào canvas → tạo TextItem mới', () => {
+describe('Flyout — spawn item mới từ palette (Văn bản)', () => {
+  it('kéo tile "Business Title" từ palette thả vào canvas → tạo TextItem mới đúng style preset', () => {
     const { container } = render(<LayoutDesignerApp content={sampleContent()} />);
 
-    const tile = screen.getByText('Chữ').closest('div')!;
+    const tile = screen.getByText('Business Title').closest('button')!;
     fireEvent.mouseDown(tile, { clientX: 10, clientY: 10 });
 
-    // Ghost xuất hiện theo con trỏ khi đang kéo (label lấy từ ItemTypeDefinition.label = "Chữ").
-    expect(screen.getAllByText('Chữ').length).toBeGreaterThan(0);
+    // Ghost xuất hiện theo con trỏ khi đang kéo (label lấy từ SpawnKind.label = tên preset).
+    expect(screen.getAllByText('Business Title').length).toBeGreaterThan(0);
 
     // Tìm artEl (Frame, khung 760x428) để thả đúng vào giữa vùng canvas — mock getBoundingClientRect.
     const artEl = container.querySelector('[data-testid="canvas-frame"]') as HTMLElement;
@@ -81,15 +82,15 @@ describe('Flyout — spawn item mới từ palette (Thành phần)', () => {
     fireEvent.mouseMove(window, { clientX: 400, clientY: 200 });
     fireEvent.mouseUp(window, { clientX: 400, clientY: 200 });
 
-    // Item mới mặc định content "Văn bản mới" (createDefault trong item-type.ts), tự động
+    // Item mới mặc định content = tên preset (TextPresetsPanel's overrides.content), tự động
     // được chọn (addItemCommand.apply set selection) nên xuất hiện cả ở canvas lẫn textarea
     // property panel — dùng getAllByText thay vì getByText.
-    expect(screen.getAllByText('Văn bản mới').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Business Title').length).toBeGreaterThan(0);
   });
 
   it('thả NGOÀI vùng Frame (nhưng vẫn trong Canvas) → VẪN tạo item (kéo tự do, đổi 2026-07-18)', () => {
     const { container } = render(<LayoutDesignerApp content={sampleContent()} />);
-    const tile = screen.getByText('Chữ').closest('div')!;
+    const tile = screen.getByText('Business Title').closest('button')!;
     fireEvent.mouseDown(tile, { clientX: 10, clientY: 10 });
 
     const artEl = container.querySelector('[data-testid="canvas-frame"]') as HTMLElement;
@@ -100,7 +101,7 @@ describe('Flyout — spawn item mới từ palette (Thành phần)', () => {
     // vượt xa refW/refH (sẽ không hiện trên slide thật vì nằm ngoài Frame).
     fireEvent.mouseUp(window, { clientX: 9999, clientY: 9999 });
 
-    expect(screen.queryAllByText('Văn bản mới').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('Business Title').length).toBeGreaterThan(0);
   });
 });
 
@@ -117,14 +118,15 @@ describe('Flyout — ghost label vị trí TƯƠNG ĐỐI với root app (không
     const rootEl = container.firstElementChild as HTMLElement;
     rootEl.getBoundingClientRect = () => ({ left: 300, top: 150, right: 1300, bottom: 900, width: 1000, height: 750, x: 300, y: 150, toJSON: () => {} }) as DOMRect;
 
-    const tile = screen.getByText('Chữ').closest('div')!;
+    const tile = screen.getByText('Business Title').closest('button')!;
     fireEvent.mouseDown(tile, { clientX: 350, clientY: 200 });
 
-    // Ghost label lấy từ ItemTypeDefinition.label ("Văn bản" cho type=text — khác text hiển thị
-    // trên tile "Chữ", xem item-type.ts) — lọc qua z-index 9999 (chỉ ghost có z-index này).
+    // Ghost label lấy từ SpawnKind.label (TextPresetsPanel đặt = tên preset, KHÁC GraphicsPanel's
+    // basic tile dùng ItemTypeDefinition.label chung "Văn bản" — mỗi preset ghi rõ đang kéo style
+    // nào) — lọc qua z-index 9999 (chỉ ghost có z-index này).
     const ghostEl = [...document.querySelectorAll('div')].find((el) => el.style.zIndex === '9999') as HTMLElement;
     expect(ghostEl).toBeTruthy();
-    expect(ghostEl.textContent).toBe('Văn bản');
+    expect(ghostEl.textContent).toBe('Business Title');
     // Ghost style.left/top PHẢI là toạ độ TƯƠNG ĐỐI (clientX - root.left, clientY - root.top),
     // KHÔNG PHẢI clientX/clientY tuyệt đối (350/200) — đó chính là bug đã sửa.
     expect(parseFloat(ghostEl.style.left)).toBeCloseTo(350 - 300 + 10, 0); // clientX - root.left + offset 10

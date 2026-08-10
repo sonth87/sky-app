@@ -11,6 +11,8 @@ import { computeLoopLayout, renderOverflowMoreText } from './loop.js';
 import { resolveTokens, resolveContentTokens } from './tokens.js';
 import { SHAPE_CLIP_PATHS } from './shapeClipPaths.js';
 import { useAutoFitFontSize } from './useAutoFitFontSize.js';
+import { getFilterDef, buildCssFilter, collectSvgFilterDefs } from './imageFilters.js';
+import { getSpecialPreset } from './imageFrames.js';
 
 /** Chọn variant khớp tỷ lệ màn hình gần nhất (04-schema-layout-document.md). */
 export function resolveVariant(content: LayoutContent, screen: { w: number; h: number }): LayoutVariant | null {
@@ -234,6 +236,53 @@ function RibbonItemView({
   return <div style={style}>{text}</div>;
 }
 
+/** 4 dải "băng dính" góc — port từ my-builder's TapeDecoration (Image.tsx), dùng khi
+ * ImageItem.specialFrame === 'tape'. Container cha PHẢI overflow:visible (băng dính lồi ra ngoài
+ * khung). Kích thước giữ NGUYÊN px tuyệt đối (không nhân scale) — hiệu ứng trang trí phụ, chấp
+ * nhận lệch nhẹ ở scale cực đoan, giống cách my-builder không co giãn theo canvas scale. */
+function TapeDecoration() {
+  const tapes: Array<CSSProperties & { rotate: string }> = [
+    { top: '-10px', left: '18px', rotate: '-20deg' },
+    { top: '-10px', right: '18px', rotate: '20deg' },
+    { bottom: '-10px', left: '18px', rotate: '15deg' },
+    { bottom: '-10px', right: '18px', rotate: '-15deg' },
+  ];
+  return (
+    <>
+      {tapes.map(({ rotate, ...pos }, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            width: 36,
+            height: 14,
+            background: 'rgba(215,205,165,0.72)',
+            transform: `rotate(${rotate})`,
+            pointerEvents: 'none',
+            zIndex: 2,
+            ...pos,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+/** SVG ẩn chứa toàn bộ <filter> def (3D/Ink) — chèn 1 lần mỗi ảnh dùng filter mode="svg" để
+ * `filter: url(#id)` resolve được. Trùng id giữa nhiều ảnh không sao (trình duyệt lấy def đầu
+ * tiên khớp), port nguyên trạng cách làm của my-builder. */
+function ImageSvgFilterDefs() {
+  const defs = collectSvgFilterDefs();
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: `<defs>${defs}</defs>` }}
+    />
+  );
+}
+
 function ImageItemView({
   item,
   scaleX,
@@ -248,19 +297,43 @@ function ImageItemView({
   resolveAsset: (p: string) => string;
 }) {
   const relPath = item.varKey ? resolveCanonicalField(record as CanonicalSubject, item.varKey) : item.src;
-  const shadowCSS = getShadowCSS(item.shadow);
+  const fScale = Math.min(scaleX, scaleY);
+
+  const filterDef = getFilterDef(item.filter);
+  const cssFilter = buildCssFilter(filterDef);
+  const combinedFilter = [cssFilter, item.dropShadow].filter(Boolean).join(' ') || undefined;
+  const hasSvgFilter = filterDef?.mode === 'svg';
+  const hasFilterOverlay = filterDef?.mode === 'overlay' && !!filterDef.overlayColor;
+
+  const specialFrame = item.specialFrame ?? 'none';
+  const specialPreset = getSpecialPreset(specialFrame);
+  const isTape = specialFrame === 'tape';
+
+  const boxShadowCSS = item.boxShadow ?? getShadowCSS(item.shadow);
+  const borderRadiusCSS = item.clipPath
+    ? undefined
+    : item.borderRadius != null
+      ? (typeof item.borderRadius === 'number' ? item.borderRadius * fScale : item.borderRadius)
+      : item.shape === 'circle'
+        ? '50%'
+        : item.shape === 'round'
+          ? 12
+          : undefined;
+
   const style: CSSProperties = {
     ...toRenderBox(item.box, scaleX, scaleY),
     opacity: item.opacity != null ? item.opacity / 100 : undefined,
-    overflow: 'hidden',
-    borderRadius: item.clipPath ? undefined : (item.shape === 'circle' ? '50%' : item.shape === 'round' ? 12 : undefined),
+    overflow: isTape ? 'visible' : 'hidden',
+    borderRadius: borderRadiusCSS,
     clipPath: item.clipPath ?? undefined,
-    border: item.borderW ? `${item.borderW * Math.min(scaleX, scaleY)}px solid ${item.borderColor ?? '#fff'}` : undefined,
+    border: item.borderW ? `${item.borderW * fScale}px ${item.borderStyle ?? 'solid'} ${item.borderColor ?? '#fff'}` : undefined,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     background: '#0002',
-    boxShadow: shadowCSS,
+    boxShadow: boxShadowCSS,
+    // Special CSS-only presets (polaroid/vintage) — áp thẳng lên container, xem imageFrames.ts.
+    ...(specialPreset && !specialPreset.requiresCustomMarkup ? (specialPreset.cssStyle as CSSProperties | undefined) : undefined),
   };
   if (!relPath) {
     return <div style={style}>{item.fallbackText ?? ''}</div>;
@@ -269,6 +342,7 @@ function ImageItemView({
   const focalY = (item.focalY ?? 0.5) * 100;
   return (
     <div style={style}>
+      {hasSvgFilter && <ImageSvgFilterDefs />}
       <img
         src={resolveAsset(relPath)}
         alt=""
@@ -276,9 +350,36 @@ function ImageItemView({
           width: '100%',
           height: '100%',
           objectFit: item.fit ?? 'cover',
-          objectPosition: (item.fit ?? 'cover') === 'cover' ? `${focalX}% ${focalY}%` : undefined,
+          objectPosition: (item.fit ?? 'cover') !== 'fill' ? `${focalX}% ${focalY}%` : undefined,
+          filter: combinedFilter,
         }}
       />
+      {/* Overlay màu của filter mode="overlay" (VD Faded/Kerouac...) */}
+      {hasFilterOverlay && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: filterDef!.overlayColor,
+            opacity: filterDef!.overlayOpacity ?? 0.3,
+            mixBlendMode: (filterDef!.overlayBlend ?? 'multiply') as CSSProperties['mixBlendMode'],
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {/* Overlay màu THỦ CÔNG, độc lập với overlay của filter (có thể cộng dồn cả 2) */}
+      {(item.overlayOpacity ?? 0) > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: item.overlayColor ?? '#000000',
+            opacity: (item.overlayOpacity ?? 0) / 100,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {isTape && <TapeDecoration />}
     </div>
   );
 }

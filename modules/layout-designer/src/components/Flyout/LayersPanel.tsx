@@ -73,7 +73,7 @@ export function LayersPanel({ editor, variant }: { editor: Editor; variant: Layo
   return (
     <>
       <div className="px-[15px] pt-[15px] pb-[10px] font-bold text-[13px]">Lớp</div>
-      <div className="p-[6px_14px_14px] overflow-y-auto flex flex-col gap-[5px]">
+      <div className="p-[6px_14px_14px] overflow-y-auto flex-1 flex flex-col gap-[5px]">
         {visible.map((node) => {
           const { item: it, path, depth } = node;
           const key = path.join('.');
@@ -89,7 +89,7 @@ export function LayersPanel({ editor, variant }: { editor: Editor; variant: Layo
               }}
               title={isTopLevel ? undefined : 'Nhấp đúp vào khung lặp trên canvas để sửa mẫu'}
               className={cn(
-                'flex items-center gap-2 py-[7px] px-[9px] rounded-lg border',
+                'shrink-0 flex items-center gap-2 py-[7px] px-[9px] rounded-lg border',
                 isTopLevel ? 'cursor-pointer opacity-100' : 'cursor-default opacity-55',
                 on
                   ? 'bg-[#4b57e6]/10 text-[#4b57e6] border-[#4b57e6]/30'

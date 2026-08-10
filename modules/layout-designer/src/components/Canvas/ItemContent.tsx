@@ -1,6 +1,6 @@
 import { useRef, type CSSProperties } from 'react';
 import type { LayoutItem, TextItem } from '@sky-app/slide-shared';
-import { SHAPE_CLIP_PATHS, useAutoFitFontSize } from '@sky-app/slide-shared';
+import { SHAPE_CLIP_PATHS, useAutoFitFontSize, getFilterDef, buildCssFilter, collectSvgFilterDefs, getSpecialPreset } from '@sky-app/slide-shared';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
 
 function getCSSValue(value: string | { kind: 'gradient'; value: string } | undefined): string | undefined {
@@ -93,6 +93,60 @@ export function ItemContent({
   }
 }
 
+/** Đổ bóng khối cho ImageItemContent — box-shadow ĐẦY ĐỦ nếu có (`boxShadow`, port my-builder's
+ * Shadow presets), fallback về đổ bóng đơn giản cũ (`shadow` boolean|TextShadow) cho layout cũ.
+ * Bản sao rút gọn của renderer.tsx's getShadowCSS (không export, xem comment ở đó) — cùng quy ước
+ * duplicate JSX/logic giữa 2 nơi render như shapeClipPaths.ts đã ghi chú. */
+function imageBoxShadowCss(item: Extract<LayoutItem, { type: 'image' }>): string | undefined {
+  if (item.boxShadow) return item.boxShadow;
+  if (!item.shadow) return undefined;
+  if (item.shadow === true) return '0 2px 4px rgba(0,0,0,0.35)';
+  const { offsetX = 0, offsetY = 0, blur = 0, color = 'rgba(0,0,0,0.4)' } = item.shadow;
+  return `${offsetX}px ${offsetY}px ${blur}px ${color}`;
+}
+
+/** 4 dải "băng dính" góc cho preview editor — bản sao renderer.tsx's TapeDecoration, dùng khi
+ * ImageItem.specialFrame === 'tape'. Xem comment ở đó (kích thước giữ nguyên px, không nhân scale). */
+function ImageTapeDecoration() {
+  const tapes: Array<CSSProperties & { rotate: string }> = [
+    { top: '-10px', left: '18px', rotate: '-20deg' },
+    { top: '-10px', right: '18px', rotate: '20deg' },
+    { bottom: '-10px', left: '18px', rotate: '15deg' },
+    { bottom: '-10px', right: '18px', rotate: '-15deg' },
+  ];
+  return (
+    <>
+      {tapes.map(({ rotate, ...pos }, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            width: 36,
+            height: 14,
+            background: 'rgba(215,205,165,0.72)',
+            transform: `rotate(${rotate})`,
+            pointerEvents: 'none',
+            zIndex: 2,
+            ...pos,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+function ImageSvgFilterDefs() {
+  const defs = collectSvgFilterDefs();
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: `<defs>${defs}</defs>` }}
+    />
+  );
+}
+
 export function ImageItemContent({
   item,
   fScale,
@@ -103,27 +157,82 @@ export function ImageItemContent({
   resolveAssetUrl?: (path: string) => Promise<string>;
 }) {
   const resolvedUrl = useResolvedAssetUrl(item.src, resolveAssetUrl);
+
+  const filterDef = getFilterDef(item.filter);
+  const cssFilter = buildCssFilter(filterDef);
+  const combinedFilter = [cssFilter, item.dropShadow].filter(Boolean).join(' ') || undefined;
+  const hasSvgFilter = filterDef?.mode === 'svg';
+  const hasFilterOverlay = filterDef?.mode === 'overlay' && !!filterDef.overlayColor;
+
+  const specialFrame = item.specialFrame ?? 'none';
+  const specialPreset = getSpecialPreset(specialFrame);
+  const isTape = specialFrame === 'tape';
+
+  const borderRadiusCSS = item.clipPath
+    ? undefined
+    : item.borderRadius != null
+      ? (typeof item.borderRadius === 'number' ? item.borderRadius * fScale : item.borderRadius)
+      : item.shape === 'circle'
+        ? '50%'
+        : item.shape === 'round'
+          ? 16
+          : 2;
+
+  const focalX = (item.focalX ?? 0.5) * 100;
+  const focalY = (item.focalY ?? 0.5) * 100;
+
   return (
     <div
       style={{
         width: '100%',
         height: '100%',
-        borderRadius: item.clipPath ? undefined : (item.shape === 'circle' ? '50%' : item.shape === 'round' ? 16 : 2),
+        borderRadius: borderRadiusCSS,
         clipPath: item.clipPath ?? undefined,
-        background: resolvedUrl ? `center/${item.fit ?? 'cover'} url(${resolvedUrl})` : 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
-        border: item.borderW ? `${item.borderW * fScale}px solid ${item.borderColor ?? '#000'}` : undefined,
-        overflow: 'hidden',
+        background: resolvedUrl
+          ? `${focalX}% ${focalY}%/${item.fit ?? 'cover'} no-repeat url(${resolvedUrl})`
+          : 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
+        border: item.borderW ? `${item.borderW * fScale}px ${item.borderStyle ?? 'solid'} ${item.borderColor ?? '#000'}` : undefined,
+        boxShadow: imageBoxShadowCss(item),
+        filter: resolvedUrl ? combinedFilter : undefined,
+        overflow: isTape ? 'visible' : 'hidden',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         color: '#7c7c8c',
         fontWeight: 700,
         fontSize: 11,
+        position: 'relative',
+        ...(specialPreset && !specialPreset.requiresCustomMarkup ? (specialPreset.cssStyle as CSSProperties | undefined) : undefined),
       }}
     >
+      {resolvedUrl && hasSvgFilter && <ImageSvgFilterDefs />}
       {/* fallbackText ưu tiên cao nhất khi có — sau đó mới tới @varKey (bind biến ảnh, hiện tên
           biến khi preview không có data thật) rồi tới chuỗi 'ẢNH' mặc định (Bước 5 kế hoạch). */}
       {!resolvedUrl && (item.fallbackText || (item.varKey ? `@${item.varKey}` : 'ẢNH'))}
+      {resolvedUrl && hasFilterOverlay && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: filterDef!.overlayColor,
+            opacity: filterDef!.overlayOpacity ?? 0.3,
+            mixBlendMode: (filterDef!.overlayBlend ?? 'multiply') as CSSProperties['mixBlendMode'],
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {resolvedUrl && (item.overlayOpacity ?? 0) > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: item.overlayColor ?? '#000000',
+            opacity: (item.overlayOpacity ?? 0) / 100,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {resolvedUrl && isTape && <ImageTapeDecoration />}
     </div>
   );
 }

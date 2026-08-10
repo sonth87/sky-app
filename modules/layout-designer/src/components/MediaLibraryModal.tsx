@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { Search, Trash2, CheckCircle2, XCircle, Loader2, CloudUpload, Image as ImageIcon } from 'lucide-react';
 import type { Asset, AssetPort, AssetType } from '@sky-app/service-contracts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogFooter, Tabs, TabsList, TabsTrigger, TabsContent, cn } from '@sky-app/ui';
+import { useResolvedAssetUrl } from '../hooks/useResolvedAssetUrl.js';
 
 export interface MediaLibraryModalProps {
   open: boolean;
@@ -10,6 +11,34 @@ export interface MediaLibraryModalProps {
   onSelect: (relativePath: string) => void;
   usedAssetPaths?: string[];
   initialTab?: 'current' | 'library' | 'upload' | 'url';
+  /** Resolve Asset.relativePath (path lưu trong DB, có thể là "key blob" WASM hoặc path tương
+   * đối — KHÔNG dùng thẳng làm <img src> được ở mọi platform) → URL hiển thị thật. Bỏ trống =
+   * coi relativePath là URL sẵn dùng được (fail-soft, giống useResolvedAssetUrl's quy ước). */
+  resolveAssetUrl?: (path: string) => Promise<string>;
+}
+
+/** Thumbnail ảnh trong lưới — MỖI ảnh tự resolve URL riêng qua useResolvedAssetUrl (đồng bộ hoá
+ * với cách ImageControls/ItemContent hiển thị ảnh ở nơi khác, xem hooks/useResolvedAssetUrl.ts).
+ * Thiếu bước resolve này là NGUYÊN NHÂN bug "toàn bộ ảnh hiện xám" (2026-08-07) — relativePath
+ * lưu trong Asset không phải lúc nào cũng dùng thẳng làm <img src> được. */
+function AssetThumbImg({
+  relativePath,
+  resolveAssetUrl,
+  alt,
+  className,
+  onError,
+}: {
+  relativePath: string;
+  resolveAssetUrl?: (path: string) => Promise<string>;
+  alt: string;
+  className?: string;
+  onError?: (e: SyntheticEvent<HTMLImageElement>) => void;
+}) {
+  const resolvedUrl = useResolvedAssetUrl(relativePath, resolveAssetUrl);
+  if (!resolvedUrl) {
+    return <div className={cn(className, 'bg-[#e6e6ee] animate-pulse')} />;
+  }
+  return <img src={resolvedUrl} alt={alt} className={className} onError={onError} />;
 }
 
 interface UploadItem {
@@ -21,7 +50,7 @@ interface UploadItem {
   relativePath?: string;
 }
 
-export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect, usedAssetPaths, initialTab }: MediaLibraryModalProps) {
+export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect, usedAssetPaths, initialTab, resolveAssetUrl }: MediaLibraryModalProps) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -192,7 +221,7 @@ export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect, use
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[720px] max-h-[80vh] flex flex-col">
+      <DialogContent className="w-[960px] h-[680px] max-w-[92vw] max-h-[88vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Thư viện Media</DialogTitle>
           <DialogClose />
@@ -216,24 +245,33 @@ export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect, use
                   Layout này chưa dùng ảnh nào
                 </div>
               ) : (
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-5 gap-3">
                   {assets
                     .filter(a => usedAssetSet.has(a.relativePath))
                     .map((asset) => (
-                      <div key={asset.id} className="relative group rounded-lg overflow-hidden border border-[#e6e6ee] hover:border-[#4b57e6] transition-colors">
-                        <img src={asset.relativePath} alt={asset.name} className="w-full aspect-square object-cover" />
+                      <div
+                        key={asset.id}
+                        className={cn(
+                          'relative group rounded-lg overflow-hidden border-2 transition-colors',
+                          selectedAsset?.relativePath === asset.relativePath
+                            ? 'border-[#4b57e6]'
+                            : 'border-[#e6e6ee] hover:border-[#4b57e6]/50'
+                        )}
+                      >
+                        <AssetThumbImg relativePath={asset.relativePath} resolveAssetUrl={resolveAssetUrl} alt={asset.name} className="w-full aspect-square object-cover" />
+                        {selectedAsset?.relativePath === asset.relativePath && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-[#4b57e6] rounded-full flex items-center justify-center">
+                            <CheckCircle2 size={16} className="text-white" />
+                          </div>
+                        )}
                         <button
                           onClick={() => handleDeleteAsset(asset.relativePath)}
-                          className="absolute top-1 right-1 bg-red-500 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-white rounded hover:bg-red-50"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={14} className="text-red-500" />
                         </button>
                         <button
-                          onClick={() => {
-                            setSelectedAsset(asset);
-                            onSelect(asset.relativePath);
-                            onOpenChange(false);
-                          }}
+                          onClick={() => setSelectedAsset(asset)}
                           className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors"
                         />
                       </div>
@@ -279,7 +317,7 @@ export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect, use
                   Không có ảnh trong thư viện
                 </div>
               ) : (
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-5 gap-3">
                   {filteredAssets.map((asset) => (
                     <div key={asset.relativePath} className="relative group">
                       <div
@@ -291,8 +329,9 @@ export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect, use
                             : 'border-[#e6e6ee] hover:border-[#4b57e6]/50'
                         )}
                       >
-                        <img
-                          src={asset.relativePath}
+                        <AssetThumbImg
+                          relativePath={asset.relativePath}
+                          resolveAssetUrl={resolveAssetUrl}
                           alt={asset.name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -410,7 +449,7 @@ export function MediaLibraryModal({ open, onOpenChange, assetPort, onSelect, use
 
         <DialogFooter>
           <div className="flex-1 text-sm text-[#9a9bab]">
-            {activeTab === 'library' && (
+            {(activeTab === 'library' || activeTab === 'current') && (
               selectedAsset ? `Đã chọn: ${selectedAsset.name}` : 'Chưa chọn ảnh'
             )}
           </div>

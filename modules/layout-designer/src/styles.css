@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @source "./**/*.{ts,tsx}";
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
 
 /*
  * Explicit @layer order — REQUIRED vì bundle này share trang với

@@ -8,7 +8,7 @@ export interface GridPresetsPanelProps {
 export function GridPresetsPanel({ onSpawnDown }: GridPresetsPanelProps) {
   return (
     <div className="p-4 space-y-4 overflow-y-auto flex flex-col flex-1">
-      <div>
+      <div className="shrink-0">
         <h3 className="font-semibold text-[11px] tracking-[.04em] uppercase text-[#9a9bab] mb-3">Mẫu lưới</h3>
         <div className="grid grid-cols-2 gap-3">
           {GRID_PRESETS.map((preset) => (
@@ -58,7 +58,7 @@ export function GridPresetsPanel({ onSpawnDown }: GridPresetsPanelProps) {
         </div>
       </div>
 
-      <div className="pb-2">
+      <div className="pb-2 shrink-0">
         <h3 className="font-semibold text-[11px] tracking-[.04em] uppercase text-[#9a9bab] mb-3">Lưới động</h3>
         <div className="text-[11px] text-[#9a9bab] text-center py-6 px-2 bg-[#fcfcfd] rounded-lg border border-dashed border-[#cfd0da]">
           Dùng Khung lặp để tạo lưới tự động

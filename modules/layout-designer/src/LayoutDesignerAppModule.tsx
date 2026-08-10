@@ -273,10 +273,7 @@ export function LayoutDesignerAppModule({
       onTokenInserted={handleTokenInserted}
       layoutId={layoutId}
       layoutPort={layoutPort}
-      resolveAssetUrl={resolveAssetUrl}
-      pickAndSaveImage={pickAndSaveImage}
-      listAssets={assetPort?.listAssets}
-      deleteAsset={assetPort?.deleteAsset}
+      assetPort={assetPort}
       onBackToLibrary={() => setLayoutId(undefined)}
       onRestoreVersion={handleRestoreVersion}
       documentColor={documentColor}

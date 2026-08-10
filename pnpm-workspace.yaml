@@ -76,7 +76,7 @@ catalog:
   # quan): DeviceLayout.macOSAppleIcon/windowsStartIcon (custom icon Apple menu/Start button),
   # WindowChrome hover polish (traffic-light hiện icon khi hover bất kể focus, nút titlebar mờ
   # đi khi cửa sổ không focus).
-  "@sonth87/device-layout": "github:sonth87/device-layout#v0.5.10"
+  "@sonth87/device-layout": "github:sonth87/device-layout#v0.5.13"
 
   # Thêm 2026-07-29 — audit dependency trùng lặp giữa modules/* + packages/*ui (dựng
   # packages/ui dùng chung: cn()/color picker/primitive Radix trùng lặp 3 nơi). lucide-react

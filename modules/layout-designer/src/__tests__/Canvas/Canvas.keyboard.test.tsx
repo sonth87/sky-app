@@ -107,13 +107,13 @@ describe('Canvas — keyboard shortcut chỉ active khi canvas có focus', () =>
 
   it('Ctrl/Cmd+\\ ẩn/hiện panel trái+phải', () => {
     const { container } = render(<LayoutDesignerApp content={sampleContent()} />);
-    expect(screen.getByText('Kéo từng khối ra canvas.')).toBeTruthy();
+    expect(screen.getByText('Kéo 1 kiểu chữ ra canvas — nội dung mặc định là tên kiểu, sửa lại sau khi thả.')).toBeTruthy();
 
     const canvasEl = getCanvasEl(container);
     fireEvent.keyDown(canvasEl, { key: '\\', ctrlKey: true });
-    expect(screen.queryByText('Kéo từng khối ra canvas.')).toBeNull();
+    expect(screen.queryByText('Kéo 1 kiểu chữ ra canvas — nội dung mặc định là tên kiểu, sửa lại sau khi thả.')).toBeNull();
 
     fireEvent.keyDown(canvasEl, { key: '\\', ctrlKey: true });
-    expect(screen.getByText('Kéo từng khối ra canvas.')).toBeTruthy();
+    expect(screen.getByText('Kéo 1 kiểu chữ ra canvas — nội dung mặc định là tên kiểu, sửa lại sau khi thả.')).toBeTruthy();
   });
 });

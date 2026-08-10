@@ -1,20 +1,25 @@
-// Rail — 6 icon nhóm bên trái, theo prototype "Backdrop Editor 2a - keo tha.dc.html" §RAIL.
-// GĐ10 (2026-08-06) — đổi glyph Unicode thô sang icon lucide-react thật (dọn icon debt). Cấu
-// trúc 6 tab (comp/tpl/coll/var/img/layers) GIỮ NGUYÊN ở phase này — đổi thành 8 tab kiểu Canva
-// (Mẫu/Văn bản/Media/Đồ họa/Khung/Lưới/Biến/Lớp) thuộc GĐ19 (docs/roadmap/plans/canva-ux/
-// 10-rail-assembly.md), phụ thuộc các thư viện nội dung GĐ14-18 xây trước.
+// Rail — 8 icon nhóm bên trái, kiểu Canva (Mẫu/Văn bản/Media/Đồ họa/Khung/Lưới/Biến/Lớp), theo
+// GĐ19 (docs/roadmap/plans/canva-ux/10-rail-assembly.md). Đổi từ cấu trúc 6 nhóm cũ
+// (comp/tpl/coll/var/img/layers, GĐ10 2026-08-06) — "Bộ sưu tập" (coll) không còn trong danh sách
+// 8-nhóm chính thức, ẩn khỏi Rail (không xoá `CollectionsPanel.tsx`, giữ phòng dùng lại sau).
+// "Thành phần" (comp) tách thành 2 nhóm riêng "Văn bản" + "Đồ họa" — phần tile cơ bản (Chữ/Ảnh/
+// Ribbon/Khung lặp) không có preset riêng chuyển vào đầu `GraphicsPanel.tsx`'s "Thành phần cơ
+// bản". "Ảnh" (img) đổi tên hiển thị thành "Media" cho khớp thuật ngữ Canva, giữ nguyên nội dung
+// (`ImagePanel.tsx`) — quản lý ảnh user upload, KHÁC "Đồ họa" (icon/hình khối cung cấp sẵn).
 
-import { PanelLeftClose, LayoutTemplate, Sparkles, Variable, Image, Layers, Shapes, type LucideIcon } from 'lucide-react';
+import { PanelLeftClose, LayoutTemplate, Type, Image, Shapes, Frame, Grid3x3, Variable, Layers, type LucideIcon } from 'lucide-react';
 import { cn } from '@sky-app/ui';
 
-export type RailGroup = 'comp' | 'tpl' | 'coll' | 'var' | 'img' | 'layers';
+export type RailGroup = 'template' | 'text' | 'media' | 'graphics' | 'frame' | 'grid' | 'var' | 'layers';
 
 const GROUPS: { key: RailGroup; icon: LucideIcon; label: string }[] = [
-  { key: 'comp', icon: Shapes, label: 'Thành phần' },
-  { key: 'tpl', icon: LayoutTemplate, label: 'Mẫu' },
-  { key: 'coll', icon: Sparkles, label: 'Bộ sưu tập' },
+  { key: 'template', icon: LayoutTemplate, label: 'Mẫu' },
+  { key: 'text', icon: Type, label: 'Văn bản' },
+  { key: 'media', icon: Image, label: 'Media' },
+  { key: 'graphics', icon: Shapes, label: 'Đồ họa' },
+  { key: 'frame', icon: Frame, label: 'Khung' },
+  { key: 'grid', icon: Grid3x3, label: 'Lưới' },
   { key: 'var', icon: Variable, label: 'Biến' },
-  { key: 'img', icon: Image, label: 'Ảnh' },
   { key: 'layers', icon: Layers, label: 'Lớp' },
 ];
 

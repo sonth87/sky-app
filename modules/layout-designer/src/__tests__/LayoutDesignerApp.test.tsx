@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LayoutDesignerApp } from '../components/LayoutDesignerApp.js';
 import type { LayoutContent } from '@sky-app/slide-shared';
@@ -37,7 +37,10 @@ describe('LayoutDesignerApp — canvas & selection', () => {
     expect(screen.getByText('Không có phần tử nào đang chọn — chỉnh nền chung cho toàn bộ tỷ lệ này.')).toBeTruthy();
 
     await user.pointer({ keys: '[MouseLeft]', target: screen.getByText('Xin chào') });
-    expect(screen.getByText('Văn bản')).toBeTruthy();
+    // Scope vào PropertyPanel (data-testid) — Rail cũng có tab "Văn bản" (GĐ19, 8 nhóm) nên
+    // getByText('Văn bản') không còn duy nhất trên toàn trang.
+    const propertyPanel = screen.getByTestId('property-panel');
+    expect(within(propertyPanel).getByText('Văn bản')).toBeTruthy();
     expect(screen.getByDisplayValue('Xin chào')).toBeTruthy();
   });
 
@@ -45,11 +48,15 @@ describe('LayoutDesignerApp — canvas & selection', () => {
     const user = userEvent.setup();
     const { container } = render(<LayoutDesignerApp content={sampleContent()} />);
     await user.pointer({ keys: '[MouseLeft]', target: screen.getByText('Xin chào') });
-    expect(screen.getByText('Văn bản')).toBeTruthy();
+    expect(within(screen.getByTestId('property-panel')).getByText('Văn bản')).toBeTruthy();
 
     const canvasBg = container.querySelector('[style*="background: rgb(236, 238, 243)"]') ?? container.querySelector('div');
     fireEvent.pointerDown(canvasBg!);
-    expect(screen.queryByText('Văn bản')).toBeNull(); // bỏ chọn → không còn hiện Property Panel của item
+    // Bỏ chọn → PropertyPanel đổi hẳn sang FrameBackgroundControls (KHÔNG có data-testid
+    // "property-panel"), không phải patch lại cùng cây — queryByTestId phải trả null (không dùng
+    // within() trên biến đã capture TRƯỚC đó, vì node đó bị React thay hẳn, chỉ còn là tham chiếu
+    // "đông cứng" tới nội dung CŨ, không phản ánh live DOM — bug thật đã gặp khi viết test này).
+    expect(screen.queryByTestId('property-panel')).toBeNull();
     expect(screen.getByText('Không có phần tử nào đang chọn — chỉnh nền chung cho toàn bộ tỷ lệ này.')).toBeTruthy();
   });
 });

@@ -80,16 +80,20 @@ export interface LayoutDesignerAppProps {
   globalSuggestions?: string[];
   /** Gọi khi user chọn 1 token từ dropdown autocomplete — dùng ghi nhận variable_registry. */
   onTokenInserted?: (key: string) => void;
+  /** AssetPort đầy đủ — listAssets, queryAssets, addAssetFromUrl, saveImageBlob, deleteAsset, v.v.
+   * Khi có, ƯU TIÊN HƠN 4 prop lẻ bên dưới (queryAssets/addAssetFromUrl/saveImageBlob CHỈ khả
+   * dụng qua đường này — MediaLibraryModal cần đủ bộ mới hoạt động đúng, xem bugfix 2026-08-07:
+   * trước đó LayoutDesignerApp tự ráp lại 1 assetPort THIẾU từ 4 prop lẻ, khiến modal trống). */
+  assetPort?: AssetPort;
   /** AssetPort (docs/roadmap/plans/layout-designer/06-luu-tru-va-giao-tiep.md) — chọn ảnh +
-   * resolve URL hiển thị. Bỏ trống = ẩn nút "Đổi ảnh", ảnh hiện có vẫn hiển thị nếu src là URL
-   * dùng thẳng được (fail-soft, xem useResolvedAssetUrl). */
+   * resolve URL hiển thị. CHỈ dùng khi KHÔNG truyền `assetPort` ở trên (test cũ + caller đơn giản
+   * không cần Media Library đầy đủ vẫn hoạt động qua 4 prop lẻ này). */
   pickAndSaveImage?: () => Promise<{ relativePath: string } | null>;
   resolveAssetUrl?: (path: string) => Promise<string>;
-  /** Media Library (Bước 11 kế hoạch resize/rotate, 2026-07-18) — liệt kê ảnh đã lưu để hiện
-   * lưới thumbnail trong Flyout's panel "Ảnh". Bỏ trống = panel hiện thông báo chưa khả dụng
-   * (hành vi cũ). */
+  /** Media Library (Bước 11 kế hoạch resize/rotate, 2026-07-18) — liệt kê ảnh đã lưu. Xem ghi chú
+   * `assetPort` ở trên. */
   listAssets?: () => Promise<AssetMeta[]>;
-  /** Xoá 1 ảnh khỏi thư viện (optional, GĐ8a). Bỏ trống = không hiện nút xoá ảnh. */
+  /** Xoá 1 ảnh khỏi thư viện (optional, GĐ8a). Xem ghi chú `assetPort` ở trên. */
   deleteAsset?: (relativePath: string) => Promise<void>;
   /** Personal templates (GĐ18) — save/list/delete nhóm item tự tạo. Bỏ trống = ẩn "Lưu thành
    * mẫu" trong ItemToolbar multi-select. */
@@ -109,10 +113,11 @@ export function LayoutDesignerApp({
   onTokenInserted,
   layoutPort,
   onBackToLibrary,
-  pickAndSaveImage,
-  resolveAssetUrl,
-  listAssets,
-  deleteAsset,
+  assetPort: assetPortProp,
+  pickAndSaveImage: pickAndSaveImageProp,
+  resolveAssetUrl: resolveAssetUrlProp,
+  listAssets: listAssetsProp,
+  deleteAsset: deleteAssetProp,
   layoutComponentPort,
   documentColor,
   onChangeColor,
@@ -142,7 +147,17 @@ export function LayoutDesignerApp({
   const editingLoopItem = editingLoopId ? variant?.items.find((i) => i.id === editingLoopId) : undefined;
   const editingItemBox = editingLoopItem?.type === 'loop' ? editingLoopItem.itemBox : undefined;
 
-  const [railGroup, setRailGroup] = useState<RailGroup>('comp');
+  const resolveAssetUrl = assetPortProp?.resolveAssetUrl ?? resolveAssetUrlProp;
+  const pickAndSaveImage = assetPortProp?.pickAndSaveImage ?? pickAndSaveImageProp;
+  const listAssets = assetPortProp?.listAssets ?? listAssetsProp;
+  const deleteAsset = assetPortProp?.deleteAsset ?? deleteAssetProp;
+  // MediaLibraryModal (ImageControls/ItemToolbar) cần queryAssets/addAssetFromUrl/saveImageBlob
+  // — CHỈ có khi caller truyền `assetPort` đầy đủ (LayoutDesignerAppModule). Caller chỉ truyền 4
+  // prop lẻ (test cũ, preview đơn giản) → modal vẫn mở được nhưng thiếu tab URL/Tải lên/lọc loại
+  // (fail-soft, KHÔNG tự ráp assetPort giả từ 4 prop lẻ — đó chính là bug đã sửa 2026-08-07).
+  const assetPort = assetPortProp;
+
+  const [railGroup, setRailGroup] = useState<RailGroup>('text');
   const artElRef = useRef<HTMLDivElement | null>(null);
   const rootElRef = useRef<HTMLDivElement | null>(null);
 
@@ -232,16 +247,6 @@ export function LayoutDesignerApp({
     }
   }
 
-  const assetPort: AssetPort | undefined = useMemo(() => {
-    if (!listAssets || !pickAndSaveImage || !resolveAssetUrl) return undefined;
-    return {
-      pickAndSaveImage,
-      resolveAssetUrl,
-      listAssets,
-      deleteAsset,
-    };
-  }, [pickAndSaveImage, resolveAssetUrl, listAssets, deleteAsset]);
-
   return (
     // position:relative — containing block CỤC BỘ cho ghost label (position:absolute, xem
     // Flyout.tsx). Ghost KHÔNG dùng position:fixed vì @sonth87/device-layout's Window.tsx bọc
@@ -275,6 +280,8 @@ export function LayoutDesignerApp({
                   listAssets={listAssets}
                   deleteAsset={deleteAsset}
                   resolveAssetUrl={resolveAssetUrl}
+                  layoutComponentPort={layoutComponentPort}
+                  assetPort={assetPort}
                 />
               </>
             ) : (
@@ -292,6 +299,7 @@ export function LayoutDesignerApp({
               onRedo={() => editor.store.getState().redo()}
               onTokenInserted={onTokenInserted}
               layoutComponentPort={layoutComponentPort}
+              assetPort={assetPort}
               topLeftOverlay={
                 <VariantTabs
                   variants={doc.variants}

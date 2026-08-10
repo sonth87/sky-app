@@ -123,21 +123,54 @@ export interface ImageItem extends BaseItem {
   // Nguồn ảnh: hoặc tĩnh (src) hoặc theo biến (varKey → mỗi record 1 ảnh)
   src?: string; // asset path tĩnh
   varKey?: string; // "anh_dai_dien" — bind biến ảnh; ưu tiên hơn src khi có record
-  fit?: 'cover' | 'contain';
+  fit?: 'cover' | 'contain' | 'fill' | 'none'; // 'fill'/'none' port từ my-builder (object-fit)
   shape?: 'rect' | 'round' | 'circle';
   borderW?: number; // px trên canvas chuẩn, nhân scale như mọi kích thước khác
   borderColor?: string;
+  // 'solid'|'dashed'|'dotted'|'double' — port từ my-builder's Border tab. Mặc định 'solid' khi
+  // không set (giữ hành vi cũ trước khi có field này).
+  borderStyle?: 'solid' | 'dashed' | 'dotted' | 'double';
+  // Bo góc thủ công — ƯU TIÊN HƠN `shape` khi có (port my-builder's Border tab radius slider +
+  // Shape tab's rounded-sm/md/lg/squircle preset, dùng chung field này). number = px canvas
+  // chuẩn (nhân scale lúc render, giống borderW); string = giá trị CSS thô KHÔNG nhân scale (VD
+  // squircle dùng '40%' — % tương đối theo box, không có ý nghĩa "px canvas" để nhân).
+  borderRadius?: number | string;
   ring?: string; // ảnh viền overlay (giữ tính năng "ring" cũ)
-  filter?: 'none' | 'bright' | 'gray' | 'warm';
+  // Khoá tra IMAGE_FILTERS (imageFilters.ts, packages/slide-shared/src/layout) — port ĐẦY ĐỦ 39
+  // preset filter từ my-builder, mở từ union 4 giá trị cũ (bright/gray/warm/none) thành string tự
+  // do để không giới hạn preset. 3 giá trị bright/gray/warm GIỮ NGUYÊN làm alias trong registry
+  // (xem imageFilters.ts's comment) — layout cũ mở lại không đổi hình.
+  filter?: string;
   fallbackText?: string; // hiện khi không có ảnh — "Không có ảnh"
-  shadow?: boolean | TextShadow; // đổ bóng, reuse TextShadow type
+  // Đổ bóng ĐƠN GIẢN (legacy, dùng chung TextShadow với TextItem/ShapeItem) — item cũ trước khi
+  // có `boxShadow` bên dưới vẫn render đúng. `boxShadow` (nếu có) ưu tiên hơn field này.
+  shadow?: boolean | TextShadow;
+  // Đổ bóng khối ĐẦY ĐỦ — khoá tra SHADOW_PRESETS (imageFrames.ts) hoặc CSS box-shadow tự do,
+  // port từ my-builder's Frame Design → tab Shadow (15 preset: soft/hard/glow/inset/retro...).
+  boxShadow?: string;
+  // Bóng đổ dạng filter (CSS filter: drop-shadow(...)) — KHÁC `boxShadow` (box-shadow bám theo
+  // hình chữ nhật khung, dropShadow bám theo alpha thật của ảnh/clip-path). Cộng dồn với `filter`
+  // lúc render: `[buildCssFilter(filter), dropShadow].join(' ')`. Khoá tra DROP_SHADOW_PRESETS.
+  dropShadow?: string;
+  // Lớp phủ màu THỦ CÔNG, ĐỘC LẬP với overlay riêng của 1 số filter mode='overlay' (2 lớp có thể
+  // cộng dồn — filter overlay vẽ trước, overlayColor vẽ sau, giống thứ tự trong my-builder).
+  overlayColor?: string;
+  overlayOpacity?: number; // 0..100
   // Neo điểm crop (focal point) khi fit='cover' — 0..1 (mặc định 0.5/0.5 = center)
   // Áp dụng CSS object-position, khác với object-fit=contain (không ảnh hưởng)
   focalX?: number; // 0..1, mặc định 0.5
   focalY?: number; // 0..1, mặc định 0.5
-  // Cắt ảnh theo hình dạng trang trí (GĐ16 kế hoạch Canva-style) — CSS clip-path value
+  // Cắt ảnh theo hình dạng trang trí — CSS clip-path value. Dùng chung bởi SHAPE_PRESETS's preset
+  // dạng clip-path (hexagon/star/diamond/triangle/circle/arch-top/parallelogram, imageFrames.ts).
   // VD: 'polygon(50% 0%, 0% 100%, 100% 100%)' cho tam giác
   clipPath?: string;
+  // Hiệu ứng trang trí đặc biệt — khoá tra SPECIAL_PRESETS (imageFrames.ts), port từ my-builder's
+  // Frame Design → tab Special. 'tape' cần renderer vẽ thêm 4 dải băng dính góc (xem
+  // TapeDecoration ở renderer.tsx/ItemContent.tsx); 'polaroid'/'vintage' chỉ cần áp CSS container.
+  specialFrame?: 'none' | 'tape' | 'polaroid' | 'vintage';
+  // Click-through link (từ my-builder, tuy ceremony không dùng nhưng ý là flexible)
+  linkUrl?: string; // URL khi click vào ảnh
+  linkTarget?: '_blank' | '_self'; // Mở trong tab mới hay tab hiện tại (mặc định '_blank')
 }
 
 export interface ShapeItem extends BaseItem {

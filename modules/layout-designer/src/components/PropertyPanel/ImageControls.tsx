@@ -4,9 +4,10 @@ import type { AssetPort } from '@sky-app/service-contracts';
 import { Square, Circle } from 'lucide-react';
 import { useResolvedAssetUrl } from '../../hooks/useResolvedAssetUrl.js';
 import { Section, CollapsibleSection } from './CommonControls.js';
-import { IconToggleGroup, ColorfulSwatchButton } from '@sky-app/ui';
-import { ShadowControl } from './ShadowControl.js';
+import { ColorfulSwatchButton } from '@sky-app/ui';
 import { MediaLibraryModal } from '../MediaLibraryModal.js';
+import { ImageFilterPicker } from '../ImageFilterPicker.js';
+import { ImageFramePanel } from '../ImageFramePanel.js';
 import { cn } from '@sky-app/ui';
 
 export interface ImageControlsProps {
@@ -47,6 +48,7 @@ export function ImageControls({
         open={mediaLibraryOpen}
         onOpenChange={setMediaLibraryOpen}
         assetPort={assetPort}
+        resolveAssetUrl={resolveAssetUrl}
         usedAssetPaths={usedAssetPaths}
         initialTab="library"
         onSelect={(relativePath) => patch({ src: relativePath })}
@@ -105,18 +107,20 @@ export function ImageControls({
         />
       </Section>
       <Section title="Cách lấp đầy khung">
-        <div className="flex gap-[7px]">
+        <div className="grid grid-cols-2 gap-[7px]">
           {(
             [
               { value: 'cover', label: 'Lấp đầy (cắt bớt)' },
               { value: 'contain', label: 'Vừa khung (giữ nguyên)' },
+              { value: 'fill', label: 'Kéo giãn (méo)' },
+              { value: 'none', label: 'Kích thước gốc' },
             ] as const
           ).map((opt) => (
             <button
               key={opt.value}
               onClick={() => patch({ fit: opt.value })}
               className={cn(
-                'flex-1 py-[6px] rounded-lg border text-[10px] font-semibold cursor-pointer transition-colors duration-100',
+                'py-[6px] rounded-lg border text-[10px] font-semibold cursor-pointer transition-colors duration-100',
                 (item.fit ?? 'cover') === opt.value
                   ? 'border-[#4b57e6] bg-[#4b57e6]/10 text-[#4b57e6]'
                   : 'border-[#e6e6ee] bg-[#fcfcfd] text-[#5c5d6e] hover:bg-neutral-50'
@@ -158,53 +162,27 @@ export function ImageControls({
           })}
         </div>
       </Section>
-      <CollapsibleSection title="Viền" defaultOpen={true}>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[11.5px] flex-shrink-0">Độ dày</span>
-          <input type="range" min={0} max={16} value={item.borderW ?? 0} onChange={(e) => patch({ borderW: Number(e.target.value) })} className="flex-1" />
-        </div>
-        {(item.borderW ?? 0) > 0 && (
-          <ColorfulSwatchButton
-            color={item.borderColor ?? '#000000'}
-            onChange={(borderColor) => patch({ borderColor })}
-            title="Màu viền"
-          />
-        )}
-      </CollapsibleSection>
       <Section title="Bộ lọc">
-        <div className="grid grid-cols-4 gap-2">
-          {(
-            [
-              { value: 'none' as const, label: 'Gốc', filter: 'none' },
-              { value: 'bright' as const, label: 'Sáng', filter: 'brightness(1.3)' },
-              { value: 'gray' as const, label: 'Đen trắng', filter: 'grayscale(1)' },
-              { value: 'warm' as const, label: 'Ấm', filter: 'sepia(0.4) saturate(1.3)' },
-            ] as const
-          ).map((f) => (
-            <button
-              key={f.value}
-              onClick={() => patch({ filter: f.value })}
-              className={cn(
-                'flex flex-col items-center gap-1 p-1 rounded-[7px] border cursor-pointer transition-colors',
-                item.filter === f.value ? 'border-[#4b57e6] bg-[#4b57e6]/10' : 'border-[#e6e6ee] bg-[#fcfcfd] hover:bg-[#f4f5f9]'
-              )}
-            >
-              <div
-                className="w-8 h-8 rounded border border-[#d4d4dd]"
-                style={{
-                  backgroundImage: previewUrl ? `url(${previewUrl})` : undefined,
-                  backgroundColor: !previewUrl ? '#e6e6ee' : undefined,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  filter: f.filter === 'none' ? undefined : f.filter,
-                }}
-              />
-              <span className={cn('text-[9px] font-medium', item.filter === f.value ? 'text-[#4b57e6]' : 'text-[#5c5d6e]')}>{f.label}</span>
-            </button>
-          ))}
-        </div>
+        <ImageFilterPicker previewSrc={previewUrl} value={item.filter} onChange={(filter) => patch({ filter })} columns={4} />
       </Section>
-      {(item.fit ?? 'cover') === 'cover' && (
+      <CollapsibleSection title="Khung & hiệu ứng" defaultOpen={false}>
+        <ImageFramePanel item={item} patch={patch} />
+      </CollapsibleSection>
+      <Section title="Lớp phủ màu">
+        <div className="flex items-center gap-2 mb-2">
+          <ColorfulSwatchButton color={item.overlayColor ?? '#000000'} onChange={(overlayColor) => patch({ overlayColor })} title="Màu phủ" />
+          <span className="text-[11px] text-[#9a9bab]">{item.overlayOpacity ?? 0}%</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={item.overlayOpacity ?? 0}
+          onChange={(e) => patch({ overlayOpacity: Number(e.target.value) })}
+          className="w-full"
+        />
+      </Section>
+      {(item.fit ?? 'cover') !== 'fill' && (
         <Section title="Neo điểm crop">
           <div className="space-y-2">
             <div className="flex items-center gap-[10px]">
@@ -234,7 +212,27 @@ export function ImageControls({
           </div>
         </Section>
       )}
-      <ShadowControl value={item.shadow} onChange={(shadow) => patch({ shadow })} />
+      <CollapsibleSection title="Liên kết" defaultOpen={false}>
+        <div className="space-y-2">
+          <input
+            type="url"
+            placeholder="https://example.com"
+            value={item.linkUrl ?? ''}
+            onChange={(e) => patch({ linkUrl: e.target.value || undefined })}
+            className="w-full border border-[#e6e6ee] rounded-[7px] p-[6px_8px] text-[11.5px]"
+          />
+          {item.linkUrl && (
+            <select
+              value={item.linkTarget ?? '_blank'}
+              onChange={(e) => patch({ linkTarget: e.target.value as '_blank' | '_self' })}
+              className="w-full border border-[#e6e6ee] rounded-[7px] p-[6px_8px] text-[11.5px]"
+            >
+              <option value="_blank">Mở tab mới</option>
+              <option value="_self">Mở tab hiện tại</option>
+            </select>
+          )}
+        </div>
+      </CollapsibleSection>
     </>
   );
 }

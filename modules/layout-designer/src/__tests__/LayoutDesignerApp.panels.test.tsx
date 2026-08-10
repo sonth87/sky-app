@@ -18,18 +18,18 @@ beforeEach(() => {
 });
 
 describe('LayoutDesignerApp — toggle palette trái (Rail+Flyout)', () => {
-  it('mặc định hiện Rail (label "Thành phần")', () => {
+  it('mặc định hiện Rail (label "Văn bản")', () => {
     render(<LayoutDesignerApp content={sampleContent()} />);
-    // "Thành phần" xuất hiện CẢ ở label icon Rail LẪN tiêu đề panel Flyout (ComponentsPanel) —
+    // "Văn bản" xuất hiện CẢ ở label icon Rail LẪN tiêu đề panel Flyout (TextPresetsPanel) —
     // dùng getAllByText, chỉ cần xác nhận có ít nhất 1 (đủ để biết Rail/Flyout đang hiện).
-    expect(screen.getAllByText('Thành phần').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Văn bản').length).toBeGreaterThan(0);
   });
 
   it('bấm nút "Ẩn palette" → Rail/Flyout biến mất, xuất hiện dải mảnh "Hiện palette"', () => {
     render(<LayoutDesignerApp content={sampleContent()} />);
     fireEvent.click(screen.getByLabelText('Ẩn palette'));
 
-    expect(screen.queryByText('Thành phần')).toBeNull();
+    expect(screen.queryByText('Văn bản')).toBeNull();
     expect(screen.getByLabelText('Hiện palette')).toBeTruthy();
   });
 
@@ -38,7 +38,7 @@ describe('LayoutDesignerApp — toggle palette trái (Rail+Flyout)', () => {
     fireEvent.click(screen.getByLabelText('Ẩn palette'));
     fireEvent.click(screen.getByLabelText('Hiện palette'));
 
-    expect(screen.getAllByText('Thành phần').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Văn bản').length).toBeGreaterThan(0);
   });
 
   it('trạng thái ẩn được LƯU qua localStorage — remount component vẫn giữ ẩn', () => {
@@ -47,7 +47,7 @@ describe('LayoutDesignerApp — toggle palette trái (Rail+Flyout)', () => {
     unmount();
 
     render(<LayoutDesignerApp content={sampleContent()} />);
-    expect(screen.queryByText('Thành phần')).toBeNull();
+    expect(screen.queryByText('Văn bản')).toBeNull();
     expect(screen.getByLabelText('Hiện palette')).toBeTruthy();
   });
 });
