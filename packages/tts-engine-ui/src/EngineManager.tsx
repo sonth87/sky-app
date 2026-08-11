@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import {
   Download, Pause, Play, Trash2, AlertTriangle, CheckCircle2,
-  FolderInput, FolderOutput, RefreshCw,
+  FolderInput, FolderOutput, RefreshCw, FolderOpen, ExternalLink,
+  ChevronRight, X, Zap, HardDrive, Cpu,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -42,6 +43,10 @@ export interface EngineManagerProps {
 /** Trạng thái UI dẫn xuất cho 1 engine (từ install_status + progress đang chạy). */
 type UiPhase = EngineInstallProgress['phase'] | 'idle';
 
+/** `relative` là bắt buộc: bảng chi tiết engine phủ lên danh sách bằng `absolute inset-0`,
+ * thiếu lớp neo này nó sẽ bám theo viewport thay vì khung cửa sổ. */
+const CONTENT_CLASS = 'relative flex w-full flex-1 min-h-0 flex-col gap-3 overflow-y-auto p-5';
+
 export function EngineManager({ open, onClose, port, canInstall = false, notice, portalContainer }: EngineManagerProps) {
   const { t } = useTranslation();
   const [engines, setEngines] = useState<TtsEngines | null>(null);
@@ -50,6 +55,11 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
   const [busy, setBusy] = useState<string | null>(null); // engineId đang thao tác đồng bộ
   const [msg, setMsg] = useState<Record<string, string>>({});
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
+  /** Engine đang mở bảng chi tiết (null = đang xem danh sách). */
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [enginesDir, setEnginesDir] = useState<string>('');
+  /** Runtime dùng chung theo kind (GĐ C) — KHÔNG thuộc riêng engine nào, xem `refreshRuntimeUsage`. */
+  const [runtimeUsage, setRuntimeUsage] = useState<Array<{ kind: string; bytes: number; engineIds: string[] }>>([]);
   const progressRef = useRef<Record<string, EngineInstallProgress>>({});
   // Trạng thái tiến trình tts-service (đã có sẵn cho icon menu bar) — dùng ở đây để tự refresh
   // khi service CHUYỂN sang sẵn sàng, thay vì bắt người dùng đóng/mở lại cửa sổ.
@@ -67,9 +77,21 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
       void port.diskUsage(eng.id).then((r) =>
         setDiskUsage((prev) => ({ ...prev, [eng.id]: r.bytes })));
     }
+    // Runtime dùng chung (torch...) — KHÔNG cộng vào diskUsage() từng engine (GĐ C), hiện
+    // riêng để không tạo cảm giác "xoá 1 engine là hết ngay số này".
+    void port.runtimeDiskUsage?.().then(setRuntimeUsage);
   }, [port]);
 
   useEffect(() => { if (open) void refresh(); }, [open, refresh]);
+
+  // Đường dẫn thư mục lưu engine — chỉ nền tảng cài đặt tại chỗ mới có (Electron).
+  useEffect(() => {
+    if (!open || !port.enginesDir) return;
+    void port.enginesDir().then((r) => setEnginesDir(r.path));
+  }, [open, port]);
+
+  // Đóng cửa sổ rồi mở lại thì quay về danh sách, không giữ lại bảng chi tiết cũ.
+  useEffect(() => { if (!open) setDetailId(null); }, [open]);
 
   // Bug thật 2026-08-04: mở "Quản lý engine TTS" TRƯỚC KHI tts-service kịp start (vd vừa mở
   // app) → listEngines() trả về null (getPythonPort() chưa có), refresh() ở trên bỏ qua luôn
@@ -112,17 +134,13 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
 
   const doVerifyAndSwitch = async (id: string) => {
     setBusy(id);
-    // verify là dry-run "engine có load được không" — chỉ nền tảng cài đặt tại chỗ mới
-    // có. Nơi khác thì đổi thẳng, để service tự báo lỗi nếu engine hỏng.
-    if (port.verify) {
-      setEngineMsg(id, t('engineManager.checkingEngine'));
-      const v = await port.verify(id);
-      if (!v.ok) {
-        setEngineMsg(id, t('engineManager.engineLoadFailed', { error: v.error ?? t('engineManager.unknownError') }));
-        setBusy(null);
-        return;
-      }
-    }
+    // KHÔNG gọi port.verify() ở đây nữa (bỏ 2026-08-10). verify là dry-run spawn hẳn 1
+    // process để nạp thử model — với engine nặng (VoxCPM: torch, model ~4.5GB) mất ~118
+    // giây. Mà switchEngine bên dưới VẪN tự verify lần nữa trước khi restart, rồi process
+    // mới lại nạp model lần thứ ba → 1 lần đổi engine nạp model 3 LẦN (~6 phút), đúng
+    // triệu chứng "chuyển model cực kỳ lâu". Giờ switchEngine tự lo trọn: thử đổi tại chỗ
+    // trước (tức thì nếu engine đã từng nạp), chỉ khi process không có runtime mới quay
+    // về đường verify + restart. Xem docs/roadmap/plans/tts-engine-architecture.md GĐ A.
     setEngineMsg(id, t('engineManager.switchingEngine'));
     const sw = await port.switchEngine?.(id);
     if (sw?.ok) {
@@ -136,11 +154,30 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
     setBusy(null);
   };
 
+  const doUnload = async (id: string) => {
+    setBusy(id);
+    setEngineMsg(id, '');
+    const r = await port.unloadEngine?.(id);
+    setEngineMsg(id, r?.ok
+      ? t('engineManager.unloaded')
+      : t('engineManager.unloadFailed', { error: r?.error ?? t('engineManager.unknownError') }));
+    await refresh();
+    setBusy(null);
+  };
+
+  const doOpenFolder = async () => {
+    const r = await port.openEnginesDir?.();
+    if (r && !r.ok) setMsg((prev) => ({ ...prev, __folder: t('engineManager.openFolderFailed', { error: r.error ?? '' }) }));
+  };
+
   const phaseOf = (e: TtsEngineInfo): UiPhase => {
     const p = progress[e.id];
     if (p && p.phase !== 'done') return p.phase;
     return 'idle';
   };
+
+  /** Engine đang giữ ấm trong RAM → đổi sang là tức thì. Server cũ không trả `loaded`. */
+  const isLoaded = (id: string) => !!engines?.loaded?.includes(id);
 
   // FloatingWindow không tự gate theo `open` (không có prop đó) — caller (device-shell,
   // TTS Studio) luôn mount component này, ẩn/hiện qua chính prop `open`. Đặt gate SAU mọi
@@ -157,12 +194,41 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
       resizable
       minWidth={420}
       minHeight={360}
-      contentClassName="flex w-full flex-1 min-h-0 flex-col gap-3 overflow-y-auto p-5"
+      contentClassName={CONTENT_CLASS}
       container={portalContainer}
     >
       <p className="text-xxs text-muted-foreground">{t('engineManager.description')}</p>
 
       {notice}
+
+      {/* Nơi lưu trữ + nút mở thư mục — người vận hành cần biết dữ liệu nặng (model vài GB)
+          nằm ở đâu để dọn đĩa, chép sang máy khác hoặc gửi kèm khi cần hỗ trợ. Chỉ hiện ở
+          nền tảng cài đặt tại chỗ (Electron); bản Web không có khái niệm thư mục cục bộ. */}
+      {enginesDir && (
+        <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2">
+          <div className="flex min-w-0 flex-col">
+            <span className="text-2xs font-medium text-muted-foreground">{t('engineManager.storageLocation')}</span>
+            <span className="truncate font-mono text-2xs text-foreground" title={enginesDir}>{enginesDir}</span>
+          </div>
+          <Button variant="secondary-outline" onClick={() => void doOpenFolder()} icon={<FolderOpen size={12} />}>
+            {t('engineManager.openFolder')}
+          </Button>
+        </div>
+      )}
+      {msg.__folder && <p className="text-xxs text-destructive">{msg.__folder}</p>}
+
+      {/* Runtime dùng chung theo kind (GĐ C) — KHÔNG thuộc riêng engine nào, nên hiện tách
+          khỏi "Chiếm đĩa" của từng engine để tránh hiểu lầm xoá 1 engine là hết ngay số này. */}
+      {runtimeUsage.length > 0 && (
+        <div className="flex flex-col gap-0.5 rounded-lg bg-muted/30 px-3 py-2 text-2xs text-muted-foreground">
+          {runtimeUsage.map((r) => (
+            <span key={r.kind}>
+              {t('engineManager.sharedRuntime')}: {t(`engineManager.runtime.${r.kind}`, r.kind)} — {fmtBytes(r.bytes)}
+              {r.engineIds.length > 0 ? ` (${r.engineIds.join(', ')})` : ''}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* engines === null: listEngines() chưa trả được (service chưa start / mất kết nối) —
           hiện rõ trạng thái thay vì bỏ trống cửa sổ. Tự refresh() khi service chuyển 'ok'
@@ -175,38 +241,133 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
         </p>
       )}
 
-      {engines?.engines.map((e) => {
+      {/* Danh sách gọn: 1 dòng / engine. Chi tiết + mọi thao tác nằm trong bảng mở ra khi
+          bấm vào dòng — giữ danh sách quét mắt được khi số engine tăng lên. */}
+      <div className="flex flex-col gap-1.5">
+        {engines?.engines.map((e) => {
           const phase = phaseOf(e);
           const p = progress[e.id];
-          const pf = preflight[e.id];
           const isCurrent = engines.current === e.id;
           const pct = p && p.bytesTotal > 0 ? Math.floor((p.bytesReceived / p.bytesTotal) * 100) : 0;
           const downloading = phase === 'downloading' || phase === 'resolving' || phase === 'importing' || phase === 'installing-runtime';
           const paused = phase === 'paused';
           const usedBytes = diskUsage[e.id] ?? 0;
+          const estMb = e.install?.model?.total_mb ?? 0;
 
           return (
-            <div key={e.id} className="flex flex-col gap-2 rounded-xl border border-border p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 flex-col">
-                  <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-                    {e.label}
-                    {isCurrent && <span className="shrink-0 whitespace-nowrap rounded bg-success/15 px-1.5 py-0.5 text-2xs text-success">{t('engineManager.inUse')}</span>}
-                    {e.bundled && <span className="shrink-0 whitespace-nowrap rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">{t('engineManager.bundled')}</span>}
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => setDetailId(e.id)}
+              className="flex w-full items-center gap-3 rounded-xl border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+            >
+              <EngineStatusIcon
+                installStatus={e.install_status}
+                bundled={e.bundled}
+                isCurrent={isCurrent}
+                loaded={isLoaded(e.id)}
+              />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
+                  <span className="truncate">{e.label}</span>
+                  {isCurrent && <span className="shrink-0 whitespace-nowrap rounded bg-success/15 px-1.5 py-0.5 text-2xs text-success">{t('engineManager.inUse')}</span>}
+                  {!isCurrent && isLoaded(e.id) && (
+                    <span className="shrink-0 whitespace-nowrap rounded bg-warning/15 px-1.5 py-0.5 text-2xs text-warning-foreground" title={t('engineManager.loadedHint')}>
+                      {t('engineManager.loadedInMemory')}
+                    </span>
+                  )}
+                </span>
+                {(downloading || paused) && p && (
+                  <span className="text-2xs text-muted-foreground">
+                    {translatePhase(phase, t)} · {p.logLines?.length ? (p.installPct ?? 0) : pct}%
                   </span>
-                  <span className="text-xxs text-muted-foreground">{e.description}</span>
-                </div>
-                <StatusBadge status={e.install_status} bundled={e.bundled} t={t} />
+                )}
               </div>
+              <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
+                {usedBytes > 0 ? fmtBytes(usedBytes) : estMb > 0 ? `~${fmtBytes(estMb * 1024 * 1024)}` : ''}
+              </span>
+              <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
+            </button>
+          );
+        })}
+      </div>
 
-              {/* Yêu cầu phần cứng */}
-              {e.requirements && (
-                <p className="text-2xs text-muted-foreground">
-                  {t('engineManager.requires')}: RAM ≥ {e.requirements.min_ram_gb}GB{e.requirements.needs_gpu ? ', GPU' : ''}
-                  {e.requirements.recommended_ram_gb ? ` (${t('engineManager.recommended')} ${e.requirements.recommended_ram_gb}GB)` : ''}
-                </p>
+      {/* Bảng chi tiết engine — phủ lên danh sách trong cùng cửa sổ (mẫu list → detail). */}
+      {detailId && engines && (() => {
+        const e = engines.engines.find((x) => x.id === detailId);
+        if (!e) return null;
+        const phase = phaseOf(e);
+        const p = progress[e.id];
+        const pf = preflight[e.id];
+        const isCurrent = engines.current === e.id;
+        const pct = p && p.bytesTotal > 0 ? Math.floor((p.bytesReceived / p.bytesTotal) * 100) : 0;
+        const downloading = phase === 'downloading' || phase === 'resolving' || phase === 'importing' || phase === 'installing-runtime';
+        const paused = phase === 'paused';
+        const usedBytes = diskUsage[e.id] ?? 0;
+        const repo = e.install?.model?.repo;
+
+        return (
+          <div className="absolute inset-0 z-10 flex flex-col overflow-y-auto bg-background p-5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
+                  {e.label}
+                  {isCurrent && <span className="shrink-0 whitespace-nowrap rounded bg-success/15 px-1.5 py-0.5 text-2xs text-success">{t('engineManager.inUse')}</span>}
+                </span>
+                {repo && (
+                  <a
+                    href={`https://huggingface.co/${repo}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 font-mono text-2xs text-primary hover:underline"
+                  >
+                    {repo}<ExternalLink size={10} />
+                  </a>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailId(null)}
+                aria-label={t('engineManager.backToList')}
+                className="shrink-0 rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="pt-3 text-xs text-muted-foreground">{e.description}</p>
+
+            {/* Thẻ thuộc tính: loại runtime, trạng thái tải, đĩa, yêu cầu phần cứng */}
+            <div className="flex flex-wrap gap-1.5 pt-3">
+              <span className="flex items-center gap-1 rounded bg-muted px-2 py-1 text-2xs text-muted-foreground">
+                <Cpu size={11} />
+                {e.runtime_kind ? t(`engineManager.runtime.${e.runtime_kind}`) : t('engineManager.runtimeKind')}
+              </span>
+              {e.bundled && (
+                <span className="rounded bg-muted px-2 py-1 text-2xs text-muted-foreground">{t('engineManager.bundled')}</span>
               )}
+              {isLoaded(e.id) && (
+                <span className="flex items-center gap-1 rounded bg-warning/15 px-2 py-1 text-2xs text-warning-foreground" title={t('engineManager.loadedHint')}>
+                  <Zap size={11} />{t('engineManager.loadedInMemory')}
+                </span>
+              )}
+              <StatusBadge status={e.install_status} bundled={e.bundled} t={t} />
+            </div>
 
+            {usedBytes > 0 && (
+              <p className="flex items-center gap-1.5 pt-3 text-2xs text-muted-foreground">
+                <HardDrive size={11} />{t('engineManager.diskUsage')}: {fmtBytes(usedBytes)}
+              </p>
+            )}
+
+            {e.requirements && (
+              <p className="pt-1 text-2xs text-muted-foreground">
+                {t('engineManager.requires')}: RAM ≥ {e.requirements.min_ram_gb}GB{e.requirements.needs_gpu ? ', GPU' : ''}
+                {e.requirements.recommended_ram_gb ? ` (${t('engineManager.recommended')} ${e.requirements.recommended_ram_gb}GB)` : ''}
+              </p>
+            )}
+
+            <div className="flex flex-col gap-2 pt-4">
               {/* Progress khi đang tải/cài. */}
               {(downloading || paused) && p && (
                 <InstallProgressBlock phase={phase} p={p} pct={pct} paused={paused} t={t} />
@@ -225,11 +386,6 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
               )}
               {msg[e.id] && <p className="text-xxs text-foreground">{msg[e.id]}</p>}
               {phase === 'error' && p?.error && <p className="text-xxs text-destructive">{p.error}</p>}
-
-              {/* Dung lượng chiếm đĩa (engine mở rộng đã tải) */}
-              {!e.bundled && e.install_status !== 'missing' && usedBytes > 0 && (
-                <p className="text-2xs text-muted-foreground">{t('engineManager.diskUsage')}: {fmtBytes(usedBytes)}</p>
-              )}
 
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 {e.bundled ? (
@@ -309,12 +465,49 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
                     {t('engineManager.cancel')}
                   </Button>
                 )}
+
+                {/* Nhả RAM — chỉ có nghĩa khi engine đang giữ ấm và KHÔNG phải engine đang
+                    dùng. Khác Xoá: dữ liệu trên đĩa còn nguyên, lần sau nạp lại ngay. */}
+                {port.unloadEngine && isLoaded(e.id) && !isCurrent && (
+                  <Button
+                    variant="secondary-outline"
+                    onClick={() => void doUnload(e.id)}
+                    disabled={busy === e.id}
+                    loading={busy === e.id}
+                    icon={<Zap size={12} />}
+                    title={t('engineManager.unloadHint')}
+                  >
+                    {t('engineManager.unload')}
+                  </Button>
+                )}
               </div>
             </div>
-          );
-        })}
+          </div>
+        );
+      })()}
     </FloatingWindow>
   );
+}
+
+/**
+ * Chấm trạng thái đầu mỗi dòng engine — quét mắt nhanh hơn đọc nhãn chữ:
+ *   ✓ xanh  = đang dùng / sẵn sàng dùng
+ *   ⚡ vàng = đã tải nhưng chưa nạp, hoặc đang giữ ấm
+ *   ↓ xám  = chưa tải về máy
+ */
+function EngineStatusIcon({
+  installStatus, bundled, isCurrent, loaded,
+}: {
+  installStatus: string;
+  bundled: boolean;
+  isCurrent: boolean;
+  loaded: boolean;
+}) {
+  if (isCurrent) return <CheckCircle2 size={16} className="shrink-0 text-success" />;
+  if (loaded) return <Zap size={16} className="shrink-0 text-warning-foreground" />;
+  if (bundled || installStatus === 'installed') return <CheckCircle2 size={16} className="shrink-0 text-muted-foreground" />;
+  if (installStatus === 'partial') return <AlertTriangle size={16} className="shrink-0 text-warning-foreground" />;
+  return <Download size={16} className="shrink-0 text-muted-foreground" />;
 }
 
 /** Label nhấp nháy dấu chấm ("Đang cài đặt" → "Đang cài đặt." → ".." → "..." → lặp lại) —

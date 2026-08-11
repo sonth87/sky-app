@@ -106,8 +106,10 @@ mac:
   hardenedRuntime: false
   gatekeeperAssess: false
   extraResources:
-    - from: resources/vieneu-server
-      to: vieneu-server
+    # Tên file = tên tiến trình hiện trong Activity Monitor (macOS gán từ tên file thực
+    # thi lúc exec, tiến trình không tự đổi được). Xem apps/tts-service/vieneu-server.spec.
+    - from: resources/Sky App TTS
+      to: Sky App TTS
 
 win:
   # portable: bản .exe chạy thẳng không cần cài đặt, tiện test nhanh trên
@@ -119,8 +121,8 @@ win:
   # user chọn "More info → Run anyway".
   signAndEditExecutable: false
   extraResources:
-    - from: resources/vieneu-server.exe
-      to: vieneu-server.exe
+    - from: resources/Sky App TTS.exe
+      to: Sky App TTS.exe
 
 nsis:
   oneClick: false

@@ -74,6 +74,18 @@ export function createElectronTtsEnginePort(): TtsEnginePort {
     async diskUsage(engineId) {
       return (await window.slide.engineDiskUsage?.(engineId)) ?? { bytes: 0 };
     },
+    async runtimeDiskUsage() {
+      return (await window.slide.runtimeDiskUsage?.()) ?? [];
+    },
+    async unloadEngine(engineId) {
+      return (await window.slide.engineUnload?.(engineId)) ?? { ok: false, error: 'Bridge không hỗ trợ engineUnload' };
+    },
+    async enginesDir() {
+      return (await window.slide.ttsEnginesDir?.()) ?? { path: '' };
+    },
+    async openEnginesDir() {
+      return (await window.slide.openTtsEnginesDir?.()) ?? { ok: false, error: 'Bridge không hỗ trợ openTtsEnginesDir' };
+    },
     async importLocal(engineId) {
       return (await window.slide.engineImportLocal?.(engineId)) ?? { ok: false, error: 'Bridge không hỗ trợ engineImportLocal' };
     },

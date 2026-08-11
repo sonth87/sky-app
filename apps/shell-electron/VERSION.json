@@ -2,6 +2,42 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.6.0",
+      "date": "2026-08-11",
+      "bump": "minor",
+      "summary": "Trên máy Mac chip Apple Silicon (M1/M2/M3/M4), giọng Qwen3-TTS giờ chạy được thật bằng GPU tích hợp sẵn của máy (không cần card đồ hoạ rời) — đã thử nghiệm và xác nhận chạy đúng. Trên Windows/máy có card NVIDIA vẫn dùng đường cũ.",
+      "breaking": true,
+      "minAppVersion": "0.6.0",
+      "detailsRef": "history/2026-08-11-them-mlx-cho-qwen.md"
+    },
+    {
+      "version": "0.5.0",
+      "date": "2026-08-11",
+      "bump": "minor",
+      "summary": "Thêm 2 giọng đọc mới: Qwen3-TTS 0.6B và 1.7B (đa ngôn ngữ, cần máy có card đồ hoạ NVIDIA — chưa hỗ trợ ổn định trên CPU thường). Sửa lỗi khiến đổi qua lại giữa 2 giọng cùng loại (vd VoxCPM và Qwen) chậm hơn cần thiết.",
+      "breaking": true,
+      "minAppVersion": "0.5.0",
+      "detailsRef": "history/2026-08-11-them-qwen3-tts.md"
+    },
+    {
+      "version": "0.4.0",
+      "date": "2026-08-11",
+      "bump": "minor",
+      "summary": "Engine tải thêm (VoxCPM, MOSS) giờ dùng chung thư viện Python thay vì mỗi engine một bản riêng — đỡ vài GB dung lượng cho mỗi engine cần PyTorch thêm vào. Sửa lỗi khiến MOSS (giọng đa ngôn ngữ) bị khởi động thành tiến trình riêng không cần thiết, làm chậm lúc đổi engine. Màn hình quản lý engine hiện thêm dòng dung lượng thư viện dùng chung.",
+      "breaking": true,
+      "minAppVersion": "0.4.0",
+      "detailsRef": "history/2026-08-11-runtime-dung-chung-theo-kind.md"
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-08-10",
+      "bump": "minor",
+      "summary": "Đổi giọng đọc (engine TTS) giờ gần như tức thì thay vì phải chờ vài phút — engine đã dùng được giữ sẵn, quay lại không phải tải lại. Màn hình quản lý engine làm mới: danh sách gọn, bấm vào từng engine để xem chi tiết và nguồn model, có nút mở thư mục lưu trữ và nút giải phóng bộ nhớ (vẫn giữ nguyên dữ liệu đã tải). Sửa lỗi engine tải thêm không khởi động được ở bản cài đặt sẵn.",
+      "breaking": true,
+      "minAppVersion": "0.3.0",
+      "detailsRef": "history/2026-08-10-doi-engine-tts-tai-cho.md"
+    },
+    {
       "version": "0.2.1",
       "date": "2026-07-28",
       "bump": "patch",

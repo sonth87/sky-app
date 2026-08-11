@@ -191,6 +191,14 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:engine-delete', { engineId }),
   engineDiskUsage: (engineId: string): Promise<{ bytes: number }> =>
     ipcRenderer.invoke('tts:engine-disk-usage', { engineId }),
+  runtimeDiskUsage: (): Promise<Array<{ kind: string; bytes: number; engineIds: string[] }>> =>
+    ipcRenderer.invoke('tts:runtime-disk-usage'),
+  ttsEnginesDir: (): Promise<{ path: string }> =>
+    ipcRenderer.invoke('tts:engines-dir'),
+  openTtsEnginesDir: (): Promise<{ ok: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke('tts:open-engines-dir'),
+  engineUnload: (engineId: string): Promise<{ ok: boolean; error?: string; freedProcess?: boolean; unloaded?: boolean }> =>
+    ipcRenderer.invoke('tts:engine-unload', { engineId }),
   onEngineInstallProgress: (cb: (p: EngineInstallProgress) => void): (() => void) => {
     const handler = (_e: unknown, p: EngineInstallProgress) => cb(p);
     ipcRenderer.on('tts:engine-install-progress', handler);

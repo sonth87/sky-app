@@ -74,6 +74,17 @@ export interface TtsEngineInfo {
   implemented: boolean;
   bundled: boolean;
   install_status: 'installed' | 'partial' | 'missing';
+  /**
+   * Loại runtime engine cần. Quyết định engine nào ở chung được một tiến trình:
+   * 'onnx-bundled'/'onnx-ext' nhẹ và đổi qua lại gần như tức thì; 'torch' nặng vài GB,
+   * chạy trong tiến trình riêng. Optional vì server cũ chưa trả field này.
+   */
+  runtime_kind?: 'onnx-bundled' | 'onnx-ext' | 'torch' | 'mlx';
+  /** Repo nguồn của model (HF) — hiện link "xem nguồn" trong bảng chi tiết engine. */
+  install?: {
+    model?: { source?: string; repo?: string; total_mb?: number };
+    runtime?: { python_version?: string; pip_packages?: string[] };
+  } | null;
   requirements: {
     min_ram_gb?: number;
     recommended_ram_gb?: number;
@@ -94,6 +105,12 @@ export interface TtsEngines {
   engines: TtsEngineInfo[];
   current: string;
   current_capabilities: TtsEngineInfo['capabilities'] | null;
+  /**
+   * Engine đang được GIỮ ẤM trong RAM của tiến trình đang phục vụ (cũ nhất trước). Đổi
+   * sang một trong số này là tức thì — không phải nạp lại model. Optional vì server cũ
+   * chưa trả field này.
+   */
+  loaded?: string[];
 }
 
 export interface EngineInstallProgress {
@@ -267,6 +284,14 @@ export interface SlideApi {
   engineExportLocal(engineId: string): Promise<{ ok: boolean; error?: string; count?: number }>;
   engineDelete(engineId: string): Promise<{ ok: boolean; error?: string }>;
   engineDiskUsage(engineId: string): Promise<{ bytes: number }>;
+  /** Dung lượng runtime DÙNG CHUNG theo kind (GĐ C) — không thuộc engine cụ thể nào. */
+  runtimeDiskUsage(): Promise<Array<{ kind: string; bytes: number; engineIds: string[] }>>;
+  /** Thư mục lưu engine/model đã tải (hiện cho người vận hành biết dữ liệu nặng nằm ở đâu). */
+  ttsEnginesDir(): Promise<{ path: string }>;
+  /** Mở thư mục đó bằng Finder/Explorer. */
+  openTtsEnginesDir(): Promise<{ ok: boolean; path?: string; error?: string }>;
+  /** Nhả RAM của engine đang giữ ấm, GIỮ NGUYÊN dữ liệu đã tải trên đĩa. */
+  engineUnload(engineId: string): Promise<{ ok: boolean; error?: string; freedProcess?: boolean; unloaded?: boolean }>;
   onEngineInstallProgress(cb: (p: EngineInstallProgress) => void): () => void;
   pickAudioFile(): Promise<{ ok: boolean; filePath?: string }>;
   cloneVoice(payload: { filePath: string; label: string; gender?: string; region?: string }): Promise<{

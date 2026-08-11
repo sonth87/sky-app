@@ -142,23 +142,10 @@ export function vieneuConfigPath(): string {
 }
 
 /**
- * Runtime Python RIÊNG cho chế độ tăng tốc phần cứng (GPU) của engine VieNeu bundled.
- *
- * Vì sao phải tách hẳn: bản đóng gói chạy VieNeu bằng binary PyInstaller, bên trong đã
- * đóng băng onnxruntime bản CPU — cài onnxruntime-gpu ra ngoài KHÔNG có tác dụng gì với
- * binary đó. Muốn dùng GPU thì phải chạy main.py bằng một Python có onnxruntime-gpu,
- * nên ở đây tải Python rời + cài trọn bộ dependency của server vào.
- *
- * Chỉ tồn tại khi người dùng chủ động bật tăng tốc; bản chỉ-CPU không tải gì thêm.
- */
-export function ttsAccelDir(): string {
-  return join(app.getPath('userData'), 'tts-accel');
-}
-
-/**
  * Thư mục gốc chứa các engine TTS mở rộng TẢI THEO NHU CẦU (ngoài VieNeu bundled).
- * Mỗi engine tự chứa: runtime (Python embeddable + torch...), model, manifest.
- * Cấu trúc: <root>/<engineId>/{runtime, model, install-state.json, manifest.json}.
+ * Mỗi engine tự chứa: model, manifest, install-state — KHÔNG còn runtime riêng (xem
+ * `ttsRuntimeDir`, đổi 2026-08-11/GĐ C).
+ * Cấu trúc: <root>/<engineId>/{model, install-state.json, manifest.json}.
  */
 export function ttsEnginesDir(): string {
   return join(app.getPath('userData'), 'tts-engines');
@@ -169,6 +156,28 @@ export function ttsEngineDir(engineId: string): string {
   // Chặn path traversal: engineId chỉ nhận ký tự an toàn.
   const safe = engineId.replace(/[^a-zA-Z0-9_-]/g, '_');
   return join(ttsEnginesDir(), safe);
+}
+
+/**
+ * Runtime Python (interpreter tải rời + site-packages) DÙNG CHUNG cho mọi engine cùng
+ * `runtime_kind` — GĐ C (2026-08-11) của docs/roadmap/plans/tts-engine-architecture.md.
+ *
+ * Trước đây mỗi engine mở rộng có `runtime/site-packages` RIÊNG (nằm trong
+ * `ttsEngineDir(engineId)`) — cài 2 engine cùng cần torch (vd VoxCPM + engine torch
+ * tương lai) là torch bị tải VÀ LƯU 2 LẦN, ~2.5GB lãng phí mỗi bản trùng lặp.
+ *
+ * `kind`: 'torch' | 'onnx-ext' | 'onnx-accel' (không có 'onnx-bundled' — VieNeu chạy
+ * bằng binary PyInstaller, không có runtime rời để dùng chung).
+ * Cấu trúc: <root>/_runtime/<kind>/{python, site-packages}.
+ *
+ * `_runtime` có dấu gạch dưới để không trùng ký tự an toàn của bất kỳ `engineId` thật
+ * nào (engineId đã bị lọc qua `ttsEngineDir`'s regex, không chứa `_` ở đầu theo quy ước
+ * đặt tên hiện tại) — tránh nhầm thư mục runtime dùng chung với thư mục 1 engine cụ thể
+ * khi liệt kê `ttsEnginesDir()`.
+ */
+export function ttsRuntimeDir(kind: string): string {
+  const safe = kind.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return join(ttsEnginesDir(), '_runtime', safe);
 }
 
 /** Thư mục chứa file WAV đã pre-gen cho 1 batch */

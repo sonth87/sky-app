@@ -1,0 +1,6 @@
+# Dependency CHỈ dùng khi phát triển/chạy test — KHÔNG đưa vào binary PyInstaller.
+# Cài thêm sau requirements.txt:  venv/bin/pip install -r requirements-dev.txt
+# Tách khỏi requirements.txt có chủ đích: build.sh hash requirements.txt để quyết định
+# dựng lại venv, và spec PyInstaller thu gom theo môi trường — thêm pytest vào đó chỉ
+# làm binary phình ra vô ích.
+pytest>=8.0

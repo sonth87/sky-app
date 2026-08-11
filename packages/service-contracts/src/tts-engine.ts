@@ -75,6 +75,22 @@ export interface TtsEnginePort {
   verify?(engineId: string): Promise<{ ok: boolean; error?: string; capabilities?: unknown }>;
   deleteEngine?(engineId: string): Promise<EngineOpResult>;
   diskUsage?(engineId: string): Promise<{ bytes: number }>;
+  /**
+   * Dung lượng runtime DÙNG CHUNG theo kind ('torch'/'onnx-ext'/'onnx-accel') — KHÔNG
+   * thuộc riêng engine nào. UI dùng để hiện "torch dùng chung ~2.5GB — cho VoxCPM" thay vì
+   * cộng nhầm vào `diskUsage()` của từng engine (từ GĐ C, engine không còn giữ bản runtime
+   * riêng — xem docs/roadmap/plans/tts-engine-architecture.md).
+   */
+  runtimeDiskUsage?(): Promise<Array<{ kind: string; bytes: number; engineIds: string[] }>>;
+  /**
+   * Nhả RAM của engine đang giữ ấm nhưng GIỮ NGUYÊN dữ liệu đã tải trên đĩa — khác hẳn
+   * `deleteEngine` (xoá sạch, phải tải lại từ mạng). Lần dùng sau nạp lại từ đĩa được ngay.
+   */
+  unloadEngine?(engineId: string): Promise<EngineOpResult>;
+  /** Đường dẫn thư mục lưu engine/model đã tải. */
+  enginesDir?(): Promise<{ path: string }>;
+  /** Mở thư mục đó bằng trình quản lý tệp của hệ điều hành (Finder/Explorer). */
+  openEnginesDir?(): Promise<EngineOpResult>;
   /** Nạp engine từ thư mục có sẵn trên máy (dùng khi không có mạng). */
   importLocal?(engineId: string): Promise<EngineOpResult>;
   /** Xuất engine đã cài ra thư mục để chép sang máy khác. */

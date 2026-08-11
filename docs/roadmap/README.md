@@ -46,6 +46,7 @@ Sky-App là nền tảng multi-app (Web + Electron, Online + Offline, có licens
 | [ota-update-strategy.md](./plans/ota-update-strategy.md) | `in_progress` | Chiến lược cập nhật OTA cho renderer (không cần cài lại, Loại 1a — code xong, verify end-to-end) và main process (electron-updater + GitHub Releases, Loại 2a — code xong, chờ GitHub repo thật để test full flow) |
 | [layout-designer-completion.md](./plans/layout-designer-completion.md) | `in_progress` | GĐ6→GĐ9 xong (dọn nợ wiring, property panel LoopItem, hiệu ứng shadow/border/gradient, media library, multi-select+batch-command). GĐ10-12 (group/ungroup, custom component, bộ sưu tập) đã thay bởi `canva-ux/00-index.md` |
 | [canva-ux/00-index.md](./plans/canva-ux/00-index.md) | `proposed` | GĐ10→GĐ19: palette trái kiểu Canva (Mẫu/Văn bản/Media/Đồ họa/Khung/Lưới), property panel + toolbar theo từng loại item, sửa bug render Shape/text auto-fit, Media Library modal, saved templates — 11 file con chi tiết UI/UX/kỹ thuật từng phase |
+| [tts-engine-architecture.md](./plans/tts-engine-architecture.md) | `in_progress` | GĐ A→E xong: engine cache trong process, 2 tier runtime song song, runtime dùng chung theo kind, thêm Qwen3-TTS 0.6B/1.7B (torch trên Windows/Linux có GPU — chưa verify runtime; MLX trên Apple Silicon — đã verify THẬT chạy đúng trên GPU Mac) |
 
 **GĐ7.5 (audit port Trao Bằng → sky-app)** đã hoàn thành, xem `docs/roadmap/plans/ga7.5-audit.md`.
 

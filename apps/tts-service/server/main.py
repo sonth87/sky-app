@@ -42,15 +42,38 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 # ── Globals — được init trong lifespan(), KHÔNG set tại module level ─────────
-_engine = None            # VieneuEngine instance
+_engine = None            # engine ĐANG dùng — luôn trỏ tới 1 phần tử của _engines
 _registry = None          # VoiceRegistry instance
 _config = None            # ConfigStore instance (advanced infer params + device + engine)
 _preview_dir: Path | None = None  # FIX: không đọc env tại module level
 _ref_dir: Path | None = None
 _catalog_dir: Path | None = None
 _synth_lock = asyncio.Lock()
-_ref_codes_cache: dict[str, object] = {}
 _LOG_FILE: Path | None = None
+
+# ── Cache engine (GĐ A: đổi engine KHÔNG cần restart process) ────────────────
+# Trước đây `_engine` là biến đơn: mỗi process chỉ phục vụ đúng 1 engine, nên đổi
+# engine bắt buộc giết + spawn lại process → nạp lại model từ đầu (đo thực tế VoxCPM
+# ~118s CHỈ để đọc safetensors). Giữ engine đã nạp trong cache để lần đổi sau là tức
+# thì. `_engine` vẫn còn (trỏ tới engine hiện hành) để mọi call site cũ chạy nguyên vẹn.
+_engines: dict[str, object] = {}       # engine_id -> instance đã nạp (gồm cả engine hiện hành)
+_engine_lru: list[str] = []            # thứ tự dùng, PHẦN TỬ CUỐI = mới dùng nhất
+_current_engine_id: str | None = None
+# Nạp engine mới mất hàng chục giây–vài phút; KHÔNG giữ _synth_lock suốt thời gian đó
+# (sẽ chặn mọi request đọc). Khoá riêng này chỉ chống 2 lượt đổi engine chồng nhau.
+_load_lock = asyncio.Lock()
+
+# Hạn mức giữ ấm theo loại runtime. Engine torch ngốn vài GB RAM mỗi bản (VoxCPM 2B
+# ~4.5GB) nên mặc định chỉ giữ 1; engine ONNX rẻ hơn nhiều nên giữ được vài bản.
+_CACHE_MAX_ONNX = max(1, int(os.environ.get("VIENEU_CACHE_MAX_ONNX", "3")))
+_CACHE_MAX_TORCH = max(1, int(os.environ.get("VIENEU_CACHE_MAX_TORCH", "1")))
+
+# Ref codes (embedding giọng clone) — LỒNG THEO ENGINE, không phẳng theo voice_id.
+# Embedding do encode_reference() của TỪNG engine sinh ra, KHÔNG dùng chéo được: cache
+# phẳng như trước sẽ trả embedding của engine cũ cho engine mới sau khi đổi (sai giọng
+# hoặc crash). Vô hại khi mỗi process chỉ có 1 engine, nhưng thành bug thật ngay khi
+# cache nhiều engine chung process — nên sửa cùng lúc với _engines.
+_ref_codes_cache: dict[str, dict[str, object]] = {}   # engine_id -> voice_id -> embedding
 
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -220,11 +243,93 @@ def _pick_catalog_dir(ref_dir: Path) -> Path:
     return ref_dir
 
 
+# ── Cache engine + ref codes ─────────────────────────────────────────────────
+
+def _ref_cache(engine_id: str | None = None) -> dict[str, object]:
+    """Ngăn ref-codes của MỘT engine (tạo rỗng nếu chưa có)."""
+    eid = engine_id or _current_engine_id or "vieneu"
+    return _ref_codes_cache.setdefault(eid, {})
+
+
+def _ref_cache_forget_voice(voice_id: str) -> None:
+    """Xoá ref codes của 1 voice khỏi MỌI engine (dùng khi voice bị xoá khỏi registry)."""
+    for per_engine in _ref_codes_cache.values():
+        per_engine.pop(voice_id, None)
+
+
+def _cache_bucket(engine_id: str) -> str:
+    """Nhóm hạn mức RAM của engine: 'torch' (nặng, vài GB) hay 'onnx' (nhẹ).
+
+    Gộp 'onnx-bundled' và 'onnx-ext' vào CHUNG một nhóm — chúng cùng mức tiêu thụ RAM,
+    tách hạn mức riêng sẽ cho phép giữ ấm gấp đôi số engine so với ý định.
+    """
+    from engine_registry import engine_runtime_kind
+    return "torch" if engine_runtime_kind(engine_id) == "torch" else "onnx"
+
+
+def _cache_budget(bucket: str) -> int:
+    return _CACHE_MAX_TORCH if bucket == "torch" else _CACHE_MAX_ONNX
+
+
+def _evict_engines() -> list[str]:
+    """Thải engine cũ nhất theo LRU khi vượt hạn mức của nhóm tương ứng.
+
+    KHÔNG bao giờ thải engine đang dùng. Trả danh sách id đã thải (để ghi log).
+    """
+    evicted: list[str] = []
+    by_kind: dict[str, list[str]] = {}
+    for eid in _engine_lru:
+        by_kind.setdefault(_cache_bucket(eid), []).append(eid)
+
+    for kind, ids in by_kind.items():
+        budget = _cache_budget(kind)
+        # ids theo thứ tự LRU (cũ nhất trước) — thải từ đầu cho tới khi vừa hạn mức.
+        for eid in list(ids):
+            if len(ids) <= budget:
+                break
+            if eid == _current_engine_id:
+                continue
+            _engines.pop(eid, None)
+            _ref_codes_cache.pop(eid, None)
+            _engine_lru.remove(eid)
+            ids.remove(eid)
+            evicted.append(eid)
+
+    if evicted:
+        import gc
+        gc.collect()
+    return evicted
+
+
+def _activate_engine_sync(engine_id: str):
+    """Nạp engine vào cache (nếu chưa) và trả instance. CHẶN — gọi qua to_thread.
+
+    Không đụng `_engine`/`_current_engine_id`: việc chuyển con trỏ do caller làm sau,
+    dưới `_synth_lock`, để request đang đọc dở không bị đổi engine giữa chừng.
+    """
+    cached = _engines.get(engine_id)
+    if cached is not None:
+        return cached
+
+    from engine_registry import create_engine
+    eng = create_engine(engine_id)
+    _engines[engine_id] = eng
+    return eng
+
+
+def _touch_engine(engine_id: str) -> None:
+    """Đánh dấu engine vừa được dùng (đẩy xuống cuối danh sách LRU)."""
+    if engine_id in _engine_lru:
+        _engine_lru.remove(engine_id)
+    _engine_lru.append(engine_id)
+
+
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _engine, _registry, _config, _preview_dir, _ref_dir, _catalog_dir, _LOG_FILE
+    global _current_engine_id
 
     # FIX: đọc tất cả env vars tại đây — KHÔNG tại module level
     log_path = os.environ.get("LOG_FILE_PATH", "")
@@ -259,16 +364,18 @@ async def lifespan(app: FastAPI):
 
     # Init engine qua registry (multi-engine). Engine chưa implement / lỗi → fallback VieNeu.
     # Ưu tiên VIENEU_ENGINE (Electron set khi spawn runtime engine mở rộng) rồi mới config.
-    from engine_registry import create_engine
     engine_id = os.environ.get("VIENEU_ENGINE", "").strip() or _config.get().get("engine", "vieneu")
     _safe_console(f"[TTS] Loading engine '{engine_id}'...")
     _write_log(f"[TTS] Loading engine '{engine_id}'...")
     try:
-        _engine = create_engine(engine_id)
+        _engine = _activate_engine_sync(engine_id)
     except Exception as e:
         _safe_console(f"[TTS] Engine '{engine_id}' lỗi ({e}) — fallback 'vieneu'.")
         _write_log(f"[TTS] Engine '{engine_id}' lỗi: {e} — fallback vieneu")
-        _engine = create_engine("vieneu")
+        engine_id = "vieneu"
+        _engine = _activate_engine_sync(engine_id)
+    _current_engine_id = engine_id
+    _touch_engine(engine_id)
     _safe_console("[TTS] Engine loaded.")
     _write_log("[TTS] Engine loaded.")
 
@@ -289,7 +396,7 @@ async def lifespan(app: FastAPI):
         if ref_path and ref_path.exists():
             try:
                 emb = _engine.encode_reference(str(ref_path))
-                _ref_codes_cache[voice["id"]] = emb
+                _ref_cache()[voice["id"]] = emb
                 _safe_console(f"[TTS]   {voice['id']} ({voice.get('ref_file')}) OK")
                 _write_log(f"[TTS]   {voice['id']} OK")
             except Exception as e:
@@ -305,6 +412,9 @@ async def lifespan(app: FastAPI):
     _engine = None
     _registry = None
     _config = None
+    _current_engine_id = None
+    _engines.clear()
+    _engine_lru.clear()
     _ref_codes_cache.clear()
 
 
@@ -396,9 +506,110 @@ def get_engines():
     if isinstance(live_caps, dict):
         current = live_caps.get("id")
     if not current:
-        current = (os.environ.get("VIENEU_ENGINE", "").strip()
+        current = (_current_engine_id
+                   or os.environ.get("VIENEU_ENGINE", "").strip()
                    or (_config.get().get("engine", "vieneu") if _config is not None else "vieneu"))
-    return {"engines": list_engines(), "current": current, "current_capabilities": live_caps}
+    return {
+        "engines": list_engines(),
+        "current": current,
+        "current_capabilities": live_caps,
+        # Engine đang giữ ấm trong RAM của process NÀY (cũ nhất trước). Đổi sang một
+        # trong số này là tức thì — UI dùng để phân biệt "đổi ngay" với "phải nạp lại".
+        "loaded": list(_engine_lru),
+    }
+
+
+class EngineSwitchRequest(BaseModel):
+    engine_id: str
+
+
+@app.post("/engines/switch")
+async def switch_engine(req: EngineSwitchRequest):
+    """Đổi engine đang dùng NGAY TRONG process này — không restart, không nạp lại 2 lần.
+
+    Trả 409 kèm reason='unavailable_in_process' khi process hiện tại không có runtime cho
+    engine đó (vd engine torch trong process ONNX). Đó KHÔNG phải lỗi: caller (Electron)
+    dựa vào tín hiệu này để spawn process runtime riêng theo đường cũ.
+    """
+    global _engine, _current_engine_id
+
+    engine_id = (req.engine_id or "").strip()
+    if not engine_id:
+        raise HTTPException(400, "Thiếu engine_id")
+
+    async with _load_lock:
+        if engine_id == _current_engine_id and _engine is not None:
+            _touch_engine(engine_id)
+            return {"ok": True, "current": engine_id, "reused": True,
+                    "elapsed_ms": 0, "loaded": list(_engine_lru)}
+
+        was_cached = engine_id in _engines
+        started = datetime.now()
+        try:
+            eng = await asyncio.to_thread(_activate_engine_sync, engine_id)
+        except (ImportError, NotImplementedError) as e:
+            _write_log(f"[TTS] switch '{engine_id}' — không có runtime trong process này: {e}")
+            raise HTTPException(409, detail={
+                "reason": "unavailable_in_process",
+                "engine_id": engine_id,
+                "error": str(e),
+            })
+        except ValueError as e:
+            raise HTTPException(404, detail={"reason": "unknown_engine", "error": str(e)})
+        except Exception as e:
+            traceback.print_exc()
+            _write_log(f"[TTS] switch '{engine_id}' lỗi: {type(e).__name__}: {e}")
+            raise HTTPException(500, detail={"reason": "load_failed", "error": str(e)})
+
+        # Chuyển con trỏ DƯỚI _synth_lock: đảm bảo không có request đọc nào đang chạy dở
+        # bị tráo engine giữa chừng. Phần nạp (chậm) đã xong ở trên, ngoài khoá này.
+        async with _synth_lock:
+            _engine = eng
+            _current_engine_id = engine_id
+        _touch_engine(engine_id)
+        evicted = _evict_engines()
+
+        # Ghi nhớ lựa chọn để lần khởi động sau vào đúng engine này. Lỗi ghi config không
+        # được làm hỏng lượt đổi đang thành công.
+        if _config is not None:
+            try:
+                _config.update({"engine": engine_id})
+            except Exception as e:
+                _write_log(f"[TTS] switch: không ghi được config.engine: {e}")
+
+        elapsed_ms = int((datetime.now() - started).total_seconds() * 1000)
+        _safe_console(f"[TTS] switched engine -> {engine_id} in {elapsed_ms}ms (cached={was_cached})")
+        _write_log(f"[TTS] switched engine -> {engine_id} in {elapsed_ms}ms "
+                   f"cached={was_cached} evicted={evicted}")
+        return {"ok": True, "current": engine_id, "reused": was_cached,
+                "elapsed_ms": elapsed_ms, "evicted": evicted, "loaded": list(_engine_lru)}
+
+
+@app.post("/engines/unload")
+async def unload_engine(req: EngineSwitchRequest):
+    """Giải phóng RAM của 1 engine đang giữ ấm — GIỮ NGUYÊN file trên đĩa.
+
+    Khác hẳn xoá engine (DELETE bên Electron): đây chỉ nhả bộ nhớ, lần dùng sau nạp lại
+    từ đĩa được ngay, không cần tải lại gì.
+    """
+    engine_id = (req.engine_id or "").strip()
+    if not engine_id:
+        raise HTTPException(400, "Thiếu engine_id")
+
+    async with _load_lock:
+        if engine_id == _current_engine_id:
+            raise HTTPException(400, "Không thể giải phóng engine ĐANG dùng — chuyển sang engine khác trước.")
+        if engine_id not in _engines:
+            return {"ok": True, "unloaded": False, "loaded": list(_engine_lru)}
+
+        _engines.pop(engine_id, None)
+        _ref_codes_cache.pop(engine_id, None)
+        if engine_id in _engine_lru:
+            _engine_lru.remove(engine_id)
+        import gc
+        gc.collect()
+        _write_log(f"[TTS] unloaded engine '{engine_id}'")
+        return {"ok": True, "unloaded": True, "loaded": list(_engine_lru)}
 
 
 # ── Voices API ────────────────────────────────────────────────────────────────
@@ -525,7 +736,7 @@ def _import_catalog_entry(entry: dict, lang: str) -> dict:
             "source_lang": lang,
         },
     )
-    _ref_codes_cache[voice["id"]] = emb
+    _ref_cache()[voice["id"]] = emb
     return voice
 
 
@@ -631,7 +842,7 @@ async def clone_voice(
         raise HTTPException(500, f"Không thể encode voice: {e}")
 
     voice = _registry.add_cloned(label=label.strip(), gender=gender, region=region, ref_file=ref_filename)
-    _ref_codes_cache[voice["id"]] = emb
+    _ref_cache()[voice["id"]] = emb
     return {**voice, "warnings": warnings}
 
 
@@ -658,7 +869,9 @@ def delete_voice(voice_id: str):
         if reason == "is_preset":
             raise HTTPException(403, "Không thể xóa preset voice. Dùng PUT /voices/{id} để ẩn.")
         raise HTTPException(500, "Xóa thất bại")
-    _ref_codes_cache.pop(voice_id, None)
+    # Xoá khỏi MỌI engine — voice đã biến mất khỏi registry, ref codes của bất kỳ engine
+    # nào cũng thành rác (trước đây cache phẳng nên 1 lệnh pop là đủ).
+    _ref_cache_forget_voice(voice_id)
     return {"deleted": voice_id}
 
 
@@ -745,13 +958,15 @@ def _run_synthesis(req: TtsRequest, voice: dict) -> np.ndarray:
     # registry sinh id mới (vd "clone-xxxxx"), khác hẳn catalog id gốc client gửi lên.
     voice_id = voice["id"]
     if voice.get("type") == "cloned":
-        ref_codes = _ref_codes_cache.get(voice_id)
+        # Ngăn cache theo ĐÚNG engine đang chạy — embedding của engine khác không dùng được.
+        per_engine = _ref_cache()
+        ref_codes = per_engine.get(voice_id)
         if ref_codes is None:
             ref_path = _registry.get_ref_path(voice_id)
             if not ref_path or not ref_path.exists():
                 raise HTTPException(500, f"Ref audio not found: {voice_id}")
             ref_codes = _engine.encode_reference(str(ref_path))
-            _ref_codes_cache[voice_id] = ref_codes
+            per_engine[voice_id] = ref_codes
         return _engine.synthesize(req.text, ref_codes, req.speed, overrides=overrides)
 
     preset_id = _registry.get_preset_id(voice_id)

@@ -15,7 +15,7 @@ import {
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import * as os from 'node:os';
-import { ttsEngineDir, ttsEnginesDir } from './data/paths';
+import { ttsEngineDir, ttsEnginesDir, ttsRuntimeDir } from './data/paths';
 import { getPythonPort } from './python-server';
 import { sessionStore } from './session-store';
 import { downloadFile, DownloadError, type FileSpec } from './download-task';
@@ -46,6 +46,9 @@ interface EngineInfo {
   bundled: boolean;
   install_status: string;
   requirements: EngineRequirements | null;
+  /** 'onnx-bundled' | 'onnx-ext' | 'torch' — quyết định runtime dùng chung với engine nào
+   * khác (xem `ttsRuntimeDir`) và có cần process riêng hay không (xem `tierOfEngine`). */
+  runtime_kind?: string;
   // total_mb ước tính (runtime + model) — lấy từ /engines nếu server tính được.
   install?: { model?: { total_mb?: number }; runtime?: { pip_packages?: string[] } };
 }
@@ -88,6 +91,124 @@ function freeDiskGb(): number | null {
     return (Number(st.bavail) * Number(st.bsize)) / GB;
   } catch {
     return null;
+  }
+}
+
+/**
+ * `runtime_kind` của 1 engine đã cài, đọc từ manifest.json cục bộ — KHÔNG cần hỏi server
+ * qua HTTP. Bắt buộc phải offline-được: `tierOfEngine()` (python-server.ts) gọi hàm này để
+ * quyết định process nào phục vụ engine, kể cả lúc server CHƯA chạy (cold start) — không
+ * có port nào để fetch `/engines` vào đúng lúc cần biết.
+ *
+ * Manifest cũ (cài trước GĐ C, 2026-08-11) không có field này → mặc định 'torch' (coi là
+ * nặng, buộc tách process riêng) — an toàn hơn lỡ coi nhầm 1 engine torch là nhẹ rồi nạp
+ * chung process với binary bundled (rủi ro lệch ABI numpy/onnxruntime đã bundle).
+ */
+export function engineRuntimeKind(engineId: string): string {
+  try {
+    const raw = readFileSync(join(ttsEngineDir(engineId), 'manifest.json'), 'utf-8');
+    const m = JSON.parse(raw) as { runtimeKind?: string };
+    if (typeof m.runtimeKind === 'string' && m.runtimeKind) return m.runtimeKind;
+  } catch { /* chưa cài, hoặc manifest cũ chưa có field này */ }
+  return 'torch';
+}
+
+/**
+ * Nơi thật sự chứa runtime (interpreter + site-packages) của 1 engine mở rộng.
+ *
+ * Ưu tiên vị trí DÙNG CHUNG mới (GĐ C); nếu chưa có, dò về vị trí RIÊNG cũ (GĐ trước
+ * GĐ C: `<engineDir>/runtime/`) — engine cài từ trước bản này vẫn chạy được, không bắt
+ * cài lại chỉ vì đổi chỗ lưu.
+ */
+export function resolveEngineRuntimeLocation(engineId: string): { runtimeDir: string; sitePackages: string } {
+  const shared = ttsRuntimeDir(engineRuntimeKind(engineId));
+  if (existsSync(join(shared, 'site-packages'))) {
+    return { runtimeDir: shared, sitePackages: join(shared, 'site-packages') };
+  }
+  const legacy = join(ttsEngineDir(engineId), 'runtime');
+  return { runtimeDir: legacy, sitePackages: join(legacy, 'site-packages') };
+}
+
+/**
+ * Dung lượng runtime dùng chung của 1 `kind` + danh sách engine đang dùng nó (đã CÀI, tức
+ * `install_status` sẽ là 'installed'/'partial' theo góc nhìn server — ở đây chỉ cần biết
+ * "còn thư mục engine nào khai runtime_kind này không", không cần độ chính xác tới mức đó).
+ * Dùng cho UI hiện "Thư viện dùng chung (torch): X GB — VoxCPM" và cho việc dọn rác lúc xoá.
+ */
+export function sharedRuntimeInfo(kind: string): { bytes: number; engineIds: string[] } {
+  const dir = ttsRuntimeDir(kind);
+  let bytes = 0;
+  if (existsSync(dir)) {
+    for (const e of walkFiles(dir)) {
+      try { bytes += statSync(e.abs).size; } catch { /* ignore */ }
+    }
+  }
+  const engineIds: string[] = [];
+  if (existsSync(ttsEnginesDir())) {
+    for (const name of readdirSync(ttsEnginesDir())) {
+      if (name === '_runtime') continue;
+      if (engineRuntimeKindIfInstalled(name) === kind) engineIds.push(name);
+    }
+  }
+  return { bytes, engineIds };
+}
+
+/** Như `engineRuntimeKind`, nhưng trả null nếu engine đó chưa từng cài gì (không có
+ * manifest) — dùng để phân biệt "chưa cài" khỏi "cài cũ, mặc định torch" khi liệt kê. */
+function engineRuntimeKindIfInstalled(engineId: string): string | null {
+  try {
+    const raw = readFileSync(join(ttsEngineDir(engineId), 'manifest.json'), 'utf-8');
+    const m = JSON.parse(raw) as { runtimeKind?: string };
+    return typeof m.runtimeKind === 'string' && m.runtimeKind ? m.runtimeKind : 'torch';
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sau khi xoá 1 engine: nếu KHÔNG còn engine nào khác dùng chung `kind` này, dọn luôn thư
+ * mục runtime dùng chung — nếu không, torch (~2.5GB) sẽ nằm mồ côi vĩnh viễn sau khi user
+ * xoá engine torch duy nhất họ từng cài. Không đụng vị trí RIÊNG cũ của engine khác (nếu
+ * còn engine nào chưa migrate sang vị trí dùng chung) — chỉ dọn `ttsRuntimeDir(kind)`.
+ */
+function cleanupOrphanedRuntimeIfUnused(kind: string): void {
+  if (sharedRuntimeInfo(kind).engineIds.length > 0) return;
+  try { rmSync(ttsRuntimeDir(kind), { recursive: true, force: true }); } catch { /* ignore */ }
+}
+
+/**
+ * Vá `runtimeKind` vào manifest của engine đã cài TRƯỚC GĐ C (2026-08-11) — manifest cũ
+ * không có field này nên `engineRuntimeKind()` phải fallback 'torch' (an toàn nhưng SAI cho
+ * engine torch-free như MOSS), khiến `tierOfEngine()` vẫn route engine đó vào tier 'ext'
+ * y hệt trước khi sửa bug — bản thân fix không tự phát huy tác dụng nếu không có bước này.
+ *
+ * Gọi 1 LẦN sau khi tier 'bundled' (luôn chạy, mọi lúc) sẵn sàng — đây là nơi duy nhất hỏi
+ * được `/engines` (nguồn `runtime_kind` thật). Không chặn khởi động (fire-and-forget), không
+ * ném lỗi ra ngoài — vá thất bại thì manifest giữ nguyên, tự thử lại ở lần khởi động sau.
+ */
+export async function migrateEngineManifests(port: number): Promise<void> {
+  if (!existsSync(ttsEnginesDir())) return;
+  let engines: Array<{ id: string; runtime_kind?: string }>;
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/engines`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return;
+    engines = (await res.json()).engines ?? [];
+  } catch {
+    return;
+  }
+
+  for (const name of readdirSync(ttsEnginesDir())) {
+    if (name === '_runtime') continue;
+    const manifestPath = join(ttsEngineDir(name), 'manifest.json');
+    if (!existsSync(manifestPath)) continue;
+    try {
+      const m = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      if (m.runtimeKind) continue; // đã vá rồi hoặc cài mới (đã có sẵn)
+      const kind = engines.find((e) => e.id === name)?.runtime_kind;
+      if (!kind) continue; // server không biết engine này (đã gỡ khỏi registry) — bỏ qua
+      m.runtimeKind = kind;
+      writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf-8');
+    } catch { /* 1 manifest lỗi không được chặn vá các engine khác */ }
   }
 }
 
@@ -367,7 +488,7 @@ export class EngineInstaller {
       await this.runDownload(state, signal);
       // Model xong → cài runtime (pip) nếu có. Chỉ khi tải model không bị pause.
       if (!this.paused && this._pipPackages && this._pythonBin !== undefined) {
-        await this.installRuntime(this._pipPackages, this._pythonBin);
+        await this.installRuntime(this._pipPackages, this._pythonBin, this._runtimeKind ?? 'torch');
       }
       // Xong hẳn (không phải pause) → dừng giám sát.
       if (!this.paused) this.stopStageMonitor();
@@ -379,11 +500,16 @@ export class EngineInstaller {
   // Runtime deps để cài sau khi tải model (set qua setRuntimeInstall trước downloadFromHf).
   private _pipPackages: string[] | null = null;
   private _pythonBin: string | null | undefined = undefined;
+  /** 'torch' | 'onnx-ext' | ... — quyết định NƠI ghi runtime (dùng chung theo kind, xem
+   * `ttsRuntimeDir`). Không set = coi như chưa biết, `installRuntime()` sẽ dùng mặc định
+   * an toàn 'torch' (qua `engineRuntimeKind()`'s fallback) thay vì đoán sai. */
+  private _runtimeKind: string | null = null;
 
-  /** Khai báo gói pip + python để tự cài runtime sau khi tải model xong. */
-  setRuntimeInstall(pipPackages: string[], pythonBin: string | null) {
+  /** Khai báo gói pip + python + loại runtime để tự cài sau khi tải model xong. */
+  setRuntimeInstall(pipPackages: string[], pythonBin: string | null, runtimeKind: string) {
     this._pipPackages = pipPackages;
     this._pythonBin = pythonBin;
+    this._runtimeKind = runtimeKind;
   }
 
   /** Import model từ thư mục/USB (copy file-by-file, không cần mạng). */
@@ -427,12 +553,22 @@ export class EngineInstaller {
     }
   }
 
-  /** Xoá toàn bộ engine đã cài (model + runtime + state) để giải phóng đĩa. */
+  /**
+   * Xoá engine đã cài (model + state) để giải phóng đĩa.
+   *
+   * GĐ C: `this.dir()` không còn chứa runtime dùng chung (nằm ở `ttsRuntimeDir(kind)`) nên
+   * xoá nó KHÔNG đụng runtime của engine khác cùng kind — an toàn tự nhiên, không cần
+   * refcount thủ công. Đọc `kind` TRƯỚC khi xoá (manifest sắp biến mất theo `this.dir()`),
+   * rồi dọn nốt runtime dùng chung nếu đây là engine CUỐI CÙNG còn dùng kind đó — nếu
+   * không, torch (~2.5GB) nằm mồ côi vĩnh viễn sau khi xoá engine torch duy nhất.
+   */
   deleteInstall(): { ok: boolean; error?: string } {
+    const kind = engineRuntimeKindIfInstalled(this.engineId);
     try {
       this.stopStageMonitor();
       if (this.ac) this.ac.abort();
       rmSync(this.dir(), { recursive: true, force: true });
+      if (kind) cleanupOrphanedRuntimeIfUnused(kind);
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
@@ -450,21 +586,31 @@ export class EngineInstaller {
   }
 
   /**
-   * Cài runtime Python cho engine: pip install các gói (torch...) vào runtime/site-packages
-   * bằng `pip install --target`. Engine (Cụm sau) chạy bằng Python này + PYTHONPATH tới đây.
+   * Cài runtime Python cho engine: pip install các gói (torch...) vào site-packages bằng
+   * `pip install --target`. Engine chạy bằng Python này + PYTHONPATH tới đây.
+   *
+   * GĐ C (2026-08-11): đích ghi là `ttsRuntimeDir(runtimeKind)` — DÙNG CHUNG cho mọi engine
+   * cùng kind, KHÔNG còn nằm trong `ttsEngineDir(engineId)` riêng. Cài engine torch thứ hai
+   * (vd sau này thêm 1 engine torch khác cạnh VoxCPM) sẽ pip install vào CÙNG thư mục —
+   * torch (~2.5GB) chỉ tồn tại 1 bản trên đĩa thay vì nhân theo số engine. Đánh đổi: pip
+   * install lần sau phải giải lại dependency graph cho gói MỚI cộng với gói đã có sẵn — nếu
+   * 2 engine cùng kind đòi phiên bản torch xung đột nhau, lần cài sau có thể ghi đè/nâng cấp
+   * bản đầu (pip tự báo lỗi rõ ràng nếu không giải được, không âm thầm hỏng) — chấp nhận
+   * được vì đổi lại tiết kiệm hàng GB cho trường hợp phổ biến (không xung đột).
    *
    * pythonBin: interpreter dùng để chạy pip.
    *   - Bản dev: venv của app (caller truyền vào) — nhanh, khỏi tải thêm.
    *   - Bản ĐÓNG GÓI: caller truyền null → tự tải Python relocatable về
-   *     `<engineDir>/runtime/python` (xem python-runtime.ts) rồi pip bằng chính nó.
-   *     Đây cũng là interpreter mà resolveExtensionEngineSpawn() sẽ dùng để chạy engine.
+   *     `<runtimeRoot>/python` (xem python-runtime.ts) rồi pip bằng chính nó. Đây cũng là
+   *     interpreter mà resolveExtensionEngineSpawn()/resolveEngineRuntimeLocation() sẽ dùng.
    *
    * Tiến độ pip stream qua stdout (không có % chính xác — báo dòng log gần nhất).
    */
-  async installRuntime(pipPackages: string[], pythonBin: string | null): Promise<void> {
+  async installRuntime(pipPackages: string[], pythonBin: string | null, runtimeKind: string): Promise<void> {
     this.ac = new AbortController();
     const signal = this.ac.signal;
-    const runtimeRoot = join(this.dir(), 'runtime');
+    this._runtimeKind = runtimeKind;
+    const runtimeRoot = ttsRuntimeDir(runtimeKind);
     const runtimeDir = join(runtimeRoot, 'site-packages');
     mkdirSync(runtimeDir, { recursive: true });
 
@@ -553,6 +699,11 @@ export class EngineInstaller {
         : { engineId: this.engineId };
       m.status = 'installed';
       m.installedAt = new Date().toISOString();
+      // Ghi lại runtime_kind THẬT SỰ đã dùng để cài — nguồn sự thật offline cho
+      // engineRuntimeKind()/tierOfEngine() (không cần hỏi server qua HTTP, xem comment ở
+      // engineRuntimeKind). Chỉ ghi khi biết chắc (installRuntime() luôn set trước khi gọi
+      // markInstalled) — giữ giá trị cũ trong manifest nếu vì lý do gì đó không có.
+      if (this._runtimeKind) m.runtimeKind = this._runtimeKind;
       writeFileSync(this.manifestPath(), JSON.stringify(m, null, 2), 'utf-8');
     } catch { /* ignore */ }
   }
@@ -665,6 +816,10 @@ export class EngineInstaller {
       source,
       fileCount,
       installedAt: new Date().toISOString(),
+      // Ghi sớm ngay từ lúc model xong (thường đã biết qua setRuntimeInstall() gọi trước
+      // downloadFromHf) — để engineRuntimeKind() có câu trả lời đúng ngay cả khi runtime
+      // chưa cài xong (trạng thái 'partial'), không phải đợi tới lúc 'installed'.
+      ...(this._runtimeKind ? { runtimeKind: this._runtimeKind } : {}),
     }, null, 2), 'utf-8');
     // Dọn state khi xong (không cần resume nữa) + dừng giám sát on-stage.
     try { rmSync(this.statePath(), { force: true }); } catch { /* ignore */ }

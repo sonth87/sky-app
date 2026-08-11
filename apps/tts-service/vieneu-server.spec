@@ -77,7 +77,13 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='vieneu-server',
+    # Tên binary = tên tiến trình người dùng thấy trong Activity Monitor / Task Manager.
+    # macOS gán `p_comm` từ TÊN FILE THỰC THI lúc exec() — tiến trình không tự đổi được
+    # (đã thử: `argv0` khi spawn và symlink đều KHÔNG có tác dụng, hệ điều hành vẫn đọc
+    # file thật). Nên muốn hiện tên sản phẩm thì phải đặt ngay ở đây.
+    # Đổi tên này = phải sửa đồng bộ: build.sh, build-win.js, electron-builder.yml
+    # (extraResources) và getExecutablePath() trong python-server.ts.
+    name='Sky App TTS',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

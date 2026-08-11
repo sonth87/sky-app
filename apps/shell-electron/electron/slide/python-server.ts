@@ -2,7 +2,8 @@ import { spawn, ChildProcess } from 'node:child_process';
 import { appendFileSync, existsSync, chmodSync, mkdirSync, readdirSync, copyFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow } from 'electron';
-import { vieneuRefDir, vieneuRegistryPath, vieneuConfigPath, ttsEnginesDir, ttsEngineDir, ttsAccelDir } from './data/paths';
+import { vieneuRefDir, vieneuRegistryPath, vieneuConfigPath, ttsEnginesDir, ttsRuntimeDir } from './data/paths';
+import { resolveRuntimePython } from './python-runtime';
 const DEBUG_LOG_FILE = join(app.getPath('userData'), 'tts-debug.log');
 const DEFAULT_PORT = 8089;
 const MAX_PORT_TRIES = 20;
@@ -14,16 +15,81 @@ const HEALTH_POLL_INTERVAL_MS = 500;
 // timeout dù engine load được, chỉ là chậm hơn khoảng đệm cho phép.
 const HEALTH_TIMEOUT_MS = 300_000;
 
-let pythonProcess: ChildProcess | null = null;
-let actualPort = DEFAULT_PORT;
-let lastStartupError: string | null = null;
-let lastExitCode: number | null = null;
-let executableUsed: string = '';
-const recentStderr: string[] = []; // rolling buffer, tối đa 40 dòng
-let currentStatus: PythonStatus = 'starting';
-let currentStatusDetail = '';
-
 export type PythonStatus = 'starting' | 'ready' | 'error';
+
+/**
+ * Nhóm tiến trình Python (GĐ B của docs/roadmap/plans/tts-engine-architecture.md).
+ *
+ *  - 'bundled': chạy binary/main.py kèm app — phục vụ VieNeu và mọi engine torch-free
+ *    mà process này nạp được tại chỗ (xem create_engine phía Python).
+ *  - 'ext':     chạy runtime RIÊNG của một engine mở rộng (torch…). Mỗi lúc chỉ phục vụ
+ *    đúng 1 engine; đổi sang engine mở rộng khác thì dựng lại nhóm này.
+ *
+ * Hai nhóm SỐNG SONG SONG: đổi engine không còn giết tiến trình đang chạy, nên quay lại
+ * engine cũ là tức thì thay vì phải nạp lại model (VoxCPM đo thực tế ~118s mỗi lần nạp).
+ */
+export type PythonTier = 'bundled' | 'ext';
+
+interface TierState {
+  proc: ChildProcess | null;
+  port: number;
+  status: PythonStatus;
+  statusDetail: string;
+  /** Engine mà tiến trình này được dựng để phục vụ (nhóm 'ext' ràng buộc đúng 1 engine). */
+  engineId: string;
+  executableUsed: string;
+  lastStartupError: string | null;
+  lastExitCode: number | null;
+  recentStderr: string[];   // rolling buffer, tối đa 60 dòng
+}
+
+function newTierState(engineId: string): TierState {
+  return {
+    proc: null,
+    port: DEFAULT_PORT,
+    status: 'starting',
+    statusDetail: '',
+    engineId,
+    executableUsed: '',
+    lastStartupError: null,
+    lastExitCode: null,
+    recentStderr: [],
+  };
+}
+
+const tiers = new Map<PythonTier, TierState>();
+/** Nhóm đang phục vụ request. CHỈ đổi sau khi nhóm mới đã health-check xong. */
+let activeTier: PythonTier = 'bundled';
+
+function activeState(): TierState | undefined {
+  return tiers.get(activeTier);
+}
+
+/**
+ * Nhóm nào chạy được engine này?
+ *
+ * CHỈ engine cần runtime tự chứa RIÊNG (torch, mlx...) mới cần process riêng ('ext') —
+ * các runtime này có thể mang numpy/onnxruntime bản khác với bản đã bundle sẵn trong
+ * process 'bundled', nạp chung dễ lệch ABI. Engine 'onnx-bundled'/'onnx-ext' đều nạp
+ * được NGAY TRONG process 'bundled' đang chạy qua `create_engine()`'s sys.path append
+ * (phía Python, xem engine_registry.py) — không cần spawn gì thêm.
+ *
+ * Allowlist NGƯỢC (loại trừ 'onnx-ext' thay vì liệt kê 'torch') — tương lai thêm kind
+ * runtime tự chứa mới (vd 'mlx', đã thêm 2026-08-11) tự động rơi đúng nhánh 'ext' mà
+ * không phải sửa hàm này, chỉ 'onnx-ext' (nạp tại chỗ) mới cần liệt kê tường minh.
+ *
+ * Bug thật phát hiện lúc làm GĐ C (2026-08-11): bản GĐ B trước đó coi MỌI engine không
+ * phải 'vieneu' là 'ext' hễ đã cài xong (chỉ check `resolveExtensionEngineSpawn` có trả
+ * kết quả không, không phân biệt kind) — khiến engine torch-free (MOSS) vẫn bị spawn
+ * process riêng dù phía Python đã hỗ trợ nạp tại chỗ từ GĐ A, lãng phí thời gian/RAM
+ * không cần thiết cho đúng trường hợp mà tính năng "nạp tại chỗ" sinh ra để phục vụ.
+ */
+export async function tierOfEngine(engineId: string): Promise<PythonTier> {
+  if (!engineId || engineId === 'vieneu') return 'bundled';
+  const { engineRuntimeKind } = await import('./engine-installer');
+  if (engineRuntimeKind(engineId) === 'onnx-ext') return 'bundled';
+  return (await resolveExtensionEngineSpawn(engineId)) ? 'ext' : 'bundled';
+}
 
 /** Tìm port trống phía Electron (dự phòng nếu Python không in ra port) */
 async function findFreePort(preferred: number): Promise<number> {
@@ -40,9 +106,17 @@ async function findFreePort(preferred: number): Promise<number> {
   return preferred;
 }
 
-function pushStatus(status: PythonStatus, detail?: string) {
-  currentStatus = status;
-  currentStatusDetail = detail ?? '';
+function pushStatus(tier: PythonTier, status: PythonStatus, detail?: string) {
+  const st = tiers.get(tier);
+  if (st) {
+    st.status = status;
+    st.statusDetail = detail ?? '';
+  }
+  // CHỈ phát trạng thái của nhóm ĐANG phục vụ. Nhóm khác có thể đang khởi động nền
+  // (blue-green: dựng engine mới trong khi engine cũ vẫn đọc bình thường) — phát trạng
+  // thái 'starting' của nó ra sẽ khiến icon menu bar báo động nhầm dù dịch vụ vẫn tốt.
+  // Tiến độ của lượt đổi engine do EngineManager tự hiển thị.
+  if (tier !== activeTier) return;
   const payload = { status, detail: detail ?? '' };
   BrowserWindow.getAllWindows().forEach((w) => {
     w.webContents.send('python:status', payload);
@@ -126,11 +200,27 @@ export function getPythonPath(): string {
   return isWin ? 'python' : 'python3';
 }
 
+/**
+ * Binary TTS đóng gói sẵn. Tên file CHÍNH LÀ tên tiến trình người dùng thấy trong Activity
+ * Monitor / Task Manager (macOS gán `p_comm` từ tên file lúc exec, tiến trình không tự đổi
+ * được — `argv0` khi spawn và symlink đều không có tác dụng, đã thử).
+ *
+ * Giữ 'vieneu-server' làm tên DỰ PHÒNG: bản cài cũ (trước 0.3.0) mang binary tên đó, và
+ * người dùng có thể còn thư mục resources cũ sau khi cập nhật thủ công. Thiếu fallback này
+ * thì app im lặng rơi về đường "chạy main.py bằng system Python" — vốn không có sẵn ở máy
+ * hội trường, nên hỏng TTS hoàn toàn.
+ */
 function getExecutablePath(): string {
   const isWin = process.platform === 'win32';
-  const binName = isWin ? 'vieneu-server.exe' : 'vieneu-server';
-  if (app.isPackaged) return join(process.resourcesPath, binName);
-  return join(app.getAppPath(), 'resources', binName);
+  const names = isWin
+    ? ['Sky App TTS.exe', 'vieneu-server.exe']
+    : ['Sky App TTS', 'vieneu-server'];
+  const baseDir = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources');
+  for (const n of names) {
+    const p = join(baseDir, n);
+    if (existsSync(p)) return p;
+  }
+  return join(baseDir, names[0]);
 }
 
 /**
@@ -191,25 +281,29 @@ function readDeviceConfig(configPath: string): { providers: string; threads: num
 }
 
 /**
- * Nếu engine đang chọn là engine MỞ RỘNG đã cài (có runtime tự chứa), trả cmd/args
- * để spawn bằng runtime đó (main.py engine-agnostic + VIENEU_ENGINE + PYTHONPATH torch).
- * Trả null nếu là VieNeu bundled hoặc engine chưa có runtime → dùng đường spawn mặc định.
+ * Nếu engine đang chọn là engine mở rộng CẦN PROCESS RIÊNG (kind 'torch' — xem
+ * `engineRuntimeKind`), trả cmd/args để spawn bằng runtime của nó (main.py
+ * engine-agnostic + VIENEU_ENGINE + PYTHONPATH). Trả null nếu là VieNeu bundled, engine
+ * chưa có runtime, hoặc engine torch-free (những engine này nạp NGAY TRONG process đang
+ * chạy qua `/engines/switch` — xem `create_engine()` phía Python — không cần hàm này).
+ *
+ * Async vì phải đọc `manifest.json` của engine qua `engine-installer.ts` để biết kind
+ * (dynamic import — tránh vòng import tĩnh, `engine-installer.ts` cũng import ngược lại
+ * `getPythonPort` từ file này).
  */
-function resolveExtensionEngineSpawn(engineId: string): { cmd: string; args: string[]; sitePackages: string } | null {
+async function resolveExtensionEngineSpawn(engineId: string): Promise<{ cmd: string; args: string[]; sitePackages: string } | null> {
   if (!engineId || engineId === 'vieneu') return null;
   const serverDir = getServerDir();
   if (!serverDir) return null;
-  const runtimeDir = join(ttsEngineDir(engineId), 'runtime');
-  const sitePackages = join(runtimeDir, 'site-packages');
+  const { resolveEngineRuntimeLocation } = await import('./engine-installer');
+  // Vị trí dùng chung theo kind (GĐ C) hoặc vị trí riêng cũ nếu engine cài từ trước đó.
+  const { runtimeDir, sitePackages } = resolveEngineRuntimeLocation(engineId);
   const mainPy = join(serverDir, 'main.py');
   if (!existsSync(mainPy) || !existsSync(sitePackages)) return null;
   // Python để chạy engine:
-  //  - Packaged: Python embeddable tự chứa (runtime/bin/python | python.exe).
-  //  - Dev: không có embeddable → dùng venv app + PYTHONPATH tới site-packages đã pip --target.
-  const embeddablePy = process.platform === 'win32'
-    ? join(runtimeDir, 'python.exe')
-    : join(runtimeDir, 'bin', 'python');
-  const cmd = existsSync(embeddablePy) ? embeddablePy : getPythonPath();
+  //  - Packaged: Python tự chứa đã tải về (xem python-runtime.ts).
+  //  - Dev: không có bản tải rời → dùng venv app + PYTHONPATH tới site-packages đã pip --target.
+  const cmd = resolveRuntimePython(runtimeDir) ?? getPythonPath();
   return { cmd, args: [mainPy], sitePackages };
 }
 
@@ -218,8 +312,9 @@ function resolveExtensionEngineSpawn(engineId: string): { cmd: string; args: str
  *
  * Bản đóng gói vốn chạy VieNeu bằng binary PyInstaller đã đóng băng onnxruntime CPU,
  * nên không thể bật GPU cho nó. Khi người dùng cài gói tăng tốc, ta dựng một Python
- * rời có onnxruntime-gpu/directml + trọn bộ dependency server (xem ttsAccelDir) và
- * chạy main.py bằng nó thay cho binary.
+ * rời có onnxruntime-gpu/directml + trọn bộ dependency server (dùng chung
+ * `ttsRuntimeDir('onnx-accel')` với engine mở rộng — GĐ C) và chạy main.py bằng nó
+ * thay cho binary.
  *
  * Trả null khi: chạy dev (venv đã có sẵn, cài thẳng vào đó), chưa cài tăng tốc, hoặc
  * người dùng đang chọn CPU — lúc đó giữ binary PyInstaller vì nhẹ và khởi động nhanh hơn.
@@ -229,12 +324,11 @@ function resolveAccelSpawn(providers: string): { cmd: string; args: string[]; si
   const serverDir = getServerDir();
   if (!serverDir) return null;
   const mainPy = join(serverDir, 'main.py');
-  const runtimeDir = join(ttsAccelDir(), 'runtime');
+  const runtimeDir = ttsRuntimeDir('onnx-accel');
   const sitePackages = join(runtimeDir, 'site-packages');
-  const py = process.platform === 'win32'
-    ? join(runtimeDir, 'python', 'python.exe')
-    : join(runtimeDir, 'python', 'bin', 'python3');
-  if (!existsSync(mainPy) || !existsSync(sitePackages) || !existsSync(py)) return null;
+  // Cùng resolver với engine mở rộng — ưu tiên hardlink mang tên sản phẩm nếu đã tạo.
+  const py = resolveRuntimePython(runtimeDir);
+  if (!existsSync(mainPy) || !existsSync(sitePackages) || !py) return null;
   return { cmd: py, args: [mainPy], sitePackages };
 }
 
@@ -315,45 +409,149 @@ async function warmupSessions(port: number): Promise<void> {
   console.log('[Python Server] All speakers warmed up - ONNX models ready in RAM');
 }
 
+/** Port của nhóm ĐANG phục vụ — mọi caller cũ (synthesize/voices/config…) dùng hàm này. */
 export function getPythonPort(): number {
-  return actualPort;
+  return activeState()?.port ?? DEFAULT_PORT;
 }
 
 export function getPythonStatus(): { status: PythonStatus; detail: string } {
-  return { status: currentStatus, detail: currentStatusDetail };
+  const st = activeState();
+  if (!st) return { status: 'starting', detail: '' };
+  return { status: st.status, detail: st.statusDetail };
+}
+
+/** Engine mà nhóm đang phục vụ được dựng cho — dùng để biết có cần dựng lại nhóm 'ext' không. */
+export function getTierEngineId(tier: PythonTier): string | null {
+  return tiers.get(tier)?.engineId ?? null;
+}
+
+export function getActiveTier(): PythonTier {
+  return activeTier;
+}
+
+/**
+ * Ghi nhận engine THẬT SỰ đang được tier phục vụ, sau khi `/engines/switch` thành công
+ * trong-process (không respawn — xem `ensureTierForEngine`). Không tự cập nhật ở
+ * `ensureTierForEngine` vì lúc đó chỉ mới XÁC NHẬN tier sẵn sàng, chưa chắc switch Python
+ * phía sau có thành công hay không — caller (ipc.ts) gọi hàm này SAU khi biết chắc.
+ */
+export function markTierEngine(tier: PythonTier, engineId: string): void {
+  const st = tiers.get(tier);
+  if (st) st.engineId = engineId;
+}
+
+export function isTierRunning(tier: PythonTier): boolean {
+  const st = tiers.get(tier);
+  return !!st && st.proc !== null && st.status === 'ready';
 }
 
 const MAX_STARTUP_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
 
+/**
+ * Khởi động dịch vụ TTS cho engine đang chọn trong config (đường vào lúc mở app).
+ * Giữ nguyên chữ ký cũ để main.ts không phải đổi.
+ */
 export async function startPythonServer(vieneuModelDir: string): Promise<void> {
+  const resourcesPath = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources');
+  const userConfigPath = app.isPackaged ? vieneuConfigPath() : join(resourcesPath, 'vieneu-config.json');
+  const engineId = readDeviceConfig(userConfigPath).engine || 'vieneu';
+  const tier = await tierOfEngine(engineId);
+  activeTier = tier;
+  await startTier(tier, engineId, vieneuModelDir);
+}
+
+/**
+ * Bảo đảm có tiến trình phục vụ được `engineId`, KHÔNG đụng tới tiến trình đang chạy
+ * (blue-green). Trả port của nhóm đó khi sẵn sàng.
+ *
+ * Đây là thứ khiến "đổi engine lần sau nhanh": nhóm cũ vẫn sống, nên quay về engine cũ
+ * chỉ là đổi con trỏ `activeTier`, không nạp lại gì.
+ */
+export async function ensureTierForEngine(
+  engineId: string,
+  vieneuModelDir: string,
+): Promise<{ ok: boolean; tier: PythonTier; error?: string }> {
+  const tier = await tierOfEngine(engineId);
+  const st = tiers.get(tier);
+
+  // Nhóm 'ext' phục vụ MỌI engine 'torch' — từ GĐ C chúng dùng CHUNG site-packages
+  // (`ttsRuntimeDir('torch')`), nên `PYTHONPATH` set lúc spawn tier đã bao trọn mọi
+  // engine torch, không riêng engine nó được spawn ban đầu. Đổi engine trong tier này
+  // giờ chỉ cần respawn khi 2 engine THẬT SỰ trỏ site-packages khác nhau — trường hợp
+  // duy nhất còn xảy ra: 1 trong 2 vẫn ở bố cục runtime RIÊNG cũ (trước GĐ C,
+  // `resolveEngineRuntimeLocation()` lùi về vị trí legacy nếu chưa migrate).
+  let mustRespawn = false;
+  if (tier === 'ext' && st && st.engineId !== engineId) {
+    const { resolveEngineRuntimeLocation } = await import('./engine-installer');
+    const current = resolveEngineRuntimeLocation(st.engineId).sitePackages;
+    const target = resolveEngineRuntimeLocation(engineId).sitePackages;
+    mustRespawn = current !== target;
+  }
+  if (st && st.proc !== null && st.status === 'ready' && !mustRespawn) {
+    return { ok: true, tier };
+  }
+  if (mustRespawn) await stopTier(tier);
+
+  try {
+    await startTier(tier, engineId, vieneuModelDir);
+  } catch (err) {
+    return { ok: false, tier, error: err instanceof Error ? err.message : String(err) };
+  }
+  const after = tiers.get(tier);
+  if (!after || after.status !== 'ready') {
+    return { ok: false, tier, error: after?.statusDetail || 'Tiến trình TTS không lên được' };
+  }
+  return { ok: true, tier };
+}
+
+/** Chuyển nhóm phục vụ. Chỉ gọi SAU khi nhóm đích đã ready. */
+export function setActiveTier(tier: PythonTier): void {
+  activeTier = tier;
+  const st = tiers.get(tier);
+  if (st) pushStatus(tier, st.status, st.statusDetail);
+}
+
+async function startTier(tier: PythonTier, engineId: string, vieneuModelDir: string): Promise<void> {
   for (let attempt = 1; attempt <= MAX_STARTUP_RETRIES; attempt++) {
     try {
-      console.log(`[Python Server] Attempt ${attempt}/${MAX_STARTUP_RETRIES}`);
-      await startPythonServerOnce(vieneuModelDir);
+      console.log(`[Python Server] (${tier}/${engineId}) Attempt ${attempt}/${MAX_STARTUP_RETRIES}`);
+      await startPythonServerOnce(tier, engineId, vieneuModelDir);
       return; // Success
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[Python Server] Attempt ${attempt} failed: ${msg}`);
+      console.error(`[Python Server] (${tier}) Attempt ${attempt} failed: ${msg}`);
       if (attempt < MAX_STARTUP_RETRIES) {
-        pushStatus('starting', `Khởi động TTS engine (lần ${attempt + 1}/${MAX_STARTUP_RETRIES})...`);
+        pushStatus(tier, 'starting', `Khởi động TTS engine (lần ${attempt + 1}/${MAX_STARTUP_RETRIES})...`);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
       } else {
-        pushStatus('error', `TTS engine không thể khởi động sau ${MAX_STARTUP_RETRIES} lần thử`);
+        pushStatus(tier, 'error', `TTS engine không thể khởi động sau ${MAX_STARTUP_RETRIES} lần thử`);
         throw err;
       }
     }
   }
 }
 
-async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
+async function startPythonServerOnce(
+  tier: PythonTier,
+  engineId: string,
+  vieneuModelDir: string,
+): Promise<void> {
+  const st = newTierState(engineId);
+  tiers.set(tier, st);
   const isPackaged = app.isPackaged;
   let cmd = '';
   let args: string[] = [];
 
-  // Tìm port trống trước
-  const preferredPort = parseInt(process.env.VIENEU_PORT ?? String(DEFAULT_PORT), 10);
-  actualPort = await findFreePort(preferredPort);
+  // Tìm port trống trước. Nhóm thứ hai phải tránh cả port nhóm đang chạy — findFreePort
+  // dò từ cổng ưa thích trở lên nên bắt đầu ngay SAU cổng đã dùng để không phải chờ
+  // socket cũ nhả (nhóm kia vẫn đang sống, đây là điểm khác hẳn cơ chế restart cũ).
+  const basePort = parseInt(process.env.VIENEU_PORT ?? String(DEFAULT_PORT), 10);
+  const busyPorts = [...tiers.entries()]
+    .filter(([k, v]) => k !== tier && v.proc !== null)
+    .map(([, v]) => v.port);
+  const preferredPort = busyPorts.length ? Math.max(basePort, ...busyPorts) + 1 : basePort;
+  st.port = await findFreePort(preferredPort);
 
   if (isPackaged) {
     const exePath = getExecutablePath();
@@ -383,9 +581,9 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
     args = [scriptPaths.find(existsSync) ?? scriptPaths[0]];
   }
 
-  executableUsed = `${cmd}${args.length ? ' ' + args.join(' ') : ''}`;
-  lastStartupError = null;
-  console.log(`[Python Server] Khởi chạy port=${actualPort}: ${cmd} ${args.join(' ')}`);
+  st.executableUsed = `${cmd}${args.length ? ' ' + args.join(' ') : ''}`;
+  st.lastStartupError = null;
+  console.log(`[Python Server] (${tier}/${engineId}) Khởi chạy port=${st.port}: ${cmd} ${args.join(' ')}`);
   logPackagedResources();
 
   try {
@@ -413,19 +611,24 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
     // Device settings (provider/thread) + engine đang chọn → truyền qua env khi spawn.
     const device = readDeviceConfig(userConfigPath);
 
-    // Engine MỞ RỘNG đã cài (runtime tự chứa) → spawn bằng runtime đó thay vì binary VieNeu.
-    // VieNeu (mặc định) hoặc engine chưa có runtime → giữ cmd/args mặc định ở trên.
-    const ext = resolveExtensionEngineSpawn(device.engine);
-    let extraEnv: Record<string, string> = {};
+    // Engine MỞ RỘNG kind 'torch' (runtime tự chứa) → spawn bằng runtime đó thay vì binary
+    // VieNeu — CHỈ khi nhóm này thật sự là 'ext'. Nhóm 'bundled' LUÔN spawn bằng lệnh mặc
+    // định bên dưới dù `engineId` ban đầu là 1 engine mở rộng torch-free (MOSS): engine đó
+    // được nạp SAU, ngay trong process, qua create_engine()'s sys.path append phía Python
+    // (xem tierOfEngine) — đổi cmd/args ở đây cho trường hợp này là sai, sẽ chạy engine
+    // bằng runtime CỦA RIÊNG NÓ thay vì process 'bundled' dùng chung mà lẽ ra nó phải nạp
+    // vào (bug thật phát hiện lúc làm GĐ C, xem comment ở tierOfEngine).
+    const ext = tier === 'ext' ? await resolveExtensionEngineSpawn(engineId) : null;
+    let extraEnv: Record<string, string> = { VIENEU_ENGINE: engineId };
     if (ext) {
       cmd = ext.cmd;
       args = ext.args;
       extraEnv = {
-        VIENEU_ENGINE: device.engine,
+        VIENEU_ENGINE: engineId,
         PYTHONPATH: [ext.sitePackages, getServerDir(), process.env.PYTHONPATH ?? '']
           .filter(Boolean).join(process.platform === 'win32' ? ';' : ':'),
       };
-      console.log(`[Python Server] Engine mở rộng '${device.engine}' → spawn runtime ${cmd}`);
+      console.log(`[Python Server] Engine mở rộng '${engineId}' → spawn runtime ${cmd}`);
     } else {
       // Không phải engine mở rộng → VieNeu. Nếu người dùng đã bật tăng tốc phần cứng ở
       // bản đóng gói thì phải chạy bằng runtime có onnxruntime-gpu, vì binary PyInstaller
@@ -451,12 +654,12 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
     // dir sẽ ghi thẳng vào source tree có git track mỗi lần test nghe thử/chọn catalog voice.
     const devCatalogDir = getDevVoiceRefDir();
 
-    pythonProcess = spawn(cmd, args, {
+    const proc = spawn(cmd, args, {
       stdio: 'pipe',
       windowsHide: true,
       env: {
         ...process.env,
-        VIENEU_PORT: String(actualPort),
+        VIENEU_PORT: String(st.port),
         HF_HOME: vieneuModelDir,
         HF_HUB_OFFLINE: '1',
         RESOURCES_PATH: resourcesPath,
@@ -479,71 +682,84 @@ async function startPythonServerOnce(vieneuModelDir: string): Promise<void> {
     console.log(`[Python Server] spawn env VIENEU_PREVIEW_DIR=${previewDir}`);
     console.log(`[Python Server] spawn env LOG_FILE_PATH=${logFilePath}`);
 
+    st.proc = proc;
+
     // Đọc port thực từ stdout ("VIENEU_PORT=XXXX")
-    pythonProcess.stdout?.on('data', (data: Buffer) => {
+    proc.stdout?.on('data', (data: Buffer) => {
       const line = data.toString().trim();
-      console.log(`[Python Server stdout] ${line}`);
-      
+      console.log(`[Python Server stdout][${tier}] ${line}`);
+
       // Ghi log stdout vào rolling buffer
-      recentStderr.push(`[${new Date().toLocaleTimeString('vi-VN')}] [stdout] ${line}`);
-      if (recentStderr.length > 60) recentStderr.shift();
+      st.recentStderr.push(`[${new Date().toLocaleTimeString('vi-VN')}] [stdout] ${line}`);
+      if (st.recentStderr.length > 60) st.recentStderr.shift();
 
       const m = line.match(/^VIENEU_PORT=(\d+)/);
-      if (m) actualPort = parseInt(m[1], 10);
+      if (m) st.port = parseInt(m[1], 10);
 
       // Cập nhật trạng thái chi tiết thời gian thực khi đang khởi chạy
-      if (currentStatus === 'starting') {
+      if (st.status === 'starting') {
         const lastLine = line.split('\n').pop()?.trim() ?? line;
         if (lastLine && !lastLine.startsWith('VIENEU_PORT=')) {
-          pushStatus('starting', lastLine.replace(/^\[VieNeu Python\]\s*/, ''));
+          pushStatus(tier, 'starting', lastLine.replace(/^\[VieNeu Python\]\s*/, ''));
         }
       }
     });
-    pythonProcess.stderr?.on('data', (data: Buffer) => {
+    proc.stderr?.on('data', (data: Buffer) => {
       const line = data.toString().trim();
-      console.warn(`[Python Server stderr] ${line}`);
-      
+      console.warn(`[Python Server stderr][${tier}] ${line}`);
+
       // Ghi log stderr vào rolling buffer
-      recentStderr.push(`[${new Date().toLocaleTimeString('vi-VN')}] [stderr] ${line}`);
-      if (recentStderr.length > 60) recentStderr.shift();
+      st.recentStderr.push(`[${new Date().toLocaleTimeString('vi-VN')}] [stderr] ${line}`);
+      if (st.recentStderr.length > 60) st.recentStderr.shift();
 
       // Cập nhật trạng thái chi tiết thời gian thực khi đang khởi chạy
-      if (currentStatus === 'starting') {
+      if (st.status === 'starting') {
         const lastLine = line.split('\n').pop()?.trim() ?? line;
         if (lastLine) {
-          pushStatus('starting', lastLine);
+          pushStatus(tier, 'starting', lastLine);
         }
       }
     });
-    pythonProcess.on('error', (err) => {
-      console.error('[Python Server] Lỗi:', err);
-      lastStartupError = err.message;
-      pushStatus('error', err.message);
+    proc.on('error', (err) => {
+      console.error(`[Python Server][${tier}] Lỗi:`, err);
+      st.lastStartupError = err.message;
+      pushStatus(tier, 'error', err.message);
     });
-    pythonProcess.on('close', (code) => {
-      console.log(`[Python Server] Thoát code=${code}`);
-      lastExitCode = code;
-      pythonProcess = null;
-      if (code !== 0) pushStatus('error', `Process thoát với code ${code}`);
+    proc.on('close', (code) => {
+      console.log(`[Python Server][${tier}] Thoát code=${code}`);
+      st.lastExitCode = code;
+      st.proc = null;
+      if (code !== 0) pushStatus(tier, 'error', `Process thoát với code ${code}`);
     });
 
     // Poll health
-    const ok = await waitForHealth(actualPort);
+    const ok = await waitForHealth(st.port);
     if (!ok) {
-      pushStatus('error', `Không thể kết nối tới TTS engine sau ${HEALTH_TIMEOUT_MS / 1000}s`);
+      pushStatus(tier, 'error', `Không thể kết nối tới TTS engine sau ${HEALTH_TIMEOUT_MS / 1000}s`);
       return;
     }
 
-    pushStatus('ready', `TTS engine sẵn sàng (port ${actualPort})`);
+    pushStatus(tier, 'ready', `TTS engine sẵn sàng (port ${st.port})`);
 
     // Warmup ONNX sessions ngay sau khi server ready — background (không chặn return).
-    // Lần startup đầu sẽ warm model vào RAM; lần restart (đổi engine) có thể load model
-    // engine mới nhưng UI không cần chờ — server đã respond.
-    warmupSessions(actualPort).catch((err) => {
-      console.warn('[Python Server] Background warmup failed:', err);
-    });
+    // CHỈ warm nhóm 'bundled': giọng warmup là giọng VieNeu, và nhóm 'ext' (torch) vừa
+    // nạp xong model đã tốn hàng phút — bắt nó đọc thêm 1 câu nữa chỉ làm chậm lượt đổi
+    // engine mà người dùng đang chờ, trong khi engine đó thường không dùng giọng này.
+    if (tier === 'bundled') {
+      warmupSessions(st.port).catch((err) => {
+        console.warn('[Python Server] Background warmup failed:', err);
+      });
+      // Vá `runtimeKind` vào manifest engine cài từ TRƯỚC GĐ C — nếu không, fix tierOfEngine
+      // (route engine torch-free vào 'bundled' thay vì spawn riêng) không có tác dụng cho
+      // engine đã cài sẵn, chỉ engine cài MỚI mới hưởng. Nền, không chặn khởi động.
+      import('./engine-installer').then(({ migrateEngineManifests }) =>
+        migrateEngineManifests(st.port).catch((err) => {
+          console.warn('[Python Server] Vá runtimeKind manifest thất bại:', err);
+        }),
+      );
+    }
   } catch (err) {
-    // Re-throw để retry mechanism ở startPythonServer() xử lý
+    // Re-throw để retry mechanism ở startTier() xử lý
     throw err;
   }
 }
@@ -560,22 +776,31 @@ export interface TtsDebugInfo {
 }
 
 export async function getTtsDebugInfo(): Promise<TtsDebugInfo> {
+  const st = activeState();
+  const port = st?.port ?? DEFAULT_PORT;
   let healthOk: boolean | null = null;
   try {
-    const r = await fetch(`http://127.0.0.1:${actualPort}/health`, { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(3000) });
     healthOk = r.ok;
   } catch {
     healthOk = false;
   }
+  // Gộp log của MỌI nhóm (kèm nhãn nhóm): khi đổi engine thất bại, nguyên nhân thường
+  // nằm ở nhóm vừa dựng dở chứ không phải nhóm đang phục vụ — chỉ trả log nhóm active
+  // sẽ giấu mất đúng phần cần xem.
+  const merged: string[] = [];
+  for (const [key, s] of tiers) {
+    for (const line of s.recentStderr) merged.push(`[${key}] ${line}`);
+  }
   return {
-    port: actualPort,
-    processAlive: pythonProcess !== null,
-    processPid: pythonProcess?.pid ?? null,
-    executableUsed,
-    lastStartupError,
-    lastExitCode,
+    port,
+    processAlive: st?.proc != null,
+    processPid: st?.proc?.pid ?? null,
+    executableUsed: st?.executableUsed ?? '',
+    lastStartupError: st?.lastStartupError ?? null,
+    lastExitCode: st?.lastExitCode ?? null,
     healthOk,
-    recentStderr: [...recentStderr],
+    recentStderr: merged,
   };
 }
 
@@ -589,14 +814,17 @@ export async function getTtsDebugInfo(): Promise<TtsDebugInfo> {
 // engine đang load model nặng (torch, safetensors I/O) không kịp respond trước SIGKILL.
 const STOP_TIMEOUT_MS = 3_000;
 
-export function stopPythonServer(): Promise<void> {
-  const proc = pythonProcess;
-  pythonProcess = null;
+/** Dừng MỘT nhóm và nhả RAM của nó (engine đang giữ ấm trong nhóm đó mất theo). */
+export function stopTier(tier: PythonTier): Promise<void> {
+  const st = tiers.get(tier);
+  const proc = st?.proc ?? null;
+  if (st) st.proc = null;
+  tiers.delete(tier);
   if (!proc || proc.exitCode !== null || proc.signalCode !== null) return Promise.resolve();
-  console.log('[Python Server] Đang tắt...');
+  console.log(`[Python Server][${tier}] Đang tắt...`);
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
-      console.warn('[Python Server] Process không thoát sau SIGTERM, buộc SIGKILL...');
+      console.warn(`[Python Server][${tier}] Process không thoát sau SIGTERM, buộc SIGKILL...`);
       // SIGKILL không hợp lệ trên Windows nhưng Windows bỏ qua tên signal và luôn
       // TerminateProcess ngay lập tức, nên gọi chung được cả 2 platform.
       try { proc.kill('SIGKILL'); } catch {}
@@ -607,4 +835,15 @@ export function stopPythonServer(): Promise<void> {
     });
     if (!proc.kill('SIGTERM')) proc.kill();
   });
+}
+
+/**
+ * Dừng TOÀN BỘ tiến trình Python (thoát app, hoặc restart dịch vụ).
+ *
+ * Giữ nguyên tên cũ vì mọi caller (main.ts lúc quit, tts:restart, cài gói tăng tốc) đều
+ * mang nghĩa "tắt hẳn dịch vụ" — nay có 2 nhóm nên phải tắt cả hai, bỏ sót nhóm nào là để
+ * lại process mồ côi giữ nguyên vài GB RAM (đúng loại lỗi từng gặp 2026-08-05).
+ */
+export async function stopPythonServer(): Promise<void> {
+  await Promise.all([...tiers.keys()].map((tier) => stopTier(tier)));
 }

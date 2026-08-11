@@ -56,7 +56,29 @@ export const ttsEngineLocales = {
       },
       "showDetails": "Chi tiết",
       "hideDetails": "Ẩn chi tiết",
-      "installLog": "Nhật ký cài đặt"
+      "installLog": "Nhật ký cài đặt",
+      "storageLocation": "Nơi lưu trữ",
+      "openFolder": "Mở thư mục",
+      "openFolderFailed": "Không mở được thư mục: {{error}}",
+      "loadedInMemory": "Sẵn trong bộ nhớ",
+      "loadedHint": "Engine này đang sẵn trong bộ nhớ — đổi sang là tức thì, không phải nạp lại.",
+      "unload": "Nhả bộ nhớ",
+      "unloadHint": "Giải phóng RAM nhưng GIỮ NGUYÊN dữ liệu đã tải trên máy. Lần dùng sau nạp lại ngay từ ổ đĩa, không cần tải lại từ mạng.",
+      "unloadFailed": "Không nhả được bộ nhớ: {{error}}",
+      "unloaded": "Đã nhả bộ nhớ ✓",
+      "source": "Nguồn model",
+      "runtimeKind": "Thư viện chạy",
+      "runtime": {
+        "onnx-bundled": "ONNX (tích hợp sẵn, nhẹ)",
+        "onnx-ext": "ONNX (tải thêm, nhẹ)",
+        "torch": "PyTorch (nặng, chạy tiến trình riêng)",
+        "onnx-accel": "Tăng tốc GPU",
+        "mlx": "MLX (Apple Silicon)"
+      },
+      "sharedRuntime": "Thư viện dùng chung",
+      "switchingEngineFast": "Đang đổi engine…",
+      "backToList": "Danh sách engine",
+      "engineDetail": "Thông tin engine"
     },
     "deviceConfig": {
       "savedNeedsRestart": "Đã lưu cấu hình. Cần khởi động lại dịch vụ TTS để áp dụng.",
@@ -165,7 +187,29 @@ export const ttsEngineLocales = {
       },
       "showDetails": "Details",
       "hideDetails": "Hide details",
-      "installLog": "Install log"
+      "installLog": "Install log",
+      "storageLocation": "Storage location",
+      "openFolder": "Open folder",
+      "openFolderFailed": "Could not open folder: {{error}}",
+      "loadedInMemory": "Loaded",
+      "loadedHint": "This engine is already in memory — switching to it is instant, no reloading needed.",
+      "unload": "Free memory",
+      "unloadHint": "Frees RAM but KEEPS the downloaded data on disk. Next use loads straight from disk — no re-download.",
+      "unloadFailed": "Could not free memory: {{error}}",
+      "unloaded": "Memory freed ✓",
+      "source": "Model source",
+      "runtimeKind": "Runtime",
+      "runtime": {
+        "onnx-bundled": "ONNX (bundled, lightweight)",
+        "onnx-ext": "ONNX (downloaded, lightweight)",
+        "torch": "PyTorch (heavy, runs in its own process)",
+        "onnx-accel": "GPU acceleration",
+        "mlx": "MLX (Apple Silicon)"
+      },
+      "sharedRuntime": "Shared runtime",
+      "switchingEngineFast": "Switching engine…",
+      "backToList": "Engine list",
+      "engineDetail": "Engine details"
     },
     "deviceConfig": {
       "savedNeedsRestart": "Configuration saved. The TTS service must be restarted to apply it.",

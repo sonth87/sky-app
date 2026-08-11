@@ -180,13 +180,18 @@ else
 fi
 
 # ─── Đóng gói bằng PyInstaller (spec file) ────────────────────────────────
-echo "[Build] Đóng gói vieneu-server bằng PyInstaller..."
+echo "[Build] Đóng gói 'Sky App TTS' bằng PyInstaller..."
 pyinstaller --clean vieneu-server.spec
 
 # ─── Copy binary vào apps/shell-electron/resources/ ───────────────────────
+# Tên có DẤU CÁCH ("Sky App TTS") — đây là tên tiến trình người dùng thấy trong Activity
+# Monitor, xem comment ở vieneu-server.spec. Mọi tham chiếu phải quote đầy đủ.
 echo "[Build] Copy binary vào $SHELL_RESOURCES ..."
 mkdir -p "$SHELL_RESOURCES"
-cp dist/vieneu-server "$SHELL_RESOURCES/vieneu-server"
+cp "dist/Sky App TTS" "$SHELL_RESOURCES/Sky App TTS"
+# Dọn binary tên cũ còn sót lại từ lần build trước — để lại sẽ khiến bản đóng gói mang
+# theo 2 file ~82MB giống hệt nhau.
+rm -f "$SHELL_RESOURCES/vieneu-server"
 
 echo "[Build] Đóng gói hoàn tất!"
-echo "[Build] Binary: $SHELL_RESOURCES/vieneu-server"
+echo "[Build] Binary: $SHELL_RESOURCES/Sky App TTS"

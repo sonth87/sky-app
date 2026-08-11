@@ -1,4 +1,4 @@
-import { ipcMain, dialog, app } from 'electron';
+import { ipcMain, dialog, app, shell } from 'electron';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, readdirSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join, basename } from 'node:path';
@@ -665,18 +665,23 @@ export function registerIpcHandlers() {
     }
   }
 
-  // Lấy pip_packages runtime của engine từ /engines.
-  async function getEngineRuntimePackages(engineId: string): Promise<string[]> {
+  // Lấy pip_packages + runtime_kind của engine từ /engines. `runtime_kind` quyết định NƠI
+  // installRuntime() ghi (dùng chung theo kind — xem ttsRuntimeDir, GĐ C); thiếu field này
+  // (server cũ) → 'torch' (coi là nặng, an toàn hơn đoán nhầm 'onnx-ext').
+  async function getEngineRuntimeMeta(engineId: string): Promise<{ pipPackages: string[]; runtimeKind: string }> {
     const port = getPythonPort();
-    if (!port) return [];
+    if (!port) return { pipPackages: [], runtimeKind: 'torch' };
     try {
       const res = await fetch(`http://127.0.0.1:${port}/engines`, { signal: AbortSignal.timeout(3000) });
-      if (!res.ok) return [];
+      if (!res.ok) return { pipPackages: [], runtimeKind: 'torch' };
       const data = await res.json();
       const e = (data.engines ?? []).find((x: { id: string }) => x.id === engineId);
-      return e?.install?.runtime?.pip_packages ?? [];
+      return {
+        pipPackages: e?.install?.runtime?.pip_packages ?? [],
+        runtimeKind: typeof e?.runtime_kind === 'string' && e.runtime_kind ? e.runtime_kind : 'torch',
+      };
     } catch {
-      return [];
+      return { pipPackages: [], runtimeKind: 'torch' };
     }
   }
 
@@ -688,7 +693,7 @@ export function registerIpcHandlers() {
     if (!pf.ok) return { ok: false, error: pf.blocks.join(' '), preflight: pf };
     const repo = await getEngineModelRepo(engineId);
     if (!repo) return { ok: false, error: 'Engine không có nguồn model HF' };
-    const pipPkgs = await getEngineRuntimePackages(engineId);
+    const { pipPackages, runtimeKind } = await getEngineRuntimeMeta(engineId);
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
@@ -698,8 +703,8 @@ export function registerIpcHandlers() {
     // chạy 2 vòng tải chồng lên nhau, cùng ghi 1 file .part → hỏng file (bug thật 2026-08-03).
     if (inst.isBusy()) return { ok: true };
     // Runtime: bản dev dùng venv python (pip --target) cho nhanh. Packaged → null để
-    // installRuntime tự tải Python relocatable về engineDir/runtime (python-runtime.ts).
-    inst.setRuntimeInstall(pipPkgs, app.isPackaged ? null : getPythonPath());
+    // installRuntime tự tải Python relocatable về runtime dùng chung (python-runtime.ts).
+    inst.setRuntimeInstall(pipPackages, app.isPackaged ? null : getPythonPath(), runtimeKind);
     // Không await — chạy nền, báo tiến độ qua event.
     inst.downloadFromHf(repo);
     return { ok: true };
@@ -716,7 +721,7 @@ export function registerIpcHandlers() {
     const { getPythonPath } = await import('./python-server');
     const repo = await getEngineModelRepo(engineId);
     if (!repo) return { ok: false, error: 'Engine không có nguồn model HF' };
-    const pipPkgs = await getEngineRuntimePackages(engineId);
+    const { pipPackages, runtimeKind } = await getEngineRuntimeMeta(engineId);
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
@@ -726,7 +731,7 @@ export function registerIpcHandlers() {
     // mới tinh nên _pipPackages=null) thì downloadFromHf() tải xong phần MODEL (writeManifest
     // 'model_ready') nhưng KHÔNG BAO GIỜ chạy installRuntime() → manifest không bao giờ lên
     // 'installed' → UI mãi hiện "Tải dở"/nút Tiếp tục dù file đã tải xong hoàn toàn trên đĩa.
-    inst.setRuntimeInstall(pipPkgs, app.isPackaged ? null : getPythonPath());
+    inst.setRuntimeInstall(pipPackages, app.isPackaged ? null : getPythonPath(), runtimeKind);
     inst.downloadFromHf(repo);  // resume từ install-state.json
     return { ok: true };
   });
@@ -788,24 +793,95 @@ export function registerIpcHandlers() {
     return { bytes: getInstaller(engineId, () => {}).diskUsage() };
   });
 
+  /**
+   * Dung lượng runtime DÙNG CHUNG theo kind (GĐ C) — tách khỏi `tts:engine-disk-usage` vì
+   * từ giờ nó không còn nằm trong thư mục riêng của engine nào cả. UI dùng để hiện rõ
+   * "torch dùng chung ~2.5GB — cho VoxCPM", tránh hiểu lầm xoá 1 engine là hết ngay số đó
+   * (chỉ hết khi engine CUỐI CÙNG dùng kind đó bị xoá — xem cleanupOrphanedRuntimeIfUnused).
+   */
+  ipcMain.handle('tts:runtime-disk-usage', async () => {
+    const { sharedRuntimeInfo } = await import('./engine-installer');
+    const kinds = ['torch', 'onnx-ext', 'onnx-accel', 'mlx'];
+    return kinds
+      .map((kind) => ({ kind, ...sharedRuntimeInfo(kind) }))
+      .filter((r) => r.bytes > 0 || r.engineIds.length > 0);
+  });
+
+  // Thư mục lưu engine/model đã tải — hiện đường dẫn trong UI để người vận hành biết
+  // dữ liệu nặng nằm ở đâu (dọn đĩa, sao chép sang máy khác, gửi log khi cần hỗ trợ).
+  ipcMain.handle('tts:engines-dir', async () => {
+    const { ttsEnginesDir } = await import('./data/paths');
+    return { path: ttsEnginesDir() };
+  });
+
+  // Mở thư mục đó bằng Finder/Explorer của hệ điều hành.
+  ipcMain.handle('tts:open-engines-dir', async () => {
+    const { ttsEnginesDir } = await import('./data/paths');
+    const { mkdirSync } = await import('node:fs');
+    const dir = ttsEnginesDir();
+    try {
+      // Chưa tải engine nào thì thư mục chưa tồn tại — tạo trước, nếu không shell.openPath
+      // trả lỗi khó hiểu thay vì mở ra một thư mục rỗng như người dùng mong đợi.
+      mkdirSync(dir, { recursive: true });
+      const err = await shell.openPath(dir);   // '' nếu thành công
+      return err ? { ok: false, error: err } : { ok: true, path: dir };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  /**
+   * Nhả RAM của một engine đang giữ ấm — GIỮ NGUYÊN dữ liệu đã tải trên đĩa.
+   *
+   * Hai trường hợp khác nhau:
+   *  - Engine nằm trong tiến trình đang phục vụ → POST /engines/unload (nhả trong process).
+   *  - Engine là chủ của nhóm 'ext' đang chạy nền nhưng KHÔNG phục vụ → tắt hẳn tiến
+   *    trình đó, vì cả tiến trình chỉ tồn tại để chạy engine này (torch chiếm vài GB).
+   */
+  ipcMain.handle('tts:engine-unload', async (_e, { engineId }: { engineId: string }) => {
+    const { getActiveTier, getTierEngineId, stopTier, isTierRunning } = await import('./python-server');
+
+    if (getActiveTier() !== 'ext' && getTierEngineId('ext') === engineId && isTierRunning('ext')) {
+      await stopTier('ext');
+      return { ok: true, freedProcess: true };
+    }
+
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/engines/unload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engine_id: engineId }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        const detail = body?.detail;
+        return { ok: false, error: String((typeof detail === 'object' ? detail?.error : detail) ?? `HTTP ${res.status}`) };
+      }
+      return { ok: true, freedProcess: false, unloaded: !!body?.unloaded };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   // Dry-run kiểm engine load được (sau khi tải, TRƯỚC khi cho đổi).
   ipcMain.handle('tts:engine-verify', async (_e, { engineId }: { engineId: string }) => {
-    const { getInstaller } = await import('./engine-installer');
+    const { getInstaller, resolveEngineRuntimeLocation } = await import('./engine-installer');
     const { getServerDir, getPythonPath } = await import('./python-server');
-    const { ttsEngineDir } = await import('./data/paths');
     const serverDir = getServerDir();
     if (!serverDir) return { ok: false, error: 'Không tìm thấy code server (bản đóng gói chưa hỗ trợ verify engine mở rộng — cần bản dev).' };
 
-    const { join } = await import('node:path');
-    const { existsSync } = await import('node:fs');
-    // Runtime của engine: python trong runtime/, site-packages là target đã pip install.
-    const engineRuntime = join(ttsEngineDir(engineId), 'runtime');
-    const sitePackages = join(engineRuntime, 'site-packages');
+    const { resolveRuntimePython } = await import('./python-runtime');
+    // Runtime dùng chung theo kind (GĐ C) hoặc vị trí riêng cũ nếu engine cài từ trước đó
+    // — resolveEngineRuntimeLocation() tự dò, xem comment ở nơi khai báo.
+    const { runtimeDir: engineRuntime, sitePackages } = resolveEngineRuntimeLocation(engineId);
     // Chọn python: runtime tự chứa nếu có, không thì venv dev (đủ để verify engine bundled/nhẹ).
-    const runtimePy = process.platform === 'win32'
-      ? join(engineRuntime, 'python.exe')
-      : join(engineRuntime, 'bin', 'python');
-    const pythonBin = existsSync(runtimePy) ? runtimePy : getPythonPath();
+    // Dùng chung resolver với python-server.ts — trước đây chỗ này tự ghép `runtime/bin/python`,
+    // lệch với đường ensurePythonRuntime() thật sự tạo nên bản đóng gói luôn verify bằng
+    // system Python (không có torch) và báo engine hỏng dù engine hoàn toàn bình thường.
+    const pythonBin = resolveRuntimePython(engineRuntime) ?? getPythonPath();
 
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
@@ -818,8 +894,60 @@ export function registerIpcHandlers() {
     });
   });
 
-  // Đổi engine đang dùng: guard on-stage → verify → ghi config → restart → health →
-  // rollback VieNeu nếu engine mới không lên. (VieNeu bundled thì bỏ verify.)
+  /**
+   * Thử đổi engine NGAY trong process Python đang chạy (POST /engines/switch).
+   *
+   * Đây là đường nhanh thêm ở GĐ A: nếu process hiện tại có sẵn runtime cho engine đích
+   * thì không cần verify, không cần restart, và engine đã từng nạp thì đổi là tức thì.
+   * Đường cũ (verify + stop/start) nạp model tới 3 LẦN cho 1 lần đổi — đo thực tế VoxCPM
+   * ~118s mỗi lần nạp.
+   *
+   * Trả `{ ok: true }` khi đổi xong; `{ ok: false }` (không kèm fatal) nghĩa là "process
+   * này không làm được, hãy đi đường cũ"; `{ ok: false, fatal: true }` là lỗi thật, đi
+   * đường cũ cũng vô ích nên báo thẳng cho người dùng.
+   */
+  async function tryFastSwitch(
+    port: number,
+    engineId: string,
+  ): Promise<{ ok: boolean; fatal?: boolean; error?: string }> {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/engines/switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engine_id: engineId }),
+        // Rộng tay như HEALTH_TIMEOUT_MS: nếu server đang thật sự nạp model thì CHỜ vẫn
+        // lợi hơn bỏ cuộc — đường cũ cũng phải nạp đúng model đó, cộng thêm spawn process.
+        // Trường hợp không nạp được (thiếu runtime) trả 409 ngay, không tốn thời gian.
+        signal: AbortSignal.timeout(300_000),
+      });
+
+      if (res.ok) {
+        const body = await res.json().catch(() => null);
+        console.log(`[tts:engine-switch] fast switch -> ${engineId} `
+          + `elapsed=${body?.elapsed_ms ?? '?'}ms reused=${body?.reused ?? '?'}`);
+        return { ok: true };
+      }
+
+      // 409 = process này không có runtime cho engine đó (vd engine torch trong process
+      // ONNX). Không phải lỗi — đi đường cũ để spawn runtime riêng của engine.
+      if (res.status === 409) {
+        console.log(`[tts:engine-switch] '${engineId}' không nạp được trong process hiện tại — dùng đường restart.`);
+        return { ok: false };
+      }
+
+      const body = await res.json().catch(() => null);
+      const detail = body?.detail;
+      const msg = (typeof detail === 'object' ? detail?.error : detail) ?? `HTTP ${res.status}`;
+      return { ok: false, fatal: true, error: String(msg) };
+    } catch (err) {
+      // Server cũ chưa có endpoint này, hoặc mất kết nối → im lặng lùi về đường cũ.
+      console.log(`[tts:engine-switch] fast switch không dùng được (${err instanceof Error ? err.message : String(err)}) — dùng đường restart.`);
+      return { ok: false };
+    }
+  }
+
+  // Đổi engine đang dùng: guard on-stage → THỬ ĐỔI TẠI CHỖ → (nếu không được) verify →
+  // ghi config → restart → health → rollback VieNeu nếu engine mới không lên.
   ipcMain.handle('tts:engine-switch', async (_e, { engineId }: { engineId: string }) => {
     const { isOnStage } = await import('./engine-installer');
     if (isOnStage()) {
@@ -829,79 +957,55 @@ export function registerIpcHandlers() {
     const port = getPythonPort();
     if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
 
-    // Engine mở rộng: verify load được trước khi đổi (VieNeu bundled bỏ qua).
-    if (engineId !== 'vieneu') {
-      const { getInstaller } = await import('./engine-installer');
-      const { getServerDir, getPythonPath } = await import('./python-server');
-      const { ttsEngineDir, ttsEnginesDir, vieneuDir } = await import('./data/paths');
-      const { join } = await import('node:path');
-      const { existsSync } = await import('node:fs');
-      const serverDir = getServerDir();
-      if (!serverDir) return { ok: false, error: 'Bản đóng gói chưa hỗ trợ engine mở rộng (cần bản dev).' };
-      const engineRuntime = join(ttsEngineDir(engineId), 'runtime');
-      const runtimePy = process.platform === 'win32'
-        ? join(engineRuntime, 'python.exe') : join(engineRuntime, 'bin', 'python');
-      const pythonBin = existsSync(runtimePy) ? runtimePy : getPythonPath();
-      const inst = getInstaller(engineId, () => {});
-      const v = await inst.verify(pythonBin, serverDir, join(engineRuntime, 'site-packages'), {
-        HF_HOME: vieneuDir(), HF_HUB_OFFLINE: '1', VIENEU_ENGINES_DIR: ttsEnginesDir(),
-      });
-      if (!v.ok) return { ok: false, error: `Engine không load được: ${v.error ?? 'lỗi'}` };
+    // ── Đường nhanh: đổi tại chỗ, không restart ────────────────────────────────
+    // Python tự ghi config.engine khi đổi thành công nên không cần PUT /config ở đây.
+    const fast = await tryFastSwitch(port, engineId);
+    if (fast.ok) return { ok: true };
+    if (fast.fatal) return { ok: false, error: `Engine không load được: ${fast.error}` };
+
+    // ── Đường nhóm riêng: engine cần runtime của chính nó ─────────────────────
+    // Blue-green (GĐ B): dựng tiến trình mới trên port trống TRONG KHI tiến trình hiện
+    // tại VẪN phục vụ bình thường. Hai điểm được lợi so với cơ chế stop→start cũ:
+    //   1. Bỏ hẳn bước verify dry-run — health-check của tiến trình mới CHÍNH LÀ verify,
+    //      nên model chỉ nạp MỘT lần thay vì ba.
+    //   2. Không cần rollback: tiến trình cũ chưa hề bị đụng tới, hỏng thì chỉ việc
+    //      không chuyển sang, người dùng vẫn đọc được bằng engine đang dùng.
+    // Tiến trình cũ được GIỮ SỐNG, nên đổi ngược lại về engine cũ sau này là tức thì.
+    const { vieneuDir } = await import('./data/paths');
+    const { ensureTierForEngine, setActiveTier, getActiveTier, markTierEngine } = await import('./python-server');
+
+    const prevTier = getActiveTier();
+    const ensured = await ensureTierForEngine(engineId, vieneuDir());
+    if (!ensured.ok) {
+      return {
+        ok: false,
+        error: `Khởi động engine thất bại (vẫn đang dùng engine cũ): ${ensured.error ?? 'không rõ nguyên nhân'}`,
+      };
     }
 
-    // Ghi config.engine qua server (PUT /config), rồi restart.
-    try {
-      await fetch(`http://127.0.0.1:${port}/config`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: engineId }), signal: AbortSignal.timeout(5000),
-      });
-    } catch (err) {
-      return { ok: false, error: `Không ghi được config: ${err instanceof Error ? err.message : String(err)}` };
-    }
+    setActiveTier(ensured.tier);
 
-    // Restart để áp engine mới.
-    try {
-      await stopPythonServer();
-      await startPythonServer(vieneuDir());
-    } catch (err) {
-      // Restart lỗi → rollback config về vieneu + restart lại.
-      await rollbackToVieneu();
-      return { ok: false, error: `Khởi động engine thất bại, đã quay lại VieNeu: ${err instanceof Error ? err.message : String(err)}` };
+    // Tiến trình vừa dựng đã mang đúng engine (spawn kèm VIENEU_ENGINE). Nhưng nếu nhóm
+    // đó ĐANG SẴN chạy từ trước và phục vụ engine khác thì phải bảo nó đổi — đây là lượt
+    // đổi tại chỗ, tức thì nếu engine đã giữ ấm.
+    const afterSwitch = await tryFastSwitch(getPythonPort(), engineId);
+    if (!afterSwitch.ok && afterSwitch.fatal) {
+      setActiveTier(prevTier);   // nhóm cũ vẫn sống → quay lại là tức thì
+      return { ok: false, error: `Engine không load được: ${afterSwitch.error}` };
     }
+    // Switch tại chỗ thành công (không respawn) → ghi nhận tier NAY thật sự phục vụ
+    // engine nào, để lượt đổi tiếp theo (vd sang 1 engine torch khác) biết đúng trạng
+    // thái thay vì tưởng tier vẫn còn phục vụ engine lúc spawn ban đầu.
+    if (afterSwitch.ok) markTierEngine(ensured.tier, engineId);
 
-    // Kiểm health sau restart: engine mới phải trả /engines current đúng.
+    // Xác nhận nhóm đang phục vụ đúng engine yêu cầu (vòng đầu khớp là trả ngay).
     const healthy = await verifyEngineActive(engineId);
     if (!healthy) {
-      await rollbackToVieneu();
-      return { ok: false, error: 'Engine mới không phản hồi sau khi khởi động — đã quay lại VieNeu.' };
+      setActiveTier(prevTier);
+      return { ok: false, error: 'Engine mới không phản hồi — vẫn đang dùng engine cũ.' };
     }
     return { ok: true };
   });
-
-  async function rollbackToVieneu() {
-    const port = getPythonPort();
-    try {
-      if (port) {
-        await fetch(`http://127.0.0.1:${port}/config`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine: 'vieneu' }), signal: AbortSignal.timeout(5000),
-        }).catch(() => {});
-      }
-      // Ghi thẳng config file phòng khi server chết (không PUT được).
-      const { vieneuConfigPath } = await import('./data/paths');
-      const p = vieneuConfigPath();
-      if (existsSync(p)) {
-        const cfg = JSON.parse(readFileSync(p, 'utf-8'));
-        cfg.engine = 'vieneu';
-        writeFileSync(p, JSON.stringify(cfg, null, 2), 'utf-8');
-      }
-      await stopPythonServer();
-      const { vieneuDir } = await import('./data/paths');
-      await startPythonServer(vieneuDir());
-    } catch (err) {
-      console.error('[tts:engine-switch] rollback failed:', err);
-    }
-  }
 
   async function verifyEngineActive(engineId: string): Promise<boolean> {
     const port = getPythonPort();
@@ -955,7 +1059,10 @@ export function registerIpcHandlers() {
     }
 
     // ── Bản đóng gói: dựng runtime riêng ─────────────────────────────────────
-    const { ttsAccelDir } = await import('./data/paths');
+    // GĐ C (2026-08-11): dùng chung cơ chế `ttsRuntimeDir` với engine mở rộng thay vì
+    // thư mục `tts-accel` tách biệt trước đây — cùng 1 kind ('onnx-accel') là cùng chỗ,
+    // không tạo thêm 1 bản Python + site-packages riêng nữa.
+    const { ttsRuntimeDir } = await import('./data/paths');
     const { ensurePythonRuntime } = await import('./python-runtime');
     const { getServerDir } = await import('./python-server');
 
@@ -963,7 +1070,7 @@ export function registerIpcHandlers() {
     if (!serverDir) {
       return { ok: false, error: 'Không tìm thấy mã nguồn server (python-backend) trong bản cài đặt.' };
     }
-    const runtimeRoot = join(ttsAccelDir(), 'runtime');
+    const runtimeRoot = ttsRuntimeDir('onnx-accel');
     const sitePackages = join(runtimeRoot, 'site-packages');
 
     let py: string;

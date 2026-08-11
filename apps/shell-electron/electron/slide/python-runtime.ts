@@ -13,10 +13,20 @@
  * Giải nén bằng `tar` của hệ điều hành: macOS/Linux có sẵn, Windows 10 trở lên cũng
  * có tar.exe kèm theo. Đổi lại không phải thêm dependency giải nén vào bundle.
  */
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, rmSync, linkSync, realpathSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { spawn } from 'node:child_process';
 import { downloadFile, DownloadError, type ProgressCb } from './download-task';
+
+/**
+ * Tên tiến trình engine mở rộng hiện trong Activity Monitor / Task Manager.
+ *
+ * Hệ điều hành gán tên tiến trình từ TÊN FILE THỰC THI lúc exec — tiến trình không tự đổi
+ * được (đã thử trên máy: `argv0` khi spawn và symlink đều KHÔNG có tác dụng; chỉ tên file
+ * thật mới ăn). Nên ta tạo thêm một HARDLINK mang tên sản phẩm trỏ vào chính interpreter:
+ * tốn 0 byte, giữ nguyên mọi symlink và bố cục thư mục của bản phân phối Python.
+ */
+const PROC_ALIAS = process.platform === 'win32' ? 'Sky App TTS.exe' : 'Sky App TTS';
 
 /**
  * Phiên bản ghim. Nâng cấp = đổi 2 hằng số này; KHÔNG để "latest" vì bản đóng gói
@@ -45,6 +55,48 @@ export function embeddedPythonBin(runtimeDir: string): string {
     : join(runtimeDir, 'python', 'bin', 'python3');
 }
 
+/**
+ * Interpreter NÊN DÙNG để spawn engine mở rộng trong `runtimeDir`, hoặc null nếu chưa cài.
+ *
+ * Thứ tự ưu tiên: hardlink mang tên sản phẩm → interpreter gốc → bố cục cũ.
+ *
+ * Nhánh "bố cục cũ" (`runtime/bin/python`) tồn tại vì trước đây `resolveExtensionEngineSpawn()`
+ * và `tts:engine-verify` dò đúng đường dẫn đó, KHÔNG khớp với đường `ensurePythonRuntime()`
+ * thật sự tạo ra (`runtime/python/bin/python3`) — lệch từ hồi chuyển nguồn runtime sang
+ * astral-sh/python-build-standalone. Hệ quả ở bản ĐÓNG GÓI: không bao giờ tìm thấy
+ * interpreter vừa tải, âm thầm rơi về system Python (không có torch) nên engine mở rộng
+ * không chạy được. Gom về một hàm duy nhất để không tái diễn lệch đường dẫn.
+ */
+export function resolveRuntimePython(runtimeDir: string): string | null {
+  const real = embeddedPythonBin(runtimeDir);
+  const alias = join(dirname(real), PROC_ALIAS);
+  if (existsSync(alias)) return alias;
+  if (existsSync(real)) return real;
+  const legacy = process.platform === 'win32'
+    ? join(runtimeDir, 'python.exe')
+    : join(runtimeDir, 'bin', 'python');
+  return existsSync(legacy) ? legacy : null;
+}
+
+/**
+ * Tạo hardlink mang tên sản phẩm cạnh interpreter. Trả đường dẫn nên spawn.
+ *
+ * Không tạo được (hệ tệp không hỗ trợ hardlink, thiếu quyền…) thì trả lại bản gốc — đổi
+ * tên hiển thị là thứ "có thì tốt", KHÔNG được phép làm hỏng cài đặt engine.
+ */
+function createProcessAlias(realBin: string): string {
+  const aliasPath = join(dirname(realBin), PROC_ALIAS);
+  if (existsSync(aliasPath)) return aliasPath;
+  try {
+    // Hardlink vào FILE THẬT: `python3` thường chỉ là symlink tới `python3.11`, mà hệ điều
+    // hành resolve symlink trước khi đặt tên tiến trình — link vào symlink là mất tác dụng.
+    linkSync(realpathSync(realBin), aliasPath);
+    return aliasPath;
+  } catch {
+    return realBin;
+  }
+}
+
 function run(cmd: string, args: string[], signal?: AbortSignal): Promise<{ ok: boolean; out: string }> {
   return new Promise((resolve) => {
     const proc = spawn(cmd, args, { windowsHide: true });
@@ -69,8 +121,8 @@ export async function ensurePythonRuntime(
   signal: AbortSignal,
   onProgress?: ProgressCb,
 ): Promise<string> {
-  const bin = embeddedPythonBin(runtimeDir);
-  if (existsSync(bin)) return bin;
+  const existing = resolveRuntimePython(runtimeDir);
+  if (existing) return existing;
 
   const triple = pbsTriple();
   if (!triple) {
@@ -102,6 +154,7 @@ export async function ensurePythonRuntime(
     await run('xattr', ['-dr', 'com.apple.quarantine', join(runtimeDir, 'python')], signal);
   }
 
+  const bin = embeddedPythonBin(runtimeDir);
   if (!existsSync(bin)) {
     throw new Error(`Giải nén xong nhưng không thấy interpreter tại ${bin}`);
   }
@@ -110,5 +163,17 @@ export async function ensurePythonRuntime(
   if (!check.ok) {
     throw new Error(`Runtime Python không chạy được: ${check.out.trim()}`);
   }
-  return bin;
+
+  // Đặt tên tiến trình cho dễ nhận ra trong Activity Monitor / Task Manager. Kiểm lại bằng
+  // `-V` qua CHÍNH hardlink: nếu vì lý do nào đó nó không chạy được, quay về bản gốc thay
+  // vì để engine chết ở lần spawn thật.
+  const alias = createProcessAlias(bin);
+  if (alias !== bin) {
+    const aliasCheck = await run(alias, ['-V'], signal);
+    if (!aliasCheck.ok) {
+      rmSync(alias, { force: true });
+      return bin;
+    }
+  }
+  return alias;
 }
