@@ -58,8 +58,6 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
   /** Engine đang mở bảng chi tiết (null = đang xem danh sách). */
   const [detailId, setDetailId] = useState<string | null>(null);
   const [enginesDir, setEnginesDir] = useState<string>('');
-  /** Runtime dùng chung theo kind (GĐ C) — KHÔNG thuộc riêng engine nào, xem `refreshRuntimeUsage`. */
-  const [runtimeUsage, setRuntimeUsage] = useState<Array<{ kind: string; bytes: number; engineIds: string[] }>>([]);
   const progressRef = useRef<Record<string, EngineInstallProgress>>({});
   // Trạng thái tiến trình tts-service (đã có sẵn cho icon menu bar) — dùng ở đây để tự refresh
   // khi service CHUYỂN sang sẵn sàng, thay vì bắt người dùng đóng/mở lại cửa sổ.
@@ -70,6 +68,29 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
     const e = await port.listEngines();
     if (!e) return;
     setEngines(e);
+    // Đồng bộ lại progress cục bộ theo `install_status` THẬT từ server — vá 2 bug thật
+    // 2026-08-11: (1) event 'done' bị rớt (vd cửa sổ đổi webContents giữa chừng) khiến UI
+    // đứng mãi ở phase cũ ("đang cài thư viện"...) dù backend đã cài xong từ lâu; (2) sau khi
+    // Hủy xoá sạch thư mục, phase cũ (installing-runtime/paused/importing) vẫn hiện dù server
+    // đã báo 'missing'. Chỉ coi là cũ (xoá) khi 2 trạng thái KHÔNG THỂ nào đúng cùng lúc —
+    // vd 'installed' + phase khác 'done' luôn vô lý (đang cài dở thì server không thể đã báo
+    // xong); 'missing' + đang ở installing-runtime/verifying/paused/importing cũng vô lý (các
+    // phase đó đòi hỏi ĐÃ có file thật trên đĩa, server sẽ báo tối thiểu 'partial'). KHÔNG áp
+    // dụng cho 'resolving'/'downloading' — 2 phase đó có thể trùng 'missing' trong khoảnh khắc
+    // đầu (thư mục vừa tạo, chưa byte nào rơi xuống đĩa) của 1 lượt tải THẬT đang chạy, xoá
+    // nhầm sẽ làm mất tiến độ hiển thị của lượt tải hợp lệ.
+    let staleFound = false;
+    for (const eng of e.engines) {
+      const prog = progressRef.current[eng.id];
+      if (!prog) continue;
+      const stale = eng.install_status === 'installed'
+        ? prog.phase !== 'done'
+        : eng.install_status === 'missing'
+          ? ['installing-runtime', 'verifying', 'paused', 'importing'].includes(prog.phase)
+          : false;
+      if (stale) { delete progressRef.current[eng.id]; staleFound = true; }
+    }
+    if (staleFound) setProgress({ ...progressRef.current });
     // Dung lượng từng engine (cho hiển thị + dọn đĩa). Chỉ có ở nền tảng cài được.
     if (!port.diskUsage) return;
     for (const eng of e.engines) {
@@ -77,9 +98,6 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
       void port.diskUsage(eng.id).then((r) =>
         setDiskUsage((prev) => ({ ...prev, [eng.id]: r.bytes })));
     }
-    // Runtime dùng chung (torch...) — KHÔNG cộng vào diskUsage() từng engine (GĐ C), hiện
-    // riêng để không tạo cảm giác "xoá 1 engine là hết ngay số này".
-    void port.runtimeDiskUsage?.().then(setRuntimeUsage);
   }, [port]);
 
   useEffect(() => { if (open) void refresh(); }, [open, refresh]);
@@ -109,8 +127,9 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
     const unsub = port.onInstallProgress((p) => {
       progressRef.current[p.engineId] = p;
       setProgress({ ...progressRef.current });
-      // Cài xong / lỗi → refresh danh sách để cập nhật install_status.
-      if (p.phase === 'done' || p.phase === 'error') void refresh();
+      // Cài xong / lỗi / hủy → refresh danh sách để cập nhật install_status.
+      if (p.phase === 'done' || p.phase === 'error' || p.phase === 'canceled') void refresh();
+      if (p.phase === 'canceled') setEngineMsg(p.engineId, t('engineManager.canceledMsg'));
     });
     return () => { unsub(); };
   }, [open, port, refresh]);
@@ -216,19 +235,6 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
         </div>
       )}
       {msg.__folder && <p className="text-xxs text-destructive">{msg.__folder}</p>}
-
-      {/* Runtime dùng chung theo kind (GĐ C) — KHÔNG thuộc riêng engine nào, nên hiện tách
-          khỏi "Chiếm đĩa" của từng engine để tránh hiểu lầm xoá 1 engine là hết ngay số này. */}
-      {runtimeUsage.length > 0 && (
-        <div className="flex flex-col gap-0.5 rounded-lg bg-muted/30 px-3 py-2 text-2xs text-muted-foreground">
-          {runtimeUsage.map((r) => (
-            <span key={r.kind}>
-              {t('engineManager.sharedRuntime')}: {t(`engineManager.runtime.${r.kind}`, r.kind)} — {fmtBytes(r.bytes)}
-              {r.engineIds.length > 0 ? ` (${r.engineIds.join(', ')})` : ''}
-            </span>
-          ))}
-        </div>
-      )}
 
       {/* engines === null: listEngines() chưa trả được (service chưa start / mất kết nối) —
           hiện rõ trạng thái thay vì bỏ trống cửa sổ. Tự refresh() khi service chuyển 'ok'
@@ -458,10 +464,20 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
                     </Button>
                   </>
                 )}
-                {/* Hủy khi đang tải/tạm dừng (xoá file dở) */}
+                {/* Hủy khi đang tải/tạm dừng — XOÁ HẲN mọi thứ đã tải/cài, không resume được
+                    (khác Tạm dừng, giữ .part để tiếp tục). Xác nhận trước khi bấm — bug thật
+                    2026-08-11: trước đây không có bước này, bấm Hủy lúc tưởng UI bị treo đã
+                    âm thầm xoá mất model 4.5GB + runtime đã cài xong mà không có cảnh báo gì. */}
                 {canInstall && (downloading || paused) && (
-                  <Button variant="danger-ghost" onClick={async () => { await port.installCancel?.(e.id); void refresh(); }}
-                    icon={<Trash2 size={12} />}>
+                  <Button
+                    variant="danger-ghost"
+                    onClick={async () => {
+                      if (!confirm(t('engineManager.cancelConfirm', { label: e.label }))) return;
+                      await port.installCancel?.(e.id);
+                      void refresh();
+                    }}
+                    icon={<Trash2 size={12} />}
+                  >
                     {t('engineManager.cancel')}
                   </Button>
                 )}

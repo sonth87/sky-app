@@ -115,7 +115,12 @@ export interface TtsEngines {
 
 export interface EngineInstallProgress {
   engineId: string;
-  phase: 'resolving' | 'downloading' | 'importing' | 'installing-runtime' | 'verifying' | 'done' | 'error' | 'paused';
+  /** 'canceled' = người dùng bấm Hủy — khác 'paused' (giữ .part để Tiếp tục): cancel() XOÁ
+   * hẳn thư mục engine (model + runtime đã cài, nếu có), không resume được nữa. Trước đây
+   * dùng chung nhánh 'paused' cho cả 2 (engine-installer.ts's cancel() chỉ abort() rồi im
+   * lặng rmSync) khiến UI không phân biệt được "tạm dừng, bấm Tiếp tục được" với "đã xoá
+   * sạch, phải tải lại từ đầu" — bug thật 2026-08-11, xem docs/dev/history. */
+  phase: 'resolving' | 'downloading' | 'importing' | 'installing-runtime' | 'verifying' | 'done' | 'error' | 'paused' | 'canceled';
   filesTotal: number;
   filesDone: number;
   bytesReceived: number;

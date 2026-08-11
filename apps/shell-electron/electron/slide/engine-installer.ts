@@ -297,7 +297,7 @@ export async function preflight(engineId: string): Promise<PreflightResult> {
 
 export interface InstallProgress {
   engineId: string;
-  phase: 'resolving' | 'downloading' | 'importing' | 'installing-runtime' | 'verifying' | 'done' | 'error' | 'paused';
+  phase: 'resolving' | 'downloading' | 'importing' | 'installing-runtime' | 'verifying' | 'done' | 'error' | 'paused' | 'canceled';
   filesTotal: number;
   filesDone: number;
   bytesReceived: number;
@@ -392,6 +392,14 @@ export class EngineInstaller {
 
   isPaused() { return this.paused; }
 
+  /** true trong lúc `cancel()` đang xử lý — các nhánh `if (signal.aborted)` rải rác trong
+   * `runDownload`/`installRuntime`/`handleError` (viết cho pause) đọc cờ này để NHƯỜNG việc
+   * phát progress lại cho `cancel()` thay vì tự emit 'paused'. Không có cờ này, `abort()` gọi
+   * từ `cancel()` vẫn khớp y hệt điều kiện `signal.aborted` mà pause dùng → renderer nhận
+   * 'paused' (có nút Tiếp tục) dù thư mục engine đã bị XOÁ SẠCH ngay sau đó — bug thật
+   * 2026-08-11, xem docs/dev/history. */
+  private canceling = false;
+
   /** Đang thật sự có 1 lượt tải/cài chạy dở (không tính paused) — dùng để tránh gọi
    * `downloadFromHf` CHỒNG LÊN 1 lượt đang chạy (2 vòng lặp cùng ghi 1 file .part → hỏng file,
    * bug thật liên quan phát hiện cùng đợt với bug callback cũ ở `getInstaller`). */
@@ -416,13 +424,25 @@ export class EngineInstaller {
     if (this.ac) { this.paused = true; if (manual) this.autoPaused = false; this.ac.abort(); }
   }
 
-  /** Hủy hẳn — xoá state + file dở. */
+  /**
+   * Hủy hẳn — xoá state + file dở (kể cả model/runtime đã cài xong, không resume được nữa).
+   * Phát phase 'canceled' RIÊNG (không phải 'paused') — xem comment `canceling` ở trên.
+   *
+   * KHÔNG tự reset `canceling` về false ở cuối hàm này: `abort()` chỉ dispatch event đồng bộ
+   * cho listener đăng ký `once` (vd `proc.kill()`), nhưng promise bọc ngoài (`runDownload`'s
+   * `await downloadFile()`, `installRuntime`'s `await new Promise(...)` chờ `proc.on('close')`)
+   * chỉ reject/resolve ở TICK SAU — nếu reset ở đây, `canceling` đã về false trước khi nhánh
+   * `if (signal.aborted)` ở các hàm đó kịp đọc, quay lại y hệt bug cũ (vẫn phát 'paused').
+   * Chỗ reset đúng: đầu `downloadFromHf()`/`importFromLocal()` — lượt tải MỚI mới cần cờ sạch.
+   */
   cancel() {
     this.stopStageMonitor();
+    this.canceling = true;
     if (this.ac) this.ac.abort();
     this.paused = false;
     this.autoPaused = false;
     try { rmSync(this.dir(), { recursive: true, force: true }); } catch { /* ignore */ }
+    this.emit(this.prog('canceled', [], [], 0, 0, 0, ''));
   }
 
   /** Theo dõi on-stage: đang tải + SV lên sân khấu → tự pause; hết SV ổn định → tự resume. */
@@ -461,6 +481,7 @@ export class EngineInstaller {
   async downloadFromHf(repo: string): Promise<void> {
     this.repo = repo;
     this.paused = false;
+    this.canceling = false; // lượt MỚI — dọn cờ cancel() của lượt trước (nếu có), xem comment ở cancel()
     this.ac = new AbortController();
     const signal = this.ac.signal;
     mkdirSync(this.modelDir(), { recursive: true });
@@ -514,6 +535,7 @@ export class EngineInstaller {
 
   /** Import model từ thư mục/USB (copy file-by-file, không cần mạng). */
   async importFromLocal(srcDir: string): Promise<void> {
+    this.canceling = false; // lượt MỚI — dọn cờ cancel() của lượt trước (nếu có), xem comment ở cancel()
     this.ac = new AbortController();
     try {
       mkdirSync(this.modelDir(), { recursive: true });
@@ -678,7 +700,9 @@ export class EngineInstaller {
     // nút Tạm dừng vẫn giết được tiến trình pip thật, nhưng UI báo sai thành lỗi, không có
     // đường Resume rõ ràng → trông như bấm Tạm dừng "không có tác dụng gì".
     if (signal.aborted) {
-      emitPipProgress('paused');
+      // this.canceling: abort() đến từ cancel(), không phải pause() — cancel() tự phát
+      // 'canceled' sau khi rmSync xong, đừng đè bằng 'paused' ở đây (xem comment `canceling`).
+      if (!this.canceling) emitPipProgress('paused');
       return;
     }
 
@@ -784,7 +808,10 @@ export class EngineInstaller {
 
     for (const f of state.files) {
       if (state.doneFiles.includes(f.dest)) continue;
-      if (signal.aborted) { this.emit(this.prog('paused', state.files.map(x=>x.dest), state.doneFiles, received, total, 0, f.dest)); return; }
+      if (signal.aborted) {
+        if (!this.canceling) this.emit(this.prog('paused', state.files.map(x=>x.dest), state.doneFiles, received, total, 0, f.dest));
+        return;
+      }
 
       const baseReceived = received;
       try {
@@ -794,7 +821,7 @@ export class EngineInstaller {
         });
       } catch (e) {
         if (e instanceof DownloadError && e.kind === 'aborted') {
-          this.emit(this.prog('paused', state.files.map(x=>x.dest), state.doneFiles, received, total, 0, f.dest));
+          if (!this.canceling) this.emit(this.prog('paused', state.files.map(x=>x.dest), state.doneFiles, received, total, 0, f.dest));
           return;
         }
         throw e;
@@ -828,7 +855,7 @@ export class EngineInstaller {
 
   private handleError(e: unknown) {
     if (e instanceof DownloadError && e.kind === 'aborted') {
-      this.emit(this.prog('paused', [], [], 0, 0, 0, ''));
+      if (!this.canceling) this.emit(this.prog('paused', [], [], 0, 0, 0, ''));
       return;
     }
     const msg = e instanceof Error ? e.message : String(e);

@@ -137,11 +137,17 @@ class QwenEngine:
             ) from e
 
     def _model_dir(self) -> Path:
-        """Thư mục model đã tải: VIENEU_ENGINES_DIR/<engine_id>/model[/<snapshot>]."""
+        """Thư mục model đã tải: VIENEU_ENGINES_DIR/<engine_id đã sanitize>/model[/<snapshot>].
+
+        Dùng `engine_dir_name()` (không phải `self.engine_id` thẳng) — xem comment cùng
+        tên ở `engine_qwen_mlx.py`/`engine_registry.py`'s `engine_dir_name()` (bug thật
+        2026-08-11: dấu chấm trong "qwen-1.7b" không khớp thư mục Electron đã sanitize).
+        """
+        from engine_registry import engine_dir_name
         base = os.environ.get("VIENEU_ENGINES_DIR", "").strip()
         if not base:
             raise RuntimeError(f"VIENEU_ENGINES_DIR chưa set — không tìm được model {self.label}.")
-        model_root = Path(base) / self.engine_id / "model"
+        model_root = Path(base) / engine_dir_name(self.engine_id) / "model"
         if not model_root.exists():
             raise RuntimeError(f"Model {self.label} chưa tải: {model_root}")
         if (model_root / "config.json").exists():

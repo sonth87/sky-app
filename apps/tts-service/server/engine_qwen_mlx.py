@@ -101,6 +101,17 @@ class QwenMlxEngine:
     def __init__(self, engine_id: str, label: str) -> None:
         self.engine_id = engine_id
         self.label = label
+        # `main.py`'s `GET /capabilities` đọc thẳng `_engine.providers`/`_engine.threads`
+        # (không qua Protocol, không có getattr fallback) — MỌI engine khác (VieNeu, MOSS,
+        # QwenEngine torch, VoxCPM) đều set 2 field này dù không phải lúc nào cũng là
+        # onnxruntime provider thật (vd QwenEngine torch cũng chỉ tái dùng để suy ra có
+        # muốn CUDA hay không). MLX không có khái niệm "provider" kiểu ONNX (chỉ có 1
+        # thiết bị GPU tích hợp qua Metal, không tự chọn) — set giá trị mô tả để tránh
+        # crash `/capabilities` với `AttributeError`, không có ý nghĩa suy luận gì thêm.
+        # Bug thật 2026-08-11: thiếu 2 dòng này khiến `/capabilities` ném 500 mỗi lần
+        # gọi trong lúc Qwen (MLX) đang là engine phục vụ.
+        self.providers = ["MLXProvider"]
+        self.threads = 0
 
         try:
             # `mlx_audio.tts.load` (không phải `.utils.load_model` như README) — đường
@@ -118,11 +129,19 @@ class QwenMlxEngine:
             ) from e
 
     def _model_dir(self) -> Path:
-        """Thư mục model đã tải: VIENEU_ENGINES_DIR/<engine_id>/model[/<snapshot>]."""
+        """Thư mục model đã tải: VIENEU_ENGINES_DIR/<engine_id đã sanitize>/model[/<snapshot>].
+
+        Dùng `engine_dir_name()` (không phải `self.engine_id` thẳng) — `engine_id` của
+        Qwen có dấu chấm ("qwen-1.7b"), nhưng Electron ghi model vào thư mục đã lọc dấu
+        chấm thành gạch dưới ("qwen-1_7b"). Thiếu bước này thì mọi lần load đều báo
+        "Model chưa tải" dù đã tải/cài xong hoàn toàn — bug thật 2026-08-11, xem
+        `engine_registry.py`'s `engine_dir_name()`.
+        """
+        from engine_registry import engine_dir_name
         base = os.environ.get("VIENEU_ENGINES_DIR", "").strip()
         if not base:
             raise RuntimeError(f"VIENEU_ENGINES_DIR chưa set — không tìm được model {self.label}.")
-        model_root = Path(base) / self.engine_id / "model"
+        model_root = Path(base) / engine_dir_name(self.engine_id) / "model"
         if not model_root.exists():
             raise RuntimeError(f"Model {self.label} chưa tải: {model_root}")
         if (model_root / "config.json").exists():

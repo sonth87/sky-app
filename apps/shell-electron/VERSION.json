@@ -2,6 +2,15 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.6.1",
+      "date": "2026-08-11",
+      "bump": "patch",
+      "summary": "Sửa lỗi giọng Qwen3-TTS (0.6B/1.7B) không bao giờ được nhận là đã cài xong dù đã tải/cài đủ — do sai tên thư mục ở phần xử lý ngầm, khiến màn quản lý engine đứng mãi ở \"Đang cài thư viện...\". Sửa lỗi báo lỗi (crash) khi đang dùng Qwen trên Mac Apple Silicon. Nút Hủy giờ có xác nhận trước khi xoá dữ liệu đã tải.",
+      "breaking": true,
+      "minAppVersion": "0.6.1",
+      "detailsRef": "history/2026-08-11-fix-huy-cai-dat-am-tham-xoa-du-lieu.md"
+    },
+    {
       "version": "0.6.0",
       "date": "2026-08-11",
       "bump": "minor",

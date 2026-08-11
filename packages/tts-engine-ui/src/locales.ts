@@ -32,6 +32,8 @@ export const ttsEngineLocales = {
       "downloadModel": "Tải model",
       "importFromUsb": "Import model",
       "cancel": "Hủy",
+      "cancelConfirm": "Hủy sẽ xoá TOÀN BỘ phần đã tải/cài của \"{{label}}\" (kể cả phần đã xong) — không thể tiếp tục, phải tải lại từ đầu nếu cần. Chắc chắn muốn hủy?",
+      "canceledMsg": "Đã hủy — đã xoá dữ liệu tải dở.",
       "installStartFailed": "Không bắt đầu tải được",
       "checkingEngine": "Đang kiểm tra engine…",
       "engineLoadFailed": "Engine không load được: {{error}}",
@@ -75,7 +77,6 @@ export const ttsEngineLocales = {
         "onnx-accel": "Tăng tốc GPU",
         "mlx": "MLX (Apple Silicon)"
       },
-      "sharedRuntime": "Thư viện dùng chung",
       "switchingEngineFast": "Đang đổi engine…",
       "backToList": "Danh sách engine",
       "engineDetail": "Thông tin engine"
@@ -163,6 +164,8 @@ export const ttsEngineLocales = {
       "downloadModel": "Download model",
       "importFromUsb": "Import from USB",
       "cancel": "Cancel",
+      "cancelConfirm": "Canceling will delete EVERYTHING downloaded/installed so far for \"{{label}}\" (even finished parts) — this can't be resumed, you'll need to start over if needed. Cancel anyway?",
+      "canceledMsg": "Canceled — partial data deleted.",
       "installStartFailed": "Could not start download",
       "checkingEngine": "Checking engine…",
       "engineLoadFailed": "Engine failed to load: {{error}}",
@@ -206,7 +209,6 @@ export const ttsEngineLocales = {
         "onnx-accel": "GPU acceleration",
         "mlx": "MLX (Apple Silicon)"
       },
-      "sharedRuntime": "Shared runtime",
       "switchingEngineFast": "Switching engine…",
       "backToList": "Engine list",
       "engineDetail": "Engine details"

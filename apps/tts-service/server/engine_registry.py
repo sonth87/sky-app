@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 from pathlib import Path
 from typing import Callable
 
@@ -331,16 +332,34 @@ def engine_site_packages(engine_id: str) -> Path | None:
     return sp if sp.exists() else None
 
 
+def engine_dir_name(engine_id: str) -> str:
+    """Tên thư mục AN TOÀN cho 1 engine_id — PHẢI khớp CHÍNH XÁC cách Electron làm ở
+    `ttsEngineDir()` (apps/shell-electron/electron/slide/data/paths.ts): thay mọi ký tự
+    KHÔNG PHẢI chữ/số/'_'/'-' bằng '_'.
+
+    Bug thật 2026-08-11: thiếu bước này khiến Python tìm sai thư mục cho MỌI engine_id
+    có dấu chấm — cụ thể `qwen-0.6b`/`qwen-1.7b` (2 engine_id DUY NHẤT có dấu chấm trong
+    registry hiện tại). Electron ghi model/manifest vào `.../qwen-1_7b/` (đã lọc dấu
+    chấm → gạch dưới, chống path traversal) nhưng Python trước đây `Path(base) /
+    engine_id` thẳng, tức tìm `.../qwen-1.7b/` (còn dấu chấm) — thư mục đó KHÔNG BAO GIỜ
+    tồn tại, nên `engine_install_status()` báo mãi 'missing' dù đã tải/cài xong hoàn
+    toàn, và `_model_dir()` (engine_qwen.py/engine_qwen_mlx.py) báo "Model chưa tải" nếu
+    lỡ load được tới đó. Dùng CHUNG hàm này ở mọi nơi ghép engine_id vào path — không
+    lặp lại `.replace()` rải rác dễ quên 1 chỗ như đã xảy ra.
+    """
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", engine_id)
+
+
 def _engine_data_dir(engine_id: str) -> Path | None:
     """Thư mục cài đặt engine mở rộng (do Electron truyền qua VIENEU_ENGINES_DIR).
 
-    Cấu trúc: <VIENEU_ENGINES_DIR>/<engine_id>/{runtime, model, manifest.json}.
+    Cấu trúc: <VIENEU_ENGINES_DIR>/<engine_id đã sanitize>/{runtime, model, manifest.json}.
     Trả None nếu env chưa set (vd chạy server độc lập không qua Electron).
     """
     base = os.environ.get("VIENEU_ENGINES_DIR", "").strip()
     if not base:
         return None
-    return Path(base) / engine_id
+    return Path(base) / engine_dir_name(engine_id)
 
 
 def engine_install_status(engine_id: str) -> str:
