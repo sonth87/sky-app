@@ -247,13 +247,27 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
         </p>
       )}
 
-      {/* Danh sách gọn: 1 dòng / engine. Chi tiết + mọi thao tác nằm trong bảng mở ra khi
-          bấm vào dòng — giữ danh sách quét mắt được khi số engine tăng lên. */}
+      {/* Danh sách gọn: 1 dòng / engine, gom theo nhóm model (sinh giọng nói / nhận dạng
+          giọng nói / mô hình ngôn ngữ). Chi tiết + mọi thao tác nằm trong bảng mở ra khi
+          bấm vào dòng — giữ danh sách quét mắt được khi số engine tăng lên.
+
+          Tiêu đề nhóm CHỈ hiện khi có từ 2 nhóm trở lên: hiện tại toàn bộ model đều là
+          'tts', thêm một tiêu đề "Sinh giọng nói" cô độc phía trên chỉ tốn chỗ mà không
+          phân biệt được gì. */}
       <div className="flex flex-col gap-1.5">
-        {engines?.engines.map((e) => {
+        {groupByCategory(engines?.engines ?? []).map(([category, list, showHeader]) => (
+        <div key={category} className="flex flex-col gap-1.5">
+        {showHeader && (
+          <div className="px-1 pt-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t(`engineManager.category.${category}`)}
+          </div>
+        )}
+        {list.map((e) => {
           const phase = phaseOf(e);
           const p = progress[e.id];
-          const isCurrent = engines.current === e.id;
+          // `engines?.` (không phải `engines.`): trước đây `engines?.engines.map(...)`
+          // tự thu hẹp kiểu bên trong callback, giờ đi qua `?? []` nên không còn.
+          const isCurrent = engines?.current === e.id;
           const pct = p && p.bytesTotal > 0 ? Math.floor((p.bytesReceived / p.bytesTotal) * 100) : 0;
           const downloading = phase === 'downloading' || phase === 'resolving' || phase === 'importing' || phase === 'installing-runtime';
           const paused = phase === 'paused';
@@ -296,6 +310,8 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
             </button>
           );
         })}
+        </div>
+        ))}
       </div>
 
       {/* Bảng chi tiết engine — phủ lên danh sách trong cùng cửa sổ (mẫu list → detail). */}
@@ -511,6 +527,35 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
  *   ⚡ vàng = đã tải nhưng chưa nạp, hoặc đang giữ ấm
  *   ↓ xám  = chưa tải về máy
  */
+/** Thứ tự hiển thị các nhóm model. Nhóm lạ (server mới hơn UI) xếp cuối, KHÔNG bị bỏ đi
+ *  — thà hiện một tiêu đề chưa dịch còn hơn giấu mất model người dùng vừa tải. */
+const CATEGORY_ORDER = ['tts', 'stt', 'llm'] as const;
+
+/**
+ * Gom engine theo `category`, giữ nguyên thứ tự trong từng nhóm.
+ *
+ * Trả `[category, engines, showHeader]` — `showHeader` là false khi chỉ có ĐÚNG 1 nhóm,
+ * để không thêm một tiêu đề cô độc chẳng phân biệt được gì (hiện tại mọi model đều là
+ * 'tts'; tiêu đề chỉ có ý nghĩa khi đã có model nhận dạng giọng nói / mô hình ngôn ngữ).
+ */
+function groupByCategory(
+  engines: TtsEngineInfo[],
+): Array<[string, TtsEngineInfo[], boolean]> {
+  const groups = new Map<string, TtsEngineInfo[]>();
+  for (const e of engines) {
+    // Server cũ chưa trả `category` → coi như 'tts' (toàn bộ engine từng có đều là TTS).
+    const key = e.category ?? 'tts';
+    const list = groups.get(key);
+    if (list) list.push(e);
+    else groups.set(key, [e]);
+  }
+
+  const known = CATEGORY_ORDER.filter((c) => groups.has(c));
+  const unknown = [...groups.keys()].filter((c) => !CATEGORY_ORDER.includes(c as never));
+  const showHeader = groups.size > 1;
+  return [...known, ...unknown].map((c) => [c, groups.get(c) ?? [], showHeader]);
+}
+
 function EngineStatusIcon({
   installStatus, bundled, isCurrent, loaded,
 }: {

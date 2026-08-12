@@ -8,6 +8,7 @@ import { createElectronLayoutPort } from './adapters/layout.js';
 import { createElectronAssetPort } from './adapters/asset.js';
 import { createElectronEventPort } from './adapters/event.js';
 import { createElectronDataSourcePort } from './adapters/data-source.js';
+import { createElectronEffectPresetPort } from './adapters/effect-preset.js';
 
 export interface CreateElectronPlatformOptions {
   assetUrl?: (path: string) => string;
@@ -54,6 +55,7 @@ export async function createElectronPlatform(
   platform.services.register('asset', createElectronAssetPort());
   platform.services.register('event', createElectronEventPort());
   platform.services.register('dataSource', createElectronDataSourcePort());
+  platform.services.register('effectPreset', createElectronEffectPresetPort());
 
   return platform;
 }

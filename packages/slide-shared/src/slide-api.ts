@@ -80,6 +80,12 @@ export interface TtsEngineInfo {
    * chạy trong tiến trình riêng. Optional vì server cũ chưa trả field này.
    */
   runtime_kind?: 'onnx-bundled' | 'onnx-ext' | 'torch' | 'mlx';
+  /**
+   * Nhóm model để hiển thị theo mục trong màn Quản lý: sinh giọng nói ('tts'),
+   * nhận dạng giọng nói ('stt'), hay mô hình ngôn ngữ ('llm').
+   * Optional vì server cũ chưa trả field này — thiếu thì coi như 'tts'.
+   */
+  category?: 'tts' | 'stt' | 'llm';
   /** Repo nguồn của model (HF) — hiện link "xem nguồn" trong bảng chi tiết engine. */
   install?: {
     model?: { source?: string; repo?: string; total_mb?: number };
@@ -247,6 +253,12 @@ export interface SlideApi {
     text: string,
     voiceId?: string,
     speed?: number,
+    /** Tham số sampling theo engine, vd `{ "qwen-1.7b": { temperature: 0.3 } }`. Sau khi
+     *  khối `infer` global bị lọc theo `sampling_params` mà engine tự khai, đây là đường
+     *  DUY NHẤT chỉnh sampling của engine không khai (Qwen). */
+    engineOverrides?: Record<string, Record<string, unknown>>,
+    /** Chuỗi hiệu ứng hậu kỳ đã resolve từ preset (EffectPresetPort). */
+    effectsChain?: unknown[],
   ): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }>;
   warmupTts(): Promise<{ ok: boolean }>;
   getTtsDebug(): Promise<TtsDebugInfo>;
@@ -276,6 +288,8 @@ export interface SlideApi {
   getTtsConfig(): Promise<TtsConfig | null>;
   setTtsConfig(partial: Partial<TtsConfig>): Promise<{ ok: boolean; config?: TtsConfig; error?: string }>;
   getTtsCapabilities(): Promise<TtsCapabilities | null>;
+  /** Bảng hiệu ứng hậu kỳ do service TTS khai (`GET /effects`). Rỗng nếu không hỗ trợ. */
+  listEffectTypes(): Promise<Array<{ type: string; label: string; description: string; params: Record<string, { default: number; min: number; max: number; step: number; description: string }> }>>;
   installAccel(packageName: string): Promise<{ ok: boolean; error?: string; log?: string }>;
   listEngines(): Promise<TtsEngines | null>;
   enginePreflight(engineId: string): Promise<TtsEnginePreflight>;
@@ -299,12 +313,20 @@ export interface SlideApi {
   engineUnload(engineId: string): Promise<{ ok: boolean; error?: string; freedProcess?: boolean; unloaded?: boolean }>;
   onEngineInstallProgress(cb: (p: EngineInstallProgress) => void): () => void;
   pickAudioFile(): Promise<{ ok: boolean; filePath?: string }>;
-  cloneVoice(payload: { filePath: string; label: string; gender?: string; region?: string }): Promise<{
+  cloneVoice(payload: {
+    filePath: string;
+    label: string;
+    gender?: string;
+    region?: string;
+    /** Bản chép lời của file mẫu — bắt buộc khi engine đang chạy cần nó (Qwen). */
+    refText?: string;
+  }): Promise<{
     ok: boolean;
     voice?: { id: string; label: string; gender: string; region: string; type: string; warnings?: string[] };
     error?: string;
   }>;
-  updateVoice(voiceId: string, hidden: boolean): Promise<{ ok: boolean; error?: string }>;
+  /** Đặt/sửa `hidden` và/hoặc `refText`. Truyền `undefined` để không đụng tới field đó. */
+  updateVoice(voiceId: string, hidden?: boolean, refText?: string): Promise<{ ok: boolean; error?: string }>;
   deleteVoice(voiceId: string): Promise<{ ok: boolean; error?: string }>;
   /** Thư viện voice mẫu 'hệ thống' (resources/voice-ref/{lang}/catalog.json) — search/preview
    * trước khi chọn dùng. Không cần bước import riêng: chọn synthesize lần đầu server tự
@@ -330,7 +352,10 @@ export interface SlideApi {
   pregenCancel(): Promise<{ ok: boolean }>;
   pregenGetStatus(): Promise<PreGenStatus | null>;
   pregenRequeue(id: string): Promise<{ ok: boolean; error?: string }>;
-  pregenGetAudio(id: string): Promise<{ ok: boolean; buffer?: ArrayBuffer; error?: string }>;
+  /** `buffer` là file WAV đầy đủ (44 byte header + PCM). `sampleRate` đọc từ header đó —
+   * dùng nó khi phát PCM thô sau khi cắt header, đừng giả định 48000: mỗi engine xuất ở
+   * tần số gốc của nó (Qwen 24kHz, VieNeu/MOSS 48kHz). */
+  pregenGetAudio(id: string): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }>;
   onPregenProgress(cb: (status: PreGenStatus) => void): () => void;
   getLogs(): Promise<unknown[]>;
   retryLog(logId: string): Promise<void>;

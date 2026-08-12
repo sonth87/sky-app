@@ -14,8 +14,8 @@ export const ttsEngineLocales = {
     "engineManager": {
       "switchNeedsRestart": "Đã ghi cấu hình. Cần khởi động lại dịch vụ TTS để engine mới có hiệu lực.",
       "installNotAvailableHere": "Engine này chưa có sẵn trên máy chủ. Việc tải/cài chỉ thực hiện được trên ứng dụng máy tính.",
-      "title": "Quản lý engine TTS",
-      "description": "VieNeu là engine mặc định (tích hợp sẵn). Engine khác có thể tải thêm khi cần — nên tải trước buổi lễ, cần mạng ổn định.",
+      "title": "Quản lý mô hình",
+      "description": "VieNeu là engine sinh giọng nói mặc định (tích hợp sẵn). Mô hình khác có thể tải thêm khi cần — nên tải trước buổi lễ, cần mạng ổn định.",
       "ceremonySafetyNote": "Khi có sinh viên lên sân khấu, việc tải model sẽ <b>tự tạm dừng</b> và không cho đổi/tải engine — nhường tài nguyên cho đọc tên. Tự chạy lại khi hết. Không cần thao tác gì.",
       "inUse": "Đang dùng",
       "bundled": "Tích hợp sẵn",
@@ -76,6 +76,11 @@ export const ttsEngineLocales = {
         "torch": "PyTorch (nặng, chạy tiến trình riêng)",
         "onnx-accel": "Tăng tốc GPU",
         "mlx": "MLX (Apple Silicon)"
+      },
+      "category": {
+        "tts": "Sinh giọng nói",
+        "stt": "Nhận dạng giọng nói",
+        "llm": "Mô hình ngôn ngữ"
       },
       "switchingEngineFast": "Đang đổi engine…",
       "backToList": "Danh sách engine",
@@ -146,8 +151,8 @@ export const ttsEngineLocales = {
     "engineManager": {
       "switchNeedsRestart": "Configuration saved. The TTS service must be restarted for the new engine to take effect.",
       "installNotAvailableHere": "This engine is not available on the server. Downloading/installing is only possible in the desktop app.",
-      "title": "TTS Engine Manager",
-      "description": "VieNeu is the default engine (bundled). Other engines can be downloaded when needed — download before the ceremony, requires a stable network connection.",
+      "title": "Model Manager",
+      "description": "VieNeu is the default voice generation engine (bundled). Other models can be downloaded when needed — download before the ceremony, requires a stable network connection.",
       "ceremonySafetyNote": "While a student is on stage, model downloads will <b>automatically pause</b> and engine switching/downloading will be disabled — freeing up resources for name reading. It resumes automatically afterward. No action needed.",
       "inUse": "In use",
       "bundled": "Bundled",
@@ -208,6 +213,11 @@ export const ttsEngineLocales = {
         "torch": "PyTorch (heavy, runs in its own process)",
         "onnx-accel": "GPU acceleration",
         "mlx": "MLX (Apple Silicon)"
+      },
+      "category": {
+        "tts": "Voice generation",
+        "stt": "Transcription",
+        "llm": "Language models"
       },
       "switchingEngineFast": "Switching engine…",
       "backToList": "Engine list",

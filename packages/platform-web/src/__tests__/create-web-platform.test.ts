@@ -128,7 +128,12 @@ describe('TtsPort (web)', () => {
     const targetCall = fetchMock.mock.calls.find(call => !call[0].includes('/health'));
     expect(targetCall).toBeDefined();
     const body = JSON.parse((targetCall![1] as { body: string }).body);
-    expect(body).toEqual({ text: 'hello', speaker_id: 'NF', speed: 1.0, temperature: undefined });
+    // Giọng mặc định đổi từ 'NF' sang 'clone-d0f05071' (Giang) khi 'NF' bị xoá khỏi
+    // voice-registry.json 2026-08-04 — test này còn assert giá trị cũ nên đỏ từ trước.
+    expect(body).toEqual({
+      text: 'hello', speaker_id: 'clone-d0f05071', speed: 1.0,
+      temperature: undefined, engine_overrides: undefined,
+    });
   });
 
   it('speak() throw khi server trả lỗi', async () => {
@@ -234,9 +239,12 @@ describe('TtsPort (web)', () => {
     const voices = await tts.listVoices();
 
     expect(fetchMock).toHaveBeenCalledWith('http://localhost:9999/voices');
+    // `language` là NGÔN NGỮ, suy từ `source_lang` (thiếu → "Vietnamese"), KHÔNG phải
+    // `region` ('Bắc'/'Nam' là nhãn vùng miền). Test còn assert hành vi cũ đã sửa
+    // 2026-08-04 nên đỏ từ trước — xem languageFromSourceLang's docstring.
     expect(voices).toEqual([
-      { id: 'NF', name: 'Lan Anh', language: 'Bắc', gender: 'female' },
-      { id: 'SM', name: 'Gia Huy', language: 'Nam', gender: 'male' },
+      expect.objectContaining({ id: 'NF', name: 'Lan Anh', language: 'Vietnamese', gender: 'female' }),
+      expect.objectContaining({ id: 'SM', name: 'Gia Huy', language: 'Vietnamese', gender: 'male' }),
     ]);
   });
 

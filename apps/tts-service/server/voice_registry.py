@@ -33,6 +33,11 @@ Rules:
 - Preset voices không thể DELETE, chỉ hide
 - Khi load: luôn merge PRESET_VOICES từ code → tự nhận preset mới khi VieNeu update
 
+- ref_text (optional, chỉ cloned): BẢN CHÉP LỜI của ref_file — audio mẫu đang nói câu gì.
+  Engine clone kiểu in-context (Qwen: BẮT BUỘC; VoxCPM: tuỳ chọn, có thì clone chính xác
+  hơn) cần nó để căn text↔codec. Nguồn ưu tiên: field này → file .txt cùng tên cạnh WAV
+  (quy ước cũ, xem `_ref_text_for()` ở engine_qwen*.py/engine_voxcpm.py). VieNeu/MOSS bỏ qua.
+
 Cloned voice import từ catalog (voice_catalog.py, resources/voice-ref/{lang}/catalog.json):
 - Field bổ sung optional trên entry cloned: accent, category (list), tags (list),
   source_catalog_id (id gốc trong catalog), source_lang — dùng để UI filter/hiển thị.
@@ -149,6 +154,26 @@ class VoiceRegistry:
             self._save()
             return True
 
+    def set_ref_text(self, voice_id: str, ref_text: str) -> bool:
+        """Đặt/sửa bản chép lời của audio mẫu. Chuỗi rỗng = xoá field.
+
+        ⚠️ Caller PHẢI xoá ref codes đã cache của voice này sau khi gọi
+        (`_ref_cache_forget_voice` ở main.py) — embedding cache giữ nguyên dict
+        `{wav_path, ref_text}` suốt vòng đời process, không xoá thì transcript cũ
+        vẫn được dùng cho tới lần restart tiếp theo.
+        """
+        with self._lock:
+            voices = self._data.get("voices", {})
+            if voice_id not in voices:
+                return False
+            text = (ref_text or "").strip()
+            if text:
+                voices[voice_id]["ref_text"] = text
+            else:
+                voices[voice_id].pop("ref_text", None)
+            self._save()
+            return True
+
     def add_cloned(
         self,
         label: str,
@@ -206,7 +231,12 @@ class VoiceRegistry:
             ref_file = v.get("ref_file", "")
             if ref_file:
                 try:
-                    (self._ref_dir / ref_file).unlink(missing_ok=True)
+                    ref_path = self._ref_dir / ref_file
+                    ref_path.unlink(missing_ok=True)
+                    # Sidecar transcript cùng tên (quy ước `_ref_text_for()`): xoá theo,
+                    # nếu không thì clone voice mới trùng tên file sẽ nhặt phải bản chép
+                    # lời của voice CŨ đã xoá — sai giọng mà không có dấu hiệu gì.
+                    ref_path.with_suffix(".txt").unlink(missing_ok=True)
                 except Exception:
                     pass
 

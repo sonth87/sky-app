@@ -537,6 +537,18 @@ async function startPythonServerOnce(
   engineId: string,
   vieneuModelDir: string,
 ): Promise<void> {
+  // Dọn tiến trình cũ của CHÍNH tier này trước khi thay state. `tiers.set` bên dưới ghi đè
+  // tham chiếu `proc`, nên nếu còn tiến trình sống ở đây thì từ giây phút đó không ai giết
+  // được nó nữa — kể cả `stopPythonServer()` lúc thoát app (nó duyệt `tiers`, mà entry cũ
+  // đã bị thay). Đường tới đây: khởi động lại tier sau khi lần trước rơi vào trạng thái
+  // 'error' (health hết giờ, engine cài dở...) — `ensureTierForEngine` chỉ gọi `stopTier`
+  // khi `mustRespawn`, nên nhánh này không được bọc.
+  const existing = tiers.get(tier);
+  if (existing?.proc) {
+    console.warn(`[Python Server][${tier}] Còn tiến trình cũ pid=${existing.proc.pid} — dừng trước khi khởi động lại`);
+    await stopTier(tier);
+  }
+
   const st = newTierState(engineId);
   tiers.set(tier, st);
   const isPackaged = app.isPackaged;
@@ -736,6 +748,17 @@ async function startPythonServerOnce(
     const ok = await waitForHealth(st.port);
     if (!ok) {
       pushStatus(tier, 'error', `Không thể kết nối tới TTS engine sau ${HEALTH_TIMEOUT_MS / 1000}s`);
+      // PHẢI giết tiến trình, không chỉ return. Health hết giờ KHÔNG có nghĩa tiến trình
+      // đã chết — nó thường vẫn đang nạp model (VoxCPM đo thật ~118s, có ca vượt 300s).
+      // Bỏ mặc nó thì: (a) `startPythonServerOnce` lần sau `tiers.set` đè lên state, mất
+      // luôn tham chiếu `proc` → không ai giết được nữa, kể cả `stopPythonServer()` lúc
+      // thoát app (nó chỉ duyệt `tiers`); (b) tiến trình mồ côi vẫn giữ cổng và — sau khi
+      // Python nối vào SQLite (xem kế hoạch Phase 1) — giữ cả read-mark WAL, chặn
+      // checkpoint vô thời hạn.
+      try {
+        proc.kill();
+      } catch { /* đã chết rồi */ }
+      st.proc = null;
       return;
     }
 

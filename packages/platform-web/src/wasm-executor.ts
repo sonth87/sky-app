@@ -4,7 +4,7 @@
 // độc lập trong bộ nhớ từ CÙNG 1 nguồn IndexedDB lúc khởi tạo, rồi mỗi bên tự persist() riêng —
 // bên ghi sau ghi ĐÈ mất thay đổi của bên kia (2 bản copy không đồng bộ). Dùng chung executor
 // này để mọi thay đổi (dù từ adapter nào) đều nằm trên cùng 1 instance SQLite trong bộ nhớ.
-import { SqlJsExecutor, loadDbBytes, saveDbBytes, runMigrations } from '@sky-app/ceremony-db/browser';
+import { SqlJsExecutor, loadDbBytes, saveDbBytes, runMigrations } from '@sky-app/app-db/browser';
 
 let executorPromise: Promise<SqlJsExecutor> | null = null;
 

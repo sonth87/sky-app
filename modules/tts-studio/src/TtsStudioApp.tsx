@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppContentProps } from '@sky-app/kernel';
-import type { TtsPort, TtsEnginePort } from '@sky-app/service-contracts';
+import type { TtsPort, TtsEnginePort, EffectPresetPort } from '@sky-app/service-contracts';
 import { PortalContainerContext } from './PortalContainerContext';
 import { TextareaRefContext } from './TextareaRefContext';
 import { VoicePicker, previewPlayId } from './components/VoicePicker';
 import { SpeedSlider } from './components/SpeedSlider';
 import { EmotionInsert } from './components/EmotionInsert';
 import { EngineParamsPanel } from './components/EngineParamsPanel';
+import { EffectsPanel } from './components/EffectsPanel';
 import { UsageGuide } from './components/UsageGuide';
 import { TextInputPanel } from './components/TextInputPanel';
 import { GenerateBar, QUICK_PLAY_ID } from './components/GenerateBar';
@@ -41,6 +42,9 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
   const textareaRef = useRef<HTMLDivElement>(null);
   const tts = platform.services.get<TtsPort>('tts');
   const enginePort = platform.services.get<TtsEnginePort>('tts-engine');
+  // Vắng mặt ở môi trường không có kho preset (web chưa chạy data-service) —
+  // EffectsPanel tự ẩn khi đó.
+  const effectPresetPort = platform.services.get<EffectPresetPort>('effectPreset');
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [showEngineManager, setShowEngineManager] = useState(false);
   const [showDeviceSettings, setShowDeviceSettings] = useState(false);
@@ -261,11 +265,12 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
     setGenError(null);
     try {
       const trimmedText = text.trim();
-      const engineOverrides = useTtsStudioStore.getState().engineOverrides;
+      const { engineOverrides, effectsChain } = useTtsStudioStore.getState();
       const result = await tts.synthesizeBuffer(trimmedText, {
         voiceId: selectedVoiceId,
         speed,
         engine_overrides: Object.keys(engineOverrides).length > 0 ? engineOverrides : undefined,
+        effectsChain: effectsChain.length > 0 ? effectsChain : undefined,
       });
       lastResultRef.current = result;
       setCanQuickPlay(true);
@@ -362,6 +367,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
             <EmotionInsert />
             <SpeedSlider />
             <EngineParamsPanel ttsPort={tts} />
+            <EffectsPanel effectPresetPort={effectPresetPort} ttsPort={tts} />
             <UsageGuide />
             {loadError && (
               <p className="text-2xs text-destructive">Không tải được danh sách giọng: {loadError}</p>

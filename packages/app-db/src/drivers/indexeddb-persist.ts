@@ -4,6 +4,10 @@
  * ghi lại toàn bộ DB mỗi lần save (không debounce/incremental) — dữ liệu ceremony hiện tại nhỏ
  * (vài trăm bản ghi), không phải vấn đề hiệu năng ở quy mô này.
  */
+// GIỮ NGUYÊN tên cũ dù package đã đổi thành app-db (2026-08-12). IndexedDB không có lệnh
+// đổi tên: muốn đổi phải mở DB cũ, đọc toàn bộ bytes, ghi sang DB mới, xoá DB cũ — một
+// đường dữ liệu mới có thể hỏng giữa chừng, đổi lấy một cái tên mà người dùng không bao giờ
+// nhìn thấy (nó nằm trong storage nội bộ của trình duyệt). Không đáng.
 const DB_NAME = 'ceremony-db';
 const STORE_NAME = 'sqlite-file';
 const KEY = 'main';

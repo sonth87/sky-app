@@ -78,9 +78,14 @@ function getVoiceForRecord(
   return fallbackVoice;
 }
 
-function buildWavHeader(pcmByteLength: number): Buffer {
+/**
+ * `sampleRate` PHẢI là tần số thật của PCM (đọc từ header `X-Sample-Rate` của server),
+ * không phải hằng 48000 như trước. Mỗi engine giờ xuất ở tần số gốc của nó — Qwen 24kHz,
+ * VieNeu/MOSS 48kHz. Ghi sai con số này vào WAV header thì file phát nhanh/chậm gấp đôi
+ * mà không có lỗi nào cả: dữ liệu PCM vẫn đúng, chỉ là trình phát được báo sai tốc độ.
+ */
+function buildWavHeader(pcmByteLength: number, sampleRate: number): Buffer {
   const header = Buffer.alloc(44);
-  const sampleRate = 48000;
   const channels = 1;
   const bitsPerSample = 16;
   const byteRate = sampleRate * channels * (bitsPerSample / 8);
@@ -327,14 +332,15 @@ export class PreGenQueue {
 
         const quality = parseQualityHeaders(res.headers);
         const pcm = Buffer.from(await res.arrayBuffer());
-        logPregen(`pcm id=${record.id} bytes=${pcm.length} qScore=${quality.quality_score ?? '-'} qFlags=${quality.quality_flags?.join('|') ?? '-'}`);
-        const header = buildWavHeader(pcm.byteLength);
+        // Tần số do server báo — khác nhau theo engine đang dùng (Qwen 24kHz, VieNeu 48kHz).
+        const sampleRate = parseInt(res.headers.get('X-Sample-Rate') ?? '48000', 10) || 48000;
+        logPregen(`pcm id=${record.id} bytes=${pcm.length} sr=${sampleRate} qScore=${quality.quality_score ?? '-'} qFlags=${quality.quality_flags?.join('|') ?? '-'}`);
+        const header = buildWavHeader(pcm.byteLength, sampleRate);
         const wav = Buffer.concat([header, pcm]);
         const wavPath = ttsPregenWavPath(this.batchId, record.id);
         writeFileSync(wavPath, wav);
         logPregen(`saved wav id=${record.id} path=${wavPath} wavBytes=${wav.length}`);
 
-        const sampleRate = 48000;
         const duration_ms = Math.round((pcm.byteLength / 2 / sampleRate) * 1000);
         this.manifest.students[record.id] = {
           status: 'done',

@@ -15,7 +15,7 @@ import {
   restoreVersion,
   saveDraft,
   updateLayoutDocumentMeta,
-} from '@sky-app/ceremony-db/browser';
+} from '@sky-app/app-db/browser';
 import { getSharedWasmExecutor, persistSharedWasmExecutor } from '../wasm-executor.js';
 
 export interface SqliteWasmLayoutPortOptions {

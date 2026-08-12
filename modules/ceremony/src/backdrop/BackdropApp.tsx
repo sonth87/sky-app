@@ -1239,9 +1239,11 @@ export function BackdropApp() {
                   console.log('[Backdrop] pregenGetAudio response code=', code, 'ok=', res.ok, 'hasBuffer=', !!res.buffer, 'error=', res.error);
                   if (res.ok && res.buffer) {
                     if (lastTtsTargetCodeRef.current !== code) return;
-                    // Skip WAV header 44 bytes, phát PCM 48kHz
-                    console.log('[Backdrop] playPcm from pregen code=', code, 'pcmBytes=', res.buffer.slice(44).byteLength);
-                    playPcm(res.buffer.slice(44), 48000);
+                    // Bỏ 44 byte WAV header, phát PCM thô ở ĐÚNG tần số của file (main
+                    // process đọc từ header và trả kèm) — hardcode 48000 sẽ phát nhanh
+                    // gấp đôi với file do Qwen (24kHz) sinh ra.
+                    console.log('[Backdrop] playPcm from pregen code=', code, 'pcmBytes=', res.buffer.slice(44).byteLength, 'sr=', res.sampleRate);
+                    playPcm(res.buffer.slice(44), res.sampleRate ?? 48000);
                     return;
                   }
                 } catch (err) {

@@ -28,6 +28,24 @@ Repo đang ở giai đoạn **thiết kế — chưa có code**. Hiện chỉ c�
 
 Chi tiết & lý do: [`docs/architecture/overview.md`](./docs/architecture/overview.md) §Nguyên tắc.
 
+### 2.1 Cơ sở dữ liệu dùng chung — quy ước đặt tên bảng
+
+`packages/app-db` (file `sky-app.db`) là DB **của cả app**, không phải của riêng module nào —
+nó chứa bảng của layout designer, event/data source, media library, TTS… Tên cũ
+`ceremony-db`/`ceremony.db` là di sản của module đầu tiên dùng nó, đã đổi 2026-08-12.
+
+- **Bảng mới đặt `<module>_<tên>`**: `layout_document`, `event_layout_ref`,
+  `tts_effect_preset`. Nhóm bảng cũ nhất (`ceremony`, `app_config`, `asset`,
+  `variable_registry`, `field_mapping_profile`) để trần vì đang giữ dữ liệu thật — đổi tên
+  chỉ để cho đẹp là rủi ro không đáng.
+- **Một chủ ghi cho mỗi bảng.** Bảng do UI sở hữu thì Electron main/data-service ghi; bảng
+  `tts_*` do tiến trình Python của tts-service ghi. Không có bảng nào hai bên cùng ghi.
+- **Chỉ Electron main chạy migration.** `migrate.ts` không có khoá và dùng `CREATE TABLE`
+  trần — hai tiến trình cùng migrate là hỏng DB. Tiến trình khác chỉ được mở file đã migrate
+  xong và kiểm `MAX(version)` trước khi dùng.
+- Mọi kết nối phải set `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=5000` (pragma
+  theo từng kết nối, không kế thừa).
+
 ## 3. Skills & MCP
 
 - **Skills** (nếu dùng Claude Code): quy ước đặt trong `.claude/skills/` (chưa có — thêm khi cần). Skill dành riêng cho repo này (vd "scaffold-app", "add-port") sẽ được khai báo ở đây.

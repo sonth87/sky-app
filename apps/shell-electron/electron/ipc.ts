@@ -9,6 +9,7 @@ import { isUpdateReadyToInstall, getPendingNativeUpdateInfo } from './update-che
 import { layoutAssetsDir, ceremonyDataDir, resolveLocalAsset, ttsPregenDir, ttsPregenManifestPath, ttsPregenWavPath } from './slide/data/paths';
 import type { CanonicalGroup, CanonicalSubject, EventBundleManifest, EventDocument, FieldMappingProfile, LayoutContent, LayoutExportBundle } from '@sky-app/slide-shared';
 import type { DataSource } from '@sky-app/slide-shared';
+import type { EffectConfig } from '@sky-app/app-db/node';
 import {
   applyEventBundle,
   buildEventBundle,
@@ -24,10 +25,14 @@ import {
   getEvent,
   getLayoutDocument,
   getVersion,
+  createEffectPreset,
+  deleteEffectPreset,
   insertAsset,
   insertDataSource,
   insertDataSourceRecords,
   listAssets,
+  listEffectPresets,
+  updateEffectPreset,
   listDataSources,
   listEvents,
   listFieldMappingProfiles,
@@ -46,7 +51,7 @@ import {
   saveFieldMappingProfile,
   setActiveEvent,
   updateLayoutDocumentMeta,
-} from '@sky-app/ceremony-db/node';
+} from '@sky-app/app-db/node';
 import { ceremonyStore } from './slide/data/store';
 import { resetSessionForNewEvent, setCustomVariablesFromEvent, notifyActiveEventChanged } from './slide/socket-server';
 
@@ -647,6 +652,34 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     });
 
     return { relativePath };
+  });
+
+  // EffectPresetPort (packages/service-contracts/src/effect-preset.ts) — preset hiệu ứng
+  // hậu kỳ audio TTS. Dùng CHUNG executor với ceremonyStore, cùng lý do như LayoutPort ở trên.
+  //
+  // Chỉ quản lý PRESET. Việc áp hiệu ứng do tiến trình Python của tts-service làm —
+  // renderer tra preset qua đây rồi gửi chuỗi đã resolve kèm request synthesize (Python
+  // cách ly hoàn toàn với ceremony.db, xem migration 015).
+  ipcMain.handle('kernel:effectPreset:list', async () => {
+    return listEffectPresets(ceremonyStore.getExecutor());
+  });
+
+  ipcMain.handle(
+    'kernel:effectPreset:create',
+    async (_event, name: string, effectsChain: EffectConfig[], description?: string) => {
+      return createEffectPreset(ceremonyStore.getExecutor(), randomUUID(), name, effectsChain, description);
+    },
+  );
+
+  ipcMain.handle(
+    'kernel:effectPreset:update',
+    async (_event, id: string, patch: { name?: string; description?: string; effectsChain?: EffectConfig[] }) => {
+      return updateEffectPreset(ceremonyStore.getExecutor(), id, patch);
+    },
+  );
+
+  ipcMain.handle('kernel:effectPreset:delete', async (_event, id: string) => {
+    return deleteEffectPreset(ceremonyStore.getExecutor(), id);
   });
 
   ipcMain.handle('kernel:layoutAsset:resolve', async (_event, relativePath: string) => {

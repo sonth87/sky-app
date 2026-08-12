@@ -18,7 +18,7 @@ import {
   startSocketServer,
   stopSocketServer,
 } from './slide/socket-server.js';
-import { getCurrentActiveEvent, defaultCeremony } from '@sky-app/ceremony-db/node';
+import { getCurrentActiveEvent, defaultCeremony } from '@sky-app/app-db/node';
 import type { AppConfig } from '@sky-app/slide-shared';
 import { startHttpServer, stopHttpServer } from './slide/http-server.js';
 import { startPythonServer, stopPythonServer } from './slide/python-server.js';

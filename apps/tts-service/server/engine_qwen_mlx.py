@@ -98,6 +98,10 @@ class QwenMlxEngine:
     không đáng gộp chung 1 class rồi if/else runtime khắp nơi).
     """
 
+    # Tần số GỐC của Qwen3-TTS-12Hz — codec 12Hz giải mã ra 24kHz. Không ép lên 48kHz
+    # của VieNeu: upsample không thêm thông tin, chỉ nhân đôi chi phí mọi bước sau.
+    SAMPLE_RATE = 24_000
+
     def __init__(self, engine_id: str, label: str) -> None:
         self.engine_id = engine_id
         self.label = label
@@ -154,19 +158,50 @@ class QwenMlxEngine:
         return {
             "id": self.engine_id,
             "label": self.label,
-            "sample_rate": SAMPLE_RATE,
+            "sample_rate": self.SAMPLE_RATE,
             "supports_clone": True,
             "supports_preset": False,   # bản Base không có giọng preset — chỉ clone
             "supports_emotion": False,
+            # False = KHÔNG nhận khối `infer` global (tuning riêng của VieNeu — top_k=5
+            # sẽ ép EOS của Qwen ra ngoài top-k). Chỉnh sampling cho Qwen phải đi qua
+            # `engine_overrides["qwen-*"]`; xem _run() và main.py's _run_synthesis.
             "supports_sampling": False,
             "multilingual": True,       # 10 ngôn ngữ, KHÔNG có tiếng Việt
+            # Clone kiểu ICL cần bản chép lời của audio mẫu — thiếu là audio hỏng hoàn
+            # toàn, không phải giảm chất lượng (xem _run). UI/`/voices/clone` đọc cờ này
+            # để bắt buộc nhập transcript thay vì để lỗi xảy ra lúc synthesize.
+            "requires_ref_text": True,
             "device": "mlx",
         }
 
-    def encode_reference(self, wav_path: str) -> object:
+    def encode_reference(self, wav_path: str, ref_text: str | None = None) -> object:
         """Clone thẳng từ file wav — giữ dạng dict để về sau thêm trường không phá cache
-        đã lưu (giống engine_qwen.py/engine_voxcpm.py)."""
-        return {"wav_path": str(wav_path), "ref_text": _ref_text_for(str(wav_path))}
+        đã lưu (giống engine_qwen.py/engine_voxcpm.py).
+
+        `ref_text` từ registry ưu tiên hơn sidecar `.txt`: registry sửa được qua API/UI
+        và sống sót khi voice được import lại, còn sidecar là quy ước cũ chỉ đặt được
+        bằng tay (giữ làm fallback để không phá dữ liệu ai đã tạo theo cách đó).
+        """
+        return {
+            "wav_path": str(wav_path),
+            "ref_text": (ref_text or "").strip() or _ref_text_for(str(wav_path)),
+        }
+
+    def _estimate_text_tokens(self, text: str) -> int:
+        """Số token của `text` theo tokenizer của chính model, hoặc ước lượng theo ký tự.
+
+        Chỉ dùng để tính trần `max_tokens` (xem `_run`), không cần chính xác tuyệt đối —
+        nhưng ưu tiên tokenizer thật vì tiếng Việt có dấu tốn token hơn hẳn tiếng Anh.
+        """
+        tok = getattr(self._model, "tokenizer", None)
+        if tok is not None:
+            try:
+                return max(1, len(tok.encode(text)))
+            except Exception:
+                pass  # tokenizer nội bộ của lib có thể đổi API giữa các version
+        # Ước lượng THỪA có chủ ý (~2 ký tự/token): cap quá chặt sẽ cắt cụt câu, còn
+        # thừa một chút vẫn chặn được runaway (mốc nguy hiểm là 4096 token của lib).
+        return max(1, (len(text) + 1) // 2)
 
     def _run(self, text: str, ref: dict, overrides: dict | None) -> np.ndarray:
         wav_path = ref.get("wav_path")
@@ -181,8 +216,53 @@ class QwenMlxEngine:
 
         kwargs: dict = {"lang_code": lang_code}
         if wav_path:
+            # ⚠️ ref_text RỖNG LÀ LỖI, KHÔNG PHẢI "thiếu tuỳ chọn". mlx-audio bật chế độ
+            # ICL (in-context learning voice clone) theo điều kiện:
+            #     use_icl = ref_audio is not None and ref_text is not None and has_encoder
+            # Chuỗi rỗng "" KHÔNG phải None → ICL vẫn bật, nhưng với transcript TRỐNG.
+            # Trong _prepare_icl_generation_inputs, prompt dựng thành
+            #     ref_chat = f"<|im_start|>assistant\n{ref_text}<|im_end|>\n"
+            # rồi text tokens = ref_text_tokens + target_text_tokens, còn codec stream
+            # vẫn có đủ N giây ref codes. Model bị prefill với "chỗ audio này ứng với 0
+            # chữ" rồi ép align target text lên đó → alignment text↔codec vỡ ngay từ
+            # prefill → audio ảo giác, sai độ dài, ú ớ.
+            #
+            # Bug thật 2026-08-11: truyền `ref_text or ""` nên MỌI lần clone bằng Qwen
+            # đều rơi vào đúng trường hợp này (thư mục ref có 14 .wav, 0 .txt).
+            #
+            # Đây cũng chính là cơ chế khiến Qwen đọc được TIẾNG VIỆT dù không hỗ trợ
+            # chính chủ: cặp (audio Việt, transcript Việt) dạy model mapping chữ→âm ngay
+            # trong prompt. Bỏ ref_text đi là bỏ luôn cơ chế đó. voicebox chặn từ tầng
+            # schema (`reference_text: str = Field(..., min_length=1)`) — ta chặn ở đây.
+            if not (ref_text or "").strip():
+                raise RuntimeError(
+                    f"{self.label} cần bản chép lời của audio mẫu để clone giọng. "
+                    f"Hãy mở Quản lý giọng và nhập nội dung audio mẫu đang nói."
+                )
             kwargs["ref_audio"] = wav_path
-            kwargs["ref_text"] = ref_text or ""
+            kwargs["ref_text"] = ref_text
+
+        # Trần số token — chặn runaway khi model miss EOS. Codec 12Hz, ~3-5 token/text
+        # token là nhịp nói bình thường; hệ số 6 chừa ~50% biên cho giọng chậm/nhiều ngắt.
+        #
+        # Port từ mlx-audio 0.4.1 (`_generate_icl`), bản 0.4.8 đang cài ĐÃ GỠ cap này
+        # (`effective_max_tokens = max_tokens` thẳng) nên không thể trông cậy vào lib:
+        # thiếu cap thì mỗi lần miss EOS là sinh trọn 4096 token ≈ 5,5 phút audio rác.
+        # Tính ở đây thay vì pin về 0.4.1 để không phụ thuộc version lib nào.
+        kwargs["max_tokens"] = max(75, self._estimate_text_tokens(text) * 6)
+
+        # Sampling params — chỉ nhận từ `engine_overrides` chỉ đích danh engine này.
+        # KHÔNG nhận khối `infer` global (tuning của VieNeu: top_k=5 sẽ ép EOS của Qwen
+        # ra ngoài top-k → gần như không dừng được); main.py's _run_synthesis đã lọc sẵn
+        # theo `sampling_params` mà capabilities() khai — Qwen cố ý KHÔNG khai key nào.
+        # Không set thì giữ nguyên mặc định của lib (0.9 / 50 / 1.0 / 1.05).
+        #
+        # Ghi chú đối chiếu: voicebox KHÔNG truyền tham số sampling nào cho Qwen (đã rà
+        # toàn backend) — đây là phần sky-app làm thêm, không phải port.
+        for key in ("temperature", "top_k", "top_p", "repetition_penalty", "max_tokens"):
+            v = (overrides or {}).get(key)
+            if v is not None:
+                kwargs[key] = v
 
         # generate() là generator (hỗ trợ streaming qua stream=True) — không streaming ở
         # đây, nối MỌI chunk lại (không chỉ lấy result đầu) — model có thể trả nhiều đoạn
@@ -196,16 +276,37 @@ class QwenMlxEngine:
             raise RuntimeError(f"{self.label}: generate() không trả audio nào.")
 
         wav = np.concatenate(chunks).ravel()
+
+        # Giữ NGUYÊN tần số gốc của model (24kHz), KHÔNG ép lên 48kHz của VieNeu nữa.
+        # Upsample 2× không thêm thông tin gì mà bắt mọi bước sau (cân loudness, phase
+        # vocoder, chấm chất lượng, đóng gói int16) xử lý gấp đôi số mẫu. `sample_rate`
+        # thật được khai qua capabilities() và trả về client qua header X-Sample-Rate.
+        #
+        # Trường hợp model trả sample rate KHÁC với cái đã khai (không nên xảy ra, nhưng
+        # `_FALLBACK_SAMPLE_RATE` tồn tại vì result có thể thiếu hẳn field này): resample
+        # về đúng cái đã khai, vì client đã được báo con số đó rồi.
         sr = sr or _FALLBACK_SAMPLE_RATE
-        if sr != SAMPLE_RATE:
+        if sr != self.SAMPLE_RATE:
             import soxr
-            wav = soxr.resample(wav, sr, SAMPLE_RATE).astype(np.float32)
+            wav = soxr.resample(wav, sr, self.SAMPLE_RATE).astype(np.float32)
         return wav
 
     def synthesize(self, text: str, ref_embedding: object, speed: float = 1.0,
                    overrides: dict | None = None) -> np.ndarray:
         ref = ref_embedding if isinstance(ref_embedding, dict) else {"wav_path": str(ref_embedding)}
-        wav = self._run(text, ref, overrides)
+
+        # Chia đoạn + bắt runaway ở đây, TRƯỚC `_post_process`: hậu xử lý phải chạy một
+        # lần trên toàn bộ audio đã ghép, không phải từng đoạn (xem docstring
+        # generate_chunked). Text ngắn đi đường tắt, không tốn thêm gì.
+        from audio_dsp import has_tts_runaway
+        from chunked_tts import generate_chunked
+
+        wav = generate_chunked(
+            lambda chunk: self._run(chunk, ref, overrides),
+            text,
+            sample_rate=self.SAMPLE_RATE,
+            runaway_detector=has_tts_runaway,
+        )
         return self._post_process(wav, speed)
 
     def synthesize_preset(self, text: str, preset_id: str, speed: float = 1.0,
@@ -213,25 +314,9 @@ class QwenMlxEngine:
         raise RuntimeError(f"{self.label} không có giọng preset — hãy chọn một giọng clone từ audio mẫu.")
 
     def _post_process(self, audio: np.ndarray, speed: float) -> np.ndarray:
-        """Giống VieneuEngine._post_process: speed giữ pitch + loudness + trailing silence."""
-        audio = np.asarray(audio, dtype=np.float32).ravel()
-        if abs(speed - 1.0) > 0.01:
-            try:
-                from audio_dsp import time_stretch_keep_pitch
-                audio = time_stretch_keep_pitch(audio, speed)
-            except Exception:
-                import soxr
-                audio = soxr.resample(audio, int(SAMPLE_RATE * speed), SAMPLE_RATE)
-        target = _target_dbfs()
-        if target is not None:
-            from audio_dsp import rms_normalize
-            audio = rms_normalize(audio, target_dbfs=target)
-        else:
-            peak = np.max(np.abs(audio)) if audio.size else 0.0
-            if peak > 1.0:
-                audio = audio / peak
-        silence = np.zeros(int(SAMPLE_RATE * TRAILING_SILENCE_S), dtype=np.float32)
-        return np.concatenate([audio, silence])
+        """Hậu xử lý ở tần số GỐC của engine (24kHz) — xem audio_dsp.post_process."""
+        from audio_dsp import post_process
+        return post_process(audio, speed, self.SAMPLE_RATE, TRAILING_SILENCE_S, _target_dbfs())
 
     def close(self) -> None:
         # `del` trước khi None — giống voicebox's unload_model(), giải phóng tham chiếu

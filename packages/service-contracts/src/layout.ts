@@ -10,7 +10,7 @@ export interface VariableRegistryEntry {
 /**
  * LayoutPort — CRUD + versioning cho LayoutDocument (docs/roadmap/plans/layout-designer/
  * 21-layout-versioning.md) + variable_registry (09-quy-dinh-variable.md §2.6, gợi ý autocomplete
- * toàn cục — KHÔNG gắn với 1 layout cụ thể). Electron: IPC → @sky-app/ceremony-db (SQLite
+ * toàn cục — KHÔNG gắn với 1 layout cụ thể). Electron: IPC → @sky-app/app-db (SQLite
  * local). Web: apps/data-service REST, fallback SqliteWasmAdapter khi data-service không khả
  * dụng — đối xứng DataPort (data.ts), theo đúng docs/guides/ports-and-adapters.md.
  *

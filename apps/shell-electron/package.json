@@ -1,6 +1,6 @@
 {
   "name": "@sky-app/shell-electron",
-  "version": "0.6.1",
+  "version": "0.8.0",
   "private": true,
   "main": "./dist-electron/main/main.js",
   "scripts": {
@@ -14,7 +14,7 @@
     "build:renderer-bundle": "node scripts/build-renderer-bundle.mjs"
   },
   "dependencies": {
-    "@sky-app/ceremony-db": "workspace:*",
+    "@sky-app/app-db": "workspace:*",
     "@sky-app/device-shell": "workspace:*",
     "@sky-app/licensing": "workspace:*",
     "@sky-app/module-ceremony": "workspace:*",

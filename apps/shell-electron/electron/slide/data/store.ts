@@ -8,8 +8,8 @@ import {
   getCeremonyWithConfig as dbGetCeremonyWithConfig,
   saveCeremonyWithConfig as dbSaveCeremonyWithConfig,
   upsertAppConfig as dbUpsertAppConfig,
-} from '@sky-app/ceremony-db/node';
-import { ceremonyDbPath, ceremonyDataDir, PHOTO_DIR_NAMES } from './paths';
+} from '@sky-app/app-db/node';
+import { skyAppDbPath, migrateLegacyDbName, ceremonyDataDir, PHOTO_DIR_NAMES } from './paths';
 
 /**
  * Tìm thư mục ảnh đang thực sự tồn tại trong ceremony-data.
@@ -79,7 +79,7 @@ function normalizeKey(s: string): string {
 
 /**
  * Store dữ liệu đợt trong bộ nhớ (main process) — nguồn lưu trữ lâu dài là SQLite
- * (ceremony.db, qua @sky-app/ceremony-db), memory chỉ là cache đọc nhanh cho tra cứu
+ * (ceremony.db, qua @sky-app/app-db), memory chỉ là cache đọc nhanh cho tra cứu
  * (findById/neighborByDisplayOrder gọi liên tục mỗi lần quét QR/next/prev).
  *
  * Giai đoạn "bỏ Student" (2026-07-22): tách 2 sổ riêng theo đúng kiến trúc Canonical —
@@ -102,7 +102,10 @@ class CeremonyStore {
 
   private getExecutorOrOpen(): BetterSqlite3Executor {
     if (!this.executor) {
-      this.executor = new BetterSqlite3Executor(ceremonyDbPath());
+      // PHẢI chạy trước khi mở kết nối: mở file mới trước rồi mới đổi tên là tạo ra một DB
+      // rỗng và bỏ lại toàn bộ dữ liệu cũ ở tên cũ.
+      migrateLegacyDbName();
+      this.executor = new BetterSqlite3Executor(skyAppDbPath());
       runMigrations(this.executor);
     }
     return this.executor;

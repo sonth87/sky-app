@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { EventDocument } from '@sky-app/slide-shared';
-import { createEvent, deleteEvent, getCurrentActiveEvent, getEvent, listEvents, saveEvent, setActiveEvent } from '@sky-app/ceremony-db/node';
+import { createEvent, deleteEvent, getCurrentActiveEvent, getEvent, listEvents, saveEvent, setActiveEvent } from '@sky-app/app-db/node';
 import { getExecutor } from '../store.js';
 
 /**

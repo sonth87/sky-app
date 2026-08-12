@@ -1,11 +1,11 @@
 import type { DataPort } from '@sky-app/service-contracts';
-import { getCeremonyWithConfig, saveCeremonyWithConfig, defaultCeremony } from '@sky-app/ceremony-db/browser';
+import { getCeremonyWithConfig, saveCeremonyWithConfig, defaultCeremony } from '@sky-app/app-db/browser';
 import type { AppConfig, Ceremony } from '@sky-app/slide-shared';
 import { getSharedWasmExecutor, persistSharedWasmExecutor } from '../wasm-executor.js';
 
 const ROOM_ID = 'default';
 
-// defaultCeremony GOM VỀ @sky-app/ceremony-db (seed.ts, 2026-07-16) — import ở trên.
+// defaultCeremony GOM VỀ @sky-app/app-db (seed.ts, 2026-07-16) — import ở trên.
 // defaultConfig giữ riêng (web fallback dùng cùng giá trị data-service: port 8766, mode manual).
 function defaultConfig(): AppConfig {
   return {

@@ -1,7 +1,7 @@
 // Entry point CHUNG — chỉ schema/migration/queries, KHÔNG chứa driver cụ thể (tránh kéo
 // better-sqlite3 vào bundle trình duyệt hoặc sql.js vào build không cần). Node dùng
-// '@sky-app/ceremony-db/node' (BetterSqlite3Executor), trình duyệt dùng
-// '@sky-app/ceremony-db/browser' (SqlJsExecutor + IndexedDB) — xem package.json's exports.
+// '@sky-app/app-db/node' (BetterSqlite3Executor), trình duyệt dùng
+// '@sky-app/app-db/browser' (SqlJsExecutor + IndexedDB) — xem package.json's exports.
 export type { SqlExecutor } from './sql-executor.js';
 export { runMigrations } from './migrate.js';
 export { MIGRATIONS } from './migrations/index.js';
@@ -28,6 +28,11 @@ export {
 export { recordTokenUsage, listTopVariables } from './queries/variable-registry.js';
 export type { VariableRegistryEntry } from './queries/variable-registry.js';
 export { insertAsset, listAssets, deleteAsset } from './queries/asset.js';
+export {
+  listEffectPresets, getEffectPreset, createEffectPreset,
+  updateEffectPreset, deleteEffectPreset,
+} from './queries/effect-preset.js';
+export type { EffectPreset, EffectConfig } from './queries/effect-preset.js';
 export {
   getEvent,
   listEvents,

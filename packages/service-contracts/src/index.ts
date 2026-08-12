@@ -20,5 +20,8 @@ export type { LicensePort, LicensePayload } from './license.js';
 export type { LayoutPort, VariableRegistryEntry } from './layout.js';
 export type { AssetPort, AssetMeta, AssetQuery, AssetListResult, Asset, AssetType } from './asset.js';
 export type { LayoutComponentPort, LayoutComponentMeta } from './layoutComponent.js';
+export type {
+  EffectPresetPort, EffectPreset, EffectConfig, EffectParamDef, EffectTypeInfo,
+} from './effect-preset.js';
 export type { EventPort } from './event.js';
 export type { DataSourcePort } from './data-source.js';

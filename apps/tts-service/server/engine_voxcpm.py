@@ -149,14 +149,19 @@ class VoxCpmEngine:
             "slow": True,               # RTF 4.5–9.5 trên CPU — UI dùng để cảnh báo
         }
 
-    def encode_reference(self, wav_path: str) -> object:
+    def encode_reference(self, wav_path: str, ref_text: str | None = None) -> object:
         """
         VoxCPM clone thẳng từ file wav, không pre-encode như VieNeu.
 
         Trả kèm bản chép lời (nếu có) để synthesize dùng chế độ clone chính xác hơn.
         Giữ nguyên dạng dict để về sau thêm trường mà không phá cache đã lưu.
+
+        `ref_text` từ registry ưu tiên hơn sidecar `.txt` — xem engine_qwen_mlx.py.
         """
-        return {"wav_path": str(wav_path), "ref_text": _ref_text_for(str(wav_path))}
+        return {
+            "wav_path": str(wav_path),
+            "ref_text": (ref_text or "").strip() or _ref_text_for(str(wav_path)),
+        }
 
     def _run(self, text: str, ref: dict, overrides: dict | None) -> np.ndarray:
         kwargs: dict = {"text": text}
@@ -178,6 +183,18 @@ class VoxCpmEngine:
             kwargs["prompt_text"] = ref_text
         elif wav_path:
             kwargs["reference_wav_path"] = wav_path
+            # Nhánh này CHẠY ĐƯỢC nhưng là chế độ clone KÉM HƠN (không biết ref nói gì
+            # nên tách content/giọng kém chính xác). Trước đây rơi vào đây im lặng, không
+            # có cách nào biết trừ khi nghe kỹ. Ghi log để phân biệt "giọng vốn thế" với
+            # "đang chạy nhầm chế độ vì thiếu transcript" — khác Qwen (bắt buộc có
+            # transcript, thiếu là raise), VoxCPM chỉ giảm chất lượng nên không chặn.
+            import sys
+            print(
+                f"[voxcpm] '{Path(wav_path).name}' chưa có bản chép lời — dùng chế độ "
+                f"clone thuần (kém chính xác hơn continuation mode). Nhập transcript ở "
+                f"Quản lý giọng để cải thiện.",
+                file=sys.stderr, flush=True,
+            )
 
         # `overrides` (temperature/top_k/top_p/...) là tham số sampling chung của
         # server, mặc định tuned riêng cho VieNeu (autoregressive — xem config_store.py,
@@ -203,7 +220,20 @@ class VoxCpmEngine:
                    overrides: dict | None = None) -> np.ndarray:
         # Chấp nhận cả dict (từ encode_reference) lẫn str (registry/cache bản cũ).
         ref = ref_embedding if isinstance(ref_embedding, dict) else {"wav_path": str(ref_embedding)}
-        wav = self._run(text, ref, overrides)
+
+        # Chia đoạn cho text dài (xem chunked_tts.py). KHÔNG bật `runaway_detector`:
+        # runaway là lỗi đặc trưng của đường sinh tự hồi quy bỏ lỡ EOS (Qwen), còn VoxCPM
+        # sinh bằng diffusion với số bước cố định — không có EOS để mà lỡ. Bật lên chỉ
+        # tạo nguy cơ báo động nhầm rồi thử lại vô ích trên engine vốn đã chậm (RTF
+        # 4.5–9.5 trên CPU). voicebox cũng chỉ bật cho đúng đường MLX: `retries_runaway =
+        # backend_type == "mlx"` (backends/__init__.py:238).
+        from chunked_tts import generate_chunked
+
+        wav = generate_chunked(
+            lambda chunk: self._run(chunk, ref, overrides),
+            text,
+            sample_rate=SAMPLE_RATE,
+        )
         return self._post_process(wav, speed)
 
     def synthesize_preset(self, text: str, preset_id: str, speed: float = 1.0,
@@ -211,25 +241,10 @@ class VoxCpmEngine:
         raise RuntimeError("VoxCPM không có giọng preset — hãy chọn một giọng clone từ audio mẫu.")
 
     def _post_process(self, audio: np.ndarray, speed: float) -> np.ndarray:
-        """Giống VieneuEngine._post_process: speed giữ pitch + loudness + trailing silence."""
-        audio = np.asarray(audio, dtype=np.float32).ravel()
-        if abs(speed - 1.0) > 0.01:
-            try:
-                from audio_dsp import time_stretch_keep_pitch
-                audio = time_stretch_keep_pitch(audio, speed)
-            except Exception:
-                import soxr
-                audio = soxr.resample(audio, int(SAMPLE_RATE * speed), SAMPLE_RATE)
-        target = _target_dbfs()
-        if target is not None:
-            from audio_dsp import rms_normalize
-            audio = rms_normalize(audio, target_dbfs=target)
-        else:
-            peak = np.max(np.abs(audio)) if audio.size else 0.0
-            if peak > 1.0:
-                audio = audio / peak
-        silence = np.zeros(int(SAMPLE_RATE * TRAILING_SILENCE_S), dtype=np.float32)
-        return np.concatenate([audio, silence])
+        """Hậu xử lý dùng chung — xem audio_dsp.post_process (trước đây mỗi engine giữ
+        một bản sao gần giống hệt của cùng đoạn code này)."""
+        from audio_dsp import post_process
+        return post_process(audio, speed, SAMPLE_RATE, TRAILING_SILENCE_S, _target_dbfs())
 
     def close(self) -> None:
         self._model = None

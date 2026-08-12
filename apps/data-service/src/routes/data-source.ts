@@ -8,7 +8,7 @@ import {
   listDataSources,
   listFieldMappingProfiles,
   saveFieldMappingProfile,
-} from '@sky-app/ceremony-db/node';
+} from '@sky-app/app-db/node';
 import { getExecutor } from '../store.js';
 
 /**

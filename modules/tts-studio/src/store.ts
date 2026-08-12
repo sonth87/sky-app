@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { EffectConfig } from '@sky-app/service-contracts';
 
 export interface StudioVoice {
   id: string;
@@ -33,6 +34,12 @@ interface TtsStudioState {
   isGenerating: boolean;
   history: HistoryEntryMeta[];
   engineOverrides: Record<string, Record<string, any>>;  // {engineId: {param: value}}
+  /** Chuỗi hiệu ứng hậu kỳ đang áp (đã resolve từ preset, sửa slider tại chỗ được).
+   *  Rỗng = không dùng hiệu ứng. Gửi kèm mỗi lần synthesize. */
+  effectsChain: EffectConfig[];
+  /** Preset đang chọn — chỉ để UI biết tô sáng dòng nào; chuỗi thật nằm ở effectsChain
+   *  và có thể đã bị sửa khác preset gốc. */
+  selectedPresetId: string | null;
 
   setVoices: (voices: StudioVoice[]) => void;
   setSelectedVoiceId: (id: string) => void;
@@ -44,6 +51,9 @@ interface TtsStudioState {
   removeHistory: (id: string) => void;
   setEngineOverrides: (overrides: Record<string, Record<string, any>>) => void;
   updateEngineOverride: (engineId: string, param: string, value: any) => void;
+  setEffectsChain: (chain: EffectConfig[], presetId?: string | null) => void;
+  updateEffectParam: (index: number, param: string, value: number) => void;
+  toggleEffect: (index: number, enabled: boolean) => void;
 }
 
 export const useTtsStudioStore = create<TtsStudioState>((set) => ({
@@ -54,6 +64,8 @@ export const useTtsStudioStore = create<TtsStudioState>((set) => ({
   isGenerating: false,
   history: [],
   engineOverrides: {},
+  effectsChain: [],
+  selectedPresetId: null,
 
   setVoices: (voices) => set({ voices }),
   setSelectedVoiceId: (selectedVoiceId) => set({ selectedVoiceId }),
@@ -66,6 +78,17 @@ export const useTtsStudioStore = create<TtsStudioState>((set) => ({
   removeHistory: (id) =>
     set((s) => ({ history: s.history.filter((e) => e.id !== id) })),
   setEngineOverrides: (engineOverrides) => set({ engineOverrides }),
+  setEffectsChain: (effectsChain, selectedPresetId = null) => set({ effectsChain, selectedPresetId }),
+  updateEffectParam: (index, param, value) =>
+    set((s) => ({
+      effectsChain: s.effectsChain.map((e, i) =>
+        i === index ? { ...e, params: { ...e.params, [param]: value } } : e,
+      ),
+    })),
+  toggleEffect: (index, enabled) =>
+    set((s) => ({
+      effectsChain: s.effectsChain.map((e, i) => (i === index ? { ...e, enabled } : e)),
+    })),
   updateEngineOverride: (engineId, param, value) =>
     set((s) => ({
       engineOverrides: {

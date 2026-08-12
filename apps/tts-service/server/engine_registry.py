@@ -78,11 +78,20 @@ def _qwen_runtime_variant(model_id: str) -> dict:
     Apple qua Metal, tích hợp sẵn mọi chip Apple Silicon — không cần/không có CUDA nên
     không thể dùng đường torch). Nền tảng khác → repo PyTorch gốc qua `qwen-tts` (cần
     CUDA thật — xem cảnh báo trong engine_qwen.py's docstring).
+
+    ⚠️ `mlx-audio` PHẢI pin version. Bug thật 2026-08-11: khai `"mlx-audio"` thả nổi nên
+    pip kéo về 0.4.8, mà 0.4.8 GỠ cap chống runaway trong `_generate_icl` (0.4.1 có
+    `effective_max_tokens = min(max_tokens, max(75, n_text_tokens * 6))`, 0.4.8 đổi thành
+    `= max_tokens` thẳng). Hậu quả: mỗi lần model miss EOS là sinh trọn 4096 token ≈ 5,5
+    phút audio ảo giác — vừa hỏng tiếng vừa chậm gấp hàng chục lần. voicebox (app tham
+    chiếu, /Users/skyline/TEST/voicebox-main) pin `mlx-audio==0.4.1` từ đầu nên không
+    dính. Ta pin 0.4.8 (bản đang chạy, có batching + _icl_cache) và TỰ truyền `max_tokens`
+    ở engine_qwen_mlx.py — cap phía mình nên không phụ thuộc lib version nào.
     """
     if _is_apple_silicon():
         return {
             "runtime_kind": "mlx",
-            "pip_packages": ["mlx-audio", "soundfile", "soxr>=0.3,<0.4"],
+            "pip_packages": ["mlx-audio==0.4.8", "soundfile", "soxr>=0.3,<0.4"],
             "repo": f"mlx-community/Qwen3-TTS-12Hz-{model_id}-Base-bf16",
             "needs_gpu": False,  # Metal tích hợp sẵn Apple Silicon, không cần card rời
             "note": "Chạy qua MLX trên Apple Silicon (dùng GPU tích hợp qua Metal)",
@@ -274,6 +283,7 @@ def list_engines() -> list[dict]:
             "description": meta["description"],
             "implemented": meta["implemented"],
             "bundled": meta.get("bundled", False),
+            "category": engine_category(eid),
             "runtime_kind": engine_runtime_kind(eid),
             "capabilities": _static_caps(eid) if meta["implemented"] else None,
             "requirements": (install or {}).get("requirements"),
@@ -295,6 +305,25 @@ def _static_caps(engine_id: str) -> dict | None:
             "supports_emotion": False,
         }
     return None
+
+
+def engine_category(engine_id: str) -> str:
+    """Nhóm model để UI hiển thị theo mục: 'tts' | 'stt' | 'llm'.
+
+    Mặc định 'tts' — toàn bộ `_ENGINES` hiện tại đều là engine sinh giọng nói, và entry
+    thêm sau mà quên khai vẫn rơi vào nhóm đúng thay vì biến mất khỏi danh sách.
+
+    Khác voicebox (app tham chiếu): bên đó KHÔNG có field này, UI phân nhóm bằng cách so
+    tiền tố chuỗi tên model (`m.model_name.startsWith('whisper')` —
+    `app/src/components/ServerSettings/ModelManagement.tsx:409-421`). Registry của sky-app
+    vốn đã là dict có cấu trúc nên khai tường minh sạch hơn hẳn: thêm model mới không phải
+    nhớ sửa cả một chuỗi `if` ở renderer, và tên model đổi cũng không âm thầm rơi nhóm.
+    """
+    meta = _ENGINES.get(engine_id)
+    if meta is None:
+        return "tts"
+    declared = meta.get("category")
+    return declared if isinstance(declared, str) and declared else "tts"
 
 
 def engine_runtime_kind(engine_id: str) -> str:
@@ -319,17 +348,38 @@ def engine_runtime_kind(engine_id: str) -> str:
 
 
 def engine_site_packages(engine_id: str) -> Path | None:
-    """site-packages riêng của engine mở rộng đã cài, hoặc None nếu không có.
+    """site-packages của engine mở rộng đã cài, hoặc None nếu không có.
 
     Cho phép process đang chạy nạp engine mở rộng KHÔNG cần restart: thêm đường dẫn này
     vào cuối `sys.path` (cuối, không phải đầu — gói của process chủ luôn thắng, tránh
     numpy/onnxruntime của engine ghi đè bản đã bundle gây lệch ABI).
+
+    Dò HAI layout, cùng thứ tự ưu tiên với `resolveEngineRuntimeLocation()` phía Electron
+    (apps/shell-electron/electron/slide/engine-installer.ts) — hai bên PHẢI khớp nhau,
+    nếu không Python tìm một chỗ còn Electron cài vào chỗ khác:
+
+      1. DÙNG CHUNG (GĐ C, 2026-08-11): <base>/_runtime/<kind>/site-packages — mọi engine
+         cùng `runtime_kind` xài chung, để torch (~2.5GB) chỉ lưu 1 lần.
+      2. RIÊNG (trước GĐ C): <base>/<engine_id>/runtime/site-packages — engine cài từ
+         trước bản đó vẫn chạy, không bắt cài lại chỉ vì đổi chỗ lưu.
+
+    Bug thật: hàm này trước đây CHỈ biết layout (2). Sau GĐ C, engine mới cài (vd MOSS)
+    luôn trả None → `create_engine` append `sys.path` im lặng không làm gì → import lỗi →
+    fallback spawn process riêng, đúng cái mà GĐ C dựng in-process để tránh.
     """
+    base = os.environ.get("VIENEU_ENGINES_DIR", "").strip()
+    if base:
+        kind = engine_runtime_kind(engine_id)
+        # Khớp `ttsRuntimeDir()` (paths.ts): lọc ký tự lạ y hệt cách làm với engine_id.
+        shared = Path(base) / "_runtime" / re.sub(r"[^a-zA-Z0-9_-]", "_", kind) / "site-packages"
+        if shared.exists():
+            return shared
+
     d = _engine_data_dir(engine_id)
     if d is None:
         return None
-    sp = d / "runtime" / "site-packages"
-    return sp if sp.exists() else None
+    legacy = d / "runtime" / "site-packages"
+    return legacy if legacy.exists() else None
 
 
 def engine_dir_name(engine_id: str) -> str:

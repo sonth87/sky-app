@@ -1,4 +1,4 @@
-import { languageFromSourceLang, type SpeakOptions, type SynthesizeResult, type TtsPort, type Voice, type VoiceCatalogEntry } from '@sky-app/service-contracts';
+import { languageFromSourceLang, type EffectTypeInfo, type SpeakOptions, type SynthesizeResult, type TtsPort, type Voice, type VoiceCatalogEntry } from '@sky-app/service-contracts';
 
 interface RawVoice {
   id: string;
@@ -74,6 +74,10 @@ async function fetchSynthesize(
       speaker_id: opts?.voiceId ?? 'clone-d0f05071',
       speed: opts?.speed ?? 1.0,
       temperature: opts?.temperature,
+      engine_overrides: opts?.engine_overrides,
+      // Chỉ gửi khi có — server phân biệt "không dùng hiệu ứng" (vắng mặt/rỗng) và bỏ qua
+      // hẳn bước áp dụng, không phải dựng một pedalboard rỗng cho mỗi request.
+      ...(opts?.effectsChain?.length ? { effects_chain: opts.effectsChain } : {}),
     }),
   });
   if (!res.ok) throw new Error(`TTS synthesize failed: ${res.status} ${await res.text()}`);
@@ -151,16 +155,40 @@ export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
       if (opts.tags) {
         opts.tags.forEach(tag => formData.append('tags', tag));
       }
+      // Luôn gửi (kể cả rỗng) — server quyết định có bắt buộc hay không theo engine
+      // đang chạy, client không nên đoán thay.
+      formData.append('ref_text', opts.refText ?? '');
 
       const res = await fetch(`${baseUrl}/voices/clone`, {
         method: 'POST',
         body: formData,
       });
       if (!res.ok) {
-        return { ok: false, error: `TTS clone failed: ${res.statusText}` };
+        // Body của FastAPI mang thông báo đọc được (vd "cần bản chép lời của audio
+        // mẫu"); statusText chỉ là "Bad Request", vô dụng với người dùng.
+        return { ok: false, error: (await res.text()) || `TTS clone failed: ${res.statusText}` };
       }
       const voice = await res.json();
       return { ok: true, voice };
+    },
+
+    async listEffectTypes() {
+      const res = await fetch(`${baseUrl}/effects`);
+      if (!res.ok) return [];
+      const data = (await res.json()) as { available?: boolean; effects?: EffectTypeInfo[] };
+      return data.available ? (data.effects ?? []) : [];
+    },
+
+    async updateVoiceRefText(voiceId, refText) {
+      const res = await fetch(`${baseUrl}/voices/${encodeURIComponent(voiceId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref_text: refText }),
+      });
+      if (!res.ok) {
+        return { ok: false, error: (await res.text()) || `TTS update failed: ${res.statusText}` };
+      }
+      return { ok: true };
     },
 
     async deleteVoice(voiceId) {

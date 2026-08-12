@@ -12,6 +12,8 @@ import { SQL_011_EVENT_COLOR } from './011_event_color.js';
 import { SQL_012_LAYOUT_DOCUMENT_CATEGORY_TAGS } from './012_layout_document_category_tags.js';
 import { SQL_013_LAYOUT_DOCUMENT_TRASH } from './013_layout_document_trash.js';
 import { SQL_014_LAYOUT_COMPONENT } from './014_layout_component.js';
+import { SQL_015_EFFECT_PRESET } from './015_effect_preset.js';
+import { SQL_016_TTS_TABLE_PREFIX } from './016_tts_table_prefix.js';
 
 export interface Migration {
   version: number;
@@ -40,4 +42,6 @@ export const MIGRATIONS: Migration[] = [
   { version: 12, name: 'layout_document_category_tags', sql: SQL_012_LAYOUT_DOCUMENT_CATEGORY_TAGS },
   { version: 13, name: 'layout_document_trash', sql: SQL_013_LAYOUT_DOCUMENT_TRASH },
   { version: 14, name: 'layout_component', sql: SQL_014_LAYOUT_COMPONENT },
+  { version: 15, name: 'effect_preset', sql: SQL_015_EFFECT_PRESET },
+  { version: 16, name: 'tts_table_prefix', sql: SQL_016_TTS_TABLE_PREFIX },
 ];

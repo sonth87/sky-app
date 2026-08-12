@@ -13,6 +13,14 @@ export class BetterSqlite3Executor implements SqlExecutor {
     this.db = new Database(path);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
+    // Chờ tối đa 5s khi file đang bị tiến trình khác khoá, thay vì ném SQLITE_BUSY ngay.
+    //
+    // Khai TƯỜNG MINH dù better-sqlite3 vốn mặc định đúng 5000ms: từ khi tiến trình Python
+    // của tts-service cũng mở file này (xem `db.py`), con số đó không còn là chi tiết nội
+    // bộ của một thư viện mà là HỢP ĐỒNG giữa hai runtime khác nhau — Python đặt cùng giá
+    // trị ở phía nó. Để mặc định ngầm thì một bản nâng cấp better-sqlite3 có thể đổi nó mà
+    // không ai nhận ra, và triệu chứng sẽ là lỗi ghi ngắt quãng lúc hai bên cùng bận.
+    this.db.pragma('busy_timeout = 5000');
   }
 
   exec(sql: string): void {

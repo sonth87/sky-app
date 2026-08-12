@@ -1,3 +1,5 @@
+import type { EffectConfig, EffectTypeInfo } from './effect-preset.js';
+
 /**
  * TtsPort — sinh audio giọng nói. Electron: client → local Python service (IPC).
  * Web: HTTP → backend TTS service. Xem docs/architecture/web-vs-electron.md.
@@ -20,6 +22,12 @@ export interface Voice {
   /** id catalog entry gốc nếu voice này được server tự encode ngầm từ 1 catalog entry
    * (lần đầu synthesize chọn nó) — dùng để khớp/loại trùng với danh sách catalog ở UI. */
   sourceCatalogId?: string;
+  /** Bản chép lời của audio mẫu — audio đó đang nói câu gì.
+   *
+   * Engine clone kiểu in-context cần nó để căn text↔âm thanh: Qwen BẮT BUỘC (thiếu là
+   * audio hỏng hoàn toàn, không phải giảm chất lượng), VoxCPM tuỳ chọn (có thì clone
+   * chính xác hơn), VieNeu/MOSS không dùng. Xem `TtsCapabilities.requiresRefText`. */
+  refText?: string;
 }
 
 /** 1 entry trong thư viện voice mẫu 'hệ thống' — search/preview trước khi chọn dùng.
@@ -82,6 +90,10 @@ export interface SpeakOptions {
   speed?: number;
   temperature?: number;
   engine_overrides?: Record<string, Record<string, any>>;  // Engine-specific params
+  /** Chuỗi hiệu ứng hậu kỳ đã resolve từ preset (xem EffectPresetPort). Client tra preset
+   *  rồi gửi chuỗi cuối cùng — service TTS không biết khái niệm "preset" vì nó cách ly với
+   *  cơ sở dữ liệu chứa preset. */
+  effectsChain?: EffectConfig[];
 }
 
 export interface SynthesizeResult {
@@ -114,13 +126,23 @@ export interface TtsPort {
     tagline?: string;
     description?: string;
     tags?: string[];
+    /** Bản chép lời của file mẫu — xem `Voice.refText`. Server từ chối (400) nếu để
+     * trống khi engine đang chạy khai `requiresRefText`. */
+    refText?: string;
   }): Promise<{
     ok: boolean;
     voice?: { id: string; label: string; gender: string; region: string; type: string; warnings?: string[] };
     error?: string;
   }>;
+  /** Sửa bản chép lời của 1 voice đã có (giọng dựng sẵn hoặc đã clone trước khi có ô
+   * nhập này). Server tự xoá embedding đã cache để transcript mới có hiệu lực ngay. */
+  updateVoiceRefText?(voiceId: string, refText: string): Promise<{ ok: boolean; error?: string }>;
   /** Xóa voice đã clone. */
   deleteVoice?(voiceId: string): Promise<{ ok: boolean; error?: string }>;
   /** Mở hộp thoại chọn file âm thanh của OS (chỉ khả dụng trên Electron). */
   pickAudioFile?(): Promise<{ ok: boolean; filePath?: string }>;
+  /** Bảng hiệu ứng hậu kỳ khả dụng + định nghĩa tham số, do service TTS khai
+   *  (`GET /effects`). UI dựng slider từ đây thay vì hard-code — thêm hiệu ứng mới chỉ
+   *  cần sửa phía service. Trả mảng rỗng khi service không hỗ trợ hiệu ứng. */
+  listEffectTypes?(): Promise<EffectTypeInfo[]>;
 }

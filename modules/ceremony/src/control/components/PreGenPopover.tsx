@@ -91,8 +91,10 @@ export function PreGenPopover({ status }: Props) {
       const res = await slide.pregenGetAudio(studentCode);
       console.log('[PreGenPopover] play response studentCode=', studentCode, 'ok=', res.ok, 'hasBuffer=', !!res.buffer, 'error=', res.error);
       if (res.ok && res.buffer) {
-        console.log('[PreGenPopover] playPcm studentCode=', studentCode, 'pcmBytes=', res.buffer.slice(44).byteLength);
-        await playPcm(res.buffer.slice(44), 48000);
+        // Tần số lấy từ main process (đọc từ WAV header), không hardcode — xem
+        // BackdropApp's playPcm cùng lý do.
+        console.log('[PreGenPopover] playPcm studentCode=', studentCode, 'pcmBytes=', res.buffer.slice(44).byteLength, 'sr=', res.sampleRate);
+        await playPcm(res.buffer.slice(44), res.sampleRate ?? 48000);
       }
     } finally {
       setPlayingCode(null);

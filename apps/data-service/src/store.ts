@@ -8,11 +8,15 @@ import {
   getCeremonyWithConfig,
   saveCeremonyWithConfig,
   defaultCeremony,
-} from '@sky-app/ceremony-db/node';
+} from '@sky-app/app-db/node';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const DATA_DIR = join(__dirname, '..', 'data');
-const DB_PATH = join(DATA_DIR, 'ceremony.db');
+// `sky-app.db`, không phải `ceremony.db`: file này chứa bảng của mọi module (layout, event,
+// asset, TTS…), không riêng Ceremony. Data-service là DB dev/web RIÊNG — không dùng chung
+// file với Electron — nên đổi tên thẳng, không cần bước migrate như `paths.ts` phải làm cho
+// dữ liệu thật của người dùng.
+const DB_PATH = join(DATA_DIR, 'sky-app.db');
 
 const ROOM_ID = 'default';
 
@@ -31,7 +35,7 @@ export interface CeremonyBundle {
   syncedAt: string | null;
 }
 
-// defaultCeremony gom về @sky-app/ceremony-db (seed.ts). Chỉ defaultConfig giữ RIÊNG vì
+// defaultCeremony gom về @sky-app/app-db (seed.ts). Chỉ defaultConfig giữ RIÊNG vì
 // data-service dùng giá trị mặc định KHÁC Electron (port 8766, mode manual, kiosk off...).
 function defaultConfig(): AppConfig {
   return {

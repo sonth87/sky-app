@@ -1,5 +1,5 @@
 import { app } from 'electron';
-import { existsSync } from 'node:fs';
+import { existsSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Thư mục dữ liệu offline của buổi lễ trong userData */
@@ -13,8 +13,45 @@ export function bundleJsonPath(): string {
   return join(ceremonyDataDir(), 'bundle.json');
 }
 
-export function ceremonyDbPath(): string {
+/**
+ * File SQLite DÙNG CHUNG cho toàn app — không phải của riêng Ceremony.
+ *
+ * Tên cũ `ceremony.db` là di sản của module đầu tiên dùng nó; thực tế file này chứa bảng của
+ * layout designer, event/data-source, media library, TTS… (xem packages/app-db/src/migrations).
+ * Đổi tên 2026-08-12 cho khớp thực tế — kèm `migrateLegacyDbName()` để bản cài cũ không mất
+ * dữ liệu.
+ */
+export function skyAppDbPath(): string {
+  return join(ceremonyDataDir(), 'sky-app.db');
+}
+
+/** Đường dẫn cũ, CHỈ dùng cho bước đổi tên một lần. Không mở kết nối vào đây. */
+function legacyDbPath(): string {
   return join(ceremonyDataDir(), 'ceremony.db');
+}
+
+/**
+ * Đổi tên DB của bản cài cũ sang tên mới. Gọi TRƯỚC khi mở kết nối đầu tiên.
+ *
+ * Đổi cả 3 file: `.db`, `-wal`, `-shm`. Bỏ sót `-wal` là mất những giao dịch chưa
+ * checkpoint (WAL có thể giữ lượng ghi đáng kể — app không bao giờ đóng kết nối nên
+ * checkpoint chỉ xảy ra tự động theo ngưỡng).
+ *
+ * Không làm gì nếu file mới đã có (đã đổi rồi, hoặc máy mới) — kể cả khi file cũ vẫn còn,
+ * vì lúc đó file cũ là rác chứ không phải nguồn sự thật. Lỗi đổi tên KHÔNG được nuốt: thà
+ * dừng có thông báo còn hơn âm thầm tạo DB rỗng rồi người dùng tưởng mất sạch dữ liệu.
+ */
+export function migrateLegacyDbName(): void {
+  const target = skyAppDbPath();
+  const legacy = legacyDbPath();
+  if (existsSync(target) || !existsSync(legacy)) return;
+
+  console.log(`[DB] Đổi tên ${legacy} → ${target}`);
+  renameSync(legacy, target);
+  // -wal/-shm có thể không tồn tại (DB đã checkpoint sạch lúc thoát) — không phải lỗi.
+  for (const suffix of ['-wal', '-shm']) {
+    if (existsSync(legacy + suffix)) renameSync(legacy + suffix, target + suffix);
+  }
 }
 
 export function appConfigJsonPath(): string {

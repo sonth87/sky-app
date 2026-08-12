@@ -77,8 +77,13 @@ describe('createElectronPlatform', () => {
     }>('tts')!;
     const result = await tts.synthesizeBuffer('xin chào', { voiceId: 'NF', speed: 1.0 });
 
+    // 2 tham số cuối (engineOverrides, effectsChain) là `undefined` khi caller không
+    // truyền — nhưng vẫn phải ĐI QUA, vì sau khi khối `infer` global bị lọc theo
+    // `sampling_params` mà engine tự khai, `engine_overrides` là đường DUY NHẤT chỉnh
+    // sampling của engine không khai (Qwen). Trước đây preload gửi field đó nhưng handler
+    // IPC không nhận, nên mọi chỉnh sửa nâng cao đều rơi vào hư không mà không ai biết.
     // @ts-expect-error -- test stub
-    expect(window.slide.synthesizeTts).toHaveBeenCalledWith('xin chào', 'NF', 1.0);
+    expect(window.slide.synthesizeTts).toHaveBeenCalledWith('xin chào', 'NF', 1.0, undefined, undefined);
     expect(result).toEqual({ buffer: pcm, sampleRate: 48000 });
     // Không tự phát — AudioContext không được tạo/dùng.
     expect(ctx.createBufferSource).not.toHaveBeenCalled();
@@ -122,8 +127,12 @@ describe('createElectronPlatform', () => {
     const tts = platform.services.get<{ listVoices: () => Promise<{ id: string; name: string; language?: string; gender?: string }[]> }>('tts')!;
     const voices = await tts.listVoices();
 
+    // `language` là NGÔN NGỮ, suy từ `source_lang` (thiếu → mặc định "Vietnamese"), KHÔNG
+    // phải `region` — 'Bắc' là nhãn vùng miền, khác hẳn khái niệm ngôn ngữ. Test này còn
+    // assert hành vi CŨ đã bị sửa từ 2026-08-04 (xem languageFromSourceLang's docstring
+    // trong service-contracts/src/tts.ts) nên đỏ từ trước; cập nhật cho khớp bản sửa đó.
     expect(voices).toEqual([
-      expect.objectContaining({ id: 'NF', name: 'Lan Anh', language: 'Bắc', gender: 'female' }),
+      expect.objectContaining({ id: 'NF', name: 'Lan Anh', language: 'Vietnamese', gender: 'female' }),
     ]);
   });
 

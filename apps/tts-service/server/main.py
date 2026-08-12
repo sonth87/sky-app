@@ -395,7 +395,7 @@ async def lifespan(app: FastAPI):
         ref_path = _registry.get_ref_path(voice["id"])
         if ref_path and ref_path.exists():
             try:
-                emb = _engine.encode_reference(str(ref_path))
+                emb = _engine.encode_reference(str(ref_path), voice.get("ref_text"))
                 _ref_cache()[voice["id"]] = emb
                 _safe_console(f"[TTS]   {voice['id']} ({voice.get('ref_file')}) OK")
                 _write_log(f"[TTS]   {voice['id']} OK")
@@ -466,6 +466,24 @@ def put_config(body: dict):
     if not isinstance(body, dict):
         raise HTTPException(400, "Body phải là object JSON")
     return _config.update(body)
+
+
+# ── Hiệu ứng hậu kỳ ──────────────────────────────────────────────────────────
+
+@app.get("/effects")
+def get_effects():
+    """Danh sách hiệu ứng khả dụng + định nghĩa tham số (min/max/step/mặc định).
+
+    UI dựng slider từ dữ liệu này thay vì khai lại bằng tay ở TypeScript — thêm hiệu ứng
+    mới chỉ cần sửa `effects.py`, không phải sửa hai nơi rồi để chúng lệch nhau.
+
+    `available: false` khi pedalboard chưa cài — UI ẩn phần hiệu ứng thay vì hiện bộ
+    chỉnh bấm vào không có tác dụng gì.
+    """
+    from effects import available, get_available_effects
+    if not available():
+        return {"available": False, "effects": []}
+    return {"available": True, "effects": get_available_effects()}
 
 
 # ── Capabilities (provider/device detection cho UI switch CPU/GPU) ───────────
@@ -688,6 +706,16 @@ def _import_catalog_entry(entry: dict, lang: str) -> dict:
 
     existing = _registry.find_by_source_catalog_id(entry["id"])
     if existing is not None:
+        # Backfill `ref_text`: voice import TRƯỚC khi catalog có transcript sẽ vĩnh viễn
+        # thiếu nó nếu chỉ return sớm ở đây (guard idempotent này chạy trước mọi bước
+        # ghi). Với Qwen, thiếu transcript = không synthesize được (xem engine_qwen_mlx),
+        # nên người dùng sẽ thấy giọng catalog "hỏng" mà không hiểu vì sao — trong khi
+        # dữ liệu đúng đã nằm sẵn trong catalog.json chỉ chờ được chép sang.
+        cat_text = (entry.get("ref_text") or "").strip()
+        if cat_text and not (existing.get("ref_text") or "").strip():
+            _registry.set_ref_text(existing["id"], cat_text)
+            _ref_cache_forget_voice(existing["id"])  # cache giữ dict {wav_path, ref_text} cũ
+            existing = _registry.get_voice(existing["id"]) or existing
         return existing
 
     from voice_catalog import get_catalog_ref_path
@@ -709,8 +737,9 @@ def _import_catalog_entry(entry: dict, lang: str) -> dict:
         ref_path.unlink(missing_ok=True)
         raise
 
+    cat_ref_text = (entry.get("ref_text") or "").strip()
     try:
-        emb = _engine.encode_reference(str(ref_path))
+        emb = _engine.encode_reference(str(ref_path), cat_ref_text or None)
     except Exception as e:
         ref_path.unlink(missing_ok=True)
         raise HTTPException(500, f"Không thể encode voice: {e}")
@@ -734,6 +763,9 @@ def _import_catalog_entry(entry: dict, lang: str) -> dict:
             "description": entry.get("description"),
             "source_catalog_id": entry["id"],
             "source_lang": lang,
+            # Bản chép lời do vendor cung cấp trong catalog.json — bắt buộc với Qwen,
+            # cải thiện chất lượng với VoxCPM. Chỉ ghi khi có, tránh tạo key rỗng.
+            **({"ref_text": cat_ref_text} if cat_ref_text else {}),
         },
     )
     _ref_cache()[voice["id"]] = emb
@@ -761,47 +793,71 @@ def _ensure_voice_ready(speaker_id: str) -> dict:
 
 
 # Giới hạn ref clone — tránh file quá lớn/dài làm mọi request về sau chậm vĩnh viễn
-# (VieNeu clone in-context: ref codes nhét vào prompt, prefill tỉ lệ độ dài ref).
+# (clone in-context: ref codes nhét vào prompt, prefill tỉ lệ độ dài ref).
+# Ngưỡng thời lượng lấy từ check_ref_audio.py (nguồn chuẩn duy nhất — CLI chấm điểm và
+# server PHẢI cùng ngưỡng, xem comment ở đó).
 _CLONE_MAX_BYTES = 15 * 1024 * 1024   # 15MB
-_CLONE_MAX_SECONDS = 15.0
-_CLONE_MIN_SECONDS = 1.5
+_CLONE_MIN_RMS = 0.01                 # khớp voicebox's validate_and_load_reference_audio
 
 
 def _validate_ref_audio(path: Path) -> list[str]:
     """
-    Kiểm tra file ref trước khi encode. Raise HTTPException nếu KHÔNG dùng được;
-    trả list cảnh báo (không chặn) cho các vấn đề nhẹ.
+    LÀM SẠCH rồi kiểm tra file ref, GHI ĐÈ bản đã xử lý xuống `path`.
+
+    Raise HTTPException nếu không dùng được; trả list cảnh báo (không chặn) cho vấn đề nhẹ.
+
+    Trước đây hàm này chỉ ĐỌC metadata rồi cảnh báo bằng chữ — file upload đi thẳng vào
+    engine y nguyên, kèm cả DC offset, im lặng thừa hai đầu và đỉnh quá nóng. Với engine
+    clone in-context (Qwen/VoxCPM) những thứ đó đi thẳng vào speech tokenizer thành ref
+    codes bẩn. voicebox làm sạch TRƯỚC KHI LƯU (`add_profile_sample` →
+    `validate_and_load_reference_audio` → `preprocess_reference_audio`); đây là bản port.
     """
     import soundfile as sf
+    from audio_dsp import preprocess_reference_audio
+    from check_ref_audio import MAX_SECONDS, MIN_SECONDS
 
-    warnings: list[str] = []
     try:
-        info = sf.info(str(path))
+        data, sr = sf.read(str(path), dtype="float32", always_2d=True)
     except Exception as e:
         raise HTTPException(400, f"Không đọc được file audio: {e}")
 
-    dur = info.frames / info.samplerate if info.samplerate else 0.0
-    if dur < _CLONE_MIN_SECONDS:
-        raise HTTPException(400, f"Audio quá ngắn ({dur:.1f}s) — cần ít nhất {_CLONE_MIN_SECONDS:g}s.")
-    if dur > _CLONE_MAX_SECONDS:
-        raise HTTPException(400, f"Audio quá dài ({dur:.1f}s) — tối đa {_CLONE_MAX_SECONDS:.0f}s. Hãy cắt ngắn.")
-
-    # Cảnh báo (không chặn): sample rate thấp, và chất lượng qua analyze_quality.
-    if info.samplerate < 24000:
-        warnings.append(f"Sample rate thấp ({info.samplerate}Hz) — nên dùng ≥24kHz để giọng rõ.")
+    # Chấm điểm trên bản GỐC, trước khi làm sạch: mọi gợi ý của check_ref_audio đều nói
+    # về cách THU LẠI (đứng gần mic hơn, phòng bớt vang...), nên phải mô tả đúng bản ghi
+    # người dùng đưa vào. Chấm sau khi trim sẽ làm tụt `silence_pct` và sinh cảnh báo
+    # "không có khoảng lặng sạch" hoàn toàn do bước xử lý của ta gây ra.
+    warnings: list[str] = []
     try:
-        from engine import analyze_quality
-        data, sr = sf.read(str(path), dtype="float32", always_2d=True)
-        mono = data.mean(axis=1)
-        q = analyze_quality(mono, "x" * max(1, int(dur * 15)), sr)
-        if "clipping" in q["flags"]:
-            warnings.append("Audio bị méo/clipping — giọng clone có thể rè.")
-        if "low_energy" in q["flags"]:
-            warnings.append("Audio quá nhỏ tiếng — giọng clone có thể yếu.")
-    except HTTPException:
-        raise
+        from check_ref_audio import analyze, grade
+        for check in grade(analyze(path)):
+            if check["level"] in ("FAIL", "WARN"):
+                detail = f"{check['label']}: {check['detail']}"
+                warnings.append(f"{detail} — {check['hint']}" if check.get("hint") else detail)
     except Exception:
-        pass  # phân tích cảnh báo lỗi không được chặn clone
+        pass  # chấm điểm hỏng không được chặn clone — nó chỉ là cảnh báo
+
+    mono = data.mean(axis=1)
+    cleaned = preprocess_reference_audio(mono, sr)
+
+    dur = cleaned.size / sr if sr else 0.0
+    if dur < MIN_SECONDS:
+        raise HTTPException(400, f"Audio quá ngắn ({dur:.1f}s) — cần ít nhất {MIN_SECONDS:g}s.")
+    if dur > MAX_SECONDS:
+        raise HTTPException(400, f"Audio quá dài ({dur:.1f}s) — tối đa {MAX_SECONDS:.0f}s. Hãy cắt ngắn.")
+
+    rms = float(np.sqrt(np.mean(cleaned ** 2))) if cleaned.size else 0.0
+    if rms < _CLONE_MIN_RMS:
+        raise HTTPException(400, "Audio gần như im lặng — hãy thu lại to rõ hơn.")
+
+    # Ghi đè bằng bản đã làm sạch (mono, giữ nguyên sample rate). Ghi ra file tạm rồi
+    # replace: nếu process chết giữa chừng, file ref cũ vẫn còn nguyên thay vì thành WAV
+    # cụt không đọc được (cùng cách voicebox's save_audio làm).
+    try:
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        sf.write(str(tmp), cleaned, sr, subtype="PCM_16", format="WAV")
+        os.replace(tmp, path)
+    except Exception as e:
+        raise HTTPException(500, f"Không ghi được audio đã xử lý: {e}")
+
     return warnings
 
 
@@ -811,8 +867,15 @@ async def clone_voice(
     label: str = Form(...),
     gender: str = Form("female"),
     region: str = Form("Bắc"),
+    ref_text: str = Form(""),
 ):
-    """Upload WAV → validate → encode embedding → persist vào registry."""
+    """Upload WAV → validate → encode embedding → persist vào registry.
+
+    `ref_text` — bản chép lời của audio mẫu. Optional ở tầng HTTP (engine như
+    VieNeu/MOSS không dùng tới), nhưng BẮT BUỘC khi engine đang chạy khai
+    `requires_ref_text` — chặn ngay tại đây thay vì để người dùng clone xong mới phát
+    hiện giọng không đọc được.
+    """
     if _registry is None or _engine is None:
         raise HTTPException(503, "Service not ready")
 
@@ -823,6 +886,14 @@ async def clone_voice(
         raise HTTPException(400, f"File quá lớn ({len(content) // (1024*1024)}MB) — tối đa 15MB.")
     if not (label or "").strip():
         raise HTTPException(400, "Cần nhập tên giọng (label).")
+
+    ref_text = (ref_text or "").strip()
+    if not ref_text and _engine.capabilities().get("requires_ref_text"):
+        raise HTTPException(
+            400,
+            f"{_engine.capabilities().get('label', 'Engine hiện tại')} cần bản chép lời "
+            f"của audio mẫu — hãy nhập nội dung audio đang nói.",
+        )
 
     ref_filename = f"clone-{uuid.uuid4().hex[:8]}.wav"
     ref_path = _ref_dir / ref_filename
@@ -836,25 +907,44 @@ async def clone_voice(
         raise
 
     try:
-        emb = _engine.encode_reference(str(ref_path))
+        emb = _engine.encode_reference(str(ref_path), ref_text or None)
     except Exception as e:
         ref_path.unlink(missing_ok=True)
         raise HTTPException(500, f"Không thể encode voice: {e}")
 
-    voice = _registry.add_cloned(label=label.strip(), gender=gender, region=region, ref_file=ref_filename)
+    voice = _registry.add_cloned(
+        label=label.strip(), gender=gender, region=region, ref_file=ref_filename,
+        extra={"ref_text": ref_text} if ref_text else None,
+    )
     _ref_cache()[voice["id"]] = emb
     return {**voice, "warnings": warnings}
 
 
 @app.put("/voices/{voice_id}")
 def update_voice(voice_id: str, body: dict):
+    """Sửa voice. Nhận `hidden` (bool) và/hoặc `ref_text` (str) — ít nhất một trong hai."""
     if _registry is None:
         raise HTTPException(503, "Registry not ready")
+
     hidden = body.get("hidden")
-    if hidden is None:
-        raise HTTPException(400, "Cần trường 'hidden' (true/false)")
-    if not _registry.set_hidden(voice_id, bool(hidden)):
-        raise HTTPException(404, f"Voice not found: {voice_id}")
+    ref_text = body.get("ref_text")
+    if hidden is None and ref_text is None:
+        raise HTTPException(400, "Cần trường 'hidden' (true/false) hoặc 'ref_text' (chuỗi)")
+
+    if hidden is not None:
+        if not _registry.set_hidden(voice_id, bool(hidden)):
+            raise HTTPException(404, f"Voice not found: {voice_id}")
+
+    if ref_text is not None:
+        if not isinstance(ref_text, str):
+            raise HTTPException(400, "'ref_text' phải là chuỗi")
+        if not _registry.set_ref_text(voice_id, ref_text):
+            raise HTTPException(404, f"Voice not found: {voice_id}")
+        # Embedding đã cache giữ nguyên dict {wav_path, ref_text} cũ suốt vòng đời
+        # process — không xoá thì transcript vừa sửa không có tác dụng gì cho tới lần
+        # restart, và người dùng sẽ nghĩ việc sửa không ăn thua.
+        _ref_cache_forget_voice(voice_id)
+
     return _registry.get_voice(voice_id)
 
 
@@ -923,6 +1013,11 @@ class TtsRequest(BaseModel):
     max_new_frames: int | None = None
     # Engine-specific overrides — dict theo engine id (vd {"vieneu": {"emotion": "happy"}, "moss": {"max_new_frames": 500}})
     engine_overrides: dict | None = None
+    # Chuỗi hiệu ứng hậu kỳ ĐÃ RESOLVE (vd [{"type":"reverb","enabled":true,"params":{...}}]).
+    # Client tự tra preset rồi gửi chuỗi cuối cùng xuống — server không biết khái niệm
+    # "preset" vì preset nằm trong ceremony-db, mà tiến trình Python này cách ly với DB
+    # đó (xem docstring effects.py).
+    effects_chain: list | None = None
 
 
 def _run_synthesis(req: TtsRequest, voice: dict) -> np.ndarray:
@@ -937,17 +1032,30 @@ def _run_synthesis(req: TtsRequest, voice: dict) -> np.ndarray:
         v = getattr(req, field, None)
         return v if v is not None else cfg_infer.get(field)
 
-    overrides = {
-        "temperature": _pick("temperature"),
-        "top_k": _pick("top_k"),
-        "top_p": _pick("top_p"),
-        "repetition_penalty": _pick("repetition_penalty"),
-        "max_new_frames": _pick("max_new_frames"),
-    }
+    engine_caps = _engine.capabilities() if _engine is not None else {}
 
-    # Merge engine-specific overrides (nếu có) — ưu tiên cao nhất
+    # Khối `infer` GLOBAL (config.json) là namespace DÙNG CHUNG nhưng giá trị mặc định
+    # trong đó là tuning riêng của VieNeu (temperature=0.1/top_k=5/rep=1.3 — xem
+    # config_store.py's DEFAULTS và engine.py's VieneuEngine._INFER_KWARGS: "đủ thấp
+    # tránh random bad sample" cho ĐỌC TÊN NGHI LỄ). Chỉ rót các key mà engine hiện tại
+    # TỰ KHAI trong `sampling_params` — engine không khai thì không nhận gì.
+    #
+    # Bug thật: trước đây rót nguyên 5 key cho MỌI engine. VoxCPM phải tự bỏ qua bằng
+    # tay (xem comment dài ở engine_voxcpm.py's _run), còn Qwen thì nguy hiểm hơn hẳn —
+    # `top_k=5` của VieNeu ép Qwen chỉ xét 5 token mỗi bước, mà token EOS của Qwen
+    # thường KHÔNG nằm trong top-5, nên model gần như không bao giờ dừng được đúng lúc
+    # (chính mlx-audio 0.4.1 ghi lý do cap max_tokens là "EOS logit is suppressed by
+    # top-k"). Tức là cấu hình tuned cho engine này lại là nguyên nhân runaway ở engine
+    # kia — đúng loại lỗi mà việc lọc theo khai báo ngăn được tận gốc.
+    declared = (engine_caps.get("sampling_params") or {}).keys()
+    overrides = {k: _pick(k) for k in ("temperature", "top_k", "top_p",
+                                       "repetition_penalty", "max_new_frames")
+                 if k in declared}
+
+    # Merge engine-specific overrides — ưu tiên cao nhất, KHÔNG lọc: người gọi chỉ đích
+    # danh engine này thì họ biết mình đang chỉnh gì (đây là đường DUY NHẤT để chỉnh
+    # sampling của engine không khai `sampling_params`, vd Qwen).
     if _engine is not None and req.engine_overrides:
-        engine_caps = _engine.capabilities()
         engine_id = engine_caps.get("id")
         if engine_id and engine_id in req.engine_overrides:
             engine_specific = req.engine_overrides[engine_id]
@@ -965,7 +1073,7 @@ def _run_synthesis(req: TtsRequest, voice: dict) -> np.ndarray:
             ref_path = _registry.get_ref_path(voice_id)
             if not ref_path or not ref_path.exists():
                 raise HTTPException(500, f"Ref audio not found: {voice_id}")
-            ref_codes = _engine.encode_reference(str(ref_path))
+            ref_codes = _engine.encode_reference(str(ref_path), voice.get("ref_text"))
             per_engine[voice_id] = ref_codes
         return _engine.synthesize(req.text, ref_codes, req.speed, overrides=overrides)
 
@@ -1015,16 +1123,48 @@ async def synthesize(req: TtsRequest):
 
         from engine import SAMPLE_RATE, analyze_quality
 
+        # Tần số THẬT của engine đang phục vụ, không phải hằng 48kHz của VieNeu: Qwen
+        # xuất 24kHz và giờ giữ nguyên tần số gốc (xem engine_qwen_mlx.py). Báo sai con
+        # số này thì client phát audio nhanh/chậm gấp đôi. `SAMPLE_RATE` chỉ còn là
+        # fallback cho engine chưa khai (mọi engine hiện có đều khai).
+        sample_rate = int(_engine.capabilities().get("sample_rate") or SAMPLE_RATE)
+
         # Chấm chất lượng để cảnh báo file khả nghi (không chặn — vẫn trả audio).
-        headers = {"X-Sample-Rate": str(SAMPLE_RATE)}
+        headers = {"X-Sample-Rate": str(sample_rate)}
         try:
-            q = analyze_quality(audio_np, req.text, SAMPLE_RATE, speed=req.speed)
+            q = analyze_quality(audio_np, req.text, sample_rate, speed=req.speed)
             headers["X-Quality-Score"] = str(q["score"])
             headers["X-Quality-Flags"] = ",".join(q["flags"])  # ASCII slugs — an toàn cho HTTP header
             if q["flags"]:
                 _write_log(f"[TTS] quality voice={req.speaker_id} score={q['score']} flags={q['flags']} metrics={q['metrics']}")
         except Exception as e:  # phân tích lỗi không được làm hỏng response
             _write_log(f"[TTS] quality analysis failed: {type(e).__name__}: {e}")
+
+        # Hiệu ứng hậu kỳ — bước CUỐI, sau cả chấm chất lượng.
+        #
+        # Vị trí này quan trọng theo cả hai phía:
+        #   - SAU `_post_process` của engine: reverb/delay cố ý thay đổi mức tín hiệu, cân
+        #     loudness lại sau đó sẽ triệt tiêu đúng cái người dùng vừa chỉnh.
+        #   - SAU `analyze_quality`: điểm chất lượng nói về việc MODEL đọc có tốt không.
+        #     Chấm sau khi áp hiệu ứng thì preset "Radio" (lọc băng hẹp) hay "Echo Chamber"
+        #     (vang dày) sẽ dính cờ noisy/clipping — báo động giả về đúng thứ người dùng
+        #     chủ động chọn.
+        if req.effects_chain:
+            try:
+                from effects import apply_effects, validate_effects_chain
+                err = validate_effects_chain(req.effects_chain)
+                if err:
+                    raise HTTPException(400, f"Chuỗi hiệu ứng không hợp lệ: {err}")
+                audio_np = apply_effects(audio_np, sample_rate, req.effects_chain)
+            except HTTPException:
+                raise
+            except ImportError:
+                # pedalboard không có (vd bản đóng gói chưa gom được binary native) —
+                # trả audio KHÔNG hiệu ứng thay vì hỏng cả request. Ghi log để phân biệt
+                # "hiệu ứng không ăn thua" với "hiệu ứng chỉnh sai".
+                _write_log("[TTS] effects bị bỏ qua: pedalboard chưa cài")
+            except Exception as e:
+                raise HTTPException(500, f"Lỗi khi áp hiệu ứng: {type(e).__name__}: {e}")
 
         int16_audio = np.clip(audio_np * 32767, -32768, 32767).astype(np.int16)
         return Response(

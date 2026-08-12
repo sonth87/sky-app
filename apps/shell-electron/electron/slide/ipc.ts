@@ -24,13 +24,29 @@ import { sessionStore } from './session-store';
 import { apiLogger } from './api-logger';
 import { setAppMenu, refreshAppMenu, type MenuLanguage } from './menu';
 import { readCurrentState as readCurrentRendererState, getPendingUpdateInfo } from './renderer-updater';
-import { getCurrentActiveEvent } from '@sky-app/ceremony-db/node';
+import { getCurrentActiveEvent } from '@sky-app/app-db/node';
 
 /** Báo cho Control biết trạng thái Backdrop (mở/đóng) đã thay đổi */
 export function notifyBackdropState() {
   const open = isBackdropOpen();
   const fullscreen = open ? (getBackdropWindow()?.isKiosk() || getBackdropWindow()?.isFullScreen() || false) : false;
   getMainWindow()?.webContents.send('backdrop:state', { open, fullscreen });
+}
+
+/**
+ * Tần số lấy mẫu đọc từ header của 1 file WAV chuẩn (PCM 44 byte): UInt32LE tại offset 24.
+ *
+ * Cần vì file WAV đã cache trên đĩa có thể do BẤT KỲ engine nào sinh ra ở lần chạy trước —
+ * Qwen xuất 24kHz, VieNeu/MOSS 48kHz. Đọc từ chính file là cách duy nhất luôn đúng, kể cả
+ * với file đã tồn tại từ bản app cũ (trước khi manifest ghi thêm tần số).
+ *
+ * Trả 48000 nếu buffer quá ngắn hoặc giá trị đọc được vô lý — mọi file sinh trước 2026-08-11
+ * đều là 48kHz nên đó là phỏng đoán an toàn nhất.
+ */
+function readWavSampleRate(wav: Buffer): number {
+  if (wav.length < 28) return 48000;
+  const sr = wav.readUInt32LE(24);
+  return sr >= 8000 && sr <= 192000 ? sr : 48000;
 }
 
 function runPiper(text: string, modelName?: string, speed?: number): Promise<{ ok: boolean; buffer?: Buffer; error?: string }> {
@@ -389,7 +405,10 @@ export function registerIpcHandlers() {
               const wav = readFileSync(wavPath);
               // Trả về PCM (bỏ WAV header 44 bytes)
               const pcm = wav.slice(44);
-              const sampleRate = 48000;
+              // Đọc tần số từ CHÍNH header của file, không giả định 48000: file cache có
+              // thể do engine khác sinh ra (Qwen 24kHz) ở lần chạy trước. Đọc từ file là
+              // cách duy nhất luôn đúng, kể cả với file đã nằm sẵn trên đĩa từ bản cũ.
+              const sampleRate = readWavSampleRate(wav);
               pushTtsLog({ time: new Date().toLocaleTimeString('vi-VN'), action: 'speak', text, model, ok: true, durationMs: Date.now() - t0, cacheHit: true });
               return { ok: true, buffer: pcm, sampleRate };
             }
@@ -405,7 +424,7 @@ export function registerIpcHandlers() {
       pushTtsLog({ time: new Date().toLocaleTimeString('vi-VN'), action: 'speak', text, model, ok: true, durationMs: Date.now() - t0, cacheHit: true });
       // Lưu xuống disk nếu có studentCode
       if (studentCode && cached.buffer) {
-        _saveRealtimeWav(studentCode, text.trim(), model, spd, cached.buffer);
+        _saveRealtimeWav(studentCode, text.trim(), model, spd, cached.buffer, undefined, cached.sampleRate);
       }
       return cached;
     }
@@ -422,26 +441,44 @@ export function registerIpcHandlers() {
 
     // Lưu WAV + metadata realtime xuống disk
     if (result.ok && result.buffer && studentCode) {
-      // quality_* chỉ có ở runVieneu (VieNeu); runPiper không trả — bỏ qua an toàn.
-      const q = result as { quality_score?: number; quality_flags?: string[] };
+      // quality_* và sampleRate chỉ có ở runVieneu (VieNeu); runPiper không trả — bỏ qua
+      // an toàn. runPiper luôn xuất 48kHz nên mặc định của _saveRealtimeWav là đúng cho nó.
+      const q = result as { quality_score?: number; quality_flags?: string[]; sampleRate?: number };
       _saveRealtimeWav(studentCode, text.trim(), model, spd, result.buffer, {
         quality_score: q.quality_score,
         quality_flags: q.quality_flags,
-      });
+      }, q.sampleRate);
     }
 
     return result;
   });
 
+  // Bảng hiệu ứng hậu kỳ do service TTS khai. Renderer KHÔNG fetch thẳng port Python
+  // (port động, và quy tắc Ports & Adapters của repo cấm gọi mạng trực tiếp từ renderer).
+  ipcMain.handle('tts:list-effect-types', async () => {
+    const port = getPythonPort();
+    if (!port) return [];
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/effects`, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { available?: boolean; effects?: unknown[] };
+      // `available: false` = service chạy nhưng thiếu pedalboard → không có hiệu ứng nào.
+      return data.available ? (data.effects ?? []) : [];
+    } catch {
+      return [];
+    }
+  });
+
   // ── TTS Studio (app riêng, gọi thẳng /synthesize, không cache/log/pregen) ────
   // Tách biệt hoàn toàn khỏi hệ tts:* của Ceremony ở trên.
-  ipcMain.handle('tts-studio:synthesize', async (_e, { text, voiceId, speed }: {
-    text: string; voiceId?: string; speed?: number;
+  ipcMain.handle('tts-studio:synthesize', async (_e, { text, voiceId, speed, effectsChain, engine_overrides }: {
+    text: string; voiceId?: string; speed?: number; effectsChain?: unknown[];
+    engine_overrides?: Record<string, Record<string, unknown>>;
   }) => {
     if (!text?.trim()) return { ok: false, error: 'Empty text' };
     // 'NF' (giọng placeholder cũ) đã bị xoá khỏi voice-registry.json 2026-08-04 — Giang
     // (clone-d0f05071) là giọng mặc định mới khi voiceId trống.
-    return synthesizeTtsStudio(text.trim(), voiceId || 'clone-d0f05071', speed ?? 1.0);
+    return synthesizeTtsStudio(text.trim(), voiceId || 'clone-d0f05071', speed ?? 1.0, effectsChain, engine_overrides);
   });
 
   function _saveRealtimeWav(
@@ -451,6 +488,10 @@ export function registerIpcHandlers() {
     speed: number,
     pcm: Buffer,
     quality?: { quality_score?: number; quality_flags?: string[] },
+    // Tần số thật của PCM, do server báo qua X-Sample-Rate. Mỗi engine xuất ở tần số gốc
+    // của nó (Qwen 24kHz, VieNeu/MOSS 48kHz) — ghi sai vào WAV header thì file phát
+    // nhanh/chậm gấp đôi mà không có lỗi nào, vì dữ liệu PCM vẫn đúng.
+    sampleRateHz = 48000,
   ) {
     try {
       const batchId = getPregenBatchId();
@@ -458,7 +499,7 @@ export function registerIpcHandlers() {
       const manifestPath = ttsPregenManifestPath(batchId);
 
       // Build WAV header
-      const sampleRate = 48000;
+      const sampleRate = sampleRateHz;
       const header = Buffer.alloc(44);
       header.write('RIFF', 0, 'ascii');
       header.writeUInt32LE(36 + pcm.byteLength, 4);
@@ -1106,8 +1147,8 @@ export function registerIpcHandlers() {
   });
 
   // Clone giọng từ file WAV: gửi multipart tới Python /voices/clone
-  ipcMain.handle('tts:clone-voice', async (_e, { filePath, label, gender, region }: {
-    filePath: string; label: string; gender?: string; region?: string;
+  ipcMain.handle('tts:clone-voice', async (_e, { filePath, label, gender, region, refText }: {
+    filePath: string; label: string; gender?: string; region?: string; refText?: string;
   }) => {
     const port = getPythonPort();
     if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
@@ -1119,6 +1160,9 @@ export function registerIpcHandlers() {
       form.append('label', label);
       form.append('gender', gender ?? 'female');
       form.append('region', region ?? 'Bắc');
+      // Bản chép lời của audio mẫu. Luôn gửi (kể cả rỗng) để server tự quyết định theo
+      // engine đang chạy — server mới biết engine nào bắt buộc, renderer không nên đoán.
+      form.append('ref_text', refText ?? '');
       const res = await fetch(`http://127.0.0.1:${port}/voices/clone`, {
         method: 'POST',
         body: form,
@@ -1131,15 +1175,23 @@ export function registerIpcHandlers() {
     }
   });
 
-  // Ẩn/hiện giọng (PUT /voices/{id})
-  ipcMain.handle('tts:update-voice', async (_e, { voiceId, hidden }: { voiceId: string; hidden: boolean }) => {
+  // Ẩn/hiện giọng và/hoặc sửa bản chép lời (PUT /voices/{id})
+  ipcMain.handle('tts:update-voice', async (_e, { voiceId, hidden, refText }: {
+    voiceId: string; hidden?: boolean; refText?: string;
+  }) => {
     const port = getPythonPort();
     if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    // Chỉ gửi field được truyền — server phân biệt "không đụng tới" (vắng mặt) với
+    // "xoá đi" (chuỗi rỗng), nên gửi thừa `refText: undefined` sẽ thành xoá ngoài ý muốn.
+    const body: Record<string, unknown> = {};
+    if (hidden !== undefined) body.hidden = hidden;
+    if (refText !== undefined) body.ref_text = refText;
+    if (Object.keys(body).length === 0) return { ok: false, error: 'Không có gì để cập nhật' };
     try {
       const res = await fetch(`http://127.0.0.1:${port}/voices/${encodeURIComponent(voiceId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hidden }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
@@ -1285,8 +1337,12 @@ export function registerIpcHandlers() {
     }
     try {
       const buffer = readFileSync(wavPath);
-      console.log(`[TTS PreGen] get-audio ok id=${id} bytes=${buffer.length}`);
-      return { ok: true, buffer };
+      // Trả kèm tần số đọc từ header — renderer bỏ 44 byte header rồi phát PCM thô nên
+      // KHÔNG tự biết được tần số. Trước đây nó hardcode 48000, sai gấp đôi tốc độ với
+      // file do Qwen (24kHz) sinh ra.
+      const sampleRate = readWavSampleRate(buffer);
+      console.log(`[TTS PreGen] get-audio ok id=${id} bytes=${buffer.length} sr=${sampleRate}`);
+      return { ok: true, buffer, sampleRate };
     } catch (err) {
       console.error(`[TTS PreGen] get-audio error id=${id} wavPath=${wavPath}`, err);
       return { ok: false, error: String(err) };

@@ -5,6 +5,7 @@ import { layoutRoutes } from './routes/layout.js';
 import { assetRoutes } from './routes/asset.js';
 import { eventRoutes } from './routes/event.js';
 import { dataSourceRoutes } from './routes/data-source.js';
+import { effectPresetRoutes } from './routes/effect-preset.js';
 
 const PORT = Number(process.env.DATA_SERVICE_PORT ?? 8094);
 
@@ -18,6 +19,7 @@ async function main() {
   await app.register(assetRoutes);
   await app.register(eventRoutes);
   await app.register(dataSourceRoutes);
+  await app.register(effectPresetRoutes);
 
   app.get('/health', async () => ({ ok: true }));
 

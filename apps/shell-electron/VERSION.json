@@ -2,6 +2,24 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.8.0",
+      "date": "2026-08-12",
+      "bump": "minor",
+      "summary": "Đổi tên cơ sở dữ liệu nội bộ cho đúng với thực tế (nó chứa dữ liệu của cả app, không riêng phần buổi lễ) — dữ liệu cũ được chuyển sang tên mới tự động khi mở app lần đầu, không mất gì. Sửa lỗi tiến trình giọng nói bị bỏ lại chạy ngầm khi khởi động thất bại: trước đây nó chiếm RAM cho tới khi tắt máy và không có cách nào dừng, kể cả thoát app.",
+      "breaking": true,
+      "minAppVersion": "0.8.0",
+      "detailsRef": "history/2026-08-12-db-dung-chung-doi-ten-va-nen-mong.md"
+    },
+    {
+      "version": "0.7.0",
+      "date": "2026-08-11",
+      "bump": "minor",
+      "summary": "Sửa lỗi giọng Qwen3-TTS đọc ra âm thanh hỏng hoàn toàn và chậm bất thường. Khi tạo giọng mới từ file mẫu, giờ có ô nhập \"Audio mẫu đang nói gì?\" — bắt buộc với giọng Qwen vì model cần biết nội dung file mẫu để học cách phát âm. File âm thanh mẫu được tự động làm sạch và chấm điểm chất lượng chi tiết hơn. Văn bản dài tự chia đoạn theo câu; nếu model đọc lạc thì tự đọc lại thay vì trả về file lỗi. THÊM MỚI: hiệu ứng âm thanh cho TTS Studio (vang phòng, tiếng vọng, đổi cao độ...) với 4 kiểu dựng sẵn và tự tạo kiểu riêng. Màn Quản lý mô hình giờ chia theo nhóm (sinh giọng nói / nhận dạng giọng nói / mô hình ngôn ngữ).",
+      "breaking": true,
+      "minAppVersion": "0.7.0",
+      "detailsRef": "history/2026-08-11-fix-chat-luong-audio-qwen.md"
+    },
+    {
       "version": "0.6.1",
       "date": "2026-08-11",
       "bump": "patch",

@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync, unlinkSync } from '
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
-import { insertAsset, listAssets, deleteAsset } from '@sky-app/ceremony-db/node';
+import { insertAsset, listAssets, deleteAsset } from '@sky-app/app-db/node';
 import { getExecutor } from '../store.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));

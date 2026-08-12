@@ -10,7 +10,7 @@ export default defineConfig({
   main: {
     // @sky-app/slide-shared is bundled inline (ESM workspace source, not a
     // published package) — same as @trao-bang/shared in the source repo.
-    // @sky-app/ceremony-db stays externalized (require()'d at runtime, not bundled) —
+    // @sky-app/app-db stays externalized (require()'d at runtime, not bundled) —
     // it has an "exports.require" entry (dist-cjs/) precisely so this works, because
     // bundling it inline would also try to inline better-sqlite3 (native .node addon),
     // which Rollup cannot statically bundle.

@@ -51,9 +51,15 @@ import soundfile as sf
 AUDIO_EXTS = {".wav", ".mp3", ".flac", ".m4a", ".ogg", ".opus", ".aac", ".wma"}
 LOSSY_EXTS = {".mp3", ".m4a", ".ogg", ".opus", ".aac", ".wma"}
 
-# Độ dài: giới hạn cứng khớp _CLONE_MIN/MAX_SECONDS trong main.py; khoảng lý tưởng
-# rộng hơn mức tối thiểu vì ref quá ngắn cho model ít tín hiệu ngữ điệu.
-MIN_SECONDS, MAX_SECONDS = 1.5, 15.0
+# Độ dài — NGUỒN CHUẨN DUY NHẤT cho cả CLI này lẫn `/voices/clone` (main.py import
+# thẳng 2 hằng dưới đây, không khai lại). Trước đây main.py có bản sao riêng
+# `_CLONE_MIN/MAX_SECONDS` và comment ở đây chỉ dặn "khớp với main.py" bằng niềm tin —
+# hai nơi lệch nhau thì CLI báo ĐẠT còn server từ chối, không ai hiểu vì sao.
+#
+# Trần 30s (không phải 15s như trước): khớp voicebox, và clone kiểu in-context ổn định
+# hơn khi ref dài — ref càng dài model càng nhiều ngữ cảnh về giọng. Ràng buộc thời
+# gian prefill vẫn còn nhưng 30s là mức voicebox chạy production được.
+MIN_SECONDS, MAX_SECONDS = 1.5, 30.0
 IDEAL_MIN, IDEAL_MAX = 4.0, 10.0
 
 # Băng thông — nhóm chỉ số quyết định accent.

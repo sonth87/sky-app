@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Upload, Play, Trash2, Loader2, AlertTriangle, X } from 'lucide-react';
 import type { TtsPort, Voice } from '@sky-app/service-contracts';
 
@@ -23,11 +23,34 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
   const [tagline, setTagline] = useState('');
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
-  
+  const [refText, setRefText] = useState('');
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  // Engine clone kiểu in-context (Qwen) BẮT BUỘC có bản chép lời — thiếu là audio hỏng
+  // hoàn toàn chứ không phải kém đi. Hỏi engine đang chạy thay vì hard-code danh sách
+  // engine ở đây: engine mới thêm sau chỉ cần khai `requires_ref_text` là UI tự đúng.
+  const [refTextRequired, setRefTextRequired] = useState(false);
+
+  useEffect(() => {
+    if (!open || !ttsPort?.getEngineCapabilities) return;
+    let alive = true;
+    ttsPort
+      .getEngineCapabilities()
+      .then((caps) => {
+        if (alive) setRefTextRequired(Boolean(caps?.requires_ref_text));
+      })
+      .catch(() => {
+        // Không hỏi được thì để mặc không bắt buộc — server vẫn chặn bằng lỗi 400 có
+        // thông báo đọc được. Thà để người dùng thử và nhận lỗi rõ còn hơn chặn nhầm
+        // khi engine đang chạy vốn không cần transcript.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, ttsPort]);
 
   if (!open) return null;
 
@@ -69,6 +92,10 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
       setError('Vui lòng chọn file và nhập tên giọng đọc.');
       return;
     }
+    if (refTextRequired && !refText.trim()) {
+      setError('Engine đang dùng cần bản chép lời — hãy nhập nội dung audio mẫu đang nói.');
+      return;
+    }
     setBusy(true);
     setError(null);
     setWarnings([]);
@@ -90,6 +117,7 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
         tagline: tagline.trim(),
         description: description.trim(),
         tags,
+        refText: refText.trim(),
       });
 
       if (!res?.ok) {
@@ -106,6 +134,7 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
       setTagline('');
       setDescription('');
       setTagsInput('');
+      setRefText('');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -267,6 +296,25 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
                   </label>
                 </div>
               )}
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-foreground">
+                  Audio mẫu đang nói gì?
+                  {refTextRequired && <span className="text-destructive"> *</span>}
+                </span>
+                <textarea
+                  value={refText}
+                  onChange={(e) => setRefText(e.target.value)}
+                  placeholder="Gõ đúng từng chữ mà file audio đang đọc..."
+                  rows={2}
+                  className="text-sm px-3 py-2 rounded-lg border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none resize-none transition-all"
+                />
+                <span className="text-[11px] text-muted-foreground">
+                  {refTextRequired
+                    ? 'Bắt buộc với engine đang dùng: model cần biết audio mẫu nói gì để học cách phát âm. Gõ sai hoặc bỏ trống sẽ làm giọng đọc ra bị lỗi.'
+                    : 'Không bắt buộc, nhưng gõ vào sẽ giúp clone giống giọng gốc hơn.'}
+                </span>
+              </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-foreground">Tagline (Mô tả ngắn)</span>

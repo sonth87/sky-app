@@ -115,8 +115,8 @@ const api: SlideApi = {
       return { ok: res.ok, error: res.error };
     }),
   // tts-studio: channel riêng, KHÔNG cache/log/pregen (khác tts:speak dùng bởi Ceremony).
-  synthesizeTts: (text: string, voiceId?: string, speed?: number, engineOverrides?: Record<string, Record<string, any>>): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }> =>
-    ipcRenderer.invoke('tts-studio:synthesize', { text, voiceId, speed, engine_overrides: engineOverrides }).then((res) => {
+  synthesizeTts: (text: string, voiceId?: string, speed?: number, engineOverrides?: Record<string, Record<string, any>>, effectsChain?: unknown[]): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }> =>
+    ipcRenderer.invoke('tts-studio:synthesize', { text, voiceId, speed, engine_overrides: engineOverrides, effectsChain }).then((res) => {
       if (res.ok && res.buffer) {
         return {
           ok: true,
@@ -129,6 +129,8 @@ const api: SlideApi = {
       }
       return { ok: res.ok, error: res.error };
     }),
+  listEffectTypes: (): Promise<Array<{ type: string; label: string; description: string; params: Record<string, { default: number; min: number; max: number; step: number; description: string }> }>> =>
+    ipcRenderer.invoke('tts:list-effect-types'),
   warmupTts: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('tts:warmup'),
   // TODO: fix TTS type definition — getEngineCapabilities not in SlideApi interface yet
@@ -207,13 +209,15 @@ const api: SlideApi = {
   // ---- Clone voice ----
   pickAudioFile: (): Promise<{ ok: boolean; filePath?: string }> =>
     ipcRenderer.invoke('tts:pick-audio-file'),
-  cloneVoice: (payload: { filePath: string; label: string; gender?: string; region?: string }): Promise<{
+  cloneVoice: (payload: {
+    filePath: string; label: string; gender?: string; region?: string; refText?: string;
+  }): Promise<{
     ok: boolean;
     voice?: { id: string; label: string; gender: string; region: string; type: string; warnings?: string[] };
     error?: string;
   }> => ipcRenderer.invoke('tts:clone-voice', payload),
-  updateVoice: (voiceId: string, hidden: boolean): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('tts:update-voice', { voiceId, hidden }),
+  updateVoice: (voiceId: string, hidden?: boolean, refText?: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('tts:update-voice', { voiceId, hidden, refText }),
   deleteVoice: (voiceId: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('tts:delete-voice', { voiceId }),
   getSystemStats: (): Promise<{
@@ -242,7 +246,7 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:pregen-status'),
   pregenRequeue: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('tts:pregen-requeue', { id }),
-  pregenGetAudio: (id: string): Promise<{ ok: boolean; buffer?: ArrayBuffer; error?: string }> =>
+  pregenGetAudio: (id: string): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }> =>
     ipcRenderer.invoke('tts:pregen-get-audio', { id }).then((res) => {
       if (res.ok && res.buffer) {
         return {

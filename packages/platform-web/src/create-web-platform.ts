@@ -2,6 +2,7 @@ import { createPlatformContext, createAllowAllEntitlementSet, type PlatformConte
 import { resolveEntitlementsFromPort } from '@sky-app/licensing';
 import type { AssetPort, DataPort, DataSourcePort, EventPort, LayoutPort } from '@sky-app/service-contracts';
 import { createWebTtsPort } from './adapters/tts.js';
+import { createWebEffectPresetPort } from './adapters/effect-preset.js';
 import { createWebTtsEnginePort } from './adapters/tts-engine.js';
 import { createWebLicensePort } from './adapters/license.js';
 import { createWebDataPort } from './adapters/data.js';
@@ -132,6 +133,12 @@ export async function createWebPlatform(opts: CreateWebPlatformOptions = {}): Pr
   platform.services.register('asset', resolveAssetPort(dataBaseUrl, dataServiceAvailable));
   platform.services.register('event', resolveEventPort(dataBaseUrl, dataServiceAvailable));
   platform.services.register('dataSource', resolveDataSourcePort(dataBaseUrl, dataServiceAvailable));
+  // Preset hiệu ứng cần data-service (lưu trong ceremony-db). Không có nó thì bỏ hẳn port
+  // thay vì đăng ký một port lỗi mỗi lần gọi — UI đọc `services.get` trả undefined rồi ẩn
+  // phần hiệu ứng, giống cách các port khác xử lý chế độ không có backend.
+  if (dataServiceAvailable) {
+    platform.services.register('effectPreset', createWebEffectPresetPort(dataBaseUrl));
+  }
 
   return platform;
 }

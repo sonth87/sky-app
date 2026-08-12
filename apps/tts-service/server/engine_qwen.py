@@ -166,20 +166,42 @@ class QwenEngine:
             "supports_emotion": False,
             "supports_sampling": False,
             "multilingual": True,       # 10 ngôn ngữ, KHÔNG có tiếng Việt
+            "requires_ref_text": True,  # xem _run() — thiếu transcript là audio hỏng
             "providers": self.providers,
             "device": self.device,
             "needs_gpu_unverified": True,  # xem cảnh báo CPU ở đầu file
         }
 
-    def encode_reference(self, wav_path: str) -> object:
+    def encode_reference(self, wav_path: str, ref_text: str | None = None) -> object:
         """Clone thẳng từ file wav, không pre-encode như VieNeu — giữ dạng dict để về
-        sau thêm trường không phá cache đã lưu (giống VoxCPM)."""
-        return {"wav_path": str(wav_path), "ref_text": _ref_text_for(str(wav_path))}
+        sau thêm trường không phá cache đã lưu (giống VoxCPM).
+
+        `ref_text` từ registry ưu tiên hơn sidecar `.txt` — xem engine_qwen_mlx.py.
+        """
+        return {
+            "wav_path": str(wav_path),
+            "ref_text": (ref_text or "").strip() or _ref_text_for(str(wav_path)),
+        }
 
     def _run(self, text: str, ref: dict, overrides: dict | None) -> np.ndarray:
         wav_path = ref.get("wav_path")
         ref_text = ref.get("ref_text")
         language = _resolve_language(text, overrides)
+
+        # Cùng lý do như engine_qwen_mlx.py's _run (xem comment dài ở đó): clone kiểu ICL
+        # cần bản chép lời của ref audio để căn text↔codec; thiếu nó thì model bị prefill
+        # với "audio này ứng với 0 chữ" và cho ra audio hỏng. Chặn sớm với thông báo đọc
+        # được thay vì để lib tự xoay xở rồi trả về tiếng rác.
+        #
+        # Đường torch này truyền `ref_text=None` khi thiếu (không phải `""` như đường
+        # MLX từng làm) nên hành vi lib có thể khác, nhưng CHƯA VERIFY được trên máy dev
+        # (không có CUDA — xem cảnh báo đầu file). Chặn thống nhất với đường MLX là lựa
+        # chọn an toàn: thà báo lỗi rõ còn hơn im lặng cho ra giọng sai.
+        if wav_path and not (ref_text or "").strip():
+            raise RuntimeError(
+                f"{self.label} cần bản chép lời của audio mẫu để clone giọng. "
+                f"Hãy mở Quản lý giọng và nhập nội dung audio mẫu đang nói."
+            )
 
         wavs, sr = self._model.generate_voice_clone(
             text=text, language=language, ref_audio=wav_path, ref_text=ref_text,

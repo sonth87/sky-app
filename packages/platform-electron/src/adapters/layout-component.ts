@@ -5,7 +5,7 @@ import '../bridge-types.js';
 /**
  * Electron LayoutComponentPort — routes to main process (apps/shell-electron/electron/ipc.ts's
  * kernel:layoutComponent:* channels). Personal templates (mẫu tự tạo từ nhóm item) lưu trong
- * ceremony-db qua IPC.
+ * app-db qua IPC.
  */
 export function createElectronLayoutComponentPort(): LayoutComponentPort {
   return {
