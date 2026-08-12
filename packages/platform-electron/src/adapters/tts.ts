@@ -97,10 +97,27 @@ export function createElectronTtsPort(): TtsPort {
       return window.slide.getCatalogAudioUrl(lang, entryId);
     },
     async cloneVoice(opts) {
-      if (typeof opts.filePath !== 'string') {
-        throw new Error('Electron cloneVoice requires a string filePath');
+      const samples = opts.samples.map((s) => {
+        if (typeof s.filePath !== 'string') {
+          throw new Error('Electron cloneVoice requires string filePaths');
+        }
+        return { filePath: s.filePath, refText: s.refText };
+      });
+      return window.slide.cloneVoice({
+        samples, label: opts.label, gender: opts.gender, region: opts.region,
+      });
+    },
+    async addVoiceSample(voiceId, filePath, refText) {
+      if (typeof filePath !== 'string') {
+        throw new Error('Electron addVoiceSample requires a string filePath');
       }
-      return window.slide.cloneVoice(opts as any);
+      return window.slide.addVoiceSample(voiceId, filePath, refText);
+    },
+    async deleteVoiceSample(voiceId, sampleId) {
+      return window.slide.deleteVoiceSample(voiceId, sampleId);
+    },
+    async listVoiceSamples(voiceId) {
+      return window.slide.listVoiceSamples(voiceId);
     },
     async updateVoiceRefText(voiceId, refText) {
       // `hidden` để undefined = không đụng tới; chỉ sửa mỗi bản chép lời.

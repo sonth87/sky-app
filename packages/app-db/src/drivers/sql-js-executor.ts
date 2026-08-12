@@ -38,6 +38,13 @@ export class SqlJsExecutor implements SqlExecutor {
   static async create(initialBytes?: Uint8Array, wasmUrl?: string): Promise<SqlJsExecutor> {
     const SQL = await loadSqlJsModule(wasmUrl);
     const db = new SQL.Database(initialBytes);
+    // Khớp BetterSqlite3Executor (better-sqlite3-executor.ts) — thiếu dòng này thì MỌI ràng
+    // buộc FOREIGN KEY trong toàn bộ schema (18 bảng, kể cả `ON DELETE CASCADE` của
+    // tts_voice_sample) lặng lẽ không có tác dụng gì khi chạy qua đường web/sql.js: xoá
+    // bảng cha để lại hàng con mồ côi mà SQLite không báo lỗi cũng không tự dọn — bug thật
+    // phát hiện lúc viết migration 018, nhưng ảnh hưởng ngược tới toàn bộ 18 bảng, không
+    // riêng gì bảng mới thêm.
+    db.run('PRAGMA foreign_keys = ON');
     return new SqlJsExecutor(db);
   }
 

@@ -392,18 +392,19 @@ async def lifespan(app: FastAPI):
     for voice in _registry.list_voices(include_hidden=True):
         if voice.get("type") != "cloned":
             continue
-        ref_path = _registry.get_ref_path(voice["id"])
-        if ref_path and ref_path.exists():
-            try:
-                emb = _engine.encode_reference(str(ref_path), voice.get("ref_text"))
-                _ref_cache()[voice["id"]] = emb
-                _safe_console(f"[TTS]   {voice['id']} ({voice.get('ref_file')}) OK")
-                _write_log(f"[TTS]   {voice['id']} OK")
-            except Exception as e:
-                _safe_console(f"[TTS]   {voice['id']} WARN: {e}")
-                _write_log(f"[TTS]   {voice['id']} WARN: {e}")
-        else:
-            _safe_console(f"[TTS]   {voice['id']} SKIP — ref not found: {ref_path}")
+        samples = _registry.list_samples(voice["id"])
+        if not samples:
+            _safe_console(f"[TTS]   {voice['id']} SKIP — không có mẫu audio nào")
+            continue
+        try:
+            ref_path, ref_text = _resolve_voice_ref(voice["id"])
+            emb = _engine.encode_reference(str(ref_path), ref_text)
+            _ref_cache()[voice["id"]] = emb
+            _safe_console(f"[TTS]   {voice['id']} ({len(samples)} mẫu) OK")
+            _write_log(f"[TTS]   {voice['id']} OK")
+        except Exception as e:
+            _safe_console(f"[TTS]   {voice['id']} WARN: {e}")
+            _write_log(f"[TTS]   {voice['id']} WARN: {e}")
 
     _safe_console("[TTS] Ready.")
     _write_log("[TTS] Ready.")
@@ -711,8 +712,15 @@ def _import_catalog_entry(entry: dict, lang: str) -> dict:
         # ghi). Với Qwen, thiếu transcript = không synthesize được (xem engine_qwen_mlx),
         # nên người dùng sẽ thấy giọng catalog "hỏng" mà không hiểu vì sao — trong khi
         # dữ liệu đúng đã nằm sẵn trong catalog.json chỉ chờ được chép sang.
+        # Kiểm qua list_samples(), KHÔNG phải existing.get("ref_text") — từ Phase 2 (nhiều
+        # mẫu/voice), get_voice() không còn trả field đó nữa (luôn None). Bug thật nếu dùng
+        # nhầm field cũ: điều kiện "chưa có transcript" sẽ LUÔN đúng, khiến transcript
+        # catalog gốc ÂM THẦM GHI ĐÈ transcript người dùng đã tự sửa qua UI mỗi lần app
+        # khởi động lại — không chỉ lãng phí, mà mất đúng nội dung người dùng vừa sửa.
         cat_text = (entry.get("ref_text") or "").strip()
-        if cat_text and not (existing.get("ref_text") or "").strip():
+        existing_samples = _registry.list_samples(existing["id"])
+        has_ref_text = bool(existing_samples and existing_samples[0].get("ref_text"))
+        if cat_text and not has_ref_text:
             _registry.set_ref_text(existing["id"], cat_text)
             _ref_cache_forget_voice(existing["id"])  # cache giữ dict {wav_path, ref_text} cũ
             existing = _registry.get_voice(existing["id"]) or existing
@@ -861,63 +869,148 @@ def _validate_ref_audio(path: Path) -> list[str]:
     return warnings
 
 
-@app.post("/voices/clone")
-async def clone_voice(
-    file: UploadFile = File(...),
-    label: str = Form(...),
-    gender: str = Form("female"),
-    region: str = Form("Bắc"),
-    ref_text: str = Form(""),
-):
-    """Upload WAV → validate → encode embedding → persist vào registry.
+async def _save_and_validate_ref_upload(file: UploadFile, prefix: str = "clone") -> tuple[str, list[str]]:
+    """Đọc 1 file upload, kiểm định dạng/kích thước, lưu + làm sạch qua
+    `_validate_ref_audio`. Dùng chung cho tạo voice mới (nhiều file) và thêm sample cho
+    voice đã có — cả hai đường đều là "1 file WAV → 1 sample trên đĩa", khác nhau ở chỗ
+    gắn vào voice nào sau đó.
 
-    `ref_text` — bản chép lời của audio mẫu. Optional ở tầng HTTP (engine như
-    VieNeu/MOSS không dùng tới), nhưng BẮT BUỘC khi engine đang chạy khai
-    `requires_ref_text` — chặn ngay tại đây thay vì để người dùng clone xong mới phát
-    hiện giọng không đọc được.
+    Trả (tên file đã lưu trong `_ref_dir`, cảnh báo chất lượng). Raise HTTPException và tự
+    dọn file nếu validate thất bại — caller không cần try/except riêng cho phần này.
     """
-    if _registry is None or _engine is None:
-        raise HTTPException(503, "Service not ready")
-
     content = await file.read()
     if len(content) < 44 or content[:4] != b"RIFF":
-        raise HTTPException(400, "File phải là WAV format hợp lệ")
+        raise HTTPException(400, f"File '{file.filename}' phải là WAV format hợp lệ")
     if len(content) > _CLONE_MAX_BYTES:
-        raise HTTPException(400, f"File quá lớn ({len(content) // (1024*1024)}MB) — tối đa 15MB.")
-    if not (label or "").strip():
-        raise HTTPException(400, "Cần nhập tên giọng (label).")
-
-    ref_text = (ref_text or "").strip()
-    if not ref_text and _engine.capabilities().get("requires_ref_text"):
         raise HTTPException(
-            400,
-            f"{_engine.capabilities().get('label', 'Engine hiện tại')} cần bản chép lời "
-            f"của audio mẫu — hãy nhập nội dung audio đang nói.",
+            400, f"File '{file.filename}' quá lớn ({len(content) // (1024*1024)}MB) — tối đa 15MB.",
         )
 
-    ref_filename = f"clone-{uuid.uuid4().hex[:8]}.wav"
+    ref_filename = f"{prefix}-{uuid.uuid4().hex[:8]}.wav"
     ref_path = _ref_dir / ref_filename
     ref_path.write_bytes(content)
 
-    # Validate độ dài/định dạng TRƯỚC khi encode (encode tốn thời gian).
     try:
         warnings = _validate_ref_audio(ref_path)
     except HTTPException:
         ref_path.unlink(missing_ok=True)
         raise
 
-    try:
-        emb = _engine.encode_reference(str(ref_path), ref_text or None)
-    except Exception as e:
-        ref_path.unlink(missing_ok=True)
-        raise HTTPException(500, f"Không thể encode voice: {e}")
+    return ref_filename, warnings
 
+
+@app.post("/voices/clone")
+async def clone_voice(
+    files: list[UploadFile] = File(...),
+    label: str = Form(...),
+    gender: str = Form("female"),
+    region: str = Form("Bắc"),
+    # Cùng SỐ LƯỢNG và THỨ TỰ với `files` — client gửi field `ref_texts` lặp lại nhiều lần
+    # (multipart cho phép), FastAPI tự gom thành list theo đúng thứ tự gửi lên. Phần tử
+    # rỗng hợp lệ (mẫu không có transcript, chỉ chặn ở engine BẮT BUỘC — xem bên dưới).
+    ref_texts: list[str] = Form(...),
+):
+    """Upload MỘT HOẶC NHIỀU file WAV mẫu → validate từng file → tạo 1 voice clone, mỗi
+    file thành 1 sample của nó (nhiều mẫu ghép lại lúc synthesize cho model nhiều ngữ cảnh
+    hơn — xem audio_dsp.py's combine_voice_samples, port từ voicebox's
+    combine_voice_prompts). Encode xảy ra LƯỜI ở lần synthesize đầu tiên
+    (main.py's _run_synthesis), không encode ngay ở đây — khác hẳn bản 1-file cũ vốn encode
+    ngay lúc clone, vì giờ với >1 file phải ghép trước mới encode được (tốn hơn hẳn, không
+    đáng chặn HTTP request chờ).
+
+    `ref_texts[i]` — bản chép lời của `files[i]`. Optional ở tầng HTTP (engine như
+    VieNeu/MOSS không dùng tới), nhưng SAMPLE ĐẦU TIÊN bắt buộc có khi engine đang chạy
+    khai `requires_ref_text` — chặn ngay tại đây thay vì để người dùng clone xong mới phát
+    hiện giọng không đọc được.
+    """
+    if _registry is None or _engine is None:
+        raise HTTPException(503, "Service not ready")
+    if not files:
+        raise HTTPException(400, "Cần ít nhất 1 file audio mẫu.")
+    if len(ref_texts) != len(files):
+        raise HTTPException(400, "Số lượng ref_texts phải khớp số lượng files.")
+    if not (label or "").strip():
+        raise HTTPException(400, "Cần nhập tên giọng (label).")
+
+    ref_texts = [(t or "").strip() for t in ref_texts]
+    if not ref_texts[0] and _engine.capabilities().get("requires_ref_text"):
+        raise HTTPException(
+            400,
+            f"{_engine.capabilities().get('label', 'Engine hiện tại')} cần bản chép lời "
+            f"của audio mẫu — hãy nhập nội dung mẫu đầu tiên đang nói.",
+        )
+
+    saved: list[tuple[str, str]] = []  # [(ref_filename, ref_text), ...] — dọn nếu lỗi giữa chừng
+    all_warnings: list[str] = []
+    try:
+        for f, text in zip(files, ref_texts):
+            ref_filename, warnings = await _save_and_validate_ref_upload(f)
+            saved.append((ref_filename, text))
+            all_warnings.extend(warnings)
+    except HTTPException:
+        for ref_filename, _ in saved:
+            (_ref_dir / ref_filename).unlink(missing_ok=True)
+        raise
+
+    first_file, first_text = saved[0]
     voice = _registry.add_cloned(
-        label=label.strip(), gender=gender, region=region, ref_file=ref_filename,
-        extra={"ref_text": ref_text} if ref_text else None,
+        label=label.strip(), gender=gender, region=region, ref_file=first_file,
+        extra={"ref_text": first_text} if first_text else None,
     )
-    _ref_cache()[voice["id"]] = emb
-    return {**voice, "warnings": warnings}
+    for ref_filename, text in saved[1:]:
+        _registry.add_sample(voice["id"], ref_filename, text or None)
+
+    return {**voice, "warnings": all_warnings}
+
+
+@app.get("/voices/{voice_id}/samples")
+def list_voice_samples(voice_id: str):
+    """Danh sách mẫu audio của 1 voice clone — UI dùng khi mở lại giọng để sửa (thêm/xoá
+    mẫu, sửa transcript từng mẫu)."""
+    if _registry is None:
+        raise HTTPException(503, "Registry not ready")
+    return _registry.list_samples(voice_id)
+
+
+@app.post("/voices/{voice_id}/samples")
+async def add_voice_sample(voice_id: str, file: UploadFile = File(...), ref_text: str = Form("")):
+    """Thêm 1 mẫu audio cho voice clone ĐÃ CÓ. Xoá ref-codes cache của voice này — thêm
+    sample làm thay đổi bản ghép dùng để clone (xem main.py's _resolve_voice_ref), cache cũ
+    (nếu voice đã từng synthesize) sẽ dùng nhầm bản ghép THIẾU mẫu vừa thêm nếu không xoá."""
+    if _registry is None:
+        raise HTTPException(503, "Registry not ready")
+    voice = _registry.get_voice(voice_id)
+    if voice is None or voice.get("type") != "cloned":
+        raise HTTPException(404, f"Voice không tồn tại hoặc không phải giọng clone: {voice_id}")
+
+    ref_filename, warnings = await _save_and_validate_ref_upload(file, prefix="sample")
+    try:
+        sample = _registry.add_sample(voice_id, ref_filename, (ref_text or "").strip() or None)
+    except ValueError as e:
+        (_ref_dir / ref_filename).unlink(missing_ok=True)
+        raise HTTPException(400, str(e))
+
+    _ref_cache_forget_voice(voice_id)
+    return {**sample, "warnings": warnings}
+
+
+@app.delete("/voices/{voice_id}/samples/{sample_id}")
+def delete_voice_sample(voice_id: str, sample_id: str):
+    """Xoá 1 mẫu audio. Từ chối nếu đó là mẫu CUỐI CÙNG của voice (voice phải có ít nhất 1
+    mẫu để còn dùng được — xoá hẳn voice thì dùng DELETE /voices/{voice_id})."""
+    if _registry is None:
+        raise HTTPException(503, "Registry not ready")
+    ok, reason = _registry.delete_sample(sample_id)
+    if not ok:
+        if reason == "not_found":
+            raise HTTPException(404, f"Sample not found: {sample_id}")
+        if reason == "last_sample":
+            raise HTTPException(
+                400, "Không thể xoá mẫu cuối cùng — giọng phải có ít nhất 1 mẫu audio.",
+            )
+        raise HTTPException(500, "Xoá thất bại")
+    _ref_cache_forget_voice(voice_id)
+    return {"ok": True}
 
 
 @app.put("/voices/{voice_id}")
@@ -1020,6 +1113,46 @@ class TtsRequest(BaseModel):
     effects_chain: list | None = None
 
 
+def _resolve_voice_ref(voice_id: str) -> tuple[Path, str | None]:
+    """Trả (đường dẫn audio, transcript) dùng để `encode_reference()` cho 1 voice clone.
+
+    1 sample → dùng thẳng, không tốn gì. NHIỀU sample (Phase 2 — một giọng nhiều file mẫu,
+    port từ voicebox's `combine_voice_prompts`) → ghép bằng `combine_voice_samples`, CACHE
+    kết quả ra file thay vì ghép lại mỗi lần synthesize.
+
+    Cache khoá theo (voice_id, hash danh sách sample id, tần số của engine hiện tại) — hash
+    thay đổi khi thêm/xoá sample nên tự động vô hiệu bản cache cũ; tần số engine nằm trong
+    tên file vì `combine_voice_samples` resample theo engine đang chạy — đổi từ Qwen
+    (24kHz) sang VieNeu (48kHz) mà dùng nhầm cache của engine kia sẽ cho ra audio sai tốc độ.
+    """
+    assert _registry is not None and _ref_dir is not None and _engine is not None
+
+    samples = _registry.list_samples(voice_id)
+    if not samples:
+        raise HTTPException(500, f"Voice không có mẫu audio nào: {voice_id}")
+
+    if len(samples) == 1:
+        s = samples[0]
+        return _ref_dir / s["ref_file"], s.get("ref_text")
+
+    import hashlib
+    from audio_dsp import combine_voice_samples
+
+    sample_rate = int(_engine.capabilities().get("sample_rate") or 24000)
+    key = hashlib.md5("-".join(sorted(s["id"] for s in samples)).encode()).hexdigest()[:12]
+    cache_dir = _ref_dir / "_combined"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    combined_path = cache_dir / f"{voice_id}-{key}-{sample_rate}hz.wav"
+    combined_text = " ".join(s.get("ref_text") or "" for s in samples).strip()
+
+    if not combined_path.exists():
+        import soundfile as sf
+        mixed = combine_voice_samples([_ref_dir / s["ref_file"] for s in samples], sample_rate)
+        sf.write(str(combined_path), mixed, sample_rate, subtype="PCM_16")
+
+    return combined_path, (combined_text or None)
+
+
 def _run_synthesis(req: TtsRequest, voice: dict) -> np.ndarray:
     """
     Phần CPU-bound thuần — chạy trong thread (asyncio.to_thread) để KHÔNG block
@@ -1070,10 +1203,8 @@ def _run_synthesis(req: TtsRequest, voice: dict) -> np.ndarray:
         per_engine = _ref_cache()
         ref_codes = per_engine.get(voice_id)
         if ref_codes is None:
-            ref_path = _registry.get_ref_path(voice_id)
-            if not ref_path or not ref_path.exists():
-                raise HTTPException(500, f"Ref audio not found: {voice_id}")
-            ref_codes = _engine.encode_reference(str(ref_path), voice.get("ref_text"))
+            ref_path, ref_text = _resolve_voice_ref(voice_id)
+            ref_codes = _engine.encode_reference(str(ref_path), ref_text)
             per_engine[voice_id] = ref_codes
         return _engine.synthesize(req.text, ref_codes, req.speed, overrides=overrides)
 

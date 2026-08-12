@@ -1137,32 +1137,43 @@ export function registerIpcHandlers() {
   // Mở dialog chọn file audio (WAV) để clone giọng
   ipcMain.handle('tts:pick-audio-file', async () => {
     const win = getMainWindow();
+    // 'multiSelections' — một giọng giờ clone được từ NHIỀU file mẫu (ghép lại cho model
+    // nhiều ngữ cảnh hơn, xem audio_dsp.py's combine_voice_samples). Vẫn trả về được đúng
+    // 1 file như trước, chỉ là dạng mảng 1 phần tử — không phá caller nào chỉ cần 1 file
+    // (vd thêm sample cho voice đã có, xem tts:add-voice-sample bên dưới).
     const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined!, {
-      title: 'Chọn file audio để clone giọng',
-      properties: ['openFile'],
+      title: 'Chọn (các) file audio để clone giọng',
+      properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Audio WAV', extensions: ['wav'] }],
     });
     if (canceled || filePaths.length === 0) return { ok: false };
-    return { ok: true, filePath: filePaths[0] };
+    return { ok: true, filePaths };
   });
 
-  // Clone giọng từ file WAV: gửi multipart tới Python /voices/clone
-  ipcMain.handle('tts:clone-voice', async (_e, { filePath, label, gender, region, refText }: {
-    filePath: string; label: string; gender?: string; region?: string; refText?: string;
+  // Clone giọng từ NHIỀU file WAV: gửi multipart tới Python /voices/clone (mỗi file 1
+  // sample của cùng 1 voice — xem docstring clone_voice ở main.py).
+  ipcMain.handle('tts:clone-voice', async (_e, { samples, label, gender, region }: {
+    samples: Array<{ filePath: string; refText?: string }>;
+    label: string; gender?: string; region?: string;
   }) => {
     const port = getPythonPort();
     if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
-    if (!existsSync(filePath)) return { ok: false, error: 'File không tồn tại' };
+    if (!samples?.length) return { ok: false, error: 'Cần ít nhất 1 file audio mẫu' };
+    for (const s of samples) {
+      if (!existsSync(s.filePath)) return { ok: false, error: `File không tồn tại: ${s.filePath}` };
+    }
     try {
-      const buf = readFileSync(filePath);
       const form = new FormData();
-      form.append('file', new Blob([buf], { type: 'audio/wav' }), basename(filePath));
+      for (const s of samples) {
+        const buf = readFileSync(s.filePath);
+        form.append('files', new Blob([buf], { type: 'audio/wav' }), basename(s.filePath));
+        // Cùng số lượng và THỨ TỰ với 'files' — server gom theo tên field lặp lại, khớp
+        // vị trí. Luôn gửi (kể cả rỗng) để server tự quyết định bắt buộc theo engine.
+        form.append('ref_texts', s.refText ?? '');
+      }
       form.append('label', label);
       form.append('gender', gender ?? 'female');
       form.append('region', region ?? 'Bắc');
-      // Bản chép lời của audio mẫu. Luôn gửi (kể cả rỗng) để server tự quyết định theo
-      // engine đang chạy — server mới biết engine nào bắt buộc, renderer không nên đoán.
-      form.append('ref_text', refText ?? '');
       const res = await fetch(`http://127.0.0.1:${port}/voices/clone`, {
         method: 'POST',
         body: form,
@@ -1172,6 +1183,67 @@ export function registerIpcHandlers() {
       return { ok: true, voice: await res.json() };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  // Thêm 1 mẫu audio cho voice clone ĐÃ CÓ.
+  ipcMain.handle('tts:add-voice-sample', async (_e, { voiceId, filePath, refText }: {
+    voiceId: string; filePath: string; refText?: string;
+  }) => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    if (!existsSync(filePath)) return { ok: false, error: 'File không tồn tại' };
+    try {
+      const buf = readFileSync(filePath);
+      const form = new FormData();
+      form.append('file', new Blob([buf], { type: 'audio/wav' }), basename(filePath));
+      form.append('ref_text', refText ?? '');
+      const res = await fetch(`http://127.0.0.1:${port}/voices/${encodeURIComponent(voiceId)}/samples`, {
+        method: 'POST',
+        body: form,
+        signal: AbortSignal.timeout(60000),
+      });
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
+      return { ok: true, sample: await res.json() };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('tts:delete-voice-sample', async (_e, { voiceId, sampleId }: {
+    voiceId: string; sampleId: string;
+  }) => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      // `voiceId` trong path KHÔNG dùng để tra sample (server tự tra theo sampleId thật,
+      // đã duy nhất toàn registry) — nhưng vẫn PHẢI truyền đúng: server dùng nó để xoá
+      // đúng ref-codes cache của VOICE ĐÓ sau khi xoá sample thành công
+      // (main.py's delete_voice_sample → _ref_cache_forget_voice(voice_id)). Placeholder
+      // giả ở đây sẽ để cache cũ (bản ghép audio đã THIẾU sample vừa xoá) sống sót tới
+      // lần restart tiếp theo.
+      const res = await fetch(
+        `http://127.0.0.1:${port}/voices/${encodeURIComponent(voiceId)}/samples/${encodeURIComponent(sampleId)}`,
+        { method: 'DELETE', signal: AbortSignal.timeout(10000) },
+      );
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('tts:list-voice-samples', async (_e, { voiceId }: { voiceId: string }) => {
+    const port = getPythonPort();
+    if (!port) return [];
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/voices/${encodeURIComponent(voiceId)}/samples`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
     }
   });
 

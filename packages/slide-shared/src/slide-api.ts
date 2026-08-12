@@ -312,20 +312,38 @@ export interface SlideApi {
   /** Nhả RAM của engine đang giữ ấm, GIỮ NGUYÊN dữ liệu đã tải trên đĩa. */
   engineUnload(engineId: string): Promise<{ ok: boolean; error?: string; freedProcess?: boolean; unloaded?: boolean }>;
   onEngineInstallProgress(cb: (p: EngineInstallProgress) => void): () => void;
-  pickAudioFile(): Promise<{ ok: boolean; filePath?: string }>;
+  /** Chọn được NHIỀU file cùng lúc — 1 giọng clone được từ nhiều mẫu (ghép lại cho model
+   * nhiều ngữ cảnh hơn khi synthesize, xem audio_dsp.py's combine_voice_samples). */
+  pickAudioFile(): Promise<{ ok: boolean; filePaths?: string[] }>;
   cloneVoice(payload: {
-    filePath: string;
+    /** Mỗi phần tử là 1 sample của voice mới — phần tử ĐẦU là sample chính. */
+    samples: Array<{
+      filePath: string;
+      /** Bản chép lời của sample này — sample ĐẦU bắt buộc khi engine đang chạy cần nó
+       * (Qwen); sample sau tuỳ chọn. */
+      refText?: string;
+    }>;
     label: string;
     gender?: string;
     region?: string;
-    /** Bản chép lời của file mẫu — bắt buộc khi engine đang chạy cần nó (Qwen). */
-    refText?: string;
   }): Promise<{
     ok: boolean;
     voice?: { id: string; label: string; gender: string; region: string; type: string; warnings?: string[] };
     error?: string;
   }>;
-  /** Đặt/sửa `hidden` và/hoặc `refText`. Truyền `undefined` để không đụng tới field đó. */
+  /** Thêm 1 mẫu audio cho voice clone ĐÃ CÓ. */
+  addVoiceSample(voiceId: string, filePath: string, refText?: string): Promise<{
+    ok: boolean;
+    sample?: { id: string; ref_file: string; ref_text?: string; warnings?: string[] };
+    error?: string;
+  }>;
+  /** Xoá 1 mẫu. Server từ chối (400) nếu đó là mẫu CUỐI CÙNG của voice. */
+  deleteVoiceSample(voiceId: string, sampleId: string): Promise<{ ok: boolean; error?: string }>;
+  /** Danh sách mẫu của 1 voice clone — dùng khi mở lại giọng để sửa. */
+  listVoiceSamples(voiceId: string): Promise<Array<{ id: string; ref_file: string; ref_text?: string }>>;
+  /** Đặt/sửa `hidden` và/hoặc `refText`. Truyền `undefined` để không đụng tới field đó.
+   * `refText` sửa TRANSCRIPT CỦA SAMPLE ĐẦU TIÊN (xem voice_registry.py's set_ref_text) —
+   * dùng `addVoiceSample`/`deleteVoiceSample` để quản lý sample thứ 2 trở đi. */
   updateVoice(voiceId: string, hidden?: boolean, refText?: string): Promise<{ ok: boolean; error?: string }>;
   deleteVoice(voiceId: string): Promise<{ ok: boolean; error?: string }>;
   /** Thư viện voice mẫu 'hệ thống' (resources/voice-ref/{lang}/catalog.json) — search/preview

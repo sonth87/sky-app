@@ -172,15 +172,109 @@ class VoiceRegistryJson:
             for vid, v in self._data.get("voices", {}).items():
                 if not include_hidden and v.get("hidden", False):
                     continue
-                result.append({"id": vid, **v})
+                entry = {"id": vid, **v}
+                for field in self._INTERNAL_STORAGE_FIELDS:
+                    entry.pop(field, None)
+                result.append(entry)
             return result
+
+    # Field KHÔNG lộ ra qua get_voice()/list_voices() — đây là chi tiết LƯU TRỮ nội bộ
+    # (sample đầu tiên cho voice chưa convert, hoặc list sample đã convert), không phải
+    # hình dạng API công khai. Loại bỏ ở CẢ HAI kho để get_voice() trả cùng hình dạng bất
+    # kể đang chạy JSON hay SQL — SQL đã tách hẳn sample sang bảng riêng nên tự nhiên không
+    # có 2 field này trong `tts_voice`; JSON vẫn giữ chúng TRONG _data (đó là nơi lưu thật
+    # của sample đầu tiên) nhưng ẩn đi lúc trả về. Muốn audio/transcript của voice phải qua
+    # `list_samples()`/`get_ref_path()`.
+    _INTERNAL_STORAGE_FIELDS = ("ref_file", "ref_text", "samples")
 
     def get_voice(self, voice_id: str) -> dict | None:
         with self._lock:
             v = self._data.get("voices", {}).get(voice_id)
             if v is None:
                 return None
-            return {"id": voice_id, **v}
+            entry = {"id": voice_id, **v}
+            for field in self._INTERNAL_STORAGE_FIELDS:
+                entry.pop(field, None)
+            return entry
+
+    def list_samples(self, voice_id: str) -> list[dict]:
+        """[{"id", "ref_file", "ref_text"?}, ...] theo thứ tự thêm vào — nhiều mẫu ghép lại
+        cho 1 giọng clone (xem audio_dsp.py's combine_voice_samples).
+
+        Voice tạo TRƯỚC tính năng này chỉ có `ref_file`/`ref_text` ngay trên entry, chưa có
+        field `samples`. Suy ra 1 "sample ảo" từ đó ngay tại đây thay vì bắt sửa file lúc
+        `_load_or_init` — đơn giản hơn, và không đụng cam kết "logic gốc không đổi 1 dòng"
+        đã ghi ở Phase 1 cho class này.
+        """
+        with self._lock:
+            v = self._data.get("voices", {}).get(voice_id)
+            if v is None or v.get("type") != "cloned":
+                return []
+            samples = v.get("samples")
+            if samples:
+                return [dict(s) for s in samples]
+            if v.get("ref_file"):
+                entry = {"id": f"{voice_id}-primary", "ref_file": v["ref_file"]}
+                if v.get("ref_text"):
+                    entry["ref_text"] = v["ref_text"]
+                return [entry]
+            return []
+
+    def add_sample(self, voice_id: str, ref_file: str, ref_text: str | None = None) -> dict:
+        """Thêm 1 mẫu audio cho giọng clone ĐÃ CÓ (tạo giọng mới vẫn qua `add_cloned`, mẫu
+        đầu tiên của nó nằm ở `ref_file`/`ref_text` trên chính entry — xem `list_samples`)."""
+        with self._lock:
+            voices = self._data.get("voices", {})
+            v = voices.get(voice_id)
+            if v is None or v.get("type") != "cloned":
+                raise ValueError(f"Voice không tồn tại hoặc không phải giọng clone: {voice_id}")
+
+            # Chuyển hoá 1 lần: voice đang ở dạng cũ (ref_file trực tiếp trên entry, chưa có
+            # `samples`) → biến ref_file/ref_text hiện có thành sample đầu tiên trước khi
+            # thêm sample mới, để list_samples() sau đó luôn đọc từ MỘT nguồn duy nhất.
+            if "samples" not in v and v.get("ref_file"):
+                primary = {"id": f"{voice_id}-primary", "ref_file": v.pop("ref_file")}
+                old_text = v.pop("ref_text", None)
+                if old_text:
+                    primary["ref_text"] = old_text
+                v["samples"] = [primary]
+
+            samples = v.setdefault("samples", [])
+            entry = {"id": f"sample-{uuid.uuid4().hex[:8]}", "ref_file": ref_file}
+            text = (ref_text or "").strip()
+            if text:
+                entry["ref_text"] = text
+            samples.append(entry)
+            self._save()
+            return dict(entry)
+
+    def delete_sample(self, sample_id: str) -> tuple[bool, str]:
+        """Xoá 1 mẫu theo id. reason: 'not_found' | 'last_sample' (không cho xoá mẫu CUỐI
+        CÙNG — giọng phải có ít nhất 1 mẫu để còn dùng được).
+
+        Không nhận `voice_id` (khác `list_samples`/`add_sample`) — id sample đã DUY NHẤT
+        trong toàn registry (`sample-<hex8>` hoặc `<voice_id>-primary`), nên tự dò qua mọi
+        voice thay vì bắt caller tự nhớ voice_id nào chứa nó.
+        """
+        with self._lock:
+            for voice_id, v in self._data.get("voices", {}).items():
+                if v.get("type") != "cloned":
+                    continue
+                samples = v.get("samples")
+                if not samples:
+                    # Dạng cũ: sample "ảo" duy nhất chính là ref_file trên entry.
+                    if v.get("ref_file") and f"{voice_id}-primary" == sample_id:
+                        return False, "last_sample"
+                    continue
+                idx = next((i for i, s in enumerate(samples) if s.get("id") == sample_id), None)
+                if idx is None:
+                    continue
+                if len(samples) <= 1:
+                    return False, "last_sample"
+                samples.pop(idx)
+                self._save()
+                return True, ""
+            return False, "not_found"
 
     def set_hidden(self, voice_id: str, hidden: bool) -> bool:
         with self._lock:
@@ -192,7 +286,13 @@ class VoiceRegistryJson:
             return True
 
     def set_ref_text(self, voice_id: str, ref_text: str) -> bool:
-        """Đặt/sửa bản chép lời của audio mẫu. Chuỗi rỗng = xoá field.
+        """Đặt/sửa bản chép lời của SAMPLE ĐẦU TIÊN. Chuỗi rỗng = xoá field.
+
+        Sau Phase 2 (nhiều mẫu/voice), transcript về bản chất là thuộc tính của TỪNG SAMPLE,
+        không phải của voice — nhưng API này vẫn nhận `voice_id` vì UI hiện tại (trước khi
+        VoiceCloneModal đổi sang nhiều file) chỉ có đúng 1 ô transcript mỗi voice. Sửa sample
+        đầu tiên là hành vi khớp thực tế đang chạy: voice chỉ có 1 sample (đa số) thì đây
+        chính là sample đó, y hệt hành vi trước Phase 2.
 
         ⚠️ Caller PHẢI xoá ref codes đã cache của voice này sau khi gọi
         (`_ref_cache_forget_voice` ở main.py) — embedding cache giữ nguyên dict
@@ -200,14 +300,24 @@ class VoiceRegistryJson:
         vẫn được dùng cho tới lần restart tiếp theo.
         """
         with self._lock:
-            voices = self._data.get("voices", {})
-            if voice_id not in voices:
+            v = self._data.get("voices", {}).get(voice_id)
+            if v is None:
                 return False
             text = (ref_text or "").strip()
-            if text:
-                voices[voice_id]["ref_text"] = text
+
+            samples = v.get("samples")
+            if samples:
+                if text:
+                    samples[0]["ref_text"] = text
+                else:
+                    samples[0].pop("ref_text", None)
             else:
-                voices[voice_id].pop("ref_text", None)
+                # Chưa convert (chưa từng gọi add_sample) — ref_text vẫn nằm thẳng trên
+                # entry, đúng vị trí cũ trước Phase 2.
+                if text:
+                    v["ref_text"] = text
+                else:
+                    v.pop("ref_text", None)
             self._save()
             return True
 
@@ -280,11 +390,16 @@ class VoiceRegistryJson:
             return True, ""
 
     def get_ref_path(self, voice_id: str) -> Path | None:
-        """Trả về đường dẫn tuyệt đối đến WAV ref của cloned voice. Preset trả None."""
+        """Đường dẫn sample ĐẦU TIÊN — dùng cho các chỗ chỉ cần 1 audio nhanh (preview).
+        Preset trả None. Voice nhiều sample thật sự (>1) phải qua `list_samples()` + combine,
+        xem main.py's `_resolve_voice_ref`."""
         v = self.get_voice(voice_id)
         if v is None or v.get("type") != "cloned":
             return None
-        return self._ref_dir / v["ref_file"]
+        samples = self.list_samples(voice_id)
+        if not samples:
+            return None
+        return self._ref_dir / samples[0]["ref_file"]
 
     def get_preset_id(self, voice_id: str) -> str | None:
         """Trả về preset_id của preset voice để truyền vào engine.synthesize_preset()."""
@@ -312,7 +427,13 @@ def _row_to_voice_dict(row: sqlite3.Row) -> dict:
     """Chuyển 1 dòng `tts_voice` thành dict CÙNG HÌNH DẠNG với VoiceRegistryJson's entry:
     bool cho hidden, list đã parse cho category/tags, và KHÔNG có field NULL (JSON gốc chỉ
     có field nào thực sự được set — code gọi dùng `.get()` nên thiếu key ~ giá trị None,
-    nhưng giữ đúng hình dạng để dễ so sánh/debug khi cần đối chiếu 2 kho)."""
+    nhưng giữ đúng hình dạng để dễ so sánh/debug khi cần đối chiếu 2 kho).
+
+    `ref_file`/`ref_text` LUÔN bị loại, kể cả khi cột còn giá trị (dữ liệu backfill từ
+    migration 018) — từ Phase 2, 2 cột đó là DI SẢN thuần tuý, không còn là nguồn sự thật.
+    Lộ chúng ra đây sẽ tạo hai nguồn có thể LỆCH NHAU: cột cũ đứng yên trong khi
+    `tts_voice_sample` đã bị sửa qua `add_sample`/`delete_sample`/`set_ref_text`. Muốn biết
+    audio/transcript của 1 voice phải qua `list_samples()`/`get_ref_path()`."""
     d = dict(row)
     d["hidden"] = bool(d.get("hidden"))
     for field in _JSON_LIST_FIELDS:
@@ -323,6 +444,8 @@ def _row_to_voice_dict(row: sqlite3.Row) -> dict:
             except (TypeError, ValueError):
                 pass
     d.pop("created_at", None)  # chi tiết lưu trữ, không có trong hình dạng entry cũ
+    d.pop("ref_file", None)
+    d.pop("ref_text", None)
     return {k: v for k, v in d.items() if v is not None}
 
 
@@ -379,15 +502,24 @@ class VoiceRegistrySqlite:
             return cur.rowcount > 0
 
     def set_ref_text(self, voice_id: str, ref_text: str) -> bool:
-        """Xem VoiceRegistryJson.set_ref_text — cùng hợp đồng: chuỗi rỗng = xoá field, caller
-        vẫn phải tự xoá ref-codes cache sau khi gọi (main.py's _ref_cache_forget_voice)."""
+        """Sửa transcript của SAMPLE ĐẦU TIÊN (thứ tự `created_at, id`) — xem
+        VoiceRegistryJson.set_ref_text cho lý do "voice_id" thay vì "sample_id". Chuỗi rỗng
+        = xoá field. Caller vẫn phải tự xoá ref-codes cache sau khi gọi
+        (main.py's _ref_cache_forget_voice)."""
         with self._lock:
+            first = self._conn.execute(
+                "SELECT id FROM tts_voice_sample WHERE voice_id = ? "
+                "ORDER BY created_at, id LIMIT 1",
+                (voice_id,),
+            ).fetchone()
+            if first is None:
+                return False
             text = (ref_text or "").strip() or None
-            cur = self._conn.execute(
-                "UPDATE tts_voice SET ref_text = ? WHERE id = ?", (text, voice_id)
+            self._conn.execute(
+                "UPDATE tts_voice_sample SET ref_text = ? WHERE id = ?", (text, first["id"])
             )
             self._conn.commit()
-            return cur.rowcount > 0
+            return True
 
     def add_cloned(
         self,
@@ -398,49 +530,91 @@ class VoiceRegistrySqlite:
         voice_id: str | None = None,
         extra: dict | None = None,
     ) -> dict:
+        """Tạo voice clone MỚI + sample đầu tiên của nó. Thêm sample thứ 2 trở đi dùng
+        `add_sample()` sau khi có `id` trả về ở đây.
+
+        `ref_file` đi thẳng vào `tts_voice_sample`, KHÔNG còn set cột `ref_file`/`ref_text`
+        legacy trên `tts_voice` nữa (migration 018) — không có nhánh "sample đầu tiên đặc
+        biệt" nào, nó tạo qua đúng cấu trúc mà mọi sample khác dùng.
+        """
         with self._lock:
             vid = voice_id or f"clone-{uuid.uuid4().hex[:8]}"
             extra = extra or {}
             category = extra.get("category")
             tags = extra.get("tags")
+            now = _now_iso()
             self._conn.execute(
                 """INSERT INTO tts_voice
-                   (id, type, label, gender, region, ref_file, hidden, created_at,
-                    ref_text, accent, category_json, tags_json, tagline, description,
+                   (id, type, label, gender, region, hidden, created_at,
+                    accent, category_json, tags_json, tagline, description,
                     source_catalog_id, source_lang)
-                   VALUES (?, 'cloned', ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, 'cloned', ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    vid, label, gender, region, ref_file, _now_iso(),
-                    extra.get("ref_text"), extra.get("accent"),
+                    vid, label, gender, region, now,
+                    extra.get("accent"),
                     json.dumps(category, ensure_ascii=False) if category is not None else None,
                     json.dumps(tags, ensure_ascii=False) if tags is not None else None,
                     extra.get("tagline"), extra.get("description"),
                     extra.get("source_catalog_id"), extra.get("source_lang"),
                 ),
             )
+            self._conn.execute(
+                "INSERT INTO tts_voice_sample (id, voice_id, ref_file, ref_text, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (f"sample-{uuid.uuid4().hex[:8]}", vid, ref_file, extra.get("ref_text"), now),
+            )
             self._conn.commit()
             # Đọc lại thay vì tự dựng dict — bảo đảm hình dạng trả về LUÔN khớp get_voice(),
             # không lệch nếu sau này thêm cột mà quên cập nhật cả 2 chỗ.
             return self.get_voice(vid)  # type: ignore[return-value]
 
-    def find_by_source_catalog_id(self, source_catalog_id: str) -> dict | None:
+    def list_samples(self, voice_id: str) -> list[dict]:
         with self._lock:
-            row = self._conn.execute(
-                "SELECT * FROM tts_voice WHERE source_catalog_id = ?", (source_catalog_id,)
-            ).fetchone()
-            return _row_to_voice_dict(row) if row else None
+            rows = self._conn.execute(
+                "SELECT id, ref_file, ref_text FROM tts_voice_sample "
+                "WHERE voice_id = ? ORDER BY created_at, id",
+                (voice_id,),
+            ).fetchall()
+            return [{k: v for k, v in dict(r).items() if v is not None} for r in rows]
 
-    def delete_cloned(self, voice_id: str) -> tuple[bool, str]:
+    def add_sample(self, voice_id: str, ref_file: str, ref_text: str | None = None) -> dict:
+        with self._lock:
+            exists = self._conn.execute(
+                "SELECT 1 FROM tts_voice WHERE id = ? AND type = 'cloned'", (voice_id,)
+            ).fetchone()
+            if exists is None:
+                raise ValueError(f"Voice không tồn tại hoặc không phải giọng clone: {voice_id}")
+
+            sample_id = f"sample-{uuid.uuid4().hex[:8]}"
+            text = (ref_text or "").strip() or None
+            self._conn.execute(
+                "INSERT INTO tts_voice_sample (id, voice_id, ref_file, ref_text, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (sample_id, voice_id, ref_file, text, _now_iso()),
+            )
+            self._conn.commit()
+            entry = {"id": sample_id, "ref_file": ref_file}
+            if text:
+                entry["ref_text"] = text
+            return entry
+
+    def delete_sample(self, sample_id: str) -> tuple[bool, str]:
+        """reason: 'not_found' | 'last_sample' (không cho xoá mẫu CUỐI CÙNG của 1 voice)."""
         with self._lock:
             row = self._conn.execute(
-                "SELECT type, ref_file FROM tts_voice WHERE id = ?", (voice_id,)
+                "SELECT voice_id, ref_file FROM tts_voice_sample WHERE id = ?", (sample_id,)
             ).fetchone()
             if row is None:
                 return False, "not_found"
-            if row["type"] == "preset":
-                return False, "is_preset"
 
-            self._conn.execute("DELETE FROM tts_voice WHERE id = ?", (voice_id,))
+            count = self._conn.execute(
+                "SELECT COUNT(*) AS c FROM tts_voice_sample WHERE voice_id = ?",
+                (row["voice_id"],),
+            ).fetchone()["c"]
+            if count <= 1:
+                return False, "last_sample"
+
+            self._conn.execute("DELETE FROM tts_voice_sample WHERE id = ?", (sample_id,))
             self._conn.commit()
 
             ref_file = row["ref_file"] or ""
@@ -454,11 +628,59 @@ class VoiceRegistrySqlite:
 
             return True, ""
 
+    def find_by_source_catalog_id(self, source_catalog_id: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM tts_voice WHERE source_catalog_id = ?", (source_catalog_id,)
+            ).fetchone()
+            return _row_to_voice_dict(row) if row else None
+
+    def delete_cloned(self, voice_id: str) -> tuple[bool, str]:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT type FROM tts_voice WHERE id = ?", (voice_id,)
+            ).fetchone()
+            if row is None:
+                return False, "not_found"
+            if row["type"] == "preset":
+                return False, "is_preset"
+
+            # Đọc TRƯỚC khi xoá — `ON DELETE CASCADE` (migration 018) tự dọn các dòng
+            # `tts_voice_sample` ở tầng DB, nhưng không đụng gì tới file WAV vật lý trên
+            # đĩa. Cần biết ref_file của MỌI sample (không chỉ 1 như trước Phase 2) để dọn
+            # theo — đọc sau khi DELETE thì CASCADE đã xoá mất các dòng này rồi.
+            sample_files = [
+                r["ref_file"] for r in self._conn.execute(
+                    "SELECT ref_file FROM tts_voice_sample WHERE voice_id = ?", (voice_id,)
+                ).fetchall()
+            ]
+
+            self._conn.execute("DELETE FROM tts_voice WHERE id = ?", (voice_id,))
+            self._conn.commit()
+
+            for ref_file in sample_files:
+                if not ref_file:
+                    continue
+                try:
+                    ref_path = self._ref_dir / ref_file
+                    ref_path.unlink(missing_ok=True)
+                    ref_path.with_suffix(".txt").unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+            return True, ""
+
     def get_ref_path(self, voice_id: str) -> Path | None:
+        """Đường dẫn sample ĐẦU TIÊN — dùng cho các chỗ chỉ cần 1 audio nhanh (preview).
+        Voice nhiều sample thật sự (>1) phải qua `list_samples()` + combine, xem main.py's
+        `_resolve_voice_ref`."""
         v = self.get_voice(voice_id)
         if v is None or v.get("type") != "cloned":
             return None
-        return self._ref_dir / v["ref_file"]
+        samples = self.list_samples(voice_id)
+        if not samples:
+            return None
+        return self._ref_dir / samples[0]["ref_file"]
 
     def get_preset_id(self, voice_id: str) -> str | None:
         v = self.get_voice(voice_id)
@@ -498,22 +720,42 @@ def _import_json_once(conn: sqlite3.Connection, registry_path: Path) -> None:
     for vid, v in cloned:
         category = v.get("category")
         tags = v.get("tags")
+        # KHÔNG ghi ref_file/ref_text vào tts_voice — 2 cột đó là DI SẢN từ migration 017,
+        # nguồn sự thật cho audio/transcript từ Phase 2 là tts_voice_sample (xem
+        # _row_to_voice_dict's docstring). Insert đủ mọi sample của voice này ngay sau đây.
         conn.execute(
             """INSERT OR IGNORE INTO tts_voice
-               (id, type, label, gender, region, ref_file, hidden, created_at,
-                ref_text, accent, category_json, tags_json, tagline, description,
+               (id, type, label, gender, region, hidden, created_at,
+                accent, category_json, tags_json, tagline, description,
                 source_catalog_id, source_lang)
-               VALUES (?, 'cloned', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, 'cloned', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 vid, v.get("label", ""), v.get("gender"), v.get("region"),
-                v.get("ref_file"), 1 if v.get("hidden") else 0, now,
-                v.get("ref_text"), v.get("accent"),
+                1 if v.get("hidden") else 0, now,
+                v.get("accent"),
                 json.dumps(category, ensure_ascii=False) if category is not None else None,
                 json.dumps(tags, ensure_ascii=False) if tags is not None else None,
                 v.get("tagline"), v.get("description"),
                 v.get("source_catalog_id"), v.get("source_lang"),
             ),
         )
+
+        # Sample: ưu tiên `samples[]` nếu voice JSON đã convert (đã gọi add_sample() ít
+        # nhất 1 lần trước khi Electron kịp migrate DB — hiếm nhưng có thể xảy ra), rơi về
+        # ref_file/ref_text trên entry (dạng phổ biến — voice 1 sample, chưa từng convert).
+        samples = v.get("samples") or (
+            [{"ref_file": v["ref_file"], **({"ref_text": v["ref_text"]} if v.get("ref_text") else {})}]
+            if v.get("ref_file") else []
+        )
+        for s in samples:
+            conn.execute(
+                "INSERT OR IGNORE INTO tts_voice_sample (id, voice_id, ref_file, ref_text, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (
+                    s.get("id") or f"sample-{uuid.uuid4().hex[:8]}",
+                    vid, s.get("ref_file"), s.get("ref_text"), now,
+                ),
+            )
     conn.commit()
 
     try:

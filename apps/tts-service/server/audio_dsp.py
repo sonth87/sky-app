@@ -9,6 +9,7 @@ numpy + soxr + soundfile). Các hàm chính:
   trim_silence(x, sr)               — cắt im lặng 2 đầu.
   preprocess_reference_audio(...)   — làm sạch audio mẫu TRƯỚC khi clone giọng.
   has_tts_runaway(x, sr)            — phát hiện model sinh lạc (miss EOS).
+  combine_voice_samples(paths, sr)  — ghép NHIỀU file mẫu thành 1 clip cho voice clone.
 
 Phase vocoder ở đây đủ tốt cho giọng đọc nghi lễ (rate 0.5–1.5). Không phải chất
 lượng studio như rubberband, nhưng tránh hẳn việc kéo pitch của resample thuần và
@@ -290,3 +291,35 @@ def rms_normalize(x: np.ndarray, target_dbfs: float = -20.0, peak_ceiling: float
     if peak > peak_ceiling:
         y = y * (peak_ceiling / peak)
     return y.astype(np.float32)
+
+
+def combine_voice_samples(wav_paths: list, target_sample_rate: int) -> np.ndarray:
+    """Ghép NHIỀU file audio mẫu thành 1 clip cho engine clone kiểu in-context.
+
+    Port từ voicebox's `combine_voice_prompts` (backends/base.py:203-231): chuẩn hoá TỪNG
+    clip → nối lại → chuẩn hoá LẠI bản đã nối. Chuẩn hoá HAI LẦN là có chủ đích, không phải
+    thừa: người dùng thường ghi các mẫu ở nhiều thời điểm/thiết bị khác nhau nên mức to nhỏ
+    lệch nhau — san bằng từng clip trước (lần 1) để không có clip nào áp đảo phép đo RMS của
+    bản ghép, rồi cân lại mức TỔNG (lần 2) vì nối các clip đã san bằng chưa chắc ra đúng mức
+    mục tiêu (RMS không cộng tuyến tính qua phép nối).
+
+    Chỉ gọi hàm này khi có ≥2 file — với 1 file thì không có gì để "ghép", caller tự rẽ
+    nhánh dùng thẳng (xem main.py's `_resolve_voice_ref`).
+
+    `target_sample_rate` PHẢI là tần số của engine sẽ dùng bản ghép này để clone (không phải
+    tần số gốc của từng file mẫu) — mỗi file được resample TRƯỚC KHI chuẩn hoá nếu lệch, để
+    hai bước xử lý DSP không cộng dồn sai số của nhau.
+    """
+    import soundfile as sf
+
+    clips: list[np.ndarray] = []
+    for p in wav_paths:
+        data, sr = sf.read(str(p), dtype="float32", always_2d=True)
+        mono = data.mean(axis=1).astype(np.float32)
+        if sr != target_sample_rate:
+            import soxr
+            mono = soxr.resample(mono, sr, target_sample_rate).astype(np.float32)
+        clips.append(rms_normalize(mono, target_dbfs=-20.0))
+
+    mixed = np.concatenate(clips)
+    return rms_normalize(mixed, target_dbfs=-20.0)

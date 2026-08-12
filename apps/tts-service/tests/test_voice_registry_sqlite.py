@@ -1,12 +1,16 @@
 """Test VoiceRegistrySqlite + create_voice_registry() + nhập một lần từ JSON cũ.
 
-Dựng bảng `tts_voice` bằng tay trong SQLite in-memory — schema PHẢI khớp
-`packages/app-db/src/migrations/017_tts_voice.ts`. Không có cách nào import trực tiếp file
-.ts từ Python nên khớp bằng tay là chấp nhận được; lệch nhau sẽ lộ ngay ở test đầu
-(INSERT thiếu cột / sai kiểu).
+Dựng bảng `tts_voice`/`tts_voice_sample` bằng tay trong SQLite in-memory — schema PHẢI khớp
+`packages/app-db/src/migrations/017_tts_voice.ts` + `018_tts_voice_sample.ts`. Không có cách
+nào import trực tiếp file .ts từ Python nên khớp bằng tay là chấp nhận được; lệch nhau sẽ lộ
+ngay ở test đầu (INSERT thiếu cột / sai kiểu).
 
-Test VoiceRegistryJson (class gốc, không đổi logic) đã có sẵn ở nơi khác — không lặp lại ở
-đây, chỉ test đường SQL mới và điểm nối giữa 2 kho.
+Sau Phase 2 (nhiều mẫu/voice), `ref_file`/`ref_text` trên `tts_voice` là DI SẢN — KHÔNG còn
+lộ ra qua get_voice()/list_voices() nữa (xem `_row_to_voice_dict`'s docstring). Đọc
+audio/transcript của voice phải qua `list_samples()`/`get_ref_path()`.
+
+Test VoiceRegistryJson (class gốc) đã có sẵn ở nơi khác — không lặp lại ở đây, chỉ test
+đường SQL mới và điểm nối giữa 2 kho.
 """
 import sqlite3
 
@@ -35,6 +39,13 @@ CREATE TABLE tts_voice (
   preset_id TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE tts_voice_sample (
+  id TEXT PRIMARY KEY,
+  voice_id TEXT NOT NULL REFERENCES tts_voice(id) ON DELETE CASCADE,
+  ref_file TEXT NOT NULL,
+  ref_text TEXT,
+  created_at TEXT NOT NULL
+);
 """
 
 
@@ -42,6 +53,7 @@ CREATE TABLE tts_voice (
 def conn():
     c = sqlite3.connect(":memory:")
     c.row_factory = sqlite3.Row
+    c.execute("PRAGMA foreign_keys = ON")
     c.executescript(SCHEMA_SQL)
     yield c
     c.close()
@@ -86,9 +98,21 @@ def test_them_giong_clone_toi_thieu(registry):
     v = registry.add_cloned(label="Test", gender="female", region="Bắc", ref_file="x.wav")
     assert v["type"] == "cloned"
     assert v["label"] == "Test"
-    assert v["ref_file"] == "x.wav"
     assert v["hidden"] is False
-    assert "ref_text" not in v  # None bị lọc — đúng hình dạng JSON gốc
+    # ref_file/ref_text KHÔNG còn lộ qua get_voice() sau Phase 2 — audio nằm trong sample.
+    assert "ref_file" not in v
+    assert "ref_text" not in v
+
+
+def test_them_giong_tao_dung_1_sample_dau_tien(registry):
+    v = registry.add_cloned(
+        label="Test", gender="female", region="Bắc", ref_file="x.wav",
+        extra={"ref_text": "Xin chào"},
+    )
+    samples = registry.list_samples(v["id"])
+    assert len(samples) == 1
+    assert samples[0]["ref_file"] == "x.wav"
+    assert samples[0]["ref_text"] == "Xin chào"
 
 
 def test_them_giong_voi_du_extra_field(registry):
@@ -101,11 +125,11 @@ def test_them_giong_voi_du_extra_field(registry):
             "source_catalog_id": "cat-1", "source_lang": "vi-VN",
         },
     )
-    assert v["ref_text"] == "Xin chào"
     assert v["category"] == ["narrator"]
     assert v["tags"] == ["calm", "warm"]
     assert v["source_catalog_id"] == "cat-1"
     assert v["source_lang"] == "vi-VN"
+    assert registry.list_samples(v["id"])[0]["ref_text"] == "Xin chào"
 
 
 def test_id_tu_sinh_co_tien_to_clone(registry):
@@ -132,10 +156,79 @@ def test_list_voices_bao_gom_ca_an_khi_yeu_cau(registry):
     assert len(registry.list_voices(include_hidden=True)) == 1 + len(vr.PRESET_VOICES)
 
 
+# ── list_samples / add_sample / delete_sample ─────────────────────────────────
+
+def test_list_samples_theo_thu_tu_them_vao(registry):
+    v = registry.add_cloned(label="Test", gender="female", region="Bắc", ref_file="a.wav")
+    registry.add_sample(v["id"], "b.wav", "Mẫu 2")
+    registry.add_sample(v["id"], "c.wav", "Mẫu 3")
+    samples = registry.list_samples(v["id"])
+    assert [s["ref_file"] for s in samples] == ["a.wav", "b.wav", "c.wav"]
+
+
+def test_list_samples_voice_khong_ton_tai_tra_rong(registry):
+    assert registry.list_samples("khong-co") == []
+
+
+def test_add_sample_khong_co_transcript(registry):
+    v = registry.add_cloned(label="Test", gender="female", region="Bắc", ref_file="a.wav")
+    s = registry.add_sample(v["id"], "b.wav")
+    assert "ref_text" not in s
+
+
+def test_add_sample_voice_khong_ton_tai_bao_loi(registry):
+    with pytest.raises(ValueError):
+        registry.add_sample("khong-co", "x.wav")
+
+
+def test_add_sample_preset_bao_loi(registry):
+    preset_id = next(iter(vr.PRESET_VOICES))
+    with pytest.raises(ValueError):
+        registry.add_sample(preset_id, "x.wav")
+
+
+def test_khong_cho_xoa_sample_cuoi_cung(registry):
+    v = registry.add_cloned(label="Test", gender="female", region="Bắc", ref_file="only.wav")
+    sample_id = registry.list_samples(v["id"])[0]["id"]
+    ok, reason = registry.delete_sample(sample_id)
+    assert (ok, reason) == (False, "last_sample")
+    assert len(registry.list_samples(v["id"])) == 1
+
+
+def test_xoa_sample_khong_ton_tai(registry):
+    ok, reason = registry.delete_sample("khong-co")
+    assert (ok, reason) == (False, "not_found")
+
+
+def test_xoa_sample_con_lai_it_nhat_1_thanh_cong(registry, tmp_path):
+    ref_b = tmp_path / "b.wav"
+    ref_b.write_bytes(b"RIFF....WAVEfmt ")
+
+    v = registry.add_cloned(label="Test", gender="female", region="Bắc", ref_file="a.wav")
+    sample_b = registry.add_sample(v["id"], "b.wav")
+
+    ok, reason = registry.delete_sample(sample_b["id"])
+    assert (ok, reason) == (True, "")
+    assert len(registry.list_samples(v["id"])) == 1
+    assert not ref_b.exists()  # file vật lý bị dọn theo
+
+
 # ── set_hidden / set_ref_text ──────────────────────────────────────────────────
 
 def test_set_hidden_tra_false_neu_khong_ton_tai(registry):
     assert registry.set_hidden("khong-co", True) is False
+
+
+def test_set_ref_text_sua_sample_dau_tien(registry):
+    """`set_ref_text(voice_id)` là API cấp voice nhưng sửa transcript của SAMPLE ĐẦU TIÊN —
+    đúng thiết kế: transcript là thuộc tính của sample, voice_id chỉ còn ý nghĩa rõ ràng khi
+    voice có 1 sample (trường hợp phổ biến, và duy nhất UI hiện hỗ trợ)."""
+    v = registry.add_cloned(
+        label="Test", gender="female", region="Bắc", ref_file="x.wav",
+        extra={"ref_text": "Có sẵn"},
+    )
+    registry.set_ref_text(v["id"], "  Nội dung mới  ")
+    assert registry.list_samples(v["id"])[0]["ref_text"] == "Nội dung mới"
 
 
 def test_set_ref_text_chuoi_rong_xoa_field(registry):
@@ -144,13 +237,11 @@ def test_set_ref_text_chuoi_rong_xoa_field(registry):
         extra={"ref_text": "Có sẵn"},
     )
     assert registry.set_ref_text(v["id"], "") is True
-    assert "ref_text" not in registry.get_voice(v["id"])
+    assert "ref_text" not in registry.list_samples(v["id"])[0]
 
 
-def test_set_ref_text_cap_nhat_duoc(registry):
-    v = registry.add_cloned(label="Test", gender="female", region="Bắc", ref_file="x.wav")
-    registry.set_ref_text(v["id"], "  Nội dung mới  ")
-    assert registry.get_voice(v["id"])["ref_text"] == "Nội dung mới"
+def test_set_ref_text_khong_ton_tai_tra_false(registry):
+    assert registry.set_ref_text("khong-co", "x") is False
 
 
 # ── find_by_source_catalog_id ──────────────────────────────────────────────────
@@ -178,7 +269,7 @@ def test_xoa_khong_ton_tai(registry):
     assert (ok, reason) == (False, "not_found")
 
 
-def test_xoa_clone_thanh_cong_va_don_file(registry, tmp_path):
+def test_xoa_clone_thanh_cong_va_don_file_sample_duy_nhat(registry, tmp_path):
     ref = tmp_path / "clone-x.wav"
     ref.write_bytes(b"RIFF....WAVEfmt ")
     (tmp_path / "clone-x.txt").write_text("transcript", encoding="utf-8")
@@ -192,9 +283,37 @@ def test_xoa_clone_thanh_cong_va_don_file(registry, tmp_path):
     assert not (tmp_path / "clone-x.txt").exists()
 
 
+def test_xoa_clone_don_het_file_cua_moi_sample(registry, tmp_path):
+    """Voice nhiều sample — xoá voice phải dọn file vật lý của TẤT CẢ sample, không chỉ 1."""
+    ref_a = tmp_path / "a.wav"
+    ref_b = tmp_path / "b.wav"
+    ref_a.write_bytes(b"RIFF....WAVEfmt ")
+    ref_b.write_bytes(b"RIFF....WAVEfmt ")
+
+    v = registry.add_cloned(label="Test", gender="female", region="Bắc", ref_file="a.wav")
+    registry.add_sample(v["id"], "b.wav")
+
+    ok, reason = registry.delete_cloned(v["id"])
+    assert (ok, reason) == (True, "")
+    assert not ref_a.exists()
+    assert not ref_b.exists()
+    assert registry.list_samples(v["id"]) == []
+
+
+def test_xoa_voice_cascade_xoa_sample_trong_db(registry):
+    """Kiểm CASCADE thật (không chỉ file vật lý) — dòng tts_voice_sample phải biến mất
+    khỏi DB, không chỉ khỏi list_samples()."""
+    v = registry.add_cloned(label="Test", gender="female", region="Bắc", ref_file="a.wav")
+    registry.delete_cloned(v["id"])
+    remaining = registry._conn.execute(
+        "SELECT COUNT(*) c FROM tts_voice_sample WHERE voice_id = ?", (v["id"],)
+    ).fetchone()["c"]
+    assert remaining == 0
+
+
 # ── get_ref_path / get_preset_id ────────────────────────────────────────────────
 
-def test_get_ref_path_giong_clone(registry, tmp_path):
+def test_get_ref_path_giong_clone_tra_sample_dau_tien(registry, tmp_path):
     v = registry.add_cloned(label="Test", gender="female", region="Bắc", ref_file="clone-x.wav")
     assert registry.get_ref_path(v["id"]) == tmp_path / "clone-x.wav"
 
@@ -248,8 +367,11 @@ def test_nhap_tu_json_cu_khi_chuyen_sang_sql(monkeypatch, conn, tmp_path):
     v = reg.get_voice("clone-abc")
     assert v is not None
     assert v["label"] == "Cũ"
-    assert v["ref_text"] == "Xin chào"
     assert v["category"] == ["narrator"]
+    samples = reg.list_samples("clone-abc")
+    assert len(samples) == 1
+    assert samples[0]["ref_file"] == "old.wav"
+    assert samples[0]["ref_text"] == "Xin chào"
     # File JSON cũ được đổi tên, không xoá — dữ liệu gốc vẫn đối chiếu được nếu nhập sai.
     assert not registry_path.exists()
     assert (tmp_path / "voice-registry.imported.json").exists()
@@ -266,8 +388,12 @@ def test_nhap_khong_chay_lai_lan_2(monkeypatch, conn, tmp_path):
         encoding="utf-8",
     )
     conn.execute(
-        "INSERT INTO tts_voice (id, type, label, hidden, ref_file, created_at) "
-        "VALUES ('clone-existing', 'cloned', 'Đã có', 0, 'e.wav', '2026')"
+        "INSERT INTO tts_voice (id, type, label, hidden, created_at) "
+        "VALUES ('clone-existing', 'cloned', 'Đã có', 0, '2026')"
+    )
+    conn.execute(
+        "INSERT INTO tts_voice_sample (id, voice_id, ref_file, created_at) "
+        "VALUES ('s1', 'clone-existing', 'e.wav', '2026')"
     )
     conn.commit()
     monkeypatch.setattr(vr._db, "connect", lambda: conn)

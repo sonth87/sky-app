@@ -140,11 +140,16 @@ export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
     },
 
     async cloneVoice(opts) {
-      if (!(opts.filePath instanceof File)) {
-        throw new Error('Web cloneVoice requires a File object as filePath');
-      }
       const formData = new FormData();
-      formData.append('file', opts.filePath);
+      for (const s of opts.samples) {
+        if (!(s.filePath instanceof File)) {
+          throw new Error('Web cloneVoice requires File objects');
+        }
+        formData.append('files', s.filePath);
+        // Cùng số lượng và THỨ TỰ với 'files' — server gom theo tên field lặp lại, khớp vị
+        // trí. Luôn gửi (kể cả rỗng) — server quyết định bắt buộc hay không theo engine.
+        formData.append('ref_texts', s.refText ?? '');
+      }
       formData.append('label', opts.label);
       formData.append('gender', opts.gender);
       formData.append('region', opts.region);
@@ -155,9 +160,6 @@ export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
       if (opts.tags) {
         opts.tags.forEach(tag => formData.append('tags', tag));
       }
-      // Luôn gửi (kể cả rỗng) — server quyết định có bắt buộc hay không theo engine
-      // đang chạy, client không nên đoán thay.
-      formData.append('ref_text', opts.refText ?? '');
 
       const res = await fetch(`${baseUrl}/voices/clone`, {
         method: 'POST',
@@ -170,6 +172,41 @@ export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
       }
       const voice = await res.json();
       return { ok: true, voice };
+    },
+
+    async addVoiceSample(voiceId, filePath, refText) {
+      if (!(filePath instanceof File)) {
+        throw new Error('Web addVoiceSample requires a File object');
+      }
+      const formData = new FormData();
+      formData.append('file', filePath);
+      formData.append('ref_text', refText ?? '');
+
+      const res = await fetch(`${baseUrl}/voices/${encodeURIComponent(voiceId)}/samples`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        return { ok: false, error: (await res.text()) || `TTS add sample failed: ${res.statusText}` };
+      }
+      return { ok: true, sample: await res.json() };
+    },
+
+    async deleteVoiceSample(voiceId, sampleId) {
+      const res = await fetch(
+        `${baseUrl}/voices/${encodeURIComponent(voiceId)}/samples/${encodeURIComponent(sampleId)}`,
+        { method: 'DELETE' },
+      );
+      if (!res.ok) {
+        return { ok: false, error: (await res.text()) || `TTS delete sample failed: ${res.statusText}` };
+      }
+      return { ok: true };
+    },
+
+    async listVoiceSamples(voiceId) {
+      const res = await fetch(`${baseUrl}/voices/${encodeURIComponent(voiceId)}/samples`);
+      if (!res.ok) return [];
+      return res.json();
     },
 
     async listEffectTypes() {

@@ -15,6 +15,7 @@ import { SQL_014_LAYOUT_COMPONENT } from './014_layout_component.js';
 import { SQL_015_EFFECT_PRESET } from './015_effect_preset.js';
 import { SQL_016_TTS_TABLE_PREFIX } from './016_tts_table_prefix.js';
 import { SQL_017_TTS_VOICE } from './017_tts_voice.js';
+import { SQL_018_TTS_VOICE_SAMPLE } from './018_tts_voice_sample.js';
 
 export interface Migration {
   version: number;
@@ -46,4 +47,5 @@ export const MIGRATIONS: Migration[] = [
   { version: 15, name: 'effect_preset', sql: SQL_015_EFFECT_PRESET },
   { version: 16, name: 'tts_table_prefix', sql: SQL_016_TTS_TABLE_PREFIX },
   { version: 17, name: 'tts_voice', sql: SQL_017_TTS_VOICE },
+  { version: 18, name: 'tts_voice_sample', sql: SQL_018_TTS_VOICE_SAMPLE },
 ];

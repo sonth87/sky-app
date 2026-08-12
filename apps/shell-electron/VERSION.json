@@ -2,6 +2,15 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.10.0",
+      "date": "2026-08-12",
+      "bump": "minor",
+      "summary": "Khi tạo giọng đọc mới bằng cách sao chép giọng nói, giờ có thể chọn NHIỀU file âm thanh mẫu cùng lúc thay vì chỉ 1 — model học được nhiều ngữ cảnh về giọng hơn, cho ra giọng clone giống bản gốc hơn. Mỗi file mẫu có ô nhập nội dung riêng.",
+      "breaking": true,
+      "minAppVersion": "0.10.0",
+      "detailsRef": "history/2026-08-12-mot-giong-nhieu-mau-multi-sample.md"
+    },
+    {
       "version": "0.9.0",
       "date": "2026-08-12",
       "bump": "minor",

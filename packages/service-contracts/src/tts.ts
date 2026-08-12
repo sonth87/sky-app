@@ -115,9 +115,13 @@ export interface TtsPort {
   /** URL nghe thử audio gốc của catalog entry — dùng khi voice này CHƯA từng được
    * chọn dùng (chưa có trong registry nên chưa có /preview qua engine). */
   getCatalogAudioUrl?(lang: string, entryId: string): Promise<string>;
-  /** Clone voice từ file âm thanh mẫu. */
+  /** Clone voice từ MỘT HOẶC NHIỀU file âm thanh mẫu — nhiều mẫu ghép lại cho model nhiều
+   * ngữ cảnh về giọng hơn (port từ voicebox's combine_voice_prompts, xem
+   * audio_dsp.py's combine_voice_samples). */
   cloneVoice?(opts: {
-    filePath: string | any;
+    /** Mỗi phần tử là 1 sample. Kiểu file tuỳ platform: đường dẫn string (Electron) hoặc
+     * `File` (Web) — xem `filePath` cũ để biết vì sao `any`. */
+    samples: Array<{ filePath: string | any; refText?: string }>;
     label: string;
     gender: string;
     region: string;
@@ -126,21 +130,30 @@ export interface TtsPort {
     tagline?: string;
     description?: string;
     tags?: string[];
-    /** Bản chép lời của file mẫu — xem `Voice.refText`. Server từ chối (400) nếu để
-     * trống khi engine đang chạy khai `requiresRefText`. */
-    refText?: string;
   }): Promise<{
     ok: boolean;
     voice?: { id: string; label: string; gender: string; region: string; type: string; warnings?: string[] };
     error?: string;
   }>;
-  /** Sửa bản chép lời của 1 voice đã có (giọng dựng sẵn hoặc đã clone trước khi có ô
+  /** Thêm 1 mẫu audio cho voice clone ĐÃ CÓ (khác lúc tạo mới — voice phải tồn tại rồi). */
+  addVoiceSample?(voiceId: string, filePath: string | any, refText?: string): Promise<{
+    ok: boolean;
+    sample?: { id: string; ref_file: string; ref_text?: string; warnings?: string[] };
+    error?: string;
+  }>;
+  /** Xoá 1 mẫu. Server từ chối (400) nếu đó là mẫu CUỐI CÙNG của voice — voice phải có ít
+   * nhất 1 mẫu để còn dùng được. */
+  deleteVoiceSample?(voiceId: string, sampleId: string): Promise<{ ok: boolean; error?: string }>;
+  /** Danh sách mẫu của 1 voice clone — dùng khi mở lại giọng để sửa (thêm/xoá mẫu). */
+  listVoiceSamples?(voiceId: string): Promise<Array<{ id: string; ref_file: string; ref_text?: string }>>;
+  /** Sửa bản chép lời của SAMPLE ĐẦU TIÊN (giọng dựng sẵn hoặc đã clone trước khi có ô
    * nhập này). Server tự xoá embedding đã cache để transcript mới có hiệu lực ngay. */
   updateVoiceRefText?(voiceId: string, refText: string): Promise<{ ok: boolean; error?: string }>;
   /** Xóa voice đã clone. */
   deleteVoice?(voiceId: string): Promise<{ ok: boolean; error?: string }>;
   /** Mở hộp thoại chọn file âm thanh của OS (chỉ khả dụng trên Electron). */
-  pickAudioFile?(): Promise<{ ok: boolean; filePath?: string }>;
+  /** Mở hộp thoại chọn file — chọn được NHIỀU file cùng lúc (1 giọng clone từ nhiều mẫu). */
+  pickAudioFile?(): Promise<{ ok: boolean; filePaths?: string[] }>;
   /** Bảng hiệu ứng hậu kỳ khả dụng + định nghĩa tham số, do service TTS khai
    *  (`GET /effects`). UI dựng slider từ đây thay vì hard-code — thêm hiệu ứng mới chỉ
    *  cần sửa phía service. Trả mảng rỗng khi service không hỗ trợ hiệu ứng. */

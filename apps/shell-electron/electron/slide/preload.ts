@@ -207,15 +207,26 @@ const api: SlideApi = {
     return () => ipcRenderer.removeListener('tts:engine-install-progress', handler);
   },
   // ---- Clone voice ----
-  pickAudioFile: (): Promise<{ ok: boolean; filePath?: string }> =>
+  // Chọn được NHIỀU file cùng lúc (multiSelections) — 1 giọng giờ clone được từ nhiều mẫu.
+  pickAudioFile: (): Promise<{ ok: boolean; filePaths?: string[] }> =>
     ipcRenderer.invoke('tts:pick-audio-file'),
   cloneVoice: (payload: {
-    filePath: string; label: string; gender?: string; region?: string; refText?: string;
+    samples: Array<{ filePath: string; refText?: string }>;
+    label: string; gender?: string; region?: string;
   }): Promise<{
     ok: boolean;
     voice?: { id: string; label: string; gender: string; region: string; type: string; warnings?: string[] };
     error?: string;
   }> => ipcRenderer.invoke('tts:clone-voice', payload),
+  addVoiceSample: (voiceId: string, filePath: string, refText?: string): Promise<{
+    ok: boolean;
+    sample?: { id: string; ref_file: string; ref_text?: string; warnings?: string[] };
+    error?: string;
+  }> => ipcRenderer.invoke('tts:add-voice-sample', { voiceId, filePath, refText }),
+  deleteVoiceSample: (voiceId: string, sampleId: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('tts:delete-voice-sample', { voiceId, sampleId }),
+  listVoiceSamples: (voiceId: string): Promise<Array<{ id: string; ref_file: string; ref_text?: string }>> =>
+    ipcRenderer.invoke('tts:list-voice-samples', { voiceId }),
   updateVoice: (voiceId: string, hidden?: boolean, refText?: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('tts:update-voice', { voiceId, hidden, refText }),
   deleteVoice: (voiceId: string): Promise<{ ok: boolean; error?: string }> =>
