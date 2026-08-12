@@ -2,6 +2,15 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.9.0",
+      "date": "2026-08-12",
+      "bump": "minor",
+      "summary": "Tiến trình xử lý giọng nói giờ có thể lưu danh sách giọng đọc trực tiếp vào cơ sở dữ liệu dùng chung của app thay vì file riêng — nền tảng để thêm các tính năng giọng nói mới sau này (nhiều mẫu âm thanh cho 1 giọng, lịch sử tạo audio...). Không ảnh hưởng gì tới giọng đọc hiện có — dữ liệu cũ được giữ nguyên và có đường lùi nếu cần.",
+      "breaking": true,
+      "minAppVersion": "0.9.0",
+      "detailsRef": "history/2026-08-12-python-noi-vao-db-dung-chung.md"
+    },
+    {
       "version": "0.8.0",
       "date": "2026-08-12",
       "bump": "minor",

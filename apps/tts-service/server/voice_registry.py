@@ -45,13 +45,41 @@ Cloned voice import từ catalog (voice_catalog.py, resources/voice-ref/{lang}/c
 - KHÔNG còn danh sách cloned voice mặc định cứng trong code (NF/SF/...) — bộ giọng
   "mặc định hệ thống" giờ là toàn bộ catalog vendor (resources/voice-ref/{lang}/), tự
   sẵn sàng dùng khi chọn synthesize lần đầu (xem main.py's _ensure_voice_ready).
+
+── Hai kho lưu trữ (2026-08-12) ──────────────────────────────────────────────────────────
+
+Module này giờ có HAI cách lưu, cùng API công khai (`list_voices`/`get_voice`/`set_hidden`/
+`set_ref_text`/`add_cloned`/`find_by_source_catalog_id`/`delete_cloned`/`get_ref_path`/
+`get_preset_id`):
+
+  - `VoiceRegistryJson` — class GỐC, không đổi 1 dòng logic nào, chỉ đổi tên từ
+    `VoiceRegistry`. Dùng khi chạy độc lập ngoài Electron, `verify_engine.py`, hoặc Electron
+    đang chạy bản CŨ HƠN schema mà bản Python này cần (lệch version giữa hai bên đóng gói
+    riêng — xem `db.py`'s `REQUIRED_SCHEMA_VERSION`).
+  - `VoiceRegistrySqlite` — lưu trong bảng `tts_voice` của DB dùng chung
+    (`packages/app-db`, migration 017). Dùng khi Electron đã truyền `SKY_APP_DB_PATH` và
+    file đó đã migrate đủ.
+
+`create_voice_registry()` là điểm vào DUY NHẤT nên dùng (main.py gọi hàm này, không gọi
+constructor của class nào trực tiếp) — nó tự chọn kho theo `db.connect()`, và nếu chuyển
+sang SQL lần đầu thì tự NHẬP MỘT LẦN cloned voice từ file JSON cũ (không đụng gì nếu bảng SQL
+đã có cloned voice — tức đã nhập trước đó, hoặc người dùng đã clone giọng mới qua SQL rồi).
+
+Vì sao đáng chuyển: `voice-registry.json` hiện tại đã là file BA người ghi không khoá gì cả —
+Electron seed lúc cài, tiến trình Python tier 'bundled', và tier 'ext' (hai tier SỐNG SONG
+SONG có chủ đích, xem python-server.ts's docstring) — mỗi lần khởi động còn tự ghi đè lại file
+(`_load_or_init` → `_save()`). SQLite WAL + `busy_timeout` an toàn hơn hẳn hiện trạng đó.
 """
 from __future__ import annotations
 
 import json
+import sqlite3
 import threading
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
+
+import db as _db
 
 # 10 preset voices từ VieNeu v3 Turbo model (voices_v3_turbo.json)
 PRESET_VOICES: dict[str, dict] = {
@@ -68,8 +96,17 @@ PRESET_VOICES: dict[str, dict] = {
 }
 
 
-class VoiceRegistry:
-    """Thread-safe voice registry. Persist sang JSON file."""
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class VoiceRegistryJson:
+    """Thread-safe voice registry. Persist sang JSON file.
+
+    Đổi tên từ `VoiceRegistry` (2026-08-12) khi thêm `VoiceRegistrySqlite` — logic bên trong
+    KHÔNG đổi 1 dòng nào. Dùng `create_voice_registry()` để lấy instance đúng, không gọi
+    constructor lớp này trực tiếp trừ trong test.
+    """
 
     def __init__(self, registry_path: Path, ref_dir: Path) -> None:
         self._path = registry_path
@@ -255,3 +292,247 @@ class VoiceRegistry:
         if v is None or v.get("type") != "preset":
             return None
         return v.get("preset_id")
+
+
+# ── Kho SQL (bảng tts_voice của DB dùng chung) ──────────────────────────────────────────
+
+# Field của `extra` (add_cloned) map thẳng sang cột cùng tên trong bảng tts_voice — liệt kê
+# tường minh ở đây (khác VoiceRegistryJson's `**(extra or {})` nhận bất kỳ key nào) vì SQL
+# cần biết trước tập cột. Khớp với MỌI call site thật của add_cloned(extra=...) trong
+# main.py (_import_catalog_entry, /voices/clone) tại thời điểm viết — thêm field mới vào
+# extra ở nơi gọi mà quên thêm vào đây thì field đó lặng lẽ KHÔNG được lưu.
+_CLONED_EXTRA_COLUMNS = (
+    "ref_text", "accent", "category", "tags", "tagline", "description",
+    "source_catalog_id", "source_lang",
+)
+_JSON_LIST_FIELDS = ("category", "tags")
+
+
+def _row_to_voice_dict(row: sqlite3.Row) -> dict:
+    """Chuyển 1 dòng `tts_voice` thành dict CÙNG HÌNH DẠNG với VoiceRegistryJson's entry:
+    bool cho hidden, list đã parse cho category/tags, và KHÔNG có field NULL (JSON gốc chỉ
+    có field nào thực sự được set — code gọi dùng `.get()` nên thiếu key ~ giá trị None,
+    nhưng giữ đúng hình dạng để dễ so sánh/debug khi cần đối chiếu 2 kho)."""
+    d = dict(row)
+    d["hidden"] = bool(d.get("hidden"))
+    for field in _JSON_LIST_FIELDS:
+        raw = d.pop(f"{field}_json", None)
+        if raw:
+            try:
+                d[field] = json.loads(raw)
+            except (TypeError, ValueError):
+                pass
+    d.pop("created_at", None)  # chi tiết lưu trữ, không có trong hình dạng entry cũ
+    return {k: v for k, v in d.items() if v is not None}
+
+
+class VoiceRegistrySqlite:
+    """Cùng API với `VoiceRegistryJson`, lưu trong bảng `tts_voice` của DB dùng chung.
+
+    KHÔNG tự khoá file/transaction dài — mỗi thao tác là 1 câu SQL + commit ngay, để không
+    giữ write-lock lâu hơn cần thiết trên file mà tiến trình khác (Electron, tier Python
+    kia) cũng đang mở. `threading.RLock` chỉ chống race TRONG tiến trình này, giống
+    VoiceRegistryJson — an toàn liên-tiến-trình đến từ WAL + `busy_timeout` phía SQLite.
+    """
+
+    def __init__(self, conn: sqlite3.Connection, ref_dir: Path) -> None:
+        self._conn = conn
+        self._ref_dir = ref_dir
+        self._lock = threading.RLock()
+        self._ensure_presets()
+
+    def _ensure_presets(self) -> None:
+        """`INSERT OR IGNORE` 10 preset voice — tương đương merge preset mới của
+        VoiceRegistryJson's `_load_or_init` (tự nhận preset khi VieNeu update, không ghi đè
+        preset đã có nếu người dùng lỡ set hidden=False cho nó)."""
+        with self._lock:
+            now = _now_iso()
+            for vid, vdef in PRESET_VOICES.items():
+                self._conn.execute(
+                    """INSERT OR IGNORE INTO tts_voice
+                       (id, type, label, gender, region, preset_id, hidden, created_at)
+                       VALUES (?, 'preset', ?, ?, ?, ?, ?, ?)""",
+                    (vid, vdef["label"], vdef["gender"], vdef["region"], vdef["preset_id"],
+                     1 if vdef["hidden"] else 0, now),
+                )
+            self._conn.commit()
+
+    def list_voices(self, include_hidden: bool = False) -> list[dict]:
+        with self._lock:
+            sql = "SELECT * FROM tts_voice" + ("" if include_hidden else " WHERE hidden = 0")
+            rows = self._conn.execute(sql).fetchall()
+            return [_row_to_voice_dict(r) for r in rows]
+
+    def get_voice(self, voice_id: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM tts_voice WHERE id = ?", (voice_id,)
+            ).fetchone()
+            return _row_to_voice_dict(row) if row else None
+
+    def set_hidden(self, voice_id: str, hidden: bool) -> bool:
+        with self._lock:
+            cur = self._conn.execute(
+                "UPDATE tts_voice SET hidden = ? WHERE id = ?", (1 if hidden else 0, voice_id)
+            )
+            self._conn.commit()
+            return cur.rowcount > 0
+
+    def set_ref_text(self, voice_id: str, ref_text: str) -> bool:
+        """Xem VoiceRegistryJson.set_ref_text — cùng hợp đồng: chuỗi rỗng = xoá field, caller
+        vẫn phải tự xoá ref-codes cache sau khi gọi (main.py's _ref_cache_forget_voice)."""
+        with self._lock:
+            text = (ref_text or "").strip() or None
+            cur = self._conn.execute(
+                "UPDATE tts_voice SET ref_text = ? WHERE id = ?", (text, voice_id)
+            )
+            self._conn.commit()
+            return cur.rowcount > 0
+
+    def add_cloned(
+        self,
+        label: str,
+        gender: str,
+        region: str,
+        ref_file: str,
+        voice_id: str | None = None,
+        extra: dict | None = None,
+    ) -> dict:
+        with self._lock:
+            vid = voice_id or f"clone-{uuid.uuid4().hex[:8]}"
+            extra = extra or {}
+            category = extra.get("category")
+            tags = extra.get("tags")
+            self._conn.execute(
+                """INSERT INTO tts_voice
+                   (id, type, label, gender, region, ref_file, hidden, created_at,
+                    ref_text, accent, category_json, tags_json, tagline, description,
+                    source_catalog_id, source_lang)
+                   VALUES (?, 'cloned', ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    vid, label, gender, region, ref_file, _now_iso(),
+                    extra.get("ref_text"), extra.get("accent"),
+                    json.dumps(category, ensure_ascii=False) if category is not None else None,
+                    json.dumps(tags, ensure_ascii=False) if tags is not None else None,
+                    extra.get("tagline"), extra.get("description"),
+                    extra.get("source_catalog_id"), extra.get("source_lang"),
+                ),
+            )
+            self._conn.commit()
+            # Đọc lại thay vì tự dựng dict — bảo đảm hình dạng trả về LUÔN khớp get_voice(),
+            # không lệch nếu sau này thêm cột mà quên cập nhật cả 2 chỗ.
+            return self.get_voice(vid)  # type: ignore[return-value]
+
+    def find_by_source_catalog_id(self, source_catalog_id: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM tts_voice WHERE source_catalog_id = ?", (source_catalog_id,)
+            ).fetchone()
+            return _row_to_voice_dict(row) if row else None
+
+    def delete_cloned(self, voice_id: str) -> tuple[bool, str]:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT type, ref_file FROM tts_voice WHERE id = ?", (voice_id,)
+            ).fetchone()
+            if row is None:
+                return False, "not_found"
+            if row["type"] == "preset":
+                return False, "is_preset"
+
+            self._conn.execute("DELETE FROM tts_voice WHERE id = ?", (voice_id,))
+            self._conn.commit()
+
+            ref_file = row["ref_file"] or ""
+            if ref_file:
+                try:
+                    ref_path = self._ref_dir / ref_file
+                    ref_path.unlink(missing_ok=True)
+                    ref_path.with_suffix(".txt").unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+            return True, ""
+
+    def get_ref_path(self, voice_id: str) -> Path | None:
+        v = self.get_voice(voice_id)
+        if v is None or v.get("type") != "cloned":
+            return None
+        return self._ref_dir / v["ref_file"]
+
+    def get_preset_id(self, voice_id: str) -> str | None:
+        v = self.get_voice(voice_id)
+        if v is None or v.get("type") != "preset":
+            return None
+        return v.get("preset_id")
+
+
+def _import_json_once(conn: sqlite3.Connection, registry_path: Path) -> None:
+    """Nhập cloned voice từ `voice-registry.json` cũ vào bảng SQL, MỘT LẦN duy nhất.
+
+    Điều kiện dừng sớm: bảng đã có ≥1 cloned voice (đã nhập trước đó, hoặc người dùng đã
+    clone giọng mới qua SQL trước khi hàm này kịp chạy — không ghi đè). File JSON không tồn
+    tại hoặc hỏng → bỏ qua êm, không chặn khởi động vì giọng preset vẫn dùng được.
+
+    Đổi tên file JSON thành `.imported.json` sau khi xong (KHÔNG xoá) — cho phép đối chiếu
+    hoặc khôi phục thủ công nếu phát hiện nhập sai, đúng tinh thần
+    VoiceRegistryJson's cách xử lý file hỏng (backup, không xoá im lặng).
+    """
+    if not registry_path.exists():
+        return
+    already = conn.execute("SELECT 1 FROM tts_voice WHERE type = 'cloned' LIMIT 1").fetchone()
+    if already:
+        return
+
+    try:
+        with registry_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return
+
+    cloned = [(vid, v) for vid, v in data.get("voices", {}).items() if v.get("type") == "cloned"]
+    if not cloned:
+        return
+
+    now = _now_iso()
+    for vid, v in cloned:
+        category = v.get("category")
+        tags = v.get("tags")
+        conn.execute(
+            """INSERT OR IGNORE INTO tts_voice
+               (id, type, label, gender, region, ref_file, hidden, created_at,
+                ref_text, accent, category_json, tags_json, tagline, description,
+                source_catalog_id, source_lang)
+               VALUES (?, 'cloned', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                vid, v.get("label", ""), v.get("gender"), v.get("region"),
+                v.get("ref_file"), 1 if v.get("hidden") else 0, now,
+                v.get("ref_text"), v.get("accent"),
+                json.dumps(category, ensure_ascii=False) if category is not None else None,
+                json.dumps(tags, ensure_ascii=False) if tags is not None else None,
+                v.get("tagline"), v.get("description"),
+                v.get("source_catalog_id"), v.get("source_lang"),
+            ),
+        )
+    conn.commit()
+
+    try:
+        registry_path.rename(registry_path.with_suffix(".imported.json"))
+    except Exception:
+        pass  # dữ liệu đã an toàn trong SQL — đổi tên chỉ để dọn dẹp, không chặn nếu lỗi
+
+
+def create_voice_registry(registry_path: Path, ref_dir: Path):
+    """Điểm vào DUY NHẤT để lấy voice registry — main.py gọi hàm này, không gọi constructor
+    của VoiceRegistryJson/VoiceRegistrySqlite trực tiếp (trừ trong test).
+
+    Chọn SQL nếu `db.connect()` thành công (Electron đã truyền SKY_APP_DB_PATH và file đã
+    migrate đủ — xem db.py), JSON nếu không. Chuyển sang SQL lần đầu thì nhập dữ liệu cũ
+    một lần (`_import_json_once`) trước khi trả về, để không mất giọng người dùng đã clone.
+    """
+    conn = _db.connect()
+    if conn is None:
+        return VoiceRegistryJson(registry_path, ref_dir)
+
+    _import_json_once(conn, registry_path)
+    return VoiceRegistrySqlite(conn, ref_dir)

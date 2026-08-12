@@ -6,7 +6,7 @@ import { getExecutor } from '../store.js';
 /**
  * EventPort (packages/service-contracts/src/event.ts) — Web adapter, Giai đoạn 3 kế hoạch Event
  * (docs/roadmap/plans/layout-designer/10-quan-ly-dot-le-event.md). Dùng chung getExecutor() với
- * layoutRoutes/assetRoutes (cùng 1 file ceremony.db).
+ * layoutRoutes/assetRoutes (cùng 1 file sky-app.db).
  */
 export async function eventRoutes(app: FastifyInstance) {
   app.get('/api/events', async () => listEvents(getExecutor()));

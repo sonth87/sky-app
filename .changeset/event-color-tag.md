@@ -1,6 +1,6 @@
 ---
 "@sky-app/slide-shared": minor
-"@sky-app/ceremony-db": minor
+"@sky-app/app-db": minor
 "@sky-app/module-ceremony": minor
 ---
 

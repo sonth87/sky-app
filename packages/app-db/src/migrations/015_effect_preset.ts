@@ -3,7 +3,7 @@
 //
 // Vì sao preset nằm ở ĐÂY chứ không ở tiến trình Python (nơi thật sự áp hiệu ứng):
 // tiến trình Python của tts-service hoàn toàn CÁCH LY với DB này — nó không nhận đường
-// dẫn ceremony.db nào (xem danh sách env ở python-server.ts) và không có driver SQL trong
+// dẫn sky-app.db nào (xem danh sách env ở python-server.ts) và không có driver SQL trong
 // requirements. Renderer tra preset ở đây rồi gửi `effects_chain` đã resolve kèm mỗi
 // request /synthesize; Python chỉ việc áp dụng, không biết khái niệm "preset".
 // (voicebox — app tham chiếu — lưu trong SQLite của chính backend Python được vì bên đó

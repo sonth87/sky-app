@@ -61,6 +61,13 @@ a = Analysis(
         'onnx_providers',    # server/onnx_providers.py (device switch)
         'audio_dsp',         # server/audio_dsp.py (time-stretch + loudness)
         'engine_registry',   # server/engine_registry.py (multi-engine)
+        'db',                # server/db.py (DB dùng chung — bảng tts_*, xem AGENTS.md §2.1)
+        # stdlib, ĐÃ được gom vào build hiện tại một cách GIÁN TIẾP (kéo theo qua
+        # vieneu → pandas → pandas.io.sql, xác nhận có thật trong PKG-00.toc của build cũ).
+        # Khai TƯỜNG MINH ở đây để không phụ thuộc vào một nhánh import tình cờ của
+        # dependency khác — nếu `vieneu` bỏ nhánh gradio/pandas ở bản sau, sqlite3 biến mất
+        # khỏi binary một cách im lặng và chỉ lộ ra lúc chạy bản đóng gói, không phải lúc dev.
+        'sqlite3',
     ],
     hookspath=[],
     hooksconfig={},

@@ -3,7 +3,7 @@ import type { EffectPreset, EffectPresetPort, EffectTypeInfo, TtsPort } from '@s
 import { useTtsStudioStore } from '../store';
 
 export interface EffectsPanelProps {
-  /** Port quản lý preset (ceremony-db). Vắng mặt = môi trường không có kho preset
+  /** Port quản lý preset (app-db). Vắng mặt = môi trường không có kho preset
    *  (vd web chưa chạy data-service) → ẩn hẳn panel thay vì hiện bộ chỉnh không lưu được. */
   effectPresetPort?: EffectPresetPort;
   /** Bảng hiệu ứng + định nghĩa tham số do SERVICE khai, hỏi qua port (không fetch thẳng

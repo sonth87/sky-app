@@ -1,6 +1,6 @@
 ---
 "@sky-app/slide-shared": patch
-"@sky-app/ceremony-db": patch
+"@sky-app/app-db": patch
 "@sky-app/module-ceremony": patch
 ---
 

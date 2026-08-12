@@ -22,7 +22,7 @@ const EXT_TO_MIME: Record<string, string> = {
  * base64 (không thêm dependency @fastify/multipart cho 1 route nhỏ) — chấp nhận overhead ~33%
  * kích thước cho phạm vi local-dev hiện tại của data-service. `listAssets` (Bước 11 kế hoạch
  * resize/rotate, 2026-07-18 — Media Library) query metadata từ ceremony-db, dùng CHUNG executor
- * với layoutRoutes (getExecutor() từ store.ts, cùng 1 file ceremony.db).
+ * với layoutRoutes (getExecutor() từ store.ts, cùng 1 file sky-app.db).
  */
 export async function assetRoutes(app: FastifyInstance) {
   // Đặt TRƯỚC route ':filename' cho rõ ràng (Fastify tự định tuyến đúng theo path cụ thể trước

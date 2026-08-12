@@ -6,7 +6,7 @@
 "@sky-app/slide-shared": minor
 "@sky-app/platform-electron": minor
 "@sky-app/platform-web": minor
-"@sky-app/ceremony-db": minor
+"@sky-app/app-db": minor
 "@sky-app/module-tts-studio": minor
 "@sky-app/data-service": minor
 ---

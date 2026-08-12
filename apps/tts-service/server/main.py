@@ -43,7 +43,7 @@ from pydantic import BaseModel
 
 # ── Globals — được init trong lifespan(), KHÔNG set tại module level ─────────
 _engine = None            # engine ĐANG dùng — luôn trỏ tới 1 phần tử của _engines
-_registry = None          # VoiceRegistry instance
+_registry = None          # VoiceRegistryJson hoặc VoiceRegistrySqlite (xem create_voice_registry)
 _config = None            # ConfigStore instance (advanced infer params + device + engine)
 _preview_dir: Path | None = None  # FIX: không đọc env tại module level
 _ref_dir: Path | None = None
@@ -383,8 +383,8 @@ async def lifespan(app: FastAPI):
     registry_path_env = os.environ.get("VIENEU_REGISTRY_PATH", "")
     registry_path = Path(registry_path_env) if registry_path_env else _ref_dir.parent / "voice-registry.json"
 
-    from voice_registry import VoiceRegistry
-    _registry = VoiceRegistry(registry_path, _ref_dir)
+    from voice_registry import create_voice_registry
+    _registry = create_voice_registry(registry_path, _ref_dir)
     _safe_console(f"[TTS] Voice registry loaded from {registry_path}")
 
     # Pre-encode cloned voices lúc startup để giảm latency request đầu tiên

@@ -192,7 +192,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   // LayoutPort (packages/service-contracts/src/layout.ts) — versioning cho LayoutDocument
   // (docs/roadmap/plans/layout-designer/21-layout-versioning.md). Dùng CHUNG executor với
-  // ceremonyStore (ceremonyStore.getExecutor()) — cùng 1 file ceremony.db, tránh mở 2 kết nối
+  // ceremonyStore (ceremonyStore.getExecutor()) — cùng 1 file sky-app.db, tránh mở 2 kết nối
   // SQLite song song tới cùng file (rủi ro lock WAL không cần thiết).
   ipcMain.handle('kernel:layout:listDocuments', async () => {
     return listLayoutDocuments(ceremonyStore.getExecutor());
@@ -331,7 +331,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
 
   // EventPort/DataSourcePort (packages/service-contracts/src/event.ts, data-source.ts) —
   // Giai đoạn 3 kế hoạch Event (docs/roadmap/plans/layout-designer/10-quan-ly-dot-le-event.md).
-  // Dùng chung ceremonyStore.getExecutor() (cùng file ceremony.db).
+  // Dùng chung ceremonyStore.getExecutor() (cùng file sky-app.db).
   ipcMain.handle('kernel:event:list', async () => {
     return listEvents(ceremonyStore.getExecutor());
   });
@@ -642,7 +642,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
     // đối lưu vào LayoutItem.src PHẢI khớp đúng định dạng này.
     const relativePath = `assets/layout/${destName}`;
     // Ghi metadata vào ceremony-db (Bước 11 kế hoạch resize/rotate, 2026-07-18 — Media Library) —
-    // dùng CHUNG executor với các query khác (ceremonyStore.getExecutor()), cùng 1 file ceremony.db.
+    // dùng CHUNG executor với các query khác (ceremonyStore.getExecutor()), cùng 1 file sky-app.db.
     const { size } = await stat(destPath);
     insertAsset(ceremonyStore.getExecutor(), {
       relativePath,
@@ -659,7 +659,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null) {
   //
   // Chỉ quản lý PRESET. Việc áp hiệu ứng do tiến trình Python của tts-service làm —
   // renderer tra preset qua đây rồi gửi chuỗi đã resolve kèm request synthesize (Python
-  // cách ly hoàn toàn với ceremony.db, xem migration 015).
+  // cách ly hoàn toàn với sky-app.db, xem migration 015).
   ipcMain.handle('kernel:effectPreset:list', async () => {
     return listEffectPresets(ceremonyStore.getExecutor());
   });
