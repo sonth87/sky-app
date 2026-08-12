@@ -28,6 +28,7 @@ Env vars (truyền từ Electron qua python-server.ts):
 from __future__ import annotations
 
 import asyncio
+import inspect
 import os
 import traceback
 import uuid
@@ -398,7 +399,7 @@ async def lifespan(app: FastAPI):
             continue
         try:
             ref_path, ref_text = _resolve_voice_ref(voice["id"])
-            emb = _engine.encode_reference(str(ref_path), ref_text)
+            emb = _encode_reference(_engine, str(ref_path), ref_text)
             _ref_cache()[voice["id"]] = emb
             _safe_console(f"[TTS]   {voice['id']} ({len(samples)} mẫu) OK")
             _write_log(f"[TTS]   {voice['id']} OK")
@@ -695,6 +696,45 @@ def _find_catalog_entry_any_lang(entry_id: str) -> tuple[dict, str] | None:
     return None
 
 
+def _backfill_ref_text_from_catalog(voice: dict) -> None:
+    """Đồng bộ lại `ref_text` từ catalog.json cho 1 voice ĐÃ import — cần vì voice import
+    TRƯỚC khi catalog có transcript (hoặc transcript catalog vừa được cập nhật sau) sẽ vĩnh
+    viễn thiếu nó nếu không ai chủ động đồng bộ lại. Với Qwen, thiếu transcript = không
+    synthesize được (xem engine_qwen_mlx's _run) — không phải giảm chất lượng, audio hỏng
+    hoàn toàn.
+
+    Gọi ở CẢ 2 nơi `_ensure_voice_ready` có thể trả về voice: (1) tìm thấy NGAY qua
+    `get_voice(speaker_id)` khi speaker_id đã là id registry (đường phổ biến nhất — UI,
+    lịch sử, mặc định của client đều nhớ id registry như "clone-xxxxx", KHÔNG phải id
+    catalog gốc), và (2) nhánh idempotent trong `_import_catalog_entry` khi speaker_id vẫn
+    còn là id catalog gốc. Bug thật đã gặp: chỉ có (2) từng được gọi, nên voice catalog imp-
+    ort từ trước (đa số, vì UI mặc định dùng id registry) không bao giờ được backfill dù dữ
+    liệu đúng đã nằm sẵn trong catalog.json.
+
+    Kiểm qua `list_samples()`, KHÔNG phải `voice.get("ref_text")` — từ Phase 2 (nhiều mẫu/
+    voice), `get_voice()` không còn trả field đó nữa (luôn None, sẽ khiến điều kiện "chưa có
+    transcript" LUÔN đúng và ÂM THẦM GHI ĐÈ transcript người dùng đã tự sửa).
+    """
+    source_catalog_id = voice.get("source_catalog_id")
+    lang = voice.get("source_lang")
+    if not source_catalog_id or not lang or _catalog_dir is None:
+        return
+
+    from voice_catalog import find_catalog_entry
+    entry = find_catalog_entry(_catalog_dir, lang, source_catalog_id)
+    if entry is None:
+        return
+    cat_text = (entry.get("ref_text") or "").strip()
+    if not cat_text:
+        return
+
+    existing_samples = _registry.list_samples(voice["id"])
+    has_ref_text = bool(existing_samples and existing_samples[0].get("ref_text"))
+    if not has_ref_text:
+        _registry.set_ref_text(voice["id"], cat_text)
+        _ref_cache_forget_voice(voice["id"])  # cache giữ dict {wav_path, ref_text} cũ
+
+
 def _import_catalog_entry(entry: dict, lang: str) -> dict:
     """Convert audio nguồn (mp3/wav bất kỳ) → WAV mono trong _ref_dir (phẳng, giống mọi
     cloned voice khác), rồi add_cloned() + pre-encode reference embedding. Idempotent:
@@ -707,24 +747,8 @@ def _import_catalog_entry(entry: dict, lang: str) -> dict:
 
     existing = _registry.find_by_source_catalog_id(entry["id"])
     if existing is not None:
-        # Backfill `ref_text`: voice import TRƯỚC khi catalog có transcript sẽ vĩnh viễn
-        # thiếu nó nếu chỉ return sớm ở đây (guard idempotent này chạy trước mọi bước
-        # ghi). Với Qwen, thiếu transcript = không synthesize được (xem engine_qwen_mlx),
-        # nên người dùng sẽ thấy giọng catalog "hỏng" mà không hiểu vì sao — trong khi
-        # dữ liệu đúng đã nằm sẵn trong catalog.json chỉ chờ được chép sang.
-        # Kiểm qua list_samples(), KHÔNG phải existing.get("ref_text") — từ Phase 2 (nhiều
-        # mẫu/voice), get_voice() không còn trả field đó nữa (luôn None). Bug thật nếu dùng
-        # nhầm field cũ: điều kiện "chưa có transcript" sẽ LUÔN đúng, khiến transcript
-        # catalog gốc ÂM THẦM GHI ĐÈ transcript người dùng đã tự sửa qua UI mỗi lần app
-        # khởi động lại — không chỉ lãng phí, mà mất đúng nội dung người dùng vừa sửa.
-        cat_text = (entry.get("ref_text") or "").strip()
-        existing_samples = _registry.list_samples(existing["id"])
-        has_ref_text = bool(existing_samples and existing_samples[0].get("ref_text"))
-        if cat_text and not has_ref_text:
-            _registry.set_ref_text(existing["id"], cat_text)
-            _ref_cache_forget_voice(existing["id"])  # cache giữ dict {wav_path, ref_text} cũ
-            existing = _registry.get_voice(existing["id"]) or existing
-        return existing
+        _backfill_ref_text_from_catalog(existing)
+        return _registry.get_voice(existing["id"]) or existing
 
     from voice_catalog import get_catalog_ref_path
     src_path = get_catalog_ref_path(_catalog_dir, lang, entry)
@@ -747,7 +771,7 @@ def _import_catalog_entry(entry: dict, lang: str) -> dict:
 
     cat_ref_text = (entry.get("ref_text") or "").strip()
     try:
-        emb = _engine.encode_reference(str(ref_path), cat_ref_text or None)
+        emb = _encode_reference(_engine, str(ref_path), cat_ref_text or None)
     except Exception as e:
         ref_path.unlink(missing_ok=True)
         raise HTTPException(500, f"Không thể encode voice: {e}")
@@ -788,7 +812,8 @@ def _ensure_voice_ready(speaker_id: str) -> dict:
     assert _registry is not None
     voice = _registry.get_voice(speaker_id)
     if voice is not None:
-        return voice
+        _backfill_ref_text_from_catalog(voice)
+        return _registry.get_voice(speaker_id) or voice
 
     found = _find_catalog_entry_any_lang(speaker_id)
     if found is None:
@@ -869,18 +894,33 @@ def _validate_ref_audio(path: Path) -> list[str]:
     return warnings
 
 
+def _looks_like_audio(content: bytes) -> bool:
+    """Nhận diện WAV/MP3 qua magic byte — không tin đuôi file (người dùng đổi tên tuỳ ý).
+    WAV: header RIFF. MP3: tag ID3v2 ở đầu, hoặc frame sync MPEG thô (11 bit 1 liên tiếp:
+    byte đầu 0xFF, 3 bit cao byte sau cũng 1) khi file không có tag ID3.
+    """
+    if len(content) >= 44 and content[:4] == b"RIFF":
+        return True
+    if len(content) >= 4 and content[:3] == b"ID3":
+        return True
+    if len(content) >= 2 and content[0] == 0xFF and (content[1] & 0xE0) == 0xE0:
+        return True
+    return False
+
+
 async def _save_and_validate_ref_upload(file: UploadFile, prefix: str = "clone") -> tuple[str, list[str]]:
     """Đọc 1 file upload, kiểm định dạng/kích thước, lưu + làm sạch qua
     `_validate_ref_audio`. Dùng chung cho tạo voice mới (nhiều file) và thêm sample cho
-    voice đã có — cả hai đường đều là "1 file WAV → 1 sample trên đĩa", khác nhau ở chỗ
-    gắn vào voice nào sau đó.
+    voice đã có — cả hai đường đều là "1 file WAV/MP3 → 1 sample WAV trên đĩa" (mp3 được
+    `soundfile` giải mã rồi `_validate_ref_audio` ghi đè lại thành WAV chuẩn, xem đó), khác
+    nhau ở chỗ gắn vào voice nào sau đó.
 
     Trả (tên file đã lưu trong `_ref_dir`, cảnh báo chất lượng). Raise HTTPException và tự
     dọn file nếu validate thất bại — caller không cần try/except riêng cho phần này.
     """
     content = await file.read()
-    if len(content) < 44 or content[:4] != b"RIFF":
-        raise HTTPException(400, f"File '{file.filename}' phải là WAV format hợp lệ")
+    if not _looks_like_audio(content):
+        raise HTTPException(400, f"File '{file.filename}' phải là WAV hoặc MP3 hợp lệ")
     if len(content) > _CLONE_MAX_BYTES:
         raise HTTPException(
             400, f"File '{file.filename}' quá lớn ({len(content) // (1024*1024)}MB) — tối đa 15MB.",
@@ -1113,6 +1153,24 @@ class TtsRequest(BaseModel):
     effects_chain: list | None = None
 
 
+def _encode_reference(engine: object, ref_path: str, ref_text: str | None) -> object:
+    """Gọi `engine.encode_reference()` đúng SIGNATURE THẬT của engine đang chạy.
+
+    Không phải engine nào cũng nhận `ref_text`: engine kiểu in-context (Qwen, VoxCPM) cần
+    nó để căn text↔codec, còn engine kiểu preset/embedding thuần (VieneuEngine,
+    MossNanoEngine) không khai tham số này — `TTSEngine` Protocol khai `ref_text` optional
+    với default `None` để MỌI concrete class đều thoả Protocol, nhưng Python không tự bỏ
+    bớt đối số thừa khi gọi: truyền `ref_text` cho engine không khai nó ra
+    `TypeError: encode_reference() takes 2 positional arguments but 3 were given` (bug thật
+    gặp khi bật MossNanoEngine, xem history/2026-08-12-fix-encode-reference-2-doi-so.md).
+    Kiểm signature TRƯỚC khi gọi thay vì hard-code danh sách engine nào nhận/không nhận —
+    engine mới thêm sau tự đúng, không cần sửa thêm ở đây.
+    """
+    if len(inspect.signature(engine.encode_reference).parameters) >= 2:
+        return engine.encode_reference(ref_path, ref_text)
+    return engine.encode_reference(ref_path)
+
+
 def _resolve_voice_ref(voice_id: str) -> tuple[Path, str | None]:
     """Trả (đường dẫn audio, transcript) dùng để `encode_reference()` cho 1 voice clone.
 
@@ -1204,7 +1262,7 @@ def _run_synthesis(req: TtsRequest, voice: dict) -> np.ndarray:
         ref_codes = per_engine.get(voice_id)
         if ref_codes is None:
             ref_path, ref_text = _resolve_voice_ref(voice_id)
-            ref_codes = _engine.encode_reference(str(ref_path), ref_text)
+            ref_codes = _encode_reference(_engine, str(ref_path), ref_text)
             per_engine[voice_id] = ref_codes
         return _engine.synthesize(req.text, ref_codes, req.speed, overrides=overrides)
 

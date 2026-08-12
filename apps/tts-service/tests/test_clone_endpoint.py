@@ -18,6 +18,34 @@ import main
 # Endpoint kiểm `len(content) < 44` (kích thước header WAV chuẩn tối thiểu) TRƯỚC cả bước
 # đọc nội dung — 16 byte (chỉ có magic "RIFF"/"WAVE") không đủ, phải đệm cho đạt 44.
 WAV_HEADER = b"RIFF\x00\x00\x00\x00WAVEfmt " + b"\x00" * (44 - 16)
+# 2 dạng magic byte MP3 hợp lệ: có tag ID3v2 ở đầu, hoặc frame sync MPEG thô khi không có
+# tag (byte đầu 0xFF, 3 bit cao byte sau cũng phải là 1 — 11 bit sync liên tiếp).
+MP3_HEADER_ID3 = b"ID3\x03\x00\x00\x00\x00\x00\x00" + b"\x00" * 32
+MP3_HEADER_FRAME_SYNC = b"\xff\xfb\x90\x00" + b"\x00" * 36
+
+
+class TestLooksLikeAudio:
+    """`_looks_like_audio` là hàm thuần (không I/O) quyết định file upload có qua được
+    bước kiểm định dạng hay không — test trực tiếp exhaustive hơn là chỉ suy luận qua
+    status code HTTP."""
+
+    def test_wav_hop_le(self):
+        assert main._looks_like_audio(WAV_HEADER) is True
+
+    def test_wav_qua_ngan_bi_tu_choi(self):
+        assert main._looks_like_audio(b"RIFF") is False
+
+    def test_mp3_co_tag_id3(self):
+        assert main._looks_like_audio(MP3_HEADER_ID3) is True
+
+    def test_mp3_frame_sync_tho_khong_co_tag_id3(self):
+        assert main._looks_like_audio(MP3_HEADER_FRAME_SYNC) is True
+
+    def test_rac_bi_tu_choi(self):
+        assert main._looks_like_audio(b"khong-phai-audio-gi-ca") is False
+
+    def test_rong_bi_tu_choi(self):
+        assert main._looks_like_audio(b"") is False
 
 
 class _FakeEngine:
@@ -177,6 +205,16 @@ def test_clone_file_khong_phai_wav_bao_loi_va_khong_tao_voice(client):
     )
     assert res.status_code == 400
     assert client.registry.add_cloned_calls == []
+
+
+def test_clone_file_mp3_duoc_chap_nhan(client):
+    res = client.post(
+        "/voices/clone",
+        files=[("files", ("a.mp3", MP3_HEADER_ID3, "audio/mpeg"))],
+        data={"label": "Test", "ref_texts": [""]},
+    )
+    assert res.status_code == 200
+    assert len(client.registry.add_cloned_calls) == 1
 
 
 def test_clone_loi_o_file_thu_2_don_sach_file_thu_1(client, tmp_path):

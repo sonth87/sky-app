@@ -6,6 +6,13 @@
 
 ## Mục lục (mới nhất trên cùng)
 
+- [2026-08-12 — `ConfigStore` bị 2 tiến trình ghi đè ngược engine đã chọn](./2026-08-12-config-store-ghi-de-engine-2-tien-trinh.md)
+- [2026-08-12 — Backfill `ref_text` bỏ sót voice catalog ĐÃ import trước đó](./2026-08-12-backfill-ref-text-bo-sot-voice-da-import.md)
+- [2026-08-12 — Sửa `encode_reference()` vỡ khi engine không nhận `ref_text`](./2026-08-12-fix-encode-reference-2-doi-so.md)
+- [2026-08-12 — Backfill ref_text cho catalog + cho phép mp3 khi Clone Voice](./2026-08-12-catalog-ref-text-va-mp3-clone.md)
+- [2026-08-12 — Một giọng nhiều mẫu audio (Phase 2)](./2026-08-12-mot-giong-nhieu-mau-multi-sample.md)
+- [2026-08-12 — Python nối vào DB dùng chung (Phase 1)](./2026-08-12-python-noi-vao-db-dung-chung.md)
+- [2026-08-12 — DB dùng chung cho toàn app: đổi tên + nền móng (Phase 0)](./2026-08-12-db-dung-chung-doi-ten-va-nen-mong.md)
 - [2026-08-11 — Sửa lỗi Hủy cài engine TTS âm thầm xoá dữ liệu + UI kẹt "đang cài" dù đã xong](./2026-08-11-fix-huy-cai-dat-am-tham-xoa-du-lieu.md)
 - [2026-08-05 — MOSS codec stereo (2 kênh) → future conversation/podcast mode (stereo panning L/R)](./2026-08-05-stereo-tts-conversation-mode.md)
 - [2026-07-30 — "Dùng dữ liệu mẫu" thành công tắc bật/tắt, không xoá DB](./2026-07-30-toggle-du-lieu-mau.md)

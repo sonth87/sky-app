@@ -17,7 +17,8 @@
     ],
     "file": "gia_bao.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Chào các bạn, hôm nay mình đi tới một quán cà phê rất xinh, các bạn cùng trải nghiệm với mình nhé."
   },
   {
     "id": "bao_ngoc_gentle",
@@ -38,7 +39,8 @@
     ],
     "file": "bao_ngoc_gentle.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Bạn có thể dùng giọng nói này để làm clip, review, kể chuyện hoặc du lịch đều được. Chúc bạn xây kênh thành công."
   },
   {
     "id": "cam_hong",
@@ -59,7 +61,8 @@
     ],
     "file": "cam_hong.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Thật ra tôi ghét mấy câu mở đầu kiểu Xin chào quý vị lắm, nghe cứ như Robert đọc kịch bản vậy. Nên thôi, bỏ qua hết luôn. Chào buổi tối cả nhà ơi!"
   },
   {
     "id": "dao_reflective",
@@ -77,7 +80,8 @@
     "tags": [],
     "file": "dao_reflective.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Tôi được sinh ra ở Huế, lớn lên ở Huế, nhưng khi trưởng thành, đã rời gia đình, rời bỏ thành phố và ra đi biền biệt, đấy là câu chuyện của mình."
   },
   {
     "id": "duc_clear",
@@ -99,7 +103,8 @@
     ],
     "file": "duc_clear.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Miền Nam thì có hoa mai, gặp nhau phải có một hai lời chào. Miền Bắc thì có hoa đảo, gặp nhau phải có lời chào đầu tiên."
   },
   {
     "id": "duyen_bright",
@@ -123,7 +128,8 @@
     ],
     "file": "duyen_bright.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Thất bại không phải là dấu chấm hết mà là một phần tất yếu trên con đường đến thành công."
   },
   {
     "id": "emma_calm",
@@ -144,7 +150,8 @@
     ],
     "file": "emma_calm.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Tôi đủ lớn để hiểu rằng, mỗi năm thế giới mới đổi thay và lòng người cũng khác. Tuổi ấu thơ chỉ có một con đường để cùng nhau trúng bước."
   },
   {
     "id": "ethan_clear",
@@ -164,7 +171,8 @@
     ],
     "file": "ethan_clear.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Giọng nói của người đàn ông miền Trung mang đầm dấu ẩn của vùng đất nắng gió."
   },
   {
     "id": "giang_narrator",
@@ -188,7 +196,8 @@
     "file": "giang_narrator.mp3",
     "clonable": true,
     "source": "vendor",
-    "default": true
+    "default": true,
+    "ref_text": "Có những câu chuyện chỉ cần một giọng nói đủ gần gũi để người nghe ở lại lâu hơn. Hy vọng giọng đọc này sẽ là sự lựa chọn phù hợp cho dự án của bạn."
   },
   {
     "id": "giang_podcast",
@@ -209,7 +218,8 @@
     ],
     "file": "giang_podcast.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Cảm ơn vì đã ghé qua. Hy vọng giọng nói này sẽ đồng hành cùng bạn trong những câu chuyện bạn gửi tới người nghe."
   },
   {
     "id": "hanh_smooth",
@@ -229,7 +239,8 @@
     ],
     "file": "hanh_smooth.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Với năng lượng xanh, bạn sẽ cảm nhận khác biệt ngay lần đầu. Hãy yêu thương và chăm sóc làn da của bạn ngay hôm nay!"
   },
   {
     "id": "henry_clear",
@@ -252,7 +263,8 @@
     ],
     "file": "henry_clear.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Mảnh đất cổ đô ngàn năm, nơi đây không chỉ là một địa danh lịch sử mà còn là một tác phẩm nghệ thuật, sống đồng, mang đầm dấu ẩn thời gian."
   },
   {
     "id": "hung_pham_deep",
@@ -273,7 +285,8 @@
     ],
     "file": "hung_pham_deep.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Ta thấy, tương lai của con sẽ có nhiều biến đổi. Con cần kiên nhẫn và tập trung. Chỉ có như vậy mới đạt được sự thành công."
   },
   {
     "id": "huy_le_calm",
@@ -296,7 +309,8 @@
     ],
     "file": "huy_le_calm.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Xin chào, tôi là Huy Lê. Với chất giọng điểm tĩnh và chuyên nghiệp, tôi luôn sẵn sàng cho dự án của bạn."
   },
   {
     "id": "huyen_clear",
@@ -317,7 +331,8 @@
     ],
     "file": "huyen_clear.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Máu đỏ da vàng tôi là người Việt Nam. Tự hào là con đất Việt. Cháu vua Hùng."
   },
   {
     "id": "lan_phuong_vietnamese",
@@ -343,7 +358,8 @@
     ],
     "file": "lan_phuong_vietnamese.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Chào bạn tôi là Lan Phương, giọng nữ Hà Nội ấm áp, tự nhiên và giàu cảm xúc. Giọng đọc này phù hợp cho sách nói, kể chuyện, giáo dục."
   },
   {
     "id": "minh_anh_narrator",
@@ -361,7 +377,8 @@
     "tags": [],
     "file": "minh_anh_narrator.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Tết là dịp mọi người háo hức đón chào một năm mới với nhiều hy vọng và mong ước."
   },
   {
     "id": "minh_dang_northern",
@@ -379,7 +396,8 @@
     "tags": [],
     "file": "minh_dang_northern.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Xin chào, đây là giọng nam truyền cảm hứng với chất giọng trầm ấm, rõ ràng và tự nhiên."
   },
   {
     "id": "nation_warm",
@@ -402,7 +420,8 @@
     ],
     "file": "nation_warm.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Sau nhiều năm đi làm, tôi rút ra một kinh nghiệm đau lòng. Người làm đúng hoặc hay bị chửi thường có mấy đặc điểm giống nhau."
   },
   {
     "id": "ngoc_an_audiobook",
@@ -425,7 +444,8 @@
     ],
     "file": "ngoc_an_audiobook.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Tôi biết ơn tất cả những người đã đi ngang qua cuộc đời mình, vì mỗi cuộc gặp gỡ đều để lại một bài học sâu sắc và những yêu thương chân thành."
   },
   {
     "id": "ngoc_anh_news",
@@ -448,7 +468,8 @@
     ],
     "file": "ngoc_anh_news.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Tác phẩm dự thi bảo đảm tính khoa học, tính đảng, tính chiến đấu, tính định hướng."
   },
   {
     "id": "ngoc_diem_pham",
@@ -474,7 +495,8 @@
     ],
     "file": "ngoc_diem_pham.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Chào bạn, mình là Ngọc Diễm. Giọng đọc của mình rất phù hợp để kể chuyện thiếu nhi và podcast. Hy vọng bạn sẽ thích chất giọng này nhé!"
   },
   {
     "id": "ngoc_ngan_vietnamese",
@@ -497,7 +519,8 @@
     ],
     "file": "ngoc_ngan_vietnamese.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Anh em nào phải người xa, cùng chung bác mẹ, một nhà cùng thân, yêu nhau như thể tay chân, anh em hòa thuận, hai thân vui vầy."
   },
   {
     "id": "nhat_narrative",
@@ -516,7 +539,8 @@
     "tags": [],
     "file": "nhat_narrative.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Xin kính chào quý bạn và các vị. Mong rằng giọng nói này sẽ phù hợp với bất kỳ dự án nào của bạn. Cảm ơn đã lựa chọn. Hãy thử ngay nhé!"
   },
   {
     "id": "nhung_clear",
@@ -537,7 +561,8 @@
     ],
     "file": "nhung_clear.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Đây là Đài Tiếng Nói Việt Nam, phát thanh từ thủ đô Hà Nội, nước Cộng hòa xã hội chủ nghĩa Việt Nam."
   },
   {
     "id": "phong_warm",
@@ -561,7 +586,8 @@
     ],
     "file": "phong_warm.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Mùa hè năm ấy tôi và cậu trở thành một đôi Nhưng ai ngờ được rằng Lúc hè ghé về thêm một lần nữa Thì cậu và tôi đã lạc mất nhau rồi"
   },
   {
     "id": "phuong_doctor",
@@ -582,7 +608,8 @@
     ],
     "file": "phuong_doctor.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Quý vị có thể đang trải qua các triệu chứng như bốc hỏa, đổ mồ hôi đêm, mất ngủ và vâng cả tăng cân nữa."
   },
   {
     "id": "phuong_smooth",
@@ -606,7 +633,8 @@
     ],
     "file": "phuong_smooth.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Trăng lên đỉnh núi, gió nhẹ đưa hương, người yên giấc ngủ, mộng lành theo mây."
   },
   {
     "id": "quang_minh_clearly",
@@ -632,7 +660,8 @@
     ],
     "file": "quang_minh_clearly.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Trên thực tế, các nghi ngờ đã bắt đầu xuất hiện."
   },
   {
     "id": "quang_nguyen_dynamic",
@@ -654,7 +683,8 @@
     ],
     "file": "quang_nguyen_dynamic.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Cái nết đánh chết cái đẹp, đức tính quý hơn hình thức."
   },
   {
     "id": "quang_tien_audiobook",
@@ -678,7 +708,8 @@
     ],
     "file": "quang_tien_audiobook.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Xin chào, mình là Quang Tiến, rất vui được gặp bạn. Hy vọng giọng nói này sẽ mang đến cho bạn những trải nghiệm tự nhiên và gần gũi."
   },
   {
     "id": "rin_dinh_deep",
@@ -699,7 +730,8 @@
     ],
     "file": "rin_dinh_deep.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Người tính không bằng trời tính, mưu sự tại nhân, thành sự tại thiên."
   },
   {
     "id": "son_tran_casual",
@@ -720,7 +752,8 @@
     ],
     "file": "son_tran_casual.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Dự kiến 1 giờ lên game trong group, anh sẽ cử nói thẳng là tàn cho quà DC vì luật mới của FP, nên anh sẽ nói mẹ mé."
   },
   {
     "id": "tam_nguyen_fairy",
@@ -741,7 +774,8 @@
     ],
     "file": "tam_nguyen_fairy.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Giọng đọc chuyên cho chuyện cổ tích, phù hợp với các sản phẩm cho thiếu nhi."
   },
   {
     "id": "thanh_clear",
@@ -762,7 +796,8 @@
     ],
     "file": "thanh_clear.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Năng lượng không tự sinh ra, cũng không tự mất đi. Nó là dạng chuyển hóa từ dạng này sang dạng khác."
   },
   {
     "id": "thanh_storyteller",
@@ -783,7 +818,8 @@
     ],
     "file": "thanh_storyteller.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Cái nết đánh chết cái đẹp, đức tính quý hơn hình thức"
   },
   {
     "id": "thao_soft",
@@ -804,7 +840,8 @@
     ],
     "file": "thao_soft.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Tôi bước lên gác xếp. Ánh sáng rơi từ ô cửa nhỏ, xiên vào bụi như những sợi chỉ bạc."
   },
   {
     "id": "thám_giọng",
@@ -824,7 +861,8 @@
     ],
     "file": "thám_giọng.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Mùa thu Hà Nội như một bản nhạc dịu êm, khẽ chạm vào lòng người, gió nhẹ len qua từng con phố nhỏ, mang theo hương hoa sữa nồng nàn và vị ngọt lành."
   },
   {
     "id": "thuy_story",
@@ -842,7 +880,8 @@
     "tags": [],
     "file": "thuy_story.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Chào mừng đến với Chạm vào lịch sử, kênh khám phá những trang sử vàng và nhân vật kiệt xuất của Việt Nam."
   },
   {
     "id": "thuy_tien_narrator",
@@ -863,7 +902,8 @@
     ],
     "file": "thuy_tien_narrator.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Xin chào, hãy thử sử dụng tôi cho video, podcast và các dự án sáng tạo, cùng biến những ý tưởng của bạn thành nội dung cuốn hút hơn nhé!"
   },
   {
     "id": "trang_clear",
@@ -883,7 +923,8 @@
     ],
     "file": "trang_clear.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Người ta là hoa đất, học ăn, học nói, học gói, học mở."
   },
   {
     "id": "truc_lam",
@@ -905,7 +946,8 @@
     ],
     "file": "truc_lam.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Cái nết đánh chết cái đẹp, đức tính quý hơn hình thức"
   },
   {
     "id": "tuan_anh_and",
@@ -930,7 +972,8 @@
     ],
     "file": "tuan_anh_and.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Chào bạn, tôi là Tuấn Anh. Với chất giọng trầm ấm và đầy nội lực, tôi sẽ mang đến sự sống động và chiều sâu cho mọi kịch bản của bạn. Hãy chọn tôi nha."
   },
   {
     "id": "viet_linh",
@@ -951,7 +994,8 @@
     ],
     "file": "viet_linh.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Thời gian là vàng, không ai giàu ba họ, không ai khó ba đời."
   },
   {
     "id": "hoai_my",
@@ -973,7 +1017,8 @@
     ],
     "file": "hoai_my.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Cuộc sống mà bạn đang sống bây giờ cũng là giấc mơ của hàng triệu người. Vì vậy, hãy luôn hài lòng với cuộc sống của bạn hãy hạnh phúc trong từng khoảnh khắc của cuộc sống."
   },
   {
     "id": "nam_minh",
@@ -994,6 +1039,7 @@
     ],
     "file": "nam_minh.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Cuộc sống mà bạn đang sống bây giờ cũng là giấc mơ của hàng triệu người. Vì vậy, hãy luôn hài lòng với cuộc sống của bạn hãy hạnh phúc trong từng khoảnh khắc của cuộc sống."
   }
 ]

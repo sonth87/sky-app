@@ -97,8 +97,24 @@ class ConfigStore:
             return dict(self._data["infer"])
 
     def update(self, partial: dict) -> dict:
-        """Merge partial (chỉ các section/khóa hợp lệ), validate, lưu, trả config mới."""
+        """Merge partial (chỉ các section/khóa hợp lệ) VÀO STATE MỚI NHẤT TRÊN ĐĨA, validate,
+        lưu, trả config mới.
+
+        Bug thật: 2 tiến trình Python (tier 'bundled'/'ext', xem python-server.ts's blue-
+        green — tier cũ KHÔNG bị kill khi đổi engine, cố tình để lần sau quay lại nhanh)
+        dùng CHUNG 1 file config nhưng mỗi tiến trình giữ 1 bản `_data` RIÊNG, nạp 1 LẦN lúc
+        khởi động. `update()` cũ ghi thẳng `self._data` (đã cũ) mỗi lần gọi — tiến trình sống
+        lâu hơn (tier cũ vẫn chạy nền) ghi đè NGƯỢC LẠI thay đổi tiến trình khác vừa lưu. Ca
+        thật đã gặp: chuyển sang Qwen (tier 'ext') lưu đúng `engine: "qwen-1.7b"`, nhưng tier
+        'bundled' cũ (vẫn sống, giữ `engine: "moss-tts-nano"` trong bộ nhớ từ lúc nó khởi
+        động) gọi `update()` cho lý do khác (vd đổi `device`/`infer` qua Settings) → ghi đè
+        cả field `engine` về giá trị cũ trong bộ nhớ NÓ, không phải giá trị mới nhất trên đĩa.
+        Nạp lại từ đĩa NGAY TRƯỚC khi merge đảm bảo field không đổi (`engine`, trong ca trên)
+        giữ đúng giá trị MỚI NHẤT do tiến trình khác lưu, không phải giá trị cũ của tiến trình
+        đang gọi `update()`.
+        """
         with self._lock:
+            self._data = self._load()
             if isinstance(partial.get("infer"), dict):
                 for k, v in partial["infer"].items():
                     if k in _INFER_BOUNDS:

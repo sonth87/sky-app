@@ -68,7 +68,7 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
     if (added.length === 0) return;
     setSamples((prev) => [...prev, ...added]);
     if (!label) {
-      setLabel(added[0]!.fileName.replace(/\.wav$/i, ''));
+      setLabel(added[0]!.fileName.replace(/\.(wav|mp3)$/i, ''));
     }
   };
 
@@ -188,7 +188,7 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
       <input
         type="file"
         id="voice-file-input"
-        accept=".wav"
+        accept=".wav,.mp3"
         multiple
         className="hidden"
         onChange={handleFileChange}

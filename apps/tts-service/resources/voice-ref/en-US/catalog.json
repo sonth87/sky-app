@@ -6,13 +6,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["commercial"],
+    "category": [
+      "commercial"
+    ],
     "tagline": "High-Octane, Punchy, Urgent",
     "description": "This voice features an aggressive, high-octane, and punchy projection typical of high-stakes commercials. Ideal for urgent event promotions and limited-time offer advertisements. Also well-suited for hype reels, radio spots, and energetic intros.",
-    "tags": ["high-octane", "punchy", "urgent"],
+    "tags": [
+      "high-octane",
+      "punchy",
+      "urgent"
+    ],
     "file": "livestream-sales.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Ladies and gentlemen, boys and girls, get ready for the most incredible, amazing, mind-blowing event of the entire year."
   },
   {
     "id": "podcast-host",
@@ -21,13 +28,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["podcast"],
+    "category": [
+      "podcast"
+    ],
     "tagline": "Bright,Expressive,Conversational",
     "description": "This voice features a crisp, energetic, and modern American broadcast style with excellent projection. Ideal for tech news and startup culture podcasts. Also well-suited for radio introductions, upbeat commercials, and conference announcements.",
-    "tags": ["bright", "expressive", "conversational"],
+    "tags": [
+      "bright",
+      "expressive",
+      "conversational"
+    ],
     "file": "podcast-host.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "engaging-podcaster",
@@ -36,13 +50,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["podcast"],
+    "category": [
+      "podcast"
+    ],
     "tagline": "Textured,Resonant,Fluid",
     "description": "This voice features a warm, friendly, and robust \"morning radio\" presence that feels instantly familiar. Ideal for interview-based shows and general entertainment podcasts. Also well-suited for local business ads, promotional videos, and community announcements.",
-    "tags": ["textured", "resonant", "fluid"],
+    "tags": [
+      "textured",
+      "resonant",
+      "fluid"
+    ],
     "file": "engaging-podcaster.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello! I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "nursery-teacher",
@@ -51,13 +72,20 @@
     "language": "English",
     "gender": "female",
     "age": "adult",
-    "category": ["children"],
+    "category": [
+      "children"
+    ],
     "tagline": "Sweet,Natural,Clear",
     "description": "This voice features a bright, gentle, and highly enunciated tone with a smiling, encouraging quality. Ideal for early childhood education and storytelling apps. Also well-suited for language learning modules for kids, cartoons, and safety instructions for children.",
-    "tags": ["sweet", "natural", "clear"],
+    "tags": [
+      "sweet",
+      "natural",
+      "clear"
+    ],
     "file": "nursery-teacher.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "male-lecturer",
@@ -66,13 +94,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["news"],
+    "category": [
+      "news"
+    ],
     "tagline": "Resonant,Persuasive,Critical",
     "description": "This voice features a distinctive, highly modulated, and persuasive cadence with high engagement energy. Ideal for opinion pieces and political commentary. Also well-suited for debate-style formats, provocative video essays, and dynamic public speaking simulations.",
-    "tags": ["resonant", "persuasive", "critical"],
+    "tags": [
+      "resonant",
+      "persuasive",
+      "critical"
+    ],
     "file": "male-lecturer.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you, and let's begin our creative audio journey together."
   },
   {
     "id": "instructive-professor",
@@ -81,13 +116,20 @@
     "language": "English",
     "gender": "female",
     "age": "adult",
-    "category": ["educational"],
+    "category": [
+      "educational"
+    ],
     "tagline": "Informative,Clear,Steady",
     "description": "This voice features a knowledgeable, articulate, and paced delivery with a reassuringly authoritative tone. Ideal for academic lectures and deep-dive educational videos. Also well-suited for corporate compliance training, museum audio guides, and technical explainers.",
-    "tags": ["informative", "clear", "steady"],
+    "tags": [
+      "informative",
+      "clear",
+      "steady"
+    ],
     "file": "instructive-professor.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello. I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "gentle-storyteller",
@@ -96,13 +138,20 @@
     "language": "English",
     "gender": "female",
     "age": "young adult",
-    "category": ["storyteller"],
+    "category": [
+      "storyteller"
+    ],
     "tagline": "Soft,Sincere,Relatable",
     "description": "This voice features a soft, soothing, and empathetic quality with a measured pace. Ideal for children's audiobooks and bedtime stories. Also well-suited for meditation guides, wellness apps, and heartfelt charitable appeals.",
-    "tags": ["soft", "sincere", "relatable"],
+    "tags": [
+      "soft",
+      "sincere",
+      "relatable"
+    ],
     "file": "gentle-storyteller.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "expressive-host",
@@ -111,13 +160,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["emcee"],
+    "category": [
+      "emcee"
+    ],
     "tagline": "Deep,Fluid,Neighborly",
     "description": "This voice features a polished, inviting, and warm timbre with professional modulation. Ideal for event announcements, TV show introductions, and award ceremonies. Also well-suited for interview segments, luxury brand advertising, and welcome messages.",
-    "tags": ["deep", "fluid", "neighborly"],
+    "tags": [
+      "deep",
+      "fluid",
+      "neighborly"
+    ],
     "file": "expressive-host.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "upbeat-ashley",
@@ -126,13 +182,20 @@
     "language": "English",
     "gender": "female",
     "age": "young adult",
-    "category": ["commercial"],
+    "category": [
+      "commercial"
+    ],
     "tagline": "Raspy,Gravelly,Shaky",
     "description": "This voice has a bright, lively, and casual quality, with fast-paced, conversational speech, perfectly fitting the typical social media influencer persona. It conveys excitement and warmth through a down-to-earth style, creating a trendy atmosphere. Ideal for digital content, including lifestyle vlogs, podcast intros, and promotional stories. Perfect for roles like hosts, best friends, or trendsetting influencers.",
-    "tags": ["raspy", "gravelly", "shaky"],
+    "tags": [
+      "raspy",
+      "gravelly",
+      "shaky"
+    ],
     "file": "upbeat-ashley.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "exciting-actor",
@@ -141,13 +204,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["drama"],
+    "category": [
+      "drama"
+    ],
     "tagline": "Rapid,Energetic,Casual",
     "description": "This voice features an animated, dramatic, and highly expressive range. Ideal for character work, animation, and entertainment content. Also well-suited for video game voiceovers, dramatic advertisements, and theatrical readings.",
-    "tags": ["rapid", "energetic", "casual"],
+    "tags": [
+      "rapid",
+      "energetic",
+      "casual"
+    ],
     "file": "exciting-actor.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello! I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "friendly-paige",
@@ -156,13 +226,20 @@
     "language": "English",
     "gender": "female",
     "age": "adult",
-    "category": ["commercial"],
+    "category": [
+      "commercial"
+    ],
     "tagline": "Clear,Youthful,Confident",
     "description": "Clear, youthful, and confident with a quick, smooth pace and direct delivery that pulls you in. Great for social marketing, health apps, and personal-growth guides when you want urgency, sincerity, and friendly mentor energy.",
-    "tags": ["clear", "youthful", "confident"],
+    "tags": [
+      "clear",
+      "youthful",
+      "confident"
+    ],
     "file": "friendly-paige.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you, and let's begin our creative audio journey together."
   },
   {
     "id": "engaging-instructor",
@@ -171,13 +248,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["educational"],
+    "category": [
+      "educational"
+    ],
     "tagline": "Distinct,Informative,Friendly",
     "description": "This voice features a clear, articulate, and confident tone with trustworthy enunciation. Ideal for e-learning courses and corporate training modules. Also well-suited for academic lectures, complex product tutorials, and educational apps.",
-    "tags": ["distinct", "informative", "friendly"],
+    "tags": [
+      "distinct",
+      "informative",
+      "friendly"
+    ],
     "file": "engaging-instructor.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "relatable-riley",
@@ -186,13 +270,20 @@
     "language": "English",
     "gender": "female",
     "age": "adult",
-    "category": ["podcast"],
+    "category": [
+      "podcast"
+    ],
     "tagline": "Raspy,Breathy,Textured",
     "description": "This voice features a raspy, breathy, and richly textured quality that feels intimate and down-to-earth. Ideal for relatable lifestyle content and personal vlogs. Also well-suited for candid interview podcasts, casual social media narration, and authentic brand storytelling.",
-    "tags": ["raspy", "breathy", "textured"],
+    "tags": [
+      "raspy",
+      "breathy",
+      "textured"
+    ],
     "file": "relatable-riley.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "bubblylexi",
@@ -201,13 +292,20 @@
     "language": "English",
     "gender": "female",
     "age": "young adult",
-    "category": ["commercial"],
+    "category": [
+      "commercial"
+    ],
     "tagline": "Bright,Upbeat,Inviting",
     "description": "Centered around the modern host archetype, this voice has a bright, lively, and clear quality with a positive, confident rhythm. It conveys enthusiasm and optimism, creating an energetic atmosphere. Perfect for lifestyle ads, social media promos, and app tutorials, it’s ideal for roles like brand ambassadors, podcast hosts, or digital guides.",
-    "tags": ["bright", "upbeat", "inviting"],
+    "tags": [
+      "bright",
+      "upbeat",
+      "inviting"
+    ],
     "file": "bubblylexi.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello! I'm delighted to assist you with our voice services. Choose a voice that resonates with you, and let's begin our creative audio journey together."
   },
   {
     "id": "energetic-caster",
@@ -216,13 +314,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["commercial"],
+    "category": [
+      "commercial"
+    ],
     "tagline": "Fluid,Engaging,Fast-Paced",
     "description": "This voice features a punchy, high-energy, and dynamic projection. Ideal for sports commentary, e-sports, and hype reels. Also well-suited for energetic commercials, gaming content, and radio promotions.",
-    "tags": ["fluid", "engaging", "fast-paced"],
+    "tags": [
+      "fluid",
+      "engaging",
+      "fast-paced"
+    ],
     "file": "energetic-caster.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you, and let's begin our creative audio journey together."
   },
   {
     "id": "casual-podcaster",
@@ -231,13 +336,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["podcast"],
+    "category": [
+      "podcast"
+    ],
     "tagline": "Natural,Approachable,Authentic",
     "description": "This voice features a smooth, conversational, and modern tone with a neutral accent. Ideal for lifestyle podcasts and tech reviews. Also well-suited for talk radio segments, YouTube narrations, and blog-to-audio conversions.",
-    "tags": ["natural", "approachable", "authentic"],
+    "tags": [
+      "natural",
+      "approachable",
+      "authentic"
+    ],
     "file": "casual-podcaster.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello! I'm delighted to assist you with our voice services. Choose a voice that resonates with you, and let's begin our creative audio journey together."
   },
   {
     "id": "approachable-dan",
@@ -246,13 +358,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["commercial"],
+    "category": [
+      "commercial"
+    ],
     "tagline": "Bright,Energetic,Upbeat",
     "description": "Centered on a professional, approachable tone, this voice combines bright, warm, and clear qualities with a lively, smooth rhythm. It conveys enthusiasm and sincerity, creating a friendly atmosphere. Perfect for business and corporate content like promotional videos, training materials, and onboarding guides, it’s ideal for brand ambassadors, eLearning narrators, or customer support roles.",
-    "tags": ["bright", "energetic", "upbeat"],
+    "tags": [
+      "bright",
+      "energetic",
+      "upbeat"
+    ],
     "file": "approachable-dan.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "horror-movie-narrator",
@@ -261,13 +380,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["narrator"],
+    "category": [
+      "narrator"
+    ],
     "tagline": "Deep,Gravelly,Pragmatic",
     "description": "This voice features a deep, gravelly, and ominous resonance. Ideal for movie trailers and suspenseful storytelling. Also well-suited for horror game narration, true crime podcasts, and intense dramatic intros.",
-    "tags": ["deep", "gravelly", "pragmatic"],
+    "tags": [
+      "deep",
+      "gravelly",
+      "pragmatic"
+    ],
     "file": "horror-movie-narrator.wav",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello. I'm delighted to assist you with our voice services. Choose a voice that resonates with you, and let's begin our creative audio journey together."
   },
   {
     "id": "candid-girl",
@@ -276,13 +402,20 @@
     "language": "English",
     "gender": "female",
     "age": "adult",
-    "category": ["commercial"],
+    "category": [
+      "commercial"
+    ],
     "tagline": "Gravelly,Slow-Paced,Welcoming",
     "description": "This voice features a gravelly, slow-paced, and welcoming warmth that feels genuine and unhurried. Ideal for candid interview segments and heartfelt testimonials. Also well-suited for community welcome messages, casual brand storytelling, and relaxed conversational content.",
-    "tags": ["gravelly", "slow-paced", "welcoming"],
+    "tags": [
+      "gravelly",
+      "slow-paced",
+      "welcoming"
+    ],
     "file": "candid-girl.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "friendly-giant",
@@ -291,13 +424,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["drama"],
+    "category": [
+      "drama"
+    ],
     "tagline": "Deep,Deliberate,Threatening",
     "description": "This voice features a deep, deliberate, and commanding presence with a hint of gravel that can feel imposing. Ideal for villain characters and dramatic antagonist roles. Also well-suited for movie trailers, video game boss narration, and suspenseful audio drama.",
-    "tags": ["deep", "deliberate", "threatening"],
+    "tags": [
+      "deep",
+      "deliberate",
+      "threatening"
+    ],
     "file": "friendly-giant.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello. I'm delighted to assist you with our voice services. Choose a voice that resonates with you, and let's begin our creative audio journey together."
   },
   {
     "id": "lucky-robot",
@@ -306,13 +446,20 @@
     "language": "English",
     "gender": "male",
     "age": "adult",
-    "category": ["narrator"],
+    "category": [
+      "narrator"
+    ],
     "tagline": "Deep,Steady,Robotic",
     "description": "Deep, metallic, and resonant with steady, machine-like articulation that feels controlled and authoritative. Ideal for sci-fi interactive storytelling, trailer reads, and tech demos when you want a cinematic AI presence—calm, commanding, and precise.",
-    "tags": ["deep", "steady", "robotic"],
+    "tags": [
+      "deep",
+      "steady",
+      "robotic"
+    ],
     "file": "lucky-robot.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello, I'm delighted to assist you with our voice services. Choose a voice that resonates with you, and let's begin our creative audio journey together."
   },
   {
     "id": "witty-woman",
@@ -321,13 +468,20 @@
     "language": "English",
     "gender": "female",
     "age": "adult",
-    "category": ["commercial"],
+    "category": [
+      "commercial"
+    ],
     "tagline": "Bright,Polished,Agile",
     "description": "Bright, elegant, and agile with a lively pace and natural flow that feels modern and reassuring. Great for health-tech promos, wellness events, and podcast ad reads when you want persuasive confidence with genuine empathy.",
-    "tags": ["bright", "polished", "agile"],
+    "tags": [
+      "bright",
+      "polished",
+      "agile"
+    ],
     "file": "witty-woman.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello! I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   },
   {
     "id": "lovely-lady",
@@ -336,12 +490,19 @@
     "language": "English",
     "gender": "female",
     "age": "adult",
-    "category": ["storyteller"],
+    "category": [
+      "storyteller"
+    ],
     "tagline": "Husky,Rich,Smooth",
     "description": "This voice features a husky, rich, and smooth quality with a warm, seductive undertone. Ideal for romance audiobooks and intimate storytelling. Also well-suited for late-night radio segments, luxury brand narration, and relaxation content.",
-    "tags": ["husky", "rich", "smooth"],
+    "tags": [
+      "husky",
+      "rich",
+      "smooth"
+    ],
     "file": "lovely-lady.mp3",
     "clonable": true,
-    "source": "vendor"
+    "source": "vendor",
+    "ref_text": "Hello. I'm delighted to assist you with our voice services. Choose a voice that resonates with you and let's begin our creative audio journey together."
   }
 ]

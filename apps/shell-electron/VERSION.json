@@ -2,6 +2,42 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.11.3",
+      "date": "2026-08-12",
+      "bump": "patch",
+      "summary": "Fix lỗi engine TTS đã chọn (vd Qwen) không được nhớ đúng, cứ mở lại app là quay về engine mặc định.",
+      "breaking": true,
+      "minAppVersion": "0.11.3",
+      "detailsRef": "history/2026-08-12-config-store-ghi-de-engine-2-tien-trinh.md"
+    },
+    {
+      "version": "0.11.2",
+      "date": "2026-08-12",
+      "bump": "patch",
+      "summary": "Fix lỗi giọng đọc dựng sẵn vẫn báo thiếu bản chép lời khi dùng engine Qwen dù đã nhập/đồng bộ transcript.",
+      "breaking": true,
+      "minAppVersion": "0.11.2",
+      "detailsRef": "history/2026-08-12-backfill-ref-text-bo-sot-voice-da-import.md"
+    },
+    {
+      "version": "0.11.1",
+      "date": "2026-08-12",
+      "bump": "patch",
+      "summary": "Fix lỗi tạo audio giọng clone bị lỗi 500 khi dùng engine mặc định (bundled).",
+      "breaking": true,
+      "minAppVersion": "0.11.1",
+      "detailsRef": "history/2026-08-12-fix-encode-reference-2-doi-so.md"
+    },
+    {
+      "version": "0.11.0",
+      "date": "2026-08-12",
+      "bump": "minor",
+      "summary": "Sửa lỗi các giọng đọc dựng sẵn báo lỗi khi tạo audio với engine Qwen do thiếu bản chép lời audio mẫu. Khi tạo giọng mới bằng cách sao chép giọng nói, giờ chọn được cả file mp3, không chỉ wav.",
+      "breaking": true,
+      "minAppVersion": "0.11.0",
+      "detailsRef": "history/2026-08-12-catalog-ref-text-va-mp3-clone.md"
+    },
+    {
       "version": "0.10.0",
       "date": "2026-08-12",
       "bump": "minor",

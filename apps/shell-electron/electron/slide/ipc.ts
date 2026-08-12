@@ -1144,7 +1144,7 @@ export function registerIpcHandlers() {
     const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined!, {
       title: 'Chọn (các) file audio để clone giọng',
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Audio WAV', extensions: ['wav'] }],
+      filters: [{ name: 'Audio WAV/MP3', extensions: ['wav', 'mp3'] }],
     });
     if (canceled || filePaths.length === 0) return { ok: false };
     return { ok: true, filePaths };
