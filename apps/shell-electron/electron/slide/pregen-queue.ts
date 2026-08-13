@@ -313,7 +313,7 @@ export class PreGenQueue {
         const res = await fetch(`${pythonUrl()}/synthesize`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, speaker_id: speakerId, speed: this.config.ttsSpeed }),
+          body: JSON.stringify({ text, speaker_id: speakerId, speed: this.config.ttsSpeed, source: 'pregen' }),
           signal: AbortSignal.timeout(genTimeoutMs),
         });
         logPregen(`response id=${record.id} status=${res.status} ok=${res.ok}`);

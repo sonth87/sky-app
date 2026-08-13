@@ -178,6 +178,13 @@ export function vieneuConfigPath(): string {
   return join(vieneuUserDataDir(), 'config.json');
 }
 
+/** Thư mục lưu WAV lịch sử sinh audio (Phase 3 — xem apps/tts-service/server/history_store.py).
+ *  Tách khỏi `vieneuUserDataDir()` (giọng đọc) — đây là dữ liệu vòng đời khác hẳn (log, tự
+ *  prune theo thời gian/số lượng), không phải cấu hình giọng. */
+export function ttsHistoryDir(): string {
+  return join(app.getPath('userData'), 'tts-history');
+}
+
 /**
  * Thư mục gốc chứa các engine TTS mở rộng TẢI THEO NHU CẦU (ngoài VieNeu bundled).
  * Mỗi engine tự chứa: model, manifest, install-state — KHÔNG còn runtime riêng (xem

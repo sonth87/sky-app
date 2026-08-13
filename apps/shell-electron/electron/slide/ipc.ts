@@ -1295,6 +1295,62 @@ export function registerIpcHandlers() {
     }
   });
 
+  // ── History (Phase 3 — nhật ký sinh audio, xem apps/tts-service/server/history_store.py) ──
+
+  ipcMain.handle('tts:history-list', async (_e, { limit, source }: { limit?: number; source?: string }) => {
+    const port = getPythonPort();
+    if (!port) return [];
+    try {
+      const params = new URLSearchParams();
+      if (limit !== undefined) params.set('limit', String(limit));
+      if (source) params.set('source', source);
+      const qs = params.toString();
+      const res = await fetch(`http://127.0.0.1:${port}/history${qs ? `?${qs}` : ''}`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  });
+
+  // Trả URL thẳng tới Python server (đúng pattern getTtsPreviewUrl) — renderer's <audio src>
+  // tự fetch, không cần round-trip buffer qua IPC.
+  ipcMain.handle('tts:history-audio-url', (_e, { id }: { id: string }) => {
+    return `http://127.0.0.1:${getPythonPort()}/history/${encodeURIComponent(id)}/audio`;
+  });
+
+  ipcMain.handle('tts:history-delete', async (_e, { id }: { id: string }) => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/history/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
+      return await res.json();
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('tts:history-clear', async () => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/history`, {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
+      return await res.json();
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
   // Kiểm tra VieNeu-TTS model đã được download về resources/vieneu chưa
   ipcMain.handle('tts:model-status', () => {
     const hubDir = join(vieneuDir(), 'hub');

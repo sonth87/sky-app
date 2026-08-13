@@ -99,6 +99,29 @@ export interface SpeakOptions {
 export interface SynthesizeResult {
   buffer: ArrayBuffer;
   sampleRate: number;
+  /** id dòng vừa ghi vào lịch sử sinh audio (Phase 3) — undefined nếu adapter/backend chưa
+   *  hỗ trợ (Web hiện tại) hoặc history store phía server không sẵn sàng. */
+  historyId?: string;
+}
+
+/** 1 dòng nhật ký sinh audio (Phase 3) — xem apps/tts-service/server/history_store.py. */
+export interface HistoryEntry {
+  id: string;
+  source: 'ceremony' | 'tts_studio' | 'warmup' | 'pregen' | 'web' | 'unknown';
+  text: string;
+  voiceId?: string;
+  voiceLabel?: string;
+  speed?: number;
+  sampleRate?: number;
+  durationMs?: number;
+  engineId?: string;
+  qualityScore?: number;
+  qualityFlags?: string[];
+  /** false khi lỗi (xem `error`) hoặc nguồn 'pregen' (audio đã có sẵn ở nơi khác, không nhân
+   *  bản vào lịch sử — xem history_store.py's add_entry). */
+  hasAudio: boolean;
+  error?: string;
+  createdAt: string;
 }
 
 export interface TtsPort {
@@ -158,4 +181,15 @@ export interface TtsPort {
    *  (`GET /effects`). UI dựng slider từ đây thay vì hard-code — thêm hiệu ứng mới chỉ
    *  cần sửa phía service. Trả mảng rỗng khi service không hỗ trợ hiệu ứng. */
   listEffectTypes?(): Promise<EffectTypeInfo[]>;
+
+  // ── Lịch sử sinh audio (Phase 3) — optional: chỉ Electron adapter hỗ trợ hiện nay,
+  //    Web chưa có UI đọc lại dù mọi lượt synthesize từ Web vẫn được server ghi lại. ──
+  /** Lọc theo `source` nếu truyền (vd 'tts_studio' để không lẫn dòng metadata pregen số
+   *  lượng lớn). Trả mảng rỗng nếu history store phía server chưa sẵn sàng. */
+  listHistory?(opts?: { limit?: number; source?: string }): Promise<HistoryEntry[]>;
+  /** URL nghe lại/tải về 1 bản ghi (vd audio tag src, hoặc href tải). 404 nếu entry không
+   *  có audio (`hasAudio: false`). */
+  getHistoryAudioUrl?(id: string): Promise<string>;
+  deleteHistoryEntry?(id: string): Promise<{ ok: boolean; error?: string }>;
+  clearHistory?(): Promise<{ ok: boolean; error?: string }>;
 }

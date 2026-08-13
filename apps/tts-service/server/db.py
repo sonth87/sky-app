@@ -30,11 +30,17 @@ import sqlite3
 import threading
 from pathlib import Path
 
-# Migration TS mới nhất mà bản Python này BIẾT xử lý (bảng tts_voice tạo ở migration 017 của
-# app-db, xem packages/app-db/src/migrations/017_tts_voice.ts). Nếu DB thấp hơn số này —
-# Electron đang chạy bản CŨ HƠN bản Python vừa cập nhật, lệch version giữa hai phía đóng gói
-# riêng — từ chối dùng SQL thay vì đọc nhầm một bảng chưa tồn tại.
-REQUIRED_SCHEMA_VERSION = 17
+# Migration TS mới nhất mà bản Python này BIẾT xử lý (bảng tts_generation_history tạo ở
+# migration 019 của app-db, xem packages/app-db/src/migrations/019_tts_generation_history.ts).
+# Nếu DB thấp hơn số này — Electron đang chạy bản CŨ HƠN bản Python vừa cập nhật, lệch version
+# giữa hai phía đóng gói riêng — từ chối dùng SQL thay vì đọc nhầm một bảng chưa tồn tại.
+#
+# 2026-08-13: bump 17 → 19. Đáng lẽ phải bump lên 18 khi `tts_voice_sample` ra đời (Phase 2)
+# nhưng bị bỏ sót — lỗi có sẵn: DB đứng đúng ở v17 + Python bản mới hơn thì `connect()` tưởng
+# đủ điều kiện (17 >= 17) nhưng VoiceRegistrySqlite sẽ query nhầm bảng tts_voice_sample chưa
+# tồn tại → sqlite3.OperationalError không bắt được, thay vì rơi về JSON êm như thiết kế. Vá
+# kèm luôn trong lần bump cho tts_generation_history (Phase 3), không tách riêng.
+REQUIRED_SCHEMA_VERSION = 19
 
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None

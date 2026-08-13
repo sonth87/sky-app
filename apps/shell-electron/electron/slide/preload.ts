@@ -13,6 +13,7 @@ import type {
   PreGenStatus,
   VoiceCatalogEntry,
   TtsLogLine,
+  TtsHistoryEntry,
 } from '@sky-app/slide-shared';
 
 // Re-export for the few call-sites elsewhere in electron/slide/* that still
@@ -32,6 +33,7 @@ export type {
   PreGenStatus,
   VoiceCatalogEntry,
   TtsLogLine,
+  TtsHistoryEntry,
 } from '@sky-app/slide-shared';
 
 const api: SlideApi = {
@@ -117,12 +119,13 @@ const api: SlideApi = {
       return { ok: res.ok, error: res.error };
     }),
   // tts-studio: channel riêng, KHÔNG cache/log/pregen (khác tts:speak dùng bởi Ceremony).
-  synthesizeTts: (text: string, voiceId?: string, speed?: number, engineOverrides?: Record<string, Record<string, any>>, effectsChain?: unknown[]): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }> =>
+  synthesizeTts: (text: string, voiceId?: string, speed?: number, engineOverrides?: Record<string, Record<string, any>>, effectsChain?: unknown[]): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; historyId?: string; error?: string }> =>
     ipcRenderer.invoke('tts-studio:synthesize', { text, voiceId, speed, engine_overrides: engineOverrides, effectsChain }).then((res) => {
       if (res.ok && res.buffer) {
         return {
           ok: true,
           sampleRate: res.sampleRate ?? 48000,
+          historyId: res.historyId,
           buffer: res.buffer.buffer.slice(
             res.buffer.byteOffset,
             res.buffer.byteOffset + res.buffer.byteLength
@@ -243,6 +246,14 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:update-voice', { voiceId, hidden, refText }),
   deleteVoice: (voiceId: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('tts:delete-voice', { voiceId }),
+  listTtsHistory: (opts?: { limit?: number; source?: string }): Promise<TtsHistoryEntry[]> =>
+    ipcRenderer.invoke('tts:history-list', opts ?? {}),
+  getTtsHistoryAudioUrl: (id: string): Promise<string> =>
+    ipcRenderer.invoke('tts:history-audio-url', { id }),
+  deleteTtsHistoryEntry: (id: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('tts:history-delete', { id }),
+  clearTtsHistory: (): Promise<{ ok: boolean; error?: string; count?: number }> =>
+    ipcRenderer.invoke('tts:history-clear'),
   getSystemStats: (): Promise<{
     appRamMb: number;
     totalRamMb: number;

@@ -6,6 +6,7 @@
 
 ## Mục lục (mới nhất trên cùng)
 
+- [2026-08-13 — Lịch sử sinh audio trong DB dùng chung (Phase 3)](./2026-08-13-lich-su-sinh-audio-trong-db.md)
 - [2026-08-12 — Gộp 3 mục menu TTS thành 1 cửa sổ "Cấu hình" 4 tab](./2026-08-12-gop-cua-so-cau-hinh-tts.md)
 - [2026-08-12 — `ConfigStore` bị 2 tiến trình ghi đè ngược engine đã chọn](./2026-08-12-config-store-ghi-de-engine-2-tien-trinh.md)
 - [2026-08-12 — Backfill `ref_text` bỏ sót voice catalog ĐÃ import trước đó](./2026-08-12-backfill-ref-text-bo-sot-voice-da-import.md)

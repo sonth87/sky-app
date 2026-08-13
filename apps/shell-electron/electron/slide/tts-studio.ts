@@ -21,7 +21,7 @@ export async function synthesizeTtsStudio(
   // hư không. Đáng sửa hẳn bây giờ vì sau khi lọc khối `infer` global theo `sampling_params`
   // (xem main.py's _run_synthesis), đây là đường DUY NHẤT chỉnh được sampling của Qwen.
   engineOverrides?: Record<string, Record<string, unknown>>,
-): Promise<{ ok: boolean; buffer?: Buffer; sampleRate?: number; error?: string }> {
+): Promise<{ ok: boolean; buffer?: Buffer; sampleRate?: number; historyId?: string; error?: string }> {
   const url = `${pythonUrl()}/synthesize`;
   try {
     const normalizedText = text.trim();
@@ -30,7 +30,7 @@ export async function synthesizeTtsStudio(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text: normalizedText, speaker_id: voiceId, speed,
+        text: normalizedText, speaker_id: voiceId, speed, source: 'tts_studio',
         ...(effectsChain?.length ? { effects_chain: effectsChain } : {}),
         ...(engineOverrides ? { engine_overrides: engineOverrides } : {}),
       }),
@@ -46,8 +46,9 @@ export async function synthesizeTtsStudio(
     }
 
     const sampleRate = parseInt(response.headers.get('X-Sample-Rate') ?? '48000', 10);
+    const historyId = response.headers.get('X-History-Id') ?? undefined;
     const buffer = Buffer.from(await response.arrayBuffer());
-    return { ok: true, buffer, sampleRate };
+    return { ok: true, buffer, sampleRate, historyId };
   } catch (err) {
     const e = err as Error;
     return { ok: false, error: e?.message ?? String(err) };

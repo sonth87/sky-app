@@ -213,6 +213,27 @@ export interface TtsLogLine {
   ts: number;
 }
 
+/** 1 dòng nhật ký sinh audio (Phase 3, xem apps/tts-service/server/history_store.py) — shape
+ *  snake_case NGUYÊN VĂN từ JSON của Python's GET /history, chưa map sang camelCase (việc đó
+ *  thuộc về TtsPort adapter ở packages/platform-electron, xem packages/service-contracts's
+ *  HistoryEntry). */
+export interface TtsHistoryEntry {
+  id: string;
+  source: 'ceremony' | 'tts_studio' | 'warmup' | 'pregen' | 'web' | 'unknown';
+  text: string;
+  voice_id?: string;
+  voice_label?: string;
+  speed?: number;
+  sample_rate?: number;
+  duration_ms?: number;
+  engine_id?: string;
+  quality_score?: number;
+  quality_flags?: string[];
+  has_audio: boolean;
+  error?: string;
+  created_at: string;
+}
+
 export interface SlideApi {
   getMeta(): Promise<SlideMeta>;
   updateConfig(patch: Partial<unknown>): Promise<unknown>;
@@ -270,7 +291,7 @@ export interface SlideApi {
     engineOverrides?: Record<string, Record<string, unknown>>,
     /** Chuỗi hiệu ứng hậu kỳ đã resolve từ preset (EffectPresetPort). */
     effectsChain?: unknown[],
-  ): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }>;
+  ): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; historyId?: string; error?: string }>;
   warmupTts(): Promise<{ ok: boolean }>;
   getTtsDebug(): Promise<TtsDebugInfo>;
   preSynthesizeTts(texts: string[], modelName: string, speeds: number[]): Promise<{ ok: boolean }>;
@@ -361,6 +382,14 @@ export interface SlideApi {
    * dùng `addVoiceSample`/`deleteVoiceSample` để quản lý sample thứ 2 trở đi. */
   updateVoice(voiceId: string, hidden?: boolean, refText?: string): Promise<{ ok: boolean; error?: string }>;
   deleteVoice(voiceId: string): Promise<{ ok: boolean; error?: string }>;
+  /** Nhật ký sinh audio (Phase 3) — mọi nguồn (ceremony/tts_studio/warmup/pregen), lọc theo
+   *  `source` nếu truyền. Trả mảng rỗng nếu history store chưa sẵn sàng (DB chưa migrate đủ). */
+  listTtsHistory(opts?: { limit?: number; source?: string }): Promise<TtsHistoryEntry[]>;
+  /** URL http://127.0.0.1:<port>/history/<id>/audio — renderer's <audio src> tự fetch, đúng
+   *  pattern getTtsPreviewUrl. 404 nếu entry không có audio (lỗi, hoặc nguồn 'pregen'). */
+  getTtsHistoryAudioUrl(id: string): Promise<string>;
+  deleteTtsHistoryEntry(id: string): Promise<{ ok: boolean; error?: string }>;
+  clearTtsHistory(): Promise<{ ok: boolean; error?: string; count?: number }>;
   /** Thư viện voice mẫu 'hệ thống' (resources/voice-ref/{lang}/catalog.json) — search/preview
    * trước khi chọn dùng. Không cần bước import riêng: chọn synthesize lần đầu server tự
    * encode ngầm, voice đó tự xuất hiện trong listVoices() từ đó về sau. */

@@ -12,6 +12,12 @@ Endpoints mới (Giai đoạn 2+ mới integrate vào apps/slide):
   PUT  /voices/{voice_id}
   DELETE /voices/{voice_id}
 
+Endpoints Phase 3 (nhật ký sinh audio, xem history_store.py):
+  GET    /history?limit=&source=
+  GET    /history/{id}/audio
+  DELETE /history/{id}
+  DELETE /history
+
 Env vars (truyền từ Electron qua python-server.ts):
   VIENEU_PORT          — port server lắng nghe
   HF_HOME              — HuggingFace model cache dir
@@ -24,6 +30,8 @@ Env vars (truyền từ Electron qua python-server.ts):
   VIENEU_PREVIEW_DIR   — thư mục chứa preview WAV files
   LOG_FILE_PATH        — path ghi debug log
   VIENEU_REGISTRY_PATH — (optional) path tới voice-registry.json
+  VIENEU_HISTORY_DIR   — (optional) thư mục lưu WAV lịch sử sinh audio (Phase 3, xem
+                         history_store.py) — thiếu thì fallback cạnh VIENEU_REF_DIR
 """
 from __future__ import annotations
 
@@ -51,6 +59,7 @@ _ref_dir: Path | None = None
 _catalog_dir: Path | None = None
 _synth_lock = asyncio.Lock()
 _LOG_FILE: Path | None = None
+_history = None          # HistoryStore hoặc None (DB không sẵn sàng — xem history_store.py)
 
 # ── Cache engine (GĐ A: đổi engine KHÔNG cần restart process) ────────────────
 # Trước đây `_engine` là biến đơn: mỗi process chỉ phục vụ đúng 1 engine, nên đổi
@@ -330,7 +339,7 @@ def _touch_engine(engine_id: str) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _engine, _registry, _config, _preview_dir, _ref_dir, _catalog_dir, _LOG_FILE
-    global _current_engine_id
+    global _current_engine_id, _history
 
     # FIX: đọc tất cả env vars tại đây — KHÔNG tại module level
     log_path = os.environ.get("LOG_FILE_PATH", "")
@@ -388,6 +397,13 @@ async def lifespan(app: FastAPI):
     _registry = create_voice_registry(registry_path, _ref_dir)
     _safe_console(f"[TTS] Voice registry loaded from {registry_path}")
 
+    # Init history store (Phase 3) — None êm nếu DB chưa sẵn sàng, xem history_store.py.
+    history_dir_env = os.environ.get("VIENEU_HISTORY_DIR", "")
+    history_dir = Path(history_dir_env) if history_dir_env else _ref_dir.parent / "tts-history"
+    from history_store import create_history_store
+    _history = create_history_store(history_dir)
+    _safe_console(f"[TTS] History store {'READY' if _history else 'OFF (DB chưa sẵn sàng)'} — {history_dir}")
+
     # Pre-encode cloned voices lúc startup để giảm latency request đầu tiên
     _safe_console("[TTS] Pre-encoding voice references...")
     for voice in _registry.list_voices(include_hidden=True):
@@ -415,6 +431,7 @@ async def lifespan(app: FastAPI):
     _registry = None
     _config = None
     _current_engine_id = None
+    _history = None
     _engines.clear()
     _engine_lru.clear()
     _ref_codes_cache.clear()
@@ -436,7 +453,7 @@ app.add_middleware(
     allow_origin_regex=r"http://localhost:\d+",
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
-    expose_headers=["X-Sample-Rate", "X-Quality-Score", "X-Quality-Flags"],
+    expose_headers=["X-Sample-Rate", "X-Quality-Score", "X-Quality-Flags", "X-History-Id"],
 )
 
 
@@ -1151,6 +1168,11 @@ class TtsRequest(BaseModel):
     # "preset" vì preset nằm trong ceremony-db, mà tiến trình Python này cách ly với DB
     # đó (xem docstring effects.py).
     effects_chain: list | None = None
+    # Nguồn gọi — 'ceremony' (on-stage thật) | 'tts_studio' (test thủ công) | 'warmup' (tự
+    # động lúc khởi động) | 'pregen' (sinh hàng loạt trước buổi lễ) | 'web'. Mặc định
+    # "unknown" giữ tương thích ngược cho client chưa kịp cập nhật gửi field này (xem
+    # history_store.py, Phase 3).
+    source: str = "unknown"
 
 
 def _encode_reference(engine: object, ref_path: str, ref_text: str | None) -> object:
@@ -1308,6 +1330,15 @@ async def synthesize(req: TtsRequest):
         except Exception as e:
             traceback.print_exc()
             _write_log(f"[TTS] infer error: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            if _history is not None:
+                try:
+                    await asyncio.to_thread(
+                        _history.add_entry, source=req.source, text=req.text,
+                        voice_id=voice.get("id"), voice_label=voice.get("label"),
+                        speed=req.speed, error=f"{type(e).__name__}: {e}",
+                    )
+                except Exception as hist_err:  # ghi lịch sử lỗi không được che lỗi gốc
+                    _write_log(f"[TTS] history write (error path) failed: {hist_err}")
             raise HTTPException(500, str(e))
 
         from engine import SAMPLE_RATE, analyze_quality
@@ -1320,6 +1351,7 @@ async def synthesize(req: TtsRequest):
 
         # Chấm chất lượng để cảnh báo file khả nghi (không chặn — vẫn trả audio).
         headers = {"X-Sample-Rate": str(sample_rate)}
+        q = None  # sentinel — analyze_quality có thể throw, history write bên dưới cần biết
         try:
             q = analyze_quality(audio_np, req.text, sample_rate, speed=req.speed)
             headers["X-Quality-Score"] = str(q["score"])
@@ -1356,11 +1388,64 @@ async def synthesize(req: TtsRequest):
                 raise HTTPException(500, f"Lỗi khi áp hiệu ứng: {type(e).__name__}: {e}")
 
         int16_audio = np.clip(audio_np * 32767, -32768, 32767).astype(np.int16)
+
+        # Ghi lịch sử (Phase 3) — SAU hiệu ứng, dùng đúng audio cuối cùng đã trả cho client.
+        # Bọc riêng: lỗi ghi lịch sử không được làm hỏng response TTS thật.
+        if _history is not None:
+            try:
+                entry = await asyncio.to_thread(
+                    _history.add_entry, source=req.source, text=req.text,
+                    voice_id=voice.get("id"), voice_label=voice.get("label"), speed=req.speed,
+                    sample_rate=sample_rate,
+                    duration_ms=int(len(int16_audio) / sample_rate * 1000),
+                    engine_id=_current_engine_id,
+                    quality_score=q.get("score") if q else None,
+                    quality_flags=q.get("flags") if q else None,
+                    audio_pcm_int16=int16_audio,
+                )
+                headers["X-History-Id"] = entry["id"]
+            except Exception as hist_err:
+                _write_log(f"[TTS] history write failed: {hist_err}")
+
         return Response(
             content=int16_audio.tobytes(),
             media_type="application/octet-stream",
             headers=headers,
         )
+
+
+# ── History (Phase 3 — nhật ký sinh audio, xem history_store.py) ──────────────
+# Mọi endpoint dưới đây rơi về danh sách rỗng/404/no-op êm khi `_history is None` (DB chưa
+# sẵn sàng) — không bao giờ 503 cả app vì tính năng lịch sử không sẵn sàng.
+
+@app.get("/history")
+def list_history(limit: int = 100, source: str | None = None):
+    if _history is None:
+        return []
+    return _history.list_entries(limit=limit, source=source)
+
+
+@app.get("/history/{entry_id}/audio")
+def get_history_audio(entry_id: str):
+    path = _history.get_audio_path(entry_id) if _history is not None else None
+    if path is None:
+        raise HTTPException(404, f"Audio not found for history entry: {entry_id}")
+    return FileResponse(str(path), media_type="audio/wav")
+
+
+@app.delete("/history/{entry_id}")
+def delete_history_entry(entry_id: str):
+    if _history is None:
+        return {"ok": False, "error": "History store not ready"}
+    return {"ok": _history.delete_entry(entry_id)}
+
+
+@app.delete("/history")
+def clear_history():
+    if _history is None:
+        return {"ok": False, "error": "History store not ready"}
+    count = _history.clear_all()
+    return {"ok": True, "count": count}
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

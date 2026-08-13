@@ -105,7 +105,7 @@ describe('TtsPort (web)', () => {
       'http://localhost:9999/synthesize',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ text: 'xin chào', speaker_id: 'NF2', speed: 1.2, temperature: undefined }),
+        body: JSON.stringify({ text: 'xin chào', speaker_id: 'NF2', speed: 1.2, temperature: undefined, source: 'web' }),
       }),
     );
   });
@@ -132,7 +132,7 @@ describe('TtsPort (web)', () => {
     // voice-registry.json 2026-08-04 — test này còn assert giá trị cũ nên đỏ từ trước.
     expect(body).toEqual({
       text: 'hello', speaker_id: 'clone-d0f05071', speed: 1.0,
-      temperature: undefined, engine_overrides: undefined,
+      temperature: undefined, engine_overrides: undefined, source: 'web',
     });
   });
 
@@ -218,7 +218,7 @@ describe('TtsPort (web)', () => {
     const targetCall = fetchMock.mock.calls.find(call => !call[0].includes('/health'));
     expect(targetCall).toBeDefined();
     const body = JSON.parse((targetCall![1] as { body: string }).body);
-    expect(body).toEqual({ text: 'test', speaker_id: 'NF', speed: 1.0, temperature: undefined });
+    expect(body).toEqual({ text: 'test', speaker_id: 'NF', speed: 1.0, temperature: undefined, source: 'web' });
     expect(body).not.toHaveProperty('word_gap');
     expect(body).not.toHaveProperty('top_k');
     expect(body).not.toHaveProperty('top_p');
@@ -268,7 +268,7 @@ describe('TtsPort (web)', () => {
       'http://localhost:9999/synthesize',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ text: 'xin chào', speaker_id: 'NF2', speed: 1.2, temperature: undefined }),
+        body: JSON.stringify({ text: 'xin chào', speaker_id: 'NF2', speed: 1.2, temperature: undefined, source: 'web' }),
       }),
     );
     expect(result).toEqual({ buffer: pcm, sampleRate: 48000 });

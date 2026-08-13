@@ -1,9 +1,9 @@
 import { Download, History, Loader2, Pause, Play, Search, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
+import type { TtsPort } from '@sky-app/service-contracts';
 import { ButtonPrimitive } from '@sky-app/ui';
 import { useTtsStudioStore } from '../store';
-import { getHistoryEntry, deleteAllHistoryEntries, deleteHistoryEntry } from '../lib/history-db';
-import { getPlayingId, playPcmAudio, stopAudio, useAudioPlayingId } from '../lib/audioPlayer';
+import { getPlayingId, playUrlAudio, stopAudio, useAudioPlayingId } from '../lib/audioPlayer';
 
 function historyPlayId(id: string): string {
   return `history:${id}`;
@@ -18,7 +18,11 @@ function formatTime(ts: number): string {
   });
 }
 
-export function HistoryList() {
+export interface HistoryListProps {
+  ttsPort?: TtsPort;
+}
+
+export function HistoryList({ ttsPort }: HistoryListProps) {
   const history = useTtsStudioStore((s) => s.history);
   const removeHistory = useTtsStudioStore((s) => s.removeHistory);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -31,6 +35,7 @@ export function HistoryList() {
   );
 
   const handlePlay = async (id: string) => {
+    if (!ttsPort?.getHistoryAudioUrl) return;
     const playId = historyPlayId(id);
     if (getPlayingId() === playId) {
       stopAudio();
@@ -38,35 +43,33 @@ export function HistoryList() {
     }
     setBusyId(id);
     try {
-      const entry = await getHistoryEntry(id);
-      if (!entry) return;
-      const buffer = await entry.audioBlob.arrayBuffer();
-      await playPcmAudio(playId, buffer, entry.sampleRate);
+      const url = await ttsPort.getHistoryAudioUrl(id);
+      await playUrlAudio(playId, url);
     } finally {
       setBusyId(null);
     }
   };
 
   const handleDownload = async (id: string) => {
-    const entry = await getHistoryEntry(id);
-    if (!entry) return;
-    const url = URL.createObjectURL(entry.audioBlob);
+    if (!ttsPort?.getHistoryAudioUrl) return;
+    const url = await ttsPort.getHistoryAudioUrl(id);
     const a = document.createElement('a');
     a.href = url;
     a.download = `tts-studio-${id}.wav`;
     a.click();
-    URL.revokeObjectURL(url);
   };
 
   const handleDeleteEntry = async (id: string) => {
+    if (!ttsPort?.deleteHistoryEntry) return;
     if (!confirm('Xóa bản ghi này?')) return;
-    await deleteHistoryEntry(id);
+    await ttsPort.deleteHistoryEntry(id);
     removeHistory(id);
   };
 
   const handleClearAll = async () => {
+    if (!ttsPort?.clearHistory) return;
     if (!confirm('Xóa toàn bộ lịch sử? Hành động này không thể hoàn tác.')) return;
-    await deleteAllHistoryEntries();
+    await ttsPort.clearHistory();
     useTtsStudioStore.setState({ history: [] });
   };
 
@@ -92,7 +95,7 @@ export function HistoryList() {
 
       {history.length > 0 && (
         <div className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5">
-          <Search size={14} className="flex-shrink-0 text-muted-foreground" />
+          <Search size={14} className="shrink-0 text-muted-foreground" />
           <input
             type="text"
             placeholder="Tìm theo văn bản hoặc giọng..."
@@ -104,7 +107,7 @@ export function HistoryList() {
             <button
               type="button"
               onClick={() => setSearchText('')}
-              className="flex-shrink-0 text-muted-foreground hover:text-foreground"
+              className="shrink-0 text-muted-foreground hover:text-foreground"
             >
               <X size={14} />
             </button>
@@ -131,36 +134,39 @@ export function HistoryList() {
                 <span className="truncate text-xs text-foreground">{entry.text || '(trống)'}</span>
                 <span className="text-2xs text-muted-foreground">
                   {entry.voiceLabel} · {(entry.durationMs / 1000).toFixed(1)}s · {formatTime(entry.createdAt)}
+                  {entry.error && <span className="text-destructive"> · Lỗi: {entry.error}</span>}
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <div className="flex items-center gap-1">
-                  <ButtonPrimitive
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    disabled={busyId === entry.id}
-                    onClick={() => handlePlay(entry.id)}
-                    title={isPlaying ? 'Dừng' : 'Nghe lại'}
-                  >
-                    {busyId === entry.id ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : isPlaying ? (
-                      <Pause size={12} />
-                    ) : (
-                      <Play size={12} />
-                    )}
-                  </ButtonPrimitive>
-                  <ButtonPrimitive
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={() => handleDownload(entry.id)}
-                    title="Tải WAV"
-                  >
-                    <Download size={12} />
-                  </ButtonPrimitive>
-                </div>
+                {entry.hasAudio && (
+                  <div className="flex items-center gap-1">
+                    <ButtonPrimitive
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      disabled={busyId === entry.id}
+                      onClick={() => handlePlay(entry.id)}
+                      title={isPlaying ? 'Dừng' : 'Nghe lại'}
+                    >
+                      {busyId === entry.id ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : isPlaying ? (
+                        <Pause size={12} />
+                      ) : (
+                        <Play size={12} />
+                      )}
+                    </ButtonPrimitive>
+                    <ButtonPrimitive
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => handleDownload(entry.id)}
+                      title="Tải WAV"
+                    >
+                      <Download size={12} />
+                    </ButtonPrimitive>
+                  </div>
+                )}
                 <ButtonPrimitive
                   type="button"
                   variant="ghost"

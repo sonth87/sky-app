@@ -24,6 +24,12 @@ export interface HistoryEntryMeta {
   speed: number;
   createdAt: number;
   durationMs: number;
+  /** false khi lỗi (xem `error`) hoặc dòng nguồn 'pregen' (audio đã có sẵn ở nơi khác — xem
+   *  history_store.py's add_entry) — HistoryList tự ẩn nút Nghe lại/Tải khi false. */
+  hasAudio: boolean;
+  qualityScore?: number;
+  qualityFlags?: string[];
+  error?: string;
 }
 
 interface TtsStudioState {
@@ -73,8 +79,10 @@ export const useTtsStudioStore = create<TtsStudioState>((set) => ({
   setText: (text) => set({ text }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setHistory: (history) => set({ history }),
+  // Server giờ tự quản lý retention (5000 dòng/90 ngày, xem history_store.py) — không cap
+  // cứng 30 phía client nữa như thời IndexedDB.
   prependHistory: (entry) =>
-    set((s) => ({ history: [entry, ...s.history].slice(0, 30) })),
+    set((s) => ({ history: [entry, ...s.history] })),
   removeHistory: (id) =>
     set((s) => ({ history: s.history.filter((e) => e.id !== id) })),
   setEngineOverrides: (engineOverrides) => set({ engineOverrides }),

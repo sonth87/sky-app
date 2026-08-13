@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, chmodSync, mkdirSync, readdirSync, copyFile
 import { join } from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import type { TtsLogLine } from '@sky-app/slide-shared';
-import { vieneuRefDir, vieneuRegistryPath, vieneuConfigPath, ttsEnginesDir, ttsRuntimeDir, skyAppDbPath } from './data/paths';
+import { vieneuRefDir, vieneuRegistryPath, vieneuConfigPath, ttsEnginesDir, ttsRuntimeDir, skyAppDbPath, ttsHistoryDir } from './data/paths';
 import { resolveRuntimePython } from './python-runtime';
 const DEBUG_LOG_FILE = join(app.getPath('userData'), 'tts-debug.log');
 const DEFAULT_PORT = 8089;
@@ -419,7 +419,7 @@ async function warmupSessions(port: number): Promise<void> {
       const response = await fetch(`http://127.0.0.1:${port}/synthesize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: 'xin chào', speaker_id: speaker, speed: 1.0 }),
+        body: JSON.stringify({ text: 'xin chào', speaker_id: speaker, speed: 1.0, source: 'warmup' }),
         signal: AbortSignal.timeout(60000), // 60s timeout — VieNeu lần đầu tải model vào RAM
       });
 
@@ -711,6 +711,7 @@ async function startPythonServerOnce(
         ...(devCatalogDir ? { VIENEU_CATALOG_DIR: devCatalogDir } : {}),
         VIENEU_REGISTRY_PATH: userRegistryPath,
         VIENEU_CONFIG_PATH: userConfigPath,
+        VIENEU_HISTORY_DIR: ttsHistoryDir(),
         // DB dùng chung (bảng tts_*, xem AGENTS.md §2.1 + apps/tts-service/server/db.py).
         // Chỉ ĐƯỜNG DẪN — Python tự kiểm file tồn tại + đã migrate đủ (schema_version) trước
         // khi dùng, không giả định gì thêm ở phía Electron. An toàn để truyền vô điều kiện:

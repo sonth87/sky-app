@@ -78,13 +78,18 @@ async function fetchSynthesize(
       // Chỉ gửi khi có — server phân biệt "không dùng hiệu ứng" (vắng mặt/rỗng) và bỏ qua
       // hẳn bước áp dụng, không phải dựng một pedalboard rỗng cho mỗi request.
       ...(opts?.effectsChain?.length ? { effects_chain: opts.effectsChain } : {}),
+      // Nhật ký sinh audio (Phase 3, xem history_store.py) — Web chưa có UI đọc lại lịch sử
+      // trong phase này (listHistory?/... không implement ở adapter này), nhưng vẫn gắn
+      // nguồn 'web' để dữ liệu server-side nhất quán/audit được nếu cần sau này.
+      source: 'web',
     }),
   });
   if (!res.ok) throw new Error(`TTS synthesize failed: ${res.status} ${await res.text()}`);
 
   const sampleRate = Number(res.headers.get('X-Sample-Rate') ?? '24000');
+  const historyId = res.headers.get('X-History-Id') ?? undefined;
   const buffer = await res.arrayBuffer();
-  return { buffer, sampleRate };
+  return { buffer, sampleRate, historyId };
 }
 
 /**

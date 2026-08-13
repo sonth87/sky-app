@@ -1,5 +1,24 @@
-import { languageFromSourceLang, type TtsPort, type Voice } from '@sky-app/service-contracts';
-import type { SlideApi } from '@sky-app/slide-shared';
+import { languageFromSourceLang, type TtsPort, type Voice, type HistoryEntry } from '@sky-app/service-contracts';
+import type { SlideApi, TtsHistoryEntry } from '@sky-app/slide-shared';
+
+function toHistoryEntry(e: TtsHistoryEntry): HistoryEntry {
+  return {
+    id: e.id,
+    source: e.source,
+    text: e.text,
+    voiceId: e.voice_id,
+    voiceLabel: e.voice_label,
+    speed: e.speed,
+    sampleRate: e.sample_rate,
+    durationMs: e.duration_ms,
+    engineId: e.engine_id,
+    qualityScore: e.quality_score,
+    qualityFlags: e.quality_flags,
+    hasAudio: e.has_audio,
+    error: e.error,
+    createdAt: e.created_at,
+  };
+}
 
 declare global {
   interface Window {
@@ -85,7 +104,7 @@ export function createElectronTtsPort(): TtsPort {
         text, opts?.voiceId, opts?.speed, opts?.engine_overrides, opts?.effectsChain,
       );
       if (!res.ok || !res.buffer) throw new Error(res.error ?? 'TTS synthesize failed');
-      return { buffer: res.buffer, sampleRate: res.sampleRate ?? 48000 };
+      return { buffer: res.buffer, sampleRate: res.sampleRate ?? 48000, historyId: res.historyId };
     },
     async getPreviewUrl(voiceId) {
       return window.slide.getTtsPreviewUrl(voiceId);
@@ -131,6 +150,19 @@ export function createElectronTtsPort(): TtsPort {
     },
     async listEffectTypes() {
       return window.slide.listEffectTypes();
+    },
+    async listHistory(opts) {
+      const entries = await window.slide.listTtsHistory(opts);
+      return entries.map(toHistoryEntry);
+    },
+    async getHistoryAudioUrl(id) {
+      return window.slide.getTtsHistoryAudioUrl(id);
+    },
+    async deleteHistoryEntry(id) {
+      return window.slide.deleteTtsHistoryEntry(id);
+    },
+    async clearHistory() {
+      return window.slide.clearTtsHistory();
     },
   };
 }

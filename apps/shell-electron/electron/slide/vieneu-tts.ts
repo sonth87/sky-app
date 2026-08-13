@@ -23,7 +23,7 @@ export async function runVieneu(
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: normalizedText, speaker_id: speakerId, speed }),
+      body: JSON.stringify({ text: normalizedText, speaker_id: speakerId, speed, source: 'ceremony' }),
       signal: AbortSignal.timeout(timeoutMs),
     });
 

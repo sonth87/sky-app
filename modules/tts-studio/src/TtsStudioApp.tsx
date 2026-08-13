@@ -15,8 +15,6 @@ import { HistoryList } from './components/HistoryList';
 import { VerticalResizeHandle } from './components/VerticalResizeHandle';
 import { useTtsStudioStore } from './store';
 import { getPlayingId, playPcmAudio, playUrlAudio, stopAudio } from './lib/audioPlayer';
-import { pcmToWavBlob } from './lib/wav-encode';
-import { getAllHistoryEntries, putHistoryEntry, type HistoryEntry } from './lib/history-db';
 import { VoiceCloneModal } from '@sky-app/voice-catalog-ui';
 import { EngineManager, DeviceSettingsModal } from '@sky-app/tts-engine-ui';
 import { useMenuAction } from '@sonth87/device-layout';
@@ -212,31 +210,40 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ load 1 lần lúc mount
   }, [tts, refreshVoices]);
 
+  // Phase 3: lịch sử giờ ở DB dùng chung (server ghi mọi lượt /synthesize), không còn
+  // IndexedDB riêng của TTS Studio. Lọc `source: 'tts_studio'` để không lẫn dòng metadata
+  // pregen số lượng lớn (1 sự kiện có thể 500-1000+ dòng, xem history_store.py). `listHistory`
+  // là optional trên TtsPort (Web chưa hỗ trợ) — degrade về mảng rỗng khi thiếu.
   useEffect(() => {
+    if (!tts?.listHistory) return;
     let cancelled = false;
-    getAllHistoryEntries()
+    tts.listHistory({ source: 'tts_studio' })
       .then((entries) => {
         if (cancelled) return;
         setHistory(
           entries.map((e) => ({
             id: e.id,
             text: e.text,
-            voiceId: e.voiceId,
-            voiceLabel: e.voiceLabel,
-            speed: e.speed,
-            createdAt: e.createdAt,
-            durationMs: e.durationMs,
+            voiceId: e.voiceId ?? '',
+            voiceLabel: e.voiceLabel ?? e.voiceId ?? '',
+            speed: e.speed ?? 1.0,
+            createdAt: new Date(e.createdAt).getTime(),
+            durationMs: e.durationMs ?? 0,
+            hasAudio: e.hasAudio,
+            qualityScore: e.qualityScore,
+            qualityFlags: e.qualityFlags,
+            error: e.error,
           })),
         );
       })
       .catch(() => {
-        /* IndexedDB lỗi (vd private browsing chặn) — lịch sử trống, không chặn app */
+        /* Server/DB chưa sẵn sàng — lịch sử trống, không chặn app */
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ load 1 lần lúc mount
-  }, []);
+  }, [tts]);
 
   const handlePreview = async (voiceId: string) => {
     if (!tts) return;
@@ -278,30 +285,26 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
       // nhanh cùng điều khiển 1 audio, nút tự hiện đúng trạng thái Dừng ngay khi vừa tạo.
       await playPcmAudio(QUICK_PLAY_ID, result.buffer, result.sampleRate);
 
-      const voiceLabel = voices.find((v) => v.id === selectedVoiceId)?.name ?? selectedVoiceId;
-      const sampleCount = Math.floor(result.buffer.byteLength / 2);
-      const durationMs = (sampleCount / result.sampleRate) * 1000;
-      const entry: HistoryEntry = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        text: trimmedText,
-        voiceId: selectedVoiceId,
-        voiceLabel,
-        speed,
-        sampleRate: result.sampleRate,
-        createdAt: Date.now(),
-        audioBlob: pcmToWavBlob(result.buffer, result.sampleRate),
-        durationMs,
-      };
-      await putHistoryEntry(entry);
-      prependHistory({
-        id: entry.id,
-        text: entry.text,
-        voiceId: entry.voiceId,
-        voiceLabel: entry.voiceLabel,
-        speed: entry.speed,
-        createdAt: entry.createdAt,
-        durationMs: entry.durationMs,
-      });
+      // Phase 3: server đã ghi dòng lịch sử ngay trong /synthesize và trả id qua
+      // X-History-Id (xem history_store.py) — dựng entry NGAY TẠI CLIENT từ dữ liệu đã có
+      // sẵn, không cần round-trip gọi lại listHistory(). Bỏ qua nếu server không trả
+      // historyId (Web, hoặc history store phía server chưa sẵn sàng) — không có gì để
+      // prepend, mount effect vẫn hiển thị đúng lịch sử thật ở lần load kế tiếp.
+      if (result.historyId) {
+        const voiceLabel = voices.find((v) => v.id === selectedVoiceId)?.name ?? selectedVoiceId;
+        const sampleCount = Math.floor(result.buffer.byteLength / 2);
+        const durationMs = (sampleCount / result.sampleRate) * 1000;
+        prependHistory({
+          id: result.historyId,
+          text: trimmedText,
+          voiceId: selectedVoiceId,
+          voiceLabel,
+          speed,
+          createdAt: Date.now(),
+          durationMs,
+          hasAudio: true,
+        });
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setGenError(msg.includes('503') ? 'TTS engine đang khởi động, thử lại sau vài giây.' : msg);
@@ -389,7 +392,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
               />
             </div>
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1">
-              <HistoryList />
+              <HistoryList ttsPort={tts} />
             </div>
           </main>
         </div>
