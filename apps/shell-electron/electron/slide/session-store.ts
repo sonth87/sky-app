@@ -4,10 +4,10 @@ import type { OperatingMode, SessionState } from '@sky-app/slide-shared';
 import { ceremonyDataDir, sessionJsonPath } from './data/paths';
 
 const DEFAULT_SESSION: SessionState = {
-  current_on_stage_msv: null,
-  pending_msv: null,
+  current_on_stage_id: null,
+  pending_id: null,
   mode: 'manual',
-  last_scan_msv: null,
+  last_scan_id: null,
   last_scan_ts: null,
   broadcast_count: 0,
   sync_queue: [],
@@ -21,18 +21,20 @@ const DEFAULT_SESSION: SessionState = {
 class SessionStore {
   private state: SessionState = { ...DEFAULT_SESSION };
 
-  /** Khởi tạo: ưu tiên session.json trên đĩa, nếu chưa có thì lấy từ bundle */
-  init(fromBundle?: SessionState | null) {
+  /** Khởi tạo: ưu tiên session.json trên đĩa, nếu không có/hỏng thì dùng mặc định.
+   * KHÔNG còn nhận `fromBundle` (giai đoạn "bỏ Student", 2026-07-22) — CeremonyBundle không
+   * còn tồn tại, session độc lập hoàn toàn với ceremony/config. */
+  init() {
     const p = sessionJsonPath();
     if (existsSync(p)) {
       try {
         this.state = JSON.parse(readFileSync(p, 'utf-8')) as SessionState;
         return;
       } catch {
-        // file hỏng → rơi xuống dùng bundle/default
+        // file hỏng → rơi xuống dùng default
       }
     }
-    this.state = fromBundle ? { ...fromBundle } : { ...DEFAULT_SESSION };
+    this.state = { ...DEFAULT_SESSION };
     this.persist();
   }
 

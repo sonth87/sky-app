@@ -1,7 +1,12 @@
 export { createElectronPlatform } from './create-electron-platform.js';
 export type { CreateElectronPlatformOptions } from './create-electron-platform.js';
 export { createElectronTtsPort } from './adapters/tts.js';
+export { createElectronTtsEnginePort } from './adapters/tts-engine.js';
 export { createElectronDisplayPort } from './adapters/display.js';
 export { createElectronLicensePort } from './adapters/license.js';
 export type { CreateElectronLicensePortOptions } from './adapters/license.js';
+export { createElectronLayoutPort } from './adapters/layout.js';
+export { createElectronAssetPort } from './adapters/asset.js';
+export { createElectronEventPort } from './adapters/event.js';
+export { createElectronDataSourcePort } from './adapters/data-source.js';
 export type { SkyBridge } from './bridge-types.js';

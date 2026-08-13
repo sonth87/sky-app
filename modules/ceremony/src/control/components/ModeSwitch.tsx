@@ -16,7 +16,11 @@ export function ModeSwitch() {
             key={m}
             onClick={() => socket.current?.emit('cmd:setMode', { mode: m })}
             className={`px-3 py-1.5 text-sm ${
-              mode === m ? 'bg-info text-info-foreground' : 'bg-card text-foreground hover:bg-muted'
+              // Dùng --primary (đổi theo palette đang chọn ở Cài đặt giao diện) thay vì --info
+              // (màu xanh CỐ ĐỊNH, không đổi theo theme — xác nhận qua styles.css, --info chỉ
+              // khai trong :root/.dark, không có trong bất kỳ khối [data-theme=...] nào) — phản
+              // hồi thật 2026-07-29: nút Auto/Manual phải theo đúng màu theme ceremony đang chọn.
+              mode === m ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground hover:bg-muted'
             }`}
           >
             {m === 'auto' ? t('modeSwitch.auto') : t('modeSwitch.manual')}

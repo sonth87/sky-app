@@ -23,6 +23,14 @@ export function setBackdropStateListener(fn: () => void) {
   onBackdropStateChange = fn;
 }
 
+// Hook gắn context-menu (chuột phải Copy/Paste) cho webContents mới tạo — main.ts đăng ký hàm
+// thật (menu.ts's attachEditContextMenu) qua setter này thay vì windows.ts import thẳng menu.ts,
+// TRÁNH circular import (menu.ts đã import getMainWindow/getBackdropWindow từ file này).
+let attachContextMenu: ((webContents: BrowserWindow['webContents']) => void) | null = null;
+export function setContextMenuAttacher(fn: (webContents: BrowserWindow['webContents']) => void) {
+  attachContextMenu = fn;
+}
+
 function loadRenderer(win: BrowserWindow, htmlName: 'backdrop') {
   if (isDev) {
     win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/${htmlName}.html`);
@@ -68,6 +76,7 @@ export function createBackdropWindow(_opts: { kiosk: boolean; aspectRatio?: '16:
       nodeIntegration: false,
     },
   });
+  attachContextMenu?.(backdropWindow.webContents);
   loadRenderer(backdropWindow, 'backdrop');
   // Tạo với show:false để tránh nháy trắng; hiện ra khi nội dung sẵn sàng.
   backdropWindow.once('ready-to-show', () => {

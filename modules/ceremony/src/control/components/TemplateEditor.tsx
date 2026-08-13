@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Settings2, AudioLines, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { Student, CustomVariable } from '@sky-app/slide-shared';
-import { renderTemplate, STUDENT_TEMPLATE_VARIABLES } from '../../lib/renderTemplate';
+import type { CanonicalRecord, CustomVariable } from '@sky-app/slide-shared';
+import { renderTemplate, CORE_TEMPLATE_VARIABLES } from '../../lib/renderTemplate';
 import { useControlStore } from '../store';
 import { playPcm, stopPcm } from '../../lib/audio';
 
 interface Props {
   value: string;
   onChange: (v: string) => void;
-  previewStudent: Student | null;
+  previewRecord: CanonicalRecord | null;
   placeholder?: string;
   voiceId?: string;
   speed?: number;
@@ -87,7 +87,7 @@ function setCaretCharOffset(root: HTMLElement, offset: number) {
 export function TemplateEditor({
   value,
   onChange,
-  previewStudent,
+  previewRecord,
   placeholder,
   voiceId,
   speed,
@@ -106,7 +106,7 @@ export function TemplateEditor({
     const custom = customVariables
       .filter((v) => v.key)
       .map((v) => ({ key: v.key, label: v.label || v.key, example: v.default || '' }));
-    return [...custom, ...STUDENT_TEMPLATE_VARIABLES];
+    return [...custom, ...CORE_TEMPLATE_VARIABLES];
   }, [customVariables]);
 
   // Tập key hợp lệ để phân biệt @biến_thật (xanh) và @biến_lạ gõ nhầm/không tồn tại (đỏ).
@@ -205,7 +205,7 @@ export function TemplateEditor({
     active?.scrollIntoView({ block: 'nearest' });
   }, [dropdownIndex, dropdownQuery]);
 
-  const preview = previewStudent && value ? renderTemplate(value, previewStudent, customVariables) : null;
+  const preview = previewRecord && value ? renderTemplate(value, previewRecord, customVariables) : null;
   const isEmpty = value.length === 0;
 
   const pythonStatus = useControlStore((s) => s.pythonStatus);

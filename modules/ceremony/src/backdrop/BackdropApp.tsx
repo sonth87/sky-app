@@ -3,41 +3,36 @@ import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import {
   BackdropView,
+  LayoutRenderer,
   type BackdropAspectRatio,
   type BackdropTemplateMap,
   type Ceremony,
-  type Student,
+  type CanonicalRecord,
+  type RecordWithRuntimeState,
+  type EventDocument,
+  type EventLayoutRef,
+  type LayoutContent,
+  type LayoutVersion,
+  flattenCanonicalRecord,
+  canonicalToStudent,
+  resolveLayout,
+  applyFieldMap,
+  eventToIdleRecord,
 } from '@sky-app/slide-shared';
 import { createSocket, type SlideSocket } from '../lib/socket';
 import { resolveAsset } from '../lib/assets';
 import { playPcm, stopPcm } from './lib/tts';
 import { renderTemplate } from '../lib/renderTemplate';
 
-function getVoiceForStudent(
-  student: Student,
+function getVoiceForRecord(
+  record: CanonicalRecord,
   conditions: Array<{ attr: string; val: string; voice: string }>,
   fallbackVoice: string,
 ): string {
+  const flat = flattenCanonicalRecord(record);
   for (const cond of conditions) {
-    let studentVal = '';
-    const attr = cond.attr;
-    if (attr === 'Giới tính') {
-      studentVal = student.gender || '';
-    } else if (attr === 'Xếp loại') {
-      studentVal = student.classification || '';
-    } else if (attr === 'Ngành') {
-      studentVal = student.major_name || '';
-    } else if (attr === 'Khoa') {
-      studentVal = student.faculty_name || '';
-    } else if (attr === 'Lớp') {
-      studentVal = student.class_code || '';
-    } else if (attr === 'Khóa') {
-      studentVal = student.course_code || '';
-    } else if (attr === 'Họ tên') {
-      studentVal = student.full_name || '';
-    }
-
-    if (studentVal.trim().toLowerCase() === cond.val.trim().toLowerCase()) {
+    const recordVal = flat[cond.attr] ?? '';
+    if (recordVal.trim().toLowerCase() === cond.val.trim().toLowerCase()) {
       return cond.voice;
     }
   }
@@ -429,7 +424,21 @@ export function BackdropApp() {
   const [layouts, setLayouts] = useState<BackdropTemplateMap | null>(null);
   const [layoutOverrides, setLayoutOverrides] = useState<Record<string, any>>({});
   const [backdropAspectRatio, setBackdropAspectRatio] = useState<BackdropAspectRatio>('16:9');
-  const [onStage, setOnStage] = useState<Student | null>(null);
+  // Giai đoạn "bỏ Student" (2026-07-22): socket giờ gửi RecordWithRuntimeState — giữ nguyên
+  // shape này trong state, chỉ convert sang Student (qua canonicalToStudent) ngay trước khi
+  // truyền vào <BackdropView> bên dưới. BackdropView/DynamicBackdropView là hệ template CŨ
+  // (trước layout-designer) — theo roadmap (13-ceremony-mo-rong.md), sẽ được thay bằng
+  // LayoutRenderer ở 1 giai đoạn RIÊNG sau này (cần viết applyFieldMap + nối Event active vào
+  // backdrop, khối lượng lớn, không làm chung đợt bỏ Student). canonicalToStudent là cầu nối 1
+  // CHIỀU CHỈ dùng ở đây — KHÔNG dùng lại nơi khác trong app.
+  const [onStage, setOnStage] = useState<RecordWithRuntimeState | null>(null);
+  // Nối backdrop trao giải/màn chờ sang LayoutRenderer thật (2026-07-28) — Event active +
+  // LayoutContent tương ứng. `null`/thiếu ref cho vai trò đang cần (award/idle) → fallback về
+  // BackdropView cũ bên dưới (không breaking Event/ceremony chưa cấu hình layout mới).
+  const [activeEvent, setActiveEvent] = useState<EventDocument | null>(null);
+  const [layoutContent, setLayoutContent] = useState<LayoutContent | null>(null);
+  const [screenSize, setScreenSize] = useState({ w: 0, h: 0 });
+  const rootRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<SlideSocket | null>(null);
   const confettiEnabledRef = useRef(true);
   const confettiRepeatRef = useRef(true);
@@ -475,6 +484,62 @@ export function BackdropApp() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ribbonsRef = useRef<any[]>([]);
+
+  // Đo kích thước thật (px) của khung hiển thị — LayoutRenderer cần `screen: {w, h}` cụ thể để
+  // resolveVariant/computeScale (khác BackdropView, tự đo bên trong qua ResizeObserver riêng).
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const update = () => setScreenSize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // EventLayoutRef cần dùng NGAY BÂY GIỜ cho vai trò đang hiển thị (award khi có người trên sân
+  // khấu, idle khi không) — đối xứng: Event/vai trò chưa cấu hình layout mới → null, fallback
+  // BackdropView cũ (quyết định fallback, xem plan "Nối backdrop trao giải + màn chờ").
+  const activeLayoutRef = useMemo<{ ref: EventLayoutRef; slot: 'award' | 'idle' } | null>(() => {
+    if (!activeEvent) return null;
+    if (onStage) {
+      const awardRefs = activeEvent.layoutRefs.filter((r) => r.role !== 'idle');
+      const flat = flattenCanonicalRecord(onStage.record);
+      const layoutId = resolveLayout(flat, awardRefs);
+      const ref = layoutId ? awardRefs.find((r) => r.layoutId === layoutId) : undefined;
+      return ref ? { ref, slot: 'award' } : null;
+    }
+    const idleRef = activeEvent.layoutRefs.find((r) => r.role === 'idle');
+    return idleRef ? { ref: idleRef, slot: 'idle' } : null;
+  }, [activeEvent, onStage]);
+
+  // Fetch LayoutContent của ref đang cần — refetch khi đổi layoutId/version (Event đổi layout
+  // giữa lễ, hoặc chuyển award↔idle sang layout khác nhau).
+  useEffect(() => {
+    if (!activeLayoutRef) {
+      setLayoutContent(null);
+      return;
+    }
+    let cancelled = false;
+    window.sky
+      .invoke('kernel:layout:getVersion', activeLayoutRef.ref.layoutId, activeLayoutRef.ref.layoutVersion)
+      .then((v) => {
+        if (!cancelled) setLayoutContent((v as LayoutVersion | null)?.content ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLayoutRef?.ref.layoutId, activeLayoutRef?.ref.layoutVersion]);
+
+  // Record cuối cùng đưa vào LayoutRenderer — fieldMap đã ghép field thật/CustomVariable vào token.
+  const layoutRecord = useMemo<CanonicalRecord | null>(() => {
+    if (!activeLayoutRef || !activeEvent) return null;
+    const base = activeLayoutRef.slot === 'award' ? onStage?.record : eventToIdleRecord(activeEvent);
+    if (!base) return null;
+    return applyFieldMap(base, activeLayoutRef.ref.fieldMap, activeEvent.customVariables);
+  }, [activeLayoutRef, activeEvent, onStage]);
+
+  const useLayoutRenderer = !!(layoutContent && layoutRecord && screenSize.w > 0 && screenSize.h > 0);
 
   // Vòng lặp vẽ ruy băng (Canvas)
   useEffect(() => {
@@ -1076,13 +1141,14 @@ export function BackdropApp() {
         }, intervalMs);
       };
 
-      const handleStudent = (student: Student | null, withConfetti: boolean) => {
-        setOnStage(student);
+      const handleStudent = (data: RecordWithRuntimeState | null, withConfetti: boolean) => {
+        setOnStage(data);
+        const record = data?.record ?? null;
 
-        const isNewStudent = student?.student_code !== lastConfettiCode.current;
+        const isNewStudent = record?.id !== lastConfettiCode.current;
         console.log(
           '[Backdrop] handleStudent:',
-          student?.student_code,
+          record?.id,
           'withConfetti:',
           withConfetti,
           'isNewStudent:',
@@ -1099,12 +1165,12 @@ export function BackdropApp() {
           ribbonsRef.current = [];
         }
 
-        if (!student) {
+        if (!record) {
           stopPcm();
           lastTtsTargetCodeRef.current = null;
         }
 
-        if (student && isNewStudent) {
+        if (record && isNewStudent) {
           if (confettiEnabledRef.current) {
             // Bắn ngay đợt đầu tiên sau 300ms
             setTimeout(() => {
@@ -1138,22 +1204,22 @@ export function BackdropApp() {
           }
 
           if (ttsEnabledRef.current) {
-            const code = student.student_code;
+            const code = record.id;
             lastTtsTargetCodeRef.current = code;
 
             const speed = ttsSpeedRef.current ?? 1.0;
             const fallbackModel = ttsModelRef.current || 'vieneu-NF';
-            const model = getVoiceForStudent(student, ttsConditionsRef.current, fallbackModel);
+            const model = getVoiceForRecord(record, ttsConditionsRef.current, fallbackModel);
             const playMode = ttsPlayModeRef.current;
 
             // Build text từ template hoặc fallback sang prefix + tên
             const template = ttsTemplateRef.current;
             let textToSpeak: string;
             if (template) {
-              textToSpeak = renderTemplate(template, student, customVariablesRef.current);
+              textToSpeak = renderTemplate(template, record, customVariablesRef.current);
             } else {
               const prefix = (ttsSentencePrefixRef.current || '').trim();
-              const fullName = student.full_name?.trim() || '';
+              const fullName = record.full_name?.trim() || '';
               if (prefix) {
                 const separator = /[.,!?;]$/.test(prefix) ? ' ' : ', ';
                 textToSpeak = `${prefix}${separator}${fullName}`;
@@ -1173,9 +1239,11 @@ export function BackdropApp() {
                   console.log('[Backdrop] pregenGetAudio response code=', code, 'ok=', res.ok, 'hasBuffer=', !!res.buffer, 'error=', res.error);
                   if (res.ok && res.buffer) {
                     if (lastTtsTargetCodeRef.current !== code) return;
-                    // Skip WAV header 44 bytes, phát PCM 48kHz
-                    console.log('[Backdrop] playPcm from pregen code=', code, 'pcmBytes=', res.buffer.slice(44).byteLength);
-                    playPcm(res.buffer.slice(44), 48000);
+                    // Bỏ 44 byte WAV header, phát PCM thô ở ĐÚNG tần số của file (main
+                    // process đọc từ header và trả kèm) — hardcode 48000 sẽ phát nhanh
+                    // gấp đôi với file do Qwen (24kHz) sinh ra.
+                    console.log('[Backdrop] playPcm from pregen code=', code, 'pcmBytes=', res.buffer.slice(44).byteLength, 'sr=', res.sampleRate);
+                    playPcm(res.buffer.slice(44), res.sampleRate ?? 48000);
                     return;
                   }
                 } catch (err) {
@@ -1224,11 +1292,11 @@ export function BackdropApp() {
             }
           }
         }
-        lastConfettiCode.current = student?.student_code ?? null;
+        lastConfettiCode.current = record?.id ?? null;
       };
 
       socket.on('state:full', ({ onStage }) => handleStudent(onStage, false));
-      socket.on('state:onStage', ({ student }) => handleStudent(student, true));
+      socket.on('state:onStage', ({ data }) => handleStudent(data, true));
       socket.on('event:confetti', ({ enabled }) => {
         confettiEnabledRef.current = enabled;
       });
@@ -1311,6 +1379,16 @@ export function BackdropApp() {
       socket.on('event:customVariables', ({ variables }) => {
         customVariablesRef.current = variables;
       });
+      // Nối backdrop sang LayoutRenderer thật (2026-07-28) — Event active không được phát qua
+      // socket (chỉ có customVariables/layoutOverrides rời), nên fetch nguyên EventDocument
+      // (cần layoutRefs) qua kênh kernel:event:* đã có sẵn, dùng chung bởi control/eventStore.ts.
+      const refreshActiveEvent = () => {
+        window.sky.invoke('kernel:event:getCurrentActive').then((doc) => {
+          setActiveEvent(doc as EventDocument | null);
+        });
+      };
+      refreshActiveEvent();
+      socket.on('state:activeEventChanged', refreshActiveEvent);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (socket as any).on('event:ttsDelay', ({ delay }: { delay: number }) => {
         ttsDelayRef.current = delay;
@@ -1332,7 +1410,12 @@ export function BackdropApp() {
     };
   }, []);
 
-  const key = useMemo(() => onStage?.student_code ?? 'idle', [onStage]);
+  const key = useMemo(
+    () => `${onStage?.record.id ?? 'idle'}:${useLayoutRenderer ? activeLayoutRef!.ref.layoutId : 'old'}`,
+    [onStage, useLayoutRenderer, activeLayoutRef],
+  );
+  // Adapter TẠM cho BackdropView (hệ template cũ) — xem comment ở khai báo state onStage phía trên.
+  const onStageStudent = useMemo(() => (onStage ? canonicalToStudent(onStage.record, 0) : null), [onStage]);
 
   if (!ceremony) {
     return (
@@ -1343,7 +1426,7 @@ export function BackdropApp() {
   }
 
   return (
-    <div className="relative h-full w-full bg-black">
+    <div ref={rootRef} className="relative h-full w-full bg-black">
       <canvas
         ref={canvasRef}
         style={{
@@ -1365,15 +1448,33 @@ export function BackdropApp() {
           transition={{ duration: 0.15 }}
           className="h-full w-full"
         >
-          <BackdropView
-            student={onStage}
-            ceremony={ceremony}
-            layouts={layouts}
-            layoutOverrides={layoutOverrides}
-            resolveAsset={resolveAsset}
-            idle={!onStage}
-            aspectRatio={backdropAspectRatio}
-          />
+          {useLayoutRenderer ? (
+            <LayoutRenderer
+              content={layoutContent!}
+              screen={screenSize}
+              record={layoutRecord!}
+              resolveAsset={resolveAsset}
+              className="h-full w-full"
+            />
+          ) : onStage ? (
+            // Trao giải: KHÔNG khớp layoutRefs nào (hoặc Event chưa dùng hệ mới) → vẫn fallback
+            // BackdropView cũ, an toàn khi hành lễ (quyết định fallback #1, xem plan "Nối
+            // backdrop trao giải + màn chờ"). Phạm vi yêu cầu 2026-07-29 CHỈ áp dụng cho màn
+            // chờ (nhánh dưới), không đổi hành vi trao giải.
+            <BackdropView
+              student={onStageStudent}
+              ceremony={ceremony}
+              layouts={layouts}
+              layoutOverrides={layoutOverrides}
+              resolveAsset={resolveAsset}
+              idle={false}
+              aspectRatio={backdropAspectRatio}
+            />
+          ) : null /* Màn chờ: KHÔNG chọn layout nào ở Event → hiện màn ĐEN (nền bg-black của
+               root div phía dưới), TUYỆT ĐỐI không fallback text/ảnh cứng nào (2026-07-29,
+               phản hồi thật — "chỉ hiển thị từ layout-design đã chọn, không hard text"). Thao
+               tác viên cần vào Control > màn hình chờ để cấu hình (nút "Thiết kế màn hình chờ"
+               ở IdlePanel.tsx). */}
         </motion.div>
       </AnimatePresence>
     </div>

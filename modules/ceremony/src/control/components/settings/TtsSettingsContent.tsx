@@ -2,37 +2,23 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useControlStore } from '../../store';
 import { useSocketRef } from '../../SocketContext';
 import { useVoiceCatalog } from '../VoicePickerPopover';
-import { VoiceCloneModal } from '../VoiceCloneModal';
-import { type Student, type TtsCondition } from '@sky-app/slide-shared';
+import { VoiceCloneModal } from '@sky-app/voice-catalog-ui';
+import { usePlatform } from '../../PlatformContext';
+import type { TtsPort } from '@sky-app/service-contracts';
+import { type CanonicalRecord, type TtsCondition, flattenCanonicalRecord } from '@sky-app/slide-shared';
 import { ConfigColumn } from '../TtsModal/ConfigColumn';
 import { PregenColumn } from '../TtsModal/PregenColumn';
 import { useSlide } from '../../lib/slide';
 
 function getVoiceForStudentLocal(
-  student: Student,
+  record: CanonicalRecord,
   conditions: TtsCondition[],
   fallbackVoice: string
 ): string {
+  const flat = flattenCanonicalRecord(record);
   for (const cond of conditions) {
-    let studentVal = '';
-    const attr = cond.attr;
-    if (attr === 'Giới tính') {
-      studentVal = student.gender || '';
-    } else if (attr === 'Xếp loại') {
-      studentVal = student.classification || '';
-    } else if (attr === 'Ngành') {
-      studentVal = student.major_name || '';
-    } else if (attr === 'Khoa') {
-      studentVal = student.faculty_name || '';
-    } else if (attr === 'Lớp') {
-      studentVal = student.class_code || '';
-    } else if (attr === 'Khóa') {
-      studentVal = student.course_code || '';
-    } else if (attr === 'Họ tên') {
-      studentVal = student.full_name || '';
-    }
-
-    if (studentVal.trim().toLowerCase() === cond.val.trim().toLowerCase()) {
+    const recordVal = flat[cond.attr] ?? '';
+    if (recordVal.trim().toLowerCase() === cond.val.trim().toLowerCase()) {
       return cond.voice;
     }
   }
@@ -54,7 +40,25 @@ export function TtsSettingsContent() {
   const openSettingsModal = useControlStore((s) => s.openSettingsModal);
   const ttsVoicePool = useControlStore((s) => s.ttsVoicePool || ['vieneu-NF', 'vieneu-NM1']);
   const pregenStatus = useControlStore((s) => s.pregenStatus);
-  const students = useControlStore((s) => s.students);
+  const records = useControlStore((s) => s.records);
+  const platform = usePlatform();
+  const tts = platform?.services.get<TtsPort>('tts');
+  const refreshVoiceCatalog = useControlStore((s) => s.refreshVoiceCatalog);
+
+  const clonedVoices = useMemo(() => {
+    return VOICE_CATALOG
+      .filter((v) => v.origin === 'custom')
+      .map((v) => ({
+        id: v.id.replace(/^vieneu-/, ''),
+        name: v.name,
+        gender: v.gender,
+        language: v.language,
+        accent: v.accent,
+        category: v.category,
+        tags: v.tags,
+        type: 'cloned',
+      }));
+  }, [VOICE_CATALOG]);
 
   const [localModel, setLocalModel] = useState(ttsModel);
   const [localSpeed, setLocalSpeed] = useState(ttsSpeed);
@@ -133,7 +137,7 @@ export function TtsSettingsContent() {
   }, [localTemplate, ttsTemplate]);
 
 
-  const previewStudent = students[0] ?? null;
+  const previewRecord = records[0] ?? null;
 
   // --- Handlers lưu ngay lập tức ---
   const saveConditions = (conds: TtsCondition[]) => {
@@ -216,23 +220,11 @@ export function TtsSettingsContent() {
     saveConditions(updatedConditions);
   };
 
-  // --- Logic quản lý Điều kiện phân giọng ---
+  // --- Logic quản lý Điều kiện phân giọng — attr TỰ DO (giai đoạn "bỏ Student", 2026-07-22) ---
   const getUniqueValuesForAttr = (attr: string): string[] => {
-    if (attr === 'Giới tính') return ['Nam', 'Nữ'];
-    if (attr === 'Họ tên') return [];
-
-    const fieldMap: Record<string, keyof Student> = {
-      'Xếp loại': 'classification',
-      'Ngành': 'major_name',
-      'Khoa': 'faculty_name',
-      'Lớp': 'class_code',
-      'Khóa': 'course_code',
-    };
-    const field = fieldMap[attr];
-    if (!field) return [];
-
-    const vals = students
-      .map(s => String(s[field] || '').trim())
+    if (!attr) return [];
+    const vals = records
+      .map((r) => flattenCanonicalRecord(r)[attr]?.trim() || '')
       .filter(Boolean);
     return Array.from(new Set(vals)).sort();
   };
@@ -241,8 +233,8 @@ export function TtsSettingsContent() {
     const nextId = String(Date.now());
     const newCond: TtsCondition = {
       id: nextId,
-      attr: 'Giới tính',
-      val: 'Nữ',
+      attr: '',
+      val: '',
       voice: localVoicePool[0] || 'vieneu-NF',
     };
     const updated = [...localConditions, newCond];
@@ -293,19 +285,19 @@ export function TtsSettingsContent() {
     if (localModel && counts[localModel] === undefined) {
       counts[localModel] = 0;
     }
-    for (const s of students) {
+    for (const s of records) {
       const voice = getVoiceForStudentLocal(s, localConditions, localModel);
       counts[voice] = (counts[voice] || 0) + 1;
     }
     return Object.entries(counts).map(([vId, count]) => {
-      const label = VOICE_CATALOG.find(v => v.id === vId)?.label ?? vId;
+      const label = VOICE_CATALOG.find(v => v.id === vId)?.name ?? vId;
       return { id: vId, label, count };
     });
-  }, [students, localConditions, localModel, localVoicePool]);
+  }, [records, localConditions, localModel, localVoicePool]);
 
   // --- Thống kê tiến trình pregen ---
   const pgDone = pregenStatus?.done ?? 0;
-  const pgTotal = pregenStatus?.total ?? students.length;
+  const pgTotal = pregenStatus?.total ?? records.length;
   const pgFailed = pregenStatus?.failed ?? 0;
   const isStale = pregenStatus?.configChanged ?? false;
 
@@ -331,7 +323,7 @@ export function TtsSettingsContent() {
           }}
           localConditions={localConditions}
           hasConditions={localConditions.length > 0}
-          previewStudent={previewStudent}
+          previewRecord={previewRecord}
           getVoiceForStudent={getVoiceForStudentLocal}
           onOpenCloneModal={() => setShowCloneModal(true)}
           customVariables={customVariables}
@@ -348,7 +340,7 @@ export function TtsSettingsContent() {
           onAddVoiceToPool={handleAddVoiceToPool}
           onRemoveVoiceFromPool={handleRemoveVoiceFromPool}
           localConditions={localConditions}
-          students={students}
+          records={records}
           onUpdateCondition={handleUpdateCondition}
           onRemoveCondition={handleRemoveCondition}
           onMoveCondition={moveCondition}
@@ -373,7 +365,13 @@ export function TtsSettingsContent() {
           getVoiceForStudent={getVoiceForStudentLocal}
         />
       </div>
-      <VoiceCloneModal open={showCloneModal} onClose={() => setShowCloneModal(false)} />
+      <VoiceCloneModal
+        open={showCloneModal}
+        onClose={() => setShowCloneModal(false)}
+        ttsPort={tts}
+        onRefresh={refreshVoiceCatalog}
+        clonedVoices={clonedVoices}
+      />
     </>
   );
 }

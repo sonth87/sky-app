@@ -41,7 +41,11 @@ describe('TtsStudioApp — render bình thường khi có service tts', () => {
     expect(screen.getByText('Các bản ghi gần đây')).toBeInTheDocument();
   });
 
-  it('hiện lỗi khi listVoices() reject', async () => {
+  it('hiện lỗi khi listVoices() reject liên tục (hết số lần retry)', async () => {
+    // TtsStudioApp retry listVoices() tới 20 lần, tổng ~28s (xem comment "Bug thật #2" ở component)
+    // trước khi hiện lỗi thật — vượt quá timeout mặc định 1000ms của findByText, nên phải nâng
+    // timeout thay vì chờ giả (component dùng setTimeout thường, không phải Promise chờ tick đơn
+    // giản để fake timers advance gọn).
     const platform = createMockPlatformContext();
     platform.services.register(
       'tts',
@@ -50,6 +54,6 @@ describe('TtsStudioApp — render bình thường khi có service tts', () => {
 
     render(<TtsStudioApp appId="tts-studio" windowId="w1" platform={platform} isActive />);
 
-    expect(await screen.findByText(/network down/)).toBeInTheDocument();
-  });
+    expect(await screen.findByText(/network down/, {}, { timeout: 30000 })).toBeInTheDocument();
+  }, 32000);
 });

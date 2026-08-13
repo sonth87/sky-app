@@ -1,43 +1,76 @@
 # Sky-App
 
-> **Nền tảng multi-app đa môi trường** — một "desktop OS" chạy được cả **Web** lẫn **Electron**, **online + offline**, nơi mỗi ứng dụng (Ceremony, TTS Studio, ...) là một **app con** cắm vào theo một contract chung. Giao diện dùng [`device-layout`](https://github.com/sonth87/device-layout) để visualize cửa sổ/dock/menubar kiểu desktop.
+> **Multi-app, multi-environment platform** — a "desktop OS" that runs on both **Web** and **Electron**, **online + offline**, where each application (Ceremony, TTS Studio, ...) is a **sub-app** plugged in through a shared contract. The UI uses [`device-layout`](https://github.com/sonth87/device-layout) to visualize windows/dock/menubar like a desktop.
 
-**Trạng thái:** 🟡 Thiết kế kiến trúc — **chưa triển khai code**. Toàn bộ hiện có là tài liệu định hướng trong [`docs/`](./docs/).
+**Status:** 🟢 Active development. The platform shell, Ceremony + TTS Studio sub-apps, licensing, and the SQLite storage foundation are implemented. Architecture and roadmap docs live in [`docs/`](./docs/); an in-progress feature (layout-designer + Event) is planned in [`docs/roadmap/plans/layout-designer/`](./docs/roadmap/plans/layout-designer/).
 
 ---
 
-## Đọc gì đầu tiên?
+## What to read first?
 
-| Bạn là... | Đọc |
+| You are... | Read |
 |---|---|
-| 🤖 **AI agent** (Claude, ...) | [`AGENTS.md`](./AGENTS.md) — quy định bắt buộc TRƯỚC KHI làm bất cứ việc gì |
-| 🧭 **Người mới / muốn hiểu tổng thể** | [`docs/README.md`](./docs/README.md) — bản đồ điều hướng toàn bộ tài liệu |
-| 🏛️ **Muốn hiểu kiến trúc** | [`docs/architecture/overview.md`](./docs/architecture/overview.md) |
-| 🧩 **Muốn thêm 1 app con** | [`docs/guides/adding-an-app.md`](./docs/guides/adding-an-app.md) |
-| 🔧 **Dev đang code** | [`docs/dev/`](./docs/dev/) — versioning, changelog, quy tắc code |
+| 🤖 **AI agent** (Claude, ...) | [`AGENTS.md`](./AGENTS.md) — mandatory rules BEFORE doing anything |
+| 🧭 **New here / want the big picture** | [`docs/README.md`](./docs/README.md) — navigation map for all documentation |
+| 🏛️ **Want to understand the architecture** | [`docs/architecture/overview.md`](./docs/architecture/overview.md) |
+| 🧩 **Want to add a sub-app** | [`docs/guides/adding-an-app.md`](./docs/guides/adding-an-app.md) |
+| 🔧 **Dev actively coding** | [`docs/dev/`](./docs/dev/) — versioning, changelog, code conventions |
 
 ---
 
-## Là gì / không là gì
+## What it is / isn't
 
-**LÀ:** một shell/nền tảng chứa nhiều app + service dùng chung, tách môi trường bằng **ports & adapters** (1 codebase → 2 runtime Web/Electron), có **license/entitlement** gating theo app/feature.
+**IS:** a shell/platform hosting multiple shared apps + services, separating environments via **ports & adapters** (1 codebase → 2 runtimes Web/Electron), with **license/entitlement** gating per app/feature.
 
-**KHÔNG LÀ:** một ứng dụng đơn. Ceremony (module tổ chức sự kiện, port từ dự án Slide gốc) chỉ là **app con đầu tiên** được migrate sang, không phải toàn bộ dự án.
+**IS NOT:** a single application. Ceremony (event-organization module, ported from the original Slide project) is only the **first sub-app** migrated over, not the whole project.
 
-## Nguồn gốc
+## Origin
 
-Sky-App là bước tiến hóa của định hướng multi-app từ dự án `trao-bang-tot-nghiep-2026` (xem `docs/multi-verse.md` bên repo đó). App Ceremony (nghiệp vụ tổ chức sự kiện/lễ — không gắn tên cụ thể "trao bằng" nữa, vì nền tảng dùng chung cho nhiều loại tổ chức) + TTS được migrate sang đây làm các app con đầu tiên.
+Sky-App is the evolution of the multi-app direction from the `trao-bang-tot-nghiep-2026` project (see `docs/multi-verse.md` in that repo). The Ceremony app (event/ceremony organization — no longer tied to the specific "graduation ceremony" name, since the platform is shared across many organization types) + TTS were migrated here as the first sub-apps.
 
 ## Tech stack
 
 React 19 · TypeScript · Tailwind v4 · shadcn/ui · TanStack Query · Zustand · Electron · Vite / electron-vite · pnpm workspace + Turborepo · Changesets.
 
-## Cấu trúc (dự kiến — chưa scaffold code)
+## Structure
 
 ```
 apps/       shell-electron, shell-web, tts-service
 packages/   kernel, platform-electron, platform-web, device-shell, ui,
             service-contracts, licensing, build-config
-modules/    ceremony, ceremony-backdrop, tts-studio   (các app con)
-docs/       tài liệu (xem docs/README.md)
+modules/    ceremony, ceremony-backdrop, tts-studio   (sub-apps)
+docs/       documentation (see docs/README.md)
 ```
+
+## Adding a license key (dev/local)
+
+Any sub-app that declares an `entitlement` (e.g. Ceremony) will be **hidden from the dock** if
+the machine doesn't have a valid license. Full details (model, how to issue a real license,
+security limits): see
+[`docs/guides/licensing-entitlement.md`](./docs/guides/licensing-entitlement.md).
+
+**1. Generate a dev license key** (run from the repo root):
+
+```bash
+node scripts/gen-dev-license.mjs app.ceremony
+# multiple entitlements at once:
+node scripts/gen-dev-license.mjs app.ceremony feature.ceremony.voice-clone
+```
+
+This prints a license key string, signed with a fixed DEV private key baked into the script —
+**do not use this to issue real licenses to customers**.
+
+**2. Load the key wherever the running shell reads it from:**
+
+- **Web** (`shell-web`) — open the DevTools console on the running app page and run:
+  ```js
+  localStorage.setItem('sky-app-license', '<key printed above>')
+  ```
+  then reload the page.
+
+- **Electron** (`shell-electron`) — write the `userData/license.key` file via IPC from the
+  renderer's DevTools console:
+  ```js
+  await window.sky.invoke('kernel:license:write', '<key printed above>')
+  ```
+  then reload the window.

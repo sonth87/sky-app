@@ -1,7 +1,7 @@
 import { type RefObject } from 'react';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { getStatusLabel } from '@sky-app/slide-shared';
+import { getStatusLabel, flattenCanonicalRecord, type CanonicalRecord, type RecordRuntimeState } from '@sky-app/slide-shared';
 import { resolveAsset } from '../../../lib/assets';
 import { CopyButton } from './CopyButton';
 
@@ -16,7 +16,8 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> =
 
 interface StudentDetailPopoverProps {
   popoverRef: RefObject<HTMLDivElement | null>;
-  student: any;
+  student: CanonicalRecord;
+  status: RecordRuntimeState['status'];
   displayOrderFallback: number;
   pos: { x: number; y: number };
   mode: 'card' | 'table';
@@ -26,7 +27,8 @@ interface StudentDetailPopoverProps {
 
 export function StudentDetailPopover({
   popoverRef,
-  student,
+  student: record,
+  status,
   displayOrderFallback,
   pos,
   mode,
@@ -36,6 +38,7 @@ export function StudentDetailPopover({
   const { t } = useTranslation();
   const popoverWidth = 440;
   const popoverHeight = 380;
+  const flat = flattenCanonicalRecord(record);
 
   const left =
     pos.x + popoverWidth > window.innerWidth
@@ -47,15 +50,24 @@ export function StudentDetailPopover({
       ? Math.max(16, window.innerHeight - popoverHeight - 16)
       : Math.max(16, pos.y);
 
-  const statusColor = STATUS_COLORS[student.status] || {
+  const statusColor = STATUS_COLORS[status] || {
     bg: 'bg-muted',
     text: 'text-foreground',
     dot: 'bg-muted-foreground',
   };
 
-  const dob = student.date_of_birth
-    ? new Date(student.date_of_birth).toLocaleDateString('vi-VN')
+  const dob = record.dateOfBirth
+    ? new Date(record.dateOfBirth).toLocaleDateString('vi-VN')
     : '—';
+
+  const majorName = flat.major_name;
+  const facultyName = flat.faculty_name;
+  const classCode = flat.class_code;
+  const courseCode = flat.course_code;
+  const classification = flat.classification;
+  const gpa = flat.gpa;
+  const achievementTitle = flat.achievement_title;
+  const awardContent = flat.award_content;
 
   return (
     <div
@@ -83,10 +95,10 @@ export function StudentDetailPopover({
         <>
           {/* Thông tin chính */}
           <div className="flex gap-4">
-            {student.image_relative_path ? (
+            {record.image_relative_path ? (
               <img
-                src={resolveAsset(student.image_relative_path)}
-                alt={student.full_name}
+                src={resolveAsset(record.image_relative_path)}
+                alt={record.full_name}
                 className="h-28 w-20 flex-shrink-0 rounded-lg border border-border bg-muted object-cover shadow-sm"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).style.display = 'none';
@@ -100,15 +112,15 @@ export function StudentDetailPopover({
 
             <div className="flex-1 min-w-0 pt-1">
               <div className="text-xs font-bold text-info uppercase tracking-wide">
-                {t('studentDetailPopover.orderNumber')}: {student.display_order || displayOrderFallback}
+                {t('studentDetailPopover.orderNumber')}: {record.displayOrder || displayOrderFallback}
               </div>
               <div className="text-lg font-bold text-foreground leading-tight mt-0.5 flex items-center group">
-                <span>{student.full_name}</span>
-                <CopyButton text={student.full_name} label={t('studentDetailPopover.fieldLabels.fullName')} />
+                <span>{record.full_name}</span>
+                <CopyButton text={record.full_name} label={t('studentDetailPopover.fieldLabels.fullName')} />
               </div>
               <div className="font-mono text-xs font-semibold text-muted-foreground mt-1 flex items-center group">
-                <span>{t('studentDetailPopover.studentCodePrefix')}: {student.student_code}</span>
-                <CopyButton text={student.student_code} label={t('studentDetailPopover.fieldLabels.studentCode')} />
+                <span>{t('studentDetailPopover.studentCodePrefix')}: {record.identifierCode ?? record.id}</span>
+                <CopyButton text={record.identifierCode ?? record.id} label={t('studentDetailPopover.fieldLabels.studentCode')} />
               </div>
 
               {/* Badge trạng thái */}
@@ -116,7 +128,7 @@ export function StudentDetailPopover({
                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold mt-2.5 ${statusColor.bg} ${statusColor.text}`}
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${statusColor.dot}`} />
-                {getStatusLabel(student.status)}
+                {getStatusLabel(status)}
               </span>
             </div>
           </div>
@@ -129,12 +141,12 @@ export function StudentDetailPopover({
               </span>
               <div className="flex items-center">
                 <span className="font-semibold text-foreground font-medium">
-                  {student.class_code || '—'}
-                  {student.course_code ? ` (${student.course_code})` : ''}
+                  {classCode || '—'}
+                  {courseCode ? ` (${courseCode})` : ''}
                 </span>
-                {(student.class_code || student.course_code) && (
+                {(classCode || courseCode) && (
                   <CopyButton
-                    text={`${student.class_code || ''}${student.course_code ? ` (${student.course_code})` : ''}`}
+                    text={`${classCode || ''}${courseCode ? ` (${courseCode})` : ''}`}
                     label={t('studentDetailPopover.fieldLabels.classCode')}
                   />
                 )}
@@ -147,11 +159,11 @@ export function StudentDetailPopover({
               </span>
               <div className="flex items-center">
                 <span className="font-semibold text-foreground font-medium">
-                  {student.classification || '—'} / {student.gpa || '—'}
+                  {classification || '—'} / {gpa || '—'}
                 </span>
-                {(student.classification || student.gpa) && (
+                {(classification || gpa) && (
                   <CopyButton
-                    text={`${student.classification || ''} / ${student.gpa || ''}`}
+                    text={`${classification || ''} / ${gpa || ''}`}
                     label={t('studentDetailPopover.fieldLabels.classificationGpa')}
                   />
                 )}
@@ -164,9 +176,9 @@ export function StudentDetailPopover({
               </span>
               <div className="flex items-center">
                 <span className="font-semibold text-foreground font-medium">
-                  {student.major_name || '—'}
+                  {majorName || '—'}
                 </span>
-                {student.major_name && <CopyButton text={student.major_name} label={t('studentDetailPopover.fieldLabels.majorName')} />}
+                {majorName && <CopyButton text={majorName} label={t('studentDetailPopover.fieldLabels.majorName')} />}
               </div>
             </div>
 
@@ -176,9 +188,9 @@ export function StudentDetailPopover({
               </span>
               <div className="flex items-center">
                 <span className="font-semibold text-foreground font-medium">
-                  {student.faculty_name || '—'}
+                  {facultyName || '—'}
                 </span>
-                {student.faculty_name && <CopyButton text={student.faculty_name} label={t('studentDetailPopover.fieldLabels.facultyName')} />}
+                {facultyName && <CopyButton text={facultyName} label={t('studentDetailPopover.fieldLabels.facultyName')} />}
               </div>
             </div>
 
@@ -188,7 +200,7 @@ export function StudentDetailPopover({
               </span>
               <div className="flex items-center">
                 <span className="font-semibold text-foreground font-medium">{dob}</span>
-                {student.date_of_birth && <CopyButton text={dob} label={t('studentDetailPopover.fieldLabels.dateOfBirth')} />}
+                {record.dateOfBirth && <CopyButton text={dob} label={t('studentDetailPopover.fieldLabels.dateOfBirth')} />}
               </div>
             </div>
 
@@ -198,38 +210,38 @@ export function StudentDetailPopover({
               </span>
               <div className="flex items-center">
                 <span className="font-semibold text-foreground font-medium font-mono">
-                  {student.phone_number || '—'}
+                  {record.phone || '—'}
                 </span>
-                {student.phone_number && (
-                  <CopyButton text={student.phone_number} label={t('studentDetailPopover.fieldLabels.phoneNumber')} />
+                {record.phone && (
+                  <CopyButton text={record.phone} label={t('studentDetailPopover.fieldLabels.phoneNumber')} />
                 )}
               </div>
             </div>
 
-            {student.achievement_title && student.achievement_title !== 'Khong' && (
+            {achievementTitle && achievementTitle !== 'Khong' && (
               <div className="col-span-2 group">
                 <span className="block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t('studentDetailPopover.fieldLabels.achievementTitle')}
                 </span>
                 <div className="flex items-center">
                   <span className="font-semibold text-foreground font-medium">
-                    {student.achievement_title}
+                    {achievementTitle}
                   </span>
-                  <CopyButton text={student.achievement_title} label={t('studentDetailPopover.fieldLabels.achievementTitle')} />
+                  <CopyButton text={achievementTitle} label={t('studentDetailPopover.fieldLabels.achievementTitle')} />
                 </div>
               </div>
             )}
 
-            {student.award_content && student.award_content !== 'Khong' && (
+            {awardContent && awardContent !== 'Khong' && (
               <div className="col-span-2 group">
                 <span className="block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t('studentDetailPopover.fieldLabels.awardContent')}
                 </span>
                 <div className="flex items-center mt-0.5">
                   <span className="font-semibold text-primary bg-primary/50 px-2 py-1 rounded border border-primary/50 block flex-1 font-medium">
-                    {student.award_content}
+                    {awardContent}
                   </span>
-                  <CopyButton text={student.award_content} label={t('studentDetailPopover.fieldLabels.awardContent')} />
+                  <CopyButton text={awardContent} label={t('studentDetailPopover.fieldLabels.awardContent')} />
                 </div>
               </div>
             )}
@@ -240,7 +252,7 @@ export function StudentDetailPopover({
           {/* Tiêu đề cho view bảng */}
           <div className="border-b border-border pb-2 mb-3 pr-20">
             <span className="text-base font-bold text-foreground leading-tight block truncate">
-              {student.full_name}
+              {record.full_name}
             </span>
           </div>
 
@@ -254,12 +266,10 @@ export function StudentDetailPopover({
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(student).map(([key, val]) => {
+                {Object.entries(flat).map(([key, val]) => {
                   let displayVal = '';
                   if (val === null || val === undefined) {
                     displayVal = 'null';
-                  } else if (typeof val === 'object') {
-                    displayVal = JSON.stringify(val);
                   } else if (typeof val === 'string' && val.length > 100) {
                     if (key.includes('base64') || val.startsWith('data:image')) {
                       displayVal = t('studentDetailPopover.base64ImageData', { size: Math.round(val.length / 1024) });
@@ -270,10 +280,7 @@ export function StudentDetailPopover({
                     displayVal = String(val);
                   }
 
-                  const copyVal =
-                    typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean'
-                      ? String(val)
-                      : JSON.stringify(val);
+                  const copyVal = String(val);
 
                   return (
                     <tr key={key} className="hover:bg-card border-b border-border transition-colors">

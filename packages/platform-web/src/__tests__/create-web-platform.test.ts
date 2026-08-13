@@ -111,10 +111,13 @@ describe('TtsPort (web)', () => {
   });
 
   it('speak() dùng speaker_id/speed mặc định khi không truyền opts', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => null },
-      arrayBuffer: async () => new ArrayBuffer(0),
+    const fetchMock = vi.fn().mockImplementation((url) => {
+      if (url.includes('/health')) return Promise.resolve({ ok: false });
+      return Promise.resolve({
+        ok: true,
+        headers: { get: () => null },
+        arrayBuffer: async () => new ArrayBuffer(0),
+      });
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -122,8 +125,15 @@ describe('TtsPort (web)', () => {
     const tts = platform.services.get<{ speak: (t: string) => Promise<void> }>('tts')!;
     await expect(tts.speak('hello')).rejects.toThrow('Empty PCM buffer');
 
-    const body = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body);
-    expect(body).toEqual({ text: 'hello', speaker_id: 'NF', speed: 1.0, temperature: undefined });
+    const targetCall = fetchMock.mock.calls.find(call => !call[0].includes('/health'));
+    expect(targetCall).toBeDefined();
+    const body = JSON.parse((targetCall![1] as { body: string }).body);
+    // Giọng mặc định đổi từ 'NF' sang 'clone-d0f05071' (Giang) khi 'NF' bị xoá khỏi
+    // voice-registry.json 2026-08-04 — test này còn assert giá trị cũ nên đỏ từ trước.
+    expect(body).toEqual({
+      text: 'hello', speaker_id: 'clone-d0f05071', speed: 1.0,
+      temperature: undefined, engine_overrides: undefined,
+    });
   });
 
   it('speak() throw khi server trả lỗi', async () => {
@@ -184,10 +194,13 @@ describe('TtsPort (web)', () => {
     // hiện điều khiển các giá trị này qua PUT /config (global), không qua speak()
     // per-request. Nếu tương lai cần override per-request từ web, phải mở rộng
     // SpeakOptions trước — test này sẽ FAIL và nhắc cập nhật adapter khi đó.
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => null },
-      arrayBuffer: async () => new ArrayBuffer(0),
+    const fetchMock = vi.fn().mockImplementation((url) => {
+      if (url.includes('/health')) return Promise.resolve({ ok: false });
+      return Promise.resolve({
+        ok: true,
+        headers: { get: () => null },
+        arrayBuffer: async () => new ArrayBuffer(0),
+      });
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -202,7 +215,9 @@ describe('TtsPort (web)', () => {
       top_p: 0.9,
     }).catch(() => {});
 
-    const body = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body);
+    const targetCall = fetchMock.mock.calls.find(call => !call[0].includes('/health'));
+    expect(targetCall).toBeDefined();
+    const body = JSON.parse((targetCall![1] as { body: string }).body);
     expect(body).toEqual({ text: 'test', speaker_id: 'NF', speed: 1.0, temperature: undefined });
     expect(body).not.toHaveProperty('word_gap');
     expect(body).not.toHaveProperty('top_k');
@@ -224,9 +239,12 @@ describe('TtsPort (web)', () => {
     const voices = await tts.listVoices();
 
     expect(fetchMock).toHaveBeenCalledWith('http://localhost:9999/voices');
+    // `language` là NGÔN NGỮ, suy từ `source_lang` (thiếu → "Vietnamese"), KHÔNG phải
+    // `region` ('Bắc'/'Nam' là nhãn vùng miền). Test còn assert hành vi cũ đã sửa
+    // 2026-08-04 nên đỏ từ trước — xem languageFromSourceLang's docstring.
     expect(voices).toEqual([
-      { id: 'NF', name: 'Lan Anh', language: 'Bắc', gender: 'female' },
-      { id: 'SM', name: 'Gia Huy', language: 'Nam', gender: 'male' },
+      expect.objectContaining({ id: 'NF', name: 'Lan Anh', language: 'Vietnamese', gender: 'female' }),
+      expect.objectContaining({ id: 'SM', name: 'Gia Huy', language: 'Vietnamese', gender: 'male' }),
     ]);
   });
 
@@ -268,7 +286,10 @@ describe('TtsPort (web)', () => {
   });
 
   it('getPreviewUrl() trả URL /preview/<voiceId> không cần fetch', async () => {
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn().mockImplementation((url) => {
+      if (url.includes('/health')) return Promise.resolve({ ok: false });
+      return Promise.resolve({ ok: true });
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const platform = await createWebPlatform({ ttsBaseUrl: 'http://localhost:9999' });
@@ -276,7 +297,7 @@ describe('TtsPort (web)', () => {
     const url = await tts.getPreviewUrl('NF');
 
     expect(url).toBe('http://localhost:9999/preview/NF');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(call => !call[0].includes('/health')).length).toBe(0);
   });
 });
 

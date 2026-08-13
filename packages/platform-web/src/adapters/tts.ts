@@ -1,10 +1,19 @@
-import type { SpeakOptions, SynthesizeResult, TtsPort, Voice } from '@sky-app/service-contracts';
+import { languageFromSourceLang, type EffectTypeInfo, type SpeakOptions, type SynthesizeResult, type TtsPort, type Voice, type VoiceCatalogEntry } from '@sky-app/service-contracts';
 
 interface RawVoice {
   id: string;
   label: string;
   region?: string;
   gender?: string;
+  type?: string;
+  accent?: string;
+  category?: string[];
+  tags?: string[];
+  tagline?: string;
+  description?: string;
+  source_catalog_id?: string;
+  /** vd "vi-VN"/"en-US" — xem languageFromSourceLang. */
+  source_lang?: string;
 }
 
 let audioCtx: AudioContext | null = null;
@@ -60,9 +69,15 @@ async function fetchSynthesize(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       text,
-      speaker_id: opts?.voiceId ?? 'NF',
+      // 'NF' (giọng placeholder cũ) đã bị xoá khỏi voice-registry.json 2026-08-04 — Giang
+      // (clone-d0f05071) là giọng mặc định mới khi voiceId trống.
+      speaker_id: opts?.voiceId ?? 'clone-d0f05071',
       speed: opts?.speed ?? 1.0,
       temperature: opts?.temperature,
+      engine_overrides: opts?.engine_overrides,
+      // Chỉ gửi khi có — server phân biệt "không dùng hiệu ứng" (vắng mặt/rỗng) và bỏ qua
+      // hẳn bước áp dụng, không phải dựng một pedalboard rỗng cho mỗi request.
+      ...(opts?.effectsChain?.length ? { effects_chain: opts.effectsChain } : {}),
     }),
   });
   if (!res.ok) throw new Error(`TTS synthesize failed: ${res.status} ${await res.text()}`);
@@ -90,7 +105,19 @@ export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
       const res = await fetch(`${baseUrl}/voices`);
       if (!res.ok) throw new Error(`TTS listVoices failed: ${res.status}`);
       const raw = (await res.json()) as RawVoice[];
-      return raw.map((v): Voice => ({ id: v.id, name: v.label, language: v.region, gender: v.gender }));
+      return raw.map((v): Voice => ({
+        id: v.id,
+        name: v.label,
+        language: languageFromSourceLang(v.source_lang),
+        gender: v.gender,
+        type: v.type,
+        accent: v.accent,
+        category: v.category,
+        tags: v.tags,
+        tagline: v.tagline,
+        description: v.description,
+        sourceCatalogId: v.source_catalog_id,
+      }));
     },
 
     async synthesizeBuffer(text, opts) {
@@ -99,6 +126,116 @@ export function createWebTtsPort(baseUrl = 'http://localhost:8093'): TtsPort {
 
     async getPreviewUrl(voiceId) {
       return `${baseUrl}/preview/${voiceId}`;
+    },
+
+    async listVoiceCatalog(lang) {
+      const url = lang ? `${baseUrl}/voices/catalog?lang=${encodeURIComponent(lang)}` : `${baseUrl}/voices/catalog`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`TTS listVoiceCatalog failed: ${res.status}`);
+      return (await res.json()) as VoiceCatalogEntry[];
+    },
+
+    async getCatalogAudioUrl(lang, entryId) {
+      return `${baseUrl}/voices/catalog/${encodeURIComponent(lang)}/${encodeURIComponent(entryId)}/audio`;
+    },
+
+    async cloneVoice(opts) {
+      const formData = new FormData();
+      for (const s of opts.samples) {
+        if (!(s.filePath instanceof File)) {
+          throw new Error('Web cloneVoice requires File objects');
+        }
+        formData.append('files', s.filePath);
+        // Cùng số lượng và THỨ TỰ với 'files' — server gom theo tên field lặp lại, khớp vị
+        // trí. Luôn gửi (kể cả rỗng) — server quyết định bắt buộc hay không theo engine.
+        formData.append('ref_texts', s.refText ?? '');
+      }
+      formData.append('label', opts.label);
+      formData.append('gender', opts.gender);
+      formData.append('region', opts.region);
+      if (opts.age) formData.append('age', opts.age);
+      if (opts.language) formData.append('language', opts.language);
+      if (opts.tagline) formData.append('tagline', opts.tagline);
+      if (opts.description) formData.append('description', opts.description);
+      if (opts.tags) {
+        opts.tags.forEach(tag => formData.append('tags', tag));
+      }
+
+      const res = await fetch(`${baseUrl}/voices/clone`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        // Body của FastAPI mang thông báo đọc được (vd "cần bản chép lời của audio
+        // mẫu"); statusText chỉ là "Bad Request", vô dụng với người dùng.
+        return { ok: false, error: (await res.text()) || `TTS clone failed: ${res.statusText}` };
+      }
+      const voice = await res.json();
+      return { ok: true, voice };
+    },
+
+    async addVoiceSample(voiceId, filePath, refText) {
+      if (!(filePath instanceof File)) {
+        throw new Error('Web addVoiceSample requires a File object');
+      }
+      const formData = new FormData();
+      formData.append('file', filePath);
+      formData.append('ref_text', refText ?? '');
+
+      const res = await fetch(`${baseUrl}/voices/${encodeURIComponent(voiceId)}/samples`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        return { ok: false, error: (await res.text()) || `TTS add sample failed: ${res.statusText}` };
+      }
+      return { ok: true, sample: await res.json() };
+    },
+
+    async deleteVoiceSample(voiceId, sampleId) {
+      const res = await fetch(
+        `${baseUrl}/voices/${encodeURIComponent(voiceId)}/samples/${encodeURIComponent(sampleId)}`,
+        { method: 'DELETE' },
+      );
+      if (!res.ok) {
+        return { ok: false, error: (await res.text()) || `TTS delete sample failed: ${res.statusText}` };
+      }
+      return { ok: true };
+    },
+
+    async listVoiceSamples(voiceId) {
+      const res = await fetch(`${baseUrl}/voices/${encodeURIComponent(voiceId)}/samples`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+
+    async listEffectTypes() {
+      const res = await fetch(`${baseUrl}/effects`);
+      if (!res.ok) return [];
+      const data = (await res.json()) as { available?: boolean; effects?: EffectTypeInfo[] };
+      return data.available ? (data.effects ?? []) : [];
+    },
+
+    async updateVoiceRefText(voiceId, refText) {
+      const res = await fetch(`${baseUrl}/voices/${encodeURIComponent(voiceId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref_text: refText }),
+      });
+      if (!res.ok) {
+        return { ok: false, error: (await res.text()) || `TTS update failed: ${res.statusText}` };
+      }
+      return { ok: true };
+    },
+
+    async deleteVoice(voiceId) {
+      const res = await fetch(`${baseUrl}/voices/${encodeURIComponent(voiceId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        return { ok: false, error: `TTS delete failed: ${res.statusText}` };
+      }
+      return { ok: true };
     },
   };
 }

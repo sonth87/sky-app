@@ -1,14 +1,12 @@
-import { ipcMain, dialog, app } from 'electron';
-import { rmSync, existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, readdirSync, createWriteStream, statSync } from 'node:fs';
+import { ipcMain, dialog, app, shell } from 'electron';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, readdirSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join, basename } from 'node:path';
-import type { ZipArchive as ZipArchiveType } from 'archiver';
 import { ceremonyStore } from './data/store';
-import { syncBundle, commitImport, cancelImport, isIoBusy } from './data/sync';
-import { ceremonyDataDir, autoPlayJsonPath, piperBinPath, piperModelPath, ttsPregenWavPath, ttsPregenDir, PHOTO_DIR_NAMES, ttsPregenManifestPath, vieneuDir, resolveLocalAsset } from './data/paths';
+import { ceremonyDataDir, autoPlayJsonPath, piperBinPath, piperModelPath, ttsPregenWavPath, ttsPregenDir, ttsPregenManifestPath, vieneuDir } from './data/paths';
 import { runVieneu, warmupVieneu } from './vieneu-tts';
 import { synthesizeTtsStudio } from './tts-studio';
-import { getTtsDebugInfo, getPythonStatus, getPythonPort, stopPythonServer, startPythonServer, getPythonPath } from './python-server';
+import { getTtsDebugInfo, getPythonStatus, getPythonPort, stopPythonServer, startPythonServer, getPythonPath, getRecentLogLines } from './python-server';
 import { PreGenQueue } from './pregen-queue';
 import type { PreGenStatus, ManifestEntry } from './pregen-queue';
 import {
@@ -21,17 +19,34 @@ import {
   openBackdropWindow,
   setBackdropFullscreen,
 } from './windows';
-import { getIO, getUseSampleData, setUseSampleData, getTtsPregenConfig, getApiEnvironment, setApiEnvironment, getApiIntegrations, setApiIntegrations, hasDefaultApiIntegrations, resetApiIntegrationsToDefault, getBackdropAspectRatio } from './socket-server';
+import { getIO, getTtsPregenConfig, getApiEnvironment, setApiEnvironment, getApiIntegrations, setApiIntegrations, hasDefaultApiIntegrations, resetApiIntegrationsToDefault, getBackdropAspectRatio } from './socket-server';
 import { sessionStore } from './session-store';
 import { apiLogger } from './api-logger';
 import { setAppMenu, refreshAppMenu, type MenuLanguage } from './menu';
 import { readCurrentState as readCurrentRendererState, getPendingUpdateInfo } from './renderer-updater';
+import { getCurrentActiveEvent } from '@sky-app/app-db/node';
 
 /** Báo cho Control biết trạng thái Backdrop (mở/đóng) đã thay đổi */
 export function notifyBackdropState() {
   const open = isBackdropOpen();
   const fullscreen = open ? (getBackdropWindow()?.isKiosk() || getBackdropWindow()?.isFullScreen() || false) : false;
   getMainWindow()?.webContents.send('backdrop:state', { open, fullscreen });
+}
+
+/**
+ * Tần số lấy mẫu đọc từ header của 1 file WAV chuẩn (PCM 44 byte): UInt32LE tại offset 24.
+ *
+ * Cần vì file WAV đã cache trên đĩa có thể do BẤT KỲ engine nào sinh ra ở lần chạy trước —
+ * Qwen xuất 24kHz, VieNeu/MOSS 48kHz. Đọc từ chính file là cách duy nhất luôn đúng, kể cả
+ * với file đã tồn tại từ bản app cũ (trước khi manifest ghi thêm tần số).
+ *
+ * Trả 48000 nếu buffer quá ngắn hoặc giá trị đọc được vô lý — mọi file sinh trước 2026-08-11
+ * đều là 48kHz nên đó là phỏng đoán an toàn nhất.
+ */
+function readWavSampleRate(wav: Buffer): number {
+  if (wav.length < 28) return 48000;
+  const sr = wav.readUInt32LE(24);
+  return sr >= 8000 && sr <= 192000 ? sr : 48000;
 }
 
 function runPiper(text: string, modelName?: string, speed?: number): Promise<{ ok: boolean; buffer?: Buffer; error?: string }> {
@@ -102,225 +117,19 @@ function runPiper(text: string, modelName?: string, speed?: number): Promise<{ o
 export function registerIpcHandlers() {
   // Broadcast full state để Control/Backdrop cập nhật sau khi dữ liệu đổi.
   function broadcastFullState() {
+    const session = sessionStore.get();
+    const toData = (id: string | null) => {
+      if (!id) return null;
+      const record = ceremonyStore.findById(id);
+      if (!record) return null;
+      return { record, runtimeState: ceremonyStore.getRuntimeState(record.id) };
+    };
     getIO()?.emit('state:full', {
-      session: sessionStore.get(),
-      onStage: sessionStore.get().current_on_stage_msv
-        ? (ceremonyStore.findByMsv(sessionStore.get().current_on_stage_msv!) ?? null)
-        : null,
-      pending: sessionStore.get().pending_msv
-        ? (ceremonyStore.findByMsv(sessionStore.get().pending_msv!) ?? null)
-        : null,
+      session,
+      onStage: toData(session.current_on_stage_id),
+      pending: toData(session.pending_id),
     });
   }
-
-  // Làm mới / import dữ liệu — push progress qua event data:progress về renderer.
-  // Import file local trả pendingConfirm (chưa commit) → KHÔNG broadcast tới khi confirm.
-  ipcMain.handle('data:sync', async (e, payload?: { url?: string; zipPath?: string }) => {
-    const result = await syncBundle(payload, (p) => {
-      e.sender.send('data:progress', p);
-    });
-    if (!result.pendingConfirm) {
-      broadcastFullState();
-    }
-    return result;
-  });
-
-  // Bước 2 của import: user đã xác nhận preview → commit staging vào ceremony-data.
-  ipcMain.handle('data:confirmImport', async (e) => {
-    const result = commitImport((p) => e.sender.send('data:progress', p));
-    if (result.ok) broadcastFullState();
-    return result;
-  });
-
-  // Huỷ import đang chờ xác nhận → dọn staging.
-  ipcMain.handle('data:cancelImport', () => {
-    cancelImport();
-    return { ok: true };
-  });
-
-  // Lấy kích thước file (để renderer cảnh báo trước khi import).
-  ipcMain.handle('data:statFile', (_e, filePath: string) => {
-    try {
-      return { size: statSync(filePath).size };
-    } catch {
-      return { size: 0 };
-    }
-  });
-
-  // Mở dialog chọn file ZIP để import
-  ipcMain.handle('data:openFile', async () => {
-    const win = getMainWindow();
-    const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined!, {
-      title: 'Chọn file bundle (.zip)',
-      filters: [{ name: 'Bundle ZIP', extensions: ['zip'] }],
-      properties: ['openFile'],
-    });
-    if (canceled || filePaths.length === 0) return null;
-    return filePaths[0];
-  });
-
-  // Xuất file dữ liệu ZIP (streaming — không giữ toàn bộ trong RAM) gồm students.json, image/, voice/
-  ipcMain.handle('data:export', async (e) => {
-    const emitExport = (step: string, pct: number) => e.sender.send('data:progress', { step, pct });
-    if (getUseSampleData()) {
-      return { ok: false, message: 'Không được phép xuất dữ liệu mẫu (sample data).' };
-    }
-    // V2 — chống chạy đồng thời với import/refresh.
-    if (isIoBusy()) {
-      return { ok: false, message: 'Đang có thao tác dữ liệu khác chạy — vui lòng đợi hoàn tất.' };
-    }
-    const win = getMainWindow();
-    const { canceled, filePath } = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Xuất file dữ liệu (.zip)',
-      defaultPath: `ceremony-bundle-${new Date().toISOString().slice(0, 10)}.zip`,
-      filters: [{ name: 'ZIP archive', extensions: ['zip'] }],
-    });
-    if (canceled || !filePath) return { ok: false, message: 'Đã hủy xuất file' };
-
-    const dataDir = ceremonyDataDir();
-    const students = ceremonyStore.getStudents();
-    if (!students || students.length === 0) {
-      return { ok: false, message: 'Không có dữ liệu sinh viên để xuất' };
-    }
-
-    // Map sinh viên về RawStudent shape
-    const rawStudents = students.map((s) => ({
-      id: s.id,
-      graduation_batch_id: s.graduation_batch_id,
-      batch_name: s.batch_name || '',
-      display_order: s.display_order,
-      student_code: s.student_code,
-      full_name: s.full_name,
-      date_of_birth: s.date_of_birth,
-      major_name: s.major_name,
-      faculty_name: s.faculty_name,
-      class_code: s.class_code,
-      course_code: s.course_code,
-      phone_number: s.phone_number,
-      identity_number: s.identity_number,
-      email: s.email || '',
-      gpa: s.gpa,
-      classification: s.classification,
-      classification_type: s.classification_type || 0,
-      achievement_title: s.achievement_title || '',
-      award_type: s.award_type || '',
-      award_type_code: s.award_type_code || null,
-      award_content: s.award_content || '',
-      quote: s.quote || null,
-      image_file_name: s.image_file_name,
-      image_relative_path: s.image_relative_path,
-      presentation_template_type: s.presentation_template_type || '',
-      presentation_template_type_code: s.presentation_template_type_code || null,
-      registration_status: s.status === 'on_stage' ? 'on_stage' : s.status === 'returned' ? 'received_hardcopy' : s.status === 'checked_in' ? 'checked_in' : s.status === 'called' ? 'called' : s.status === 'absent' ? 'absent' : 'registered',
-      degree_award_status: s.degree_award_status || '',
-    }));
-
-    // V7 — serialize JSON riêng, bắt lỗi String.MAX_LENGTH rõ ràng.
-    let studentsJson: string;
-    try {
-      studentsJson = JSON.stringify(rawStudents, null, 2);
-    } catch (err) {
-      return { ok: false, message: `Không thể tạo students.json (dữ liệu quá lớn?): ${err instanceof Error ? err.message : String(err)}` };
-    }
-
-    // V6 — archiver ghi streaming trực tiếp ra file, RAM hằng số.
-    // archiver@8 là ESM-only — main process là CJS nên phải dùng dynamic import() thay vì require().
-    const { ZipArchive } = await import('archiver');
-    return await new Promise<{ ok: boolean; message: string }>((resolve) => {
-      const output = createWriteStream(filePath);
-      const zip: ZipArchiveType = new ZipArchive({ zlib: { level: 1 } }); // level thấp: ảnh/wav đã nén, ưu tiên tốc độ
-      let settled = false;
-      const done = (r: { ok: boolean; message: string }) => { if (!settled) { settled = true; resolve(r); } };
-
-      output.on('close', () => { emitExport('Hoàn tất', 100); done({ ok: true, message: 'Xuất file thành công!' }); });
-      zip.on('warning', (w: Error) => console.warn('[export] archiver warning:', w));
-      zip.on('error', (err: Error) => { console.error('[export] archiver error:', err); done({ ok: false, message: `Lỗi ghi file: ${err.message}` }); });
-      // Progress theo tổng bytes đã xử lý.
-      zip.on('progress', (p: { entries: { total: number; processed: number } }) => {
-        const pct = p.entries.total > 0 ? Math.round((p.entries.processed / p.entries.total) * 90) : 0;
-        emitExport('Đang ghi file…', Math.min(90, pct));
-      });
-
-      zip.pipe(output);
-
-      emitExport('Chuẩn bị dữ liệu…', 3);
-      zip.append(studentsJson, { name: 'students.json' });
-
-      // Ảnh: chỉ thêm ảnh thực sự tồn tại, tránh trùng tên.
-      let photoDirName = 'image';
-      for (const d of PHOTO_DIR_NAMES) {
-        if (existsSync(join(dataDir, d))) { photoDirName = d; break; }
-      }
-      const photoPath = join(dataDir, photoDirName);
-      const addedImages = new Set<string>();
-      for (const s of students) {
-        const candidates: string[] = [];
-        if (s.image_relative_path) candidates.push(resolveLocalAsset(s.image_relative_path));
-        if (s.image_file_name) candidates.push(join(photoPath, s.image_file_name));
-        for (const file of candidates) {
-          if (existsSync(file)) {
-            const zipName = s.image_file_name || basename(file);
-            if (addedImages.has(zipName)) break;
-            addedImages.add(zipName);
-            zip.file(file, { name: `image/${zipName}` });
-            break;
-          }
-        }
-      }
-
-      // Voice: wav tồn tại + manifest đã lọc.
-      const batchId = students[0]?.graduation_batch_id || 'default';
-      const voicePath = ttsPregenDir(batchId);
-      const manifestPath = ttsPregenManifestPath(batchId);
-      if (existsSync(voicePath)) {
-        for (const s of students) {
-          const safeCode = s.student_code.replace(/[^a-zA-Z0-9_-]/g, '_');
-          const wavFile = join(voicePath, `${safeCode}.wav`);
-          if (existsSync(wavFile)) {
-            zip.file(wavFile, { name: `voice/${safeCode}.wav` });
-          }
-        }
-        if (existsSync(manifestPath)) {
-          try {
-            const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-            const filteredStudents: Record<string, unknown> = {};
-            for (const s of students) {
-              const safeCode = s.student_code.replace(/[^a-zA-Z0-9_-]/g, '_');
-              const wavFile = join(voicePath, `${safeCode}.wav`);
-              if (existsSync(wavFile) && manifest.students?.[s.student_code]) {
-                filteredStudents[s.student_code] = manifest.students[s.student_code];
-              }
-            }
-            zip.append(JSON.stringify({ ...manifest, students: filteredStudents }, null, 2), { name: 'voice/manifest.json' });
-          } catch {
-            zip.file(manifestPath, { name: 'voice/manifest.json' });
-          }
-        }
-      }
-
-      emitExport('Đang ghi file…', 10);
-      zip.finalize().catch((err) => done({ ok: false, message: `Lỗi hoàn tất zip: ${err instanceof Error ? err.message : String(err)}` }));
-    });
-  });
-
-  // Config: dùng data sample hay data thật
-  ipcMain.handle('config:getUseSampleData', () => getUseSampleData());
-  ipcMain.handle('config:setUseSampleData', async (e, val: boolean) => {
-    setUseSampleData(val);
-    refreshAppMenu(); // Cập nhật checkbox "Dùng dữ liệu mẫu" trong menu Develop
-    // Load lại dữ liệu theo mode mới
-    const result = await syncBundle({ useSample: val }, (p) => e.sender.send('data:progress', p));
-    getIO()?.emit('state:full', {
-      session: sessionStore.get(),
-      onStage: sessionStore.get().current_on_stage_msv
-        ? (ceremonyStore.findByMsv(sessionStore.get().current_on_stage_msv!) ?? null)
-        : null,
-      pending: sessionStore.get().pending_msv
-        ? (ceremonyStore.findByMsv(sessionStore.get().pending_msv!) ?? null)
-        : null,
-    });
-    return result;
-  });
 
   // Cấu hình API tích hợp
   ipcMain.handle('config:getApiEnvironment', () => getApiEnvironment());
@@ -339,12 +148,11 @@ export function registerIpcHandlers() {
     return apiLogger.triggerCustomApi('submit_log', null);
   });
 
-  // Lấy thông tin meta để renderer hiển thị (cổng socket, ceremony, danh sách SV)
+  // Lấy thông tin meta để renderer hiển thị (cổng socket, ceremony, danh sách người tham dự)
   ipcMain.handle('data:meta', () => ({
     config: ceremonyStore.getConfig(),
     ceremony: ceremonyStore.getCeremony(),
-    students: ceremonyStore.getStudents(),
-    syncedAt: ceremonyStore.getBundle()?._synced_at ?? null,
+    records: ceremonyStore.getRecords(),
     hasData: ceremonyStore.hasData(),
     apiEnvironment: getApiEnvironment(),
   }));
@@ -409,7 +217,7 @@ export function registerIpcHandlers() {
   // Xóa dữ liệu sinh viên (reset ceremony data nhưng giữ config, không cần khởi động lại app)
   ipcMain.handle('data:resetStudents', async () => {
     try {
-      ceremonyStore.clearStudents();
+      ceremonyStore.clearRecords();
       sessionStore.clear();
       getIO()?.emit('state:full', {
         session: sessionStore.get(),
@@ -597,7 +405,10 @@ export function registerIpcHandlers() {
               const wav = readFileSync(wavPath);
               // Trả về PCM (bỏ WAV header 44 bytes)
               const pcm = wav.slice(44);
-              const sampleRate = 48000;
+              // Đọc tần số từ CHÍNH header của file, không giả định 48000: file cache có
+              // thể do engine khác sinh ra (Qwen 24kHz) ở lần chạy trước. Đọc từ file là
+              // cách duy nhất luôn đúng, kể cả với file đã nằm sẵn trên đĩa từ bản cũ.
+              const sampleRate = readWavSampleRate(wav);
               pushTtsLog({ time: new Date().toLocaleTimeString('vi-VN'), action: 'speak', text, model, ok: true, durationMs: Date.now() - t0, cacheHit: true });
               return { ok: true, buffer: pcm, sampleRate };
             }
@@ -613,7 +424,7 @@ export function registerIpcHandlers() {
       pushTtsLog({ time: new Date().toLocaleTimeString('vi-VN'), action: 'speak', text, model, ok: true, durationMs: Date.now() - t0, cacheHit: true });
       // Lưu xuống disk nếu có studentCode
       if (studentCode && cached.buffer) {
-        _saveRealtimeWav(studentCode, text.trim(), model, spd, cached.buffer);
+        _saveRealtimeWav(studentCode, text.trim(), model, spd, cached.buffer, undefined, cached.sampleRate);
       }
       return cached;
     }
@@ -630,24 +441,44 @@ export function registerIpcHandlers() {
 
     // Lưu WAV + metadata realtime xuống disk
     if (result.ok && result.buffer && studentCode) {
-      // quality_* chỉ có ở runVieneu (VieNeu); runPiper không trả — bỏ qua an toàn.
-      const q = result as { quality_score?: number; quality_flags?: string[] };
+      // quality_* và sampleRate chỉ có ở runVieneu (VieNeu); runPiper không trả — bỏ qua
+      // an toàn. runPiper luôn xuất 48kHz nên mặc định của _saveRealtimeWav là đúng cho nó.
+      const q = result as { quality_score?: number; quality_flags?: string[]; sampleRate?: number };
       _saveRealtimeWav(studentCode, text.trim(), model, spd, result.buffer, {
         quality_score: q.quality_score,
         quality_flags: q.quality_flags,
-      });
+      }, q.sampleRate);
     }
 
     return result;
   });
 
+  // Bảng hiệu ứng hậu kỳ do service TTS khai. Renderer KHÔNG fetch thẳng port Python
+  // (port động, và quy tắc Ports & Adapters của repo cấm gọi mạng trực tiếp từ renderer).
+  ipcMain.handle('tts:list-effect-types', async () => {
+    const port = getPythonPort();
+    if (!port) return [];
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/effects`, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { available?: boolean; effects?: unknown[] };
+      // `available: false` = service chạy nhưng thiếu pedalboard → không có hiệu ứng nào.
+      return data.available ? (data.effects ?? []) : [];
+    } catch {
+      return [];
+    }
+  });
+
   // ── TTS Studio (app riêng, gọi thẳng /synthesize, không cache/log/pregen) ────
   // Tách biệt hoàn toàn khỏi hệ tts:* của Ceremony ở trên.
-  ipcMain.handle('tts-studio:synthesize', async (_e, { text, voiceId, speed }: {
-    text: string; voiceId?: string; speed?: number;
+  ipcMain.handle('tts-studio:synthesize', async (_e, { text, voiceId, speed, effectsChain, engine_overrides }: {
+    text: string; voiceId?: string; speed?: number; effectsChain?: unknown[];
+    engine_overrides?: Record<string, Record<string, unknown>>;
   }) => {
     if (!text?.trim()) return { ok: false, error: 'Empty text' };
-    return synthesizeTtsStudio(text.trim(), voiceId || 'NF', speed ?? 1.0);
+    // 'NF' (giọng placeholder cũ) đã bị xoá khỏi voice-registry.json 2026-08-04 — Giang
+    // (clone-d0f05071) là giọng mặc định mới khi voiceId trống.
+    return synthesizeTtsStudio(text.trim(), voiceId || 'clone-d0f05071', speed ?? 1.0, effectsChain, engine_overrides);
   });
 
   function _saveRealtimeWav(
@@ -657,6 +488,10 @@ export function registerIpcHandlers() {
     speed: number,
     pcm: Buffer,
     quality?: { quality_score?: number; quality_flags?: string[] },
+    // Tần số thật của PCM, do server báo qua X-Sample-Rate. Mỗi engine xuất ở tần số gốc
+    // của nó (Qwen 24kHz, VieNeu/MOSS 48kHz) — ghi sai vào WAV header thì file phát
+    // nhanh/chậm gấp đôi mà không có lỗi nào, vì dữ liệu PCM vẫn đúng.
+    sampleRateHz = 48000,
   ) {
     try {
       const batchId = getPregenBatchId();
@@ -664,7 +499,7 @@ export function registerIpcHandlers() {
       const manifestPath = ttsPregenManifestPath(batchId);
 
       // Build WAV header
-      const sampleRate = 48000;
+      const sampleRate = sampleRateHz;
       const header = Buffer.alloc(44);
       header.write('RIFF', 0, 'ascii');
       header.writeUInt32LE(36 + pcm.byteLength, 4);
@@ -734,10 +569,16 @@ export function registerIpcHandlers() {
     return { ...info, cacheSize: ttsCache.size, activityLog: [...ttsActivityLog].reverse() };
   });
 
+  // Nạp lại buffer log gần nhất khi renderer vừa mount tab "Nhật ký" — bù cho
+  // `tts:log-line` chỉ push realtime, remount (chuyển tab/mở lại cửa sổ) trước đây mất trắng.
+  ipcMain.handle('tts:get-log-lines', async () => {
+    return getRecentLogLines();
+  });
+
   // Restart Python/VieNeu TTS server
   ipcMain.handle('tts:restart', async () => {
     try {
-      stopPythonServer();
+      await stopPythonServer();
       await startPythonServer(vieneuDir());
       return { ok: true };
     } catch (err) {
@@ -762,6 +603,31 @@ export function registerIpcHandlers() {
     if (!port) return [];
     try {
       const res = await fetch(`http://127.0.0.1:${port}/voices`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  });
+
+  // URL nghe thử audio gốc của 1 catalog entry — tương tự tts:preview-url, không fetch
+  // (chỉ build URL cho <audio> src trỏ thẳng vào python server local).
+  ipcMain.handle('tts:catalog-audio-url', (_e, { lang, entryId }: { lang: string; entryId: string }) => {
+    return `http://127.0.0.1:${getPythonPort()}/voices/catalog/${encodeURIComponent(lang)}/${encodeURIComponent(entryId)}/audio`;
+  });
+
+  // Thư viện voice mẫu 'hệ thống' (resources/voice-ref/{lang}/catalog.json) — khác /voices
+  // (registry runtime): danh sách để search/preview/chọn. Không cần bước import riêng:
+  // chọn 1 voice ở đây rồi synthesize là server tự encode ngầm (xem main.py's
+  // _ensure_voice_ready), voice đó tự xuất hiện qua tts:list-voices từ đó về sau.
+  ipcMain.handle('tts:list-voice-catalog', async (_e, lang?: string) => {
+    const port = getPythonPort();
+    if (!port) return [];
+    try {
+      const url = lang
+        ? `http://127.0.0.1:${port}/voices/catalog?lang=${encodeURIComponent(lang)}`
+        : `http://127.0.0.1:${port}/voices/catalog`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) return [];
       return await res.json();
     } catch {
@@ -846,18 +712,23 @@ export function registerIpcHandlers() {
     }
   }
 
-  // Lấy pip_packages runtime của engine từ /engines.
-  async function getEngineRuntimePackages(engineId: string): Promise<string[]> {
+  // Lấy pip_packages + runtime_kind của engine từ /engines. `runtime_kind` quyết định NƠI
+  // installRuntime() ghi (dùng chung theo kind — xem ttsRuntimeDir, GĐ C); thiếu field này
+  // (server cũ) → 'torch' (coi là nặng, an toàn hơn đoán nhầm 'onnx-ext').
+  async function getEngineRuntimeMeta(engineId: string): Promise<{ pipPackages: string[]; runtimeKind: string }> {
     const port = getPythonPort();
-    if (!port) return [];
+    if (!port) return { pipPackages: [], runtimeKind: 'torch' };
     try {
       const res = await fetch(`http://127.0.0.1:${port}/engines`, { signal: AbortSignal.timeout(3000) });
-      if (!res.ok) return [];
+      if (!res.ok) return { pipPackages: [], runtimeKind: 'torch' };
       const data = await res.json();
       const e = (data.engines ?? []).find((x: { id: string }) => x.id === engineId);
-      return e?.install?.runtime?.pip_packages ?? [];
+      return {
+        pipPackages: e?.install?.runtime?.pip_packages ?? [],
+        runtimeKind: typeof e?.runtime_kind === 'string' && e.runtime_kind ? e.runtime_kind : 'torch',
+      };
     } catch {
-      return [];
+      return { pipPackages: [], runtimeKind: 'torch' };
     }
   }
 
@@ -869,13 +740,18 @@ export function registerIpcHandlers() {
     if (!pf.ok) return { ok: false, error: pf.blocks.join(' '), preflight: pf };
     const repo = await getEngineModelRepo(engineId);
     if (!repo) return { ok: false, error: 'Engine không có nguồn model HF' };
-    const pipPkgs = await getEngineRuntimePackages(engineId);
+    const { pipPackages, runtimeKind } = await getEngineRuntimeMeta(engineId);
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
-    // Runtime: bản dev dùng venv python (pip --target). Packaged (không venv) → null
-    // → installRuntime báo cần embeddable (đã ghi nợ). Cài runtime sau khi tải model.
-    inst.setRuntimeInstall(pipPkgs, app.isPackaged ? null : getPythonPath());
+    // Đã có 1 lượt tải đang chạy dở cho engine này (VD renderer vừa reload, UI chưa kịp nhận
+    // progress event nào nên vẫn hiện nút "Tải model") → getInstaller() ở trên đã gắn lại
+    // callback theo cửa sổ hiện tại rồi, CHỈ cần dừng ở đây — gọi downloadFromHf() lần nữa sẽ
+    // chạy 2 vòng tải chồng lên nhau, cùng ghi 1 file .part → hỏng file (bug thật 2026-08-03).
+    if (inst.isBusy()) return { ok: true };
+    // Runtime: bản dev dùng venv python (pip --target) cho nhanh. Packaged → null để
+    // installRuntime tự tải Python relocatable về runtime dùng chung (python-runtime.ts).
+    inst.setRuntimeInstall(pipPackages, app.isPackaged ? null : getPythonPath(), runtimeKind);
     // Không await — chạy nền, báo tiến độ qua event.
     inst.downloadFromHf(repo);
     return { ok: true };
@@ -889,11 +765,20 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('tts:engine-install-resume', async (_e, { engineId }: { engineId: string }) => {
     const { getInstaller } = await import('./engine-installer');
+    const { getPythonPath } = await import('./python-server');
     const repo = await getEngineModelRepo(engineId);
     if (!repo) return { ok: false, error: 'Engine không có nguồn model HF' };
+    const { pipPackages, runtimeKind } = await getEngineRuntimeMeta(engineId);
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
     });
+    if (inst.isBusy()) return { ok: true }; // tránh chạy chồng 2 vòng tải, giống tts:engine-install-start
+    // Bug thật 2026-08-04: handler này trước đây KHÔNG gọi setRuntimeInstall() như
+    // tts:engine-install-start — resume 1 lượt tải dở (đặc biệt sau khi app restart, instance
+    // mới tinh nên _pipPackages=null) thì downloadFromHf() tải xong phần MODEL (writeManifest
+    // 'model_ready') nhưng KHÔNG BAO GIỜ chạy installRuntime() → manifest không bao giờ lên
+    // 'installed' → UI mãi hiện "Tải dở"/nút Tiếp tục dù file đã tải xong hoàn toàn trên đĩa.
+    inst.setRuntimeInstall(pipPackages, app.isPackaged ? null : getPythonPath(), runtimeKind);
     inst.downloadFromHf(repo);  // resume từ install-state.json
     return { ok: true };
   });
@@ -955,24 +840,95 @@ export function registerIpcHandlers() {
     return { bytes: getInstaller(engineId, () => {}).diskUsage() };
   });
 
+  /**
+   * Dung lượng runtime DÙNG CHUNG theo kind (GĐ C) — tách khỏi `tts:engine-disk-usage` vì
+   * từ giờ nó không còn nằm trong thư mục riêng của engine nào cả. UI dùng để hiện rõ
+   * "torch dùng chung ~2.5GB — cho VoxCPM", tránh hiểu lầm xoá 1 engine là hết ngay số đó
+   * (chỉ hết khi engine CUỐI CÙNG dùng kind đó bị xoá — xem cleanupOrphanedRuntimeIfUnused).
+   */
+  ipcMain.handle('tts:runtime-disk-usage', async () => {
+    const { sharedRuntimeInfo } = await import('./engine-installer');
+    const kinds = ['torch', 'onnx-ext', 'onnx-accel', 'mlx'];
+    return kinds
+      .map((kind) => ({ kind, ...sharedRuntimeInfo(kind) }))
+      .filter((r) => r.bytes > 0 || r.engineIds.length > 0);
+  });
+
+  // Thư mục lưu engine/model đã tải — hiện đường dẫn trong UI để người vận hành biết
+  // dữ liệu nặng nằm ở đâu (dọn đĩa, sao chép sang máy khác, gửi log khi cần hỗ trợ).
+  ipcMain.handle('tts:engines-dir', async () => {
+    const { ttsEnginesDir } = await import('./data/paths');
+    return { path: ttsEnginesDir() };
+  });
+
+  // Mở thư mục đó bằng Finder/Explorer của hệ điều hành.
+  ipcMain.handle('tts:open-engines-dir', async () => {
+    const { ttsEnginesDir } = await import('./data/paths');
+    const { mkdirSync } = await import('node:fs');
+    const dir = ttsEnginesDir();
+    try {
+      // Chưa tải engine nào thì thư mục chưa tồn tại — tạo trước, nếu không shell.openPath
+      // trả lỗi khó hiểu thay vì mở ra một thư mục rỗng như người dùng mong đợi.
+      mkdirSync(dir, { recursive: true });
+      const err = await shell.openPath(dir);   // '' nếu thành công
+      return err ? { ok: false, error: err } : { ok: true, path: dir };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  /**
+   * Nhả RAM của một engine đang giữ ấm — GIỮ NGUYÊN dữ liệu đã tải trên đĩa.
+   *
+   * Hai trường hợp khác nhau:
+   *  - Engine nằm trong tiến trình đang phục vụ → POST /engines/unload (nhả trong process).
+   *  - Engine là chủ của nhóm 'ext' đang chạy nền nhưng KHÔNG phục vụ → tắt hẳn tiến
+   *    trình đó, vì cả tiến trình chỉ tồn tại để chạy engine này (torch chiếm vài GB).
+   */
+  ipcMain.handle('tts:engine-unload', async (_e, { engineId }: { engineId: string }) => {
+    const { getActiveTier, getTierEngineId, stopTier, isTierRunning } = await import('./python-server');
+
+    if (getActiveTier() !== 'ext' && getTierEngineId('ext') === engineId && isTierRunning('ext')) {
+      await stopTier('ext');
+      return { ok: true, freedProcess: true };
+    }
+
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/engines/unload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engine_id: engineId }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        const detail = body?.detail;
+        return { ok: false, error: String((typeof detail === 'object' ? detail?.error : detail) ?? `HTTP ${res.status}`) };
+      }
+      return { ok: true, freedProcess: false, unloaded: !!body?.unloaded };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   // Dry-run kiểm engine load được (sau khi tải, TRƯỚC khi cho đổi).
   ipcMain.handle('tts:engine-verify', async (_e, { engineId }: { engineId: string }) => {
-    const { getInstaller } = await import('./engine-installer');
+    const { getInstaller, resolveEngineRuntimeLocation } = await import('./engine-installer');
     const { getServerDir, getPythonPath } = await import('./python-server');
-    const { ttsEngineDir } = await import('./data/paths');
     const serverDir = getServerDir();
     if (!serverDir) return { ok: false, error: 'Không tìm thấy code server (bản đóng gói chưa hỗ trợ verify engine mở rộng — cần bản dev).' };
 
-    const { join } = await import('node:path');
-    const { existsSync } = await import('node:fs');
-    // Runtime của engine: python trong runtime/, site-packages là target đã pip install.
-    const engineRuntime = join(ttsEngineDir(engineId), 'runtime');
-    const sitePackages = join(engineRuntime, 'site-packages');
+    const { resolveRuntimePython } = await import('./python-runtime');
+    // Runtime dùng chung theo kind (GĐ C) hoặc vị trí riêng cũ nếu engine cài từ trước đó
+    // — resolveEngineRuntimeLocation() tự dò, xem comment ở nơi khai báo.
+    const { runtimeDir: engineRuntime, sitePackages } = resolveEngineRuntimeLocation(engineId);
     // Chọn python: runtime tự chứa nếu có, không thì venv dev (đủ để verify engine bundled/nhẹ).
-    const runtimePy = process.platform === 'win32'
-      ? join(engineRuntime, 'python.exe')
-      : join(engineRuntime, 'bin', 'python');
-    const pythonBin = existsSync(runtimePy) ? runtimePy : getPythonPath();
+    // Dùng chung resolver với python-server.ts — trước đây chỗ này tự ghép `runtime/bin/python`,
+    // lệch với đường ensurePythonRuntime() thật sự tạo nên bản đóng gói luôn verify bằng
+    // system Python (không có torch) và báo engine hỏng dù engine hoàn toàn bình thường.
+    const pythonBin = resolveRuntimePython(engineRuntime) ?? getPythonPath();
 
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
@@ -985,8 +941,60 @@ export function registerIpcHandlers() {
     });
   });
 
-  // Đổi engine đang dùng: guard on-stage → verify → ghi config → restart → health →
-  // rollback VieNeu nếu engine mới không lên. (VieNeu bundled thì bỏ verify.)
+  /**
+   * Thử đổi engine NGAY trong process Python đang chạy (POST /engines/switch).
+   *
+   * Đây là đường nhanh thêm ở GĐ A: nếu process hiện tại có sẵn runtime cho engine đích
+   * thì không cần verify, không cần restart, và engine đã từng nạp thì đổi là tức thì.
+   * Đường cũ (verify + stop/start) nạp model tới 3 LẦN cho 1 lần đổi — đo thực tế VoxCPM
+   * ~118s mỗi lần nạp.
+   *
+   * Trả `{ ok: true }` khi đổi xong; `{ ok: false }` (không kèm fatal) nghĩa là "process
+   * này không làm được, hãy đi đường cũ"; `{ ok: false, fatal: true }` là lỗi thật, đi
+   * đường cũ cũng vô ích nên báo thẳng cho người dùng.
+   */
+  async function tryFastSwitch(
+    port: number,
+    engineId: string,
+  ): Promise<{ ok: boolean; fatal?: boolean; error?: string }> {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/engines/switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engine_id: engineId }),
+        // Rộng tay như HEALTH_TIMEOUT_MS: nếu server đang thật sự nạp model thì CHỜ vẫn
+        // lợi hơn bỏ cuộc — đường cũ cũng phải nạp đúng model đó, cộng thêm spawn process.
+        // Trường hợp không nạp được (thiếu runtime) trả 409 ngay, không tốn thời gian.
+        signal: AbortSignal.timeout(300_000),
+      });
+
+      if (res.ok) {
+        const body = await res.json().catch(() => null);
+        console.log(`[tts:engine-switch] fast switch -> ${engineId} `
+          + `elapsed=${body?.elapsed_ms ?? '?'}ms reused=${body?.reused ?? '?'}`);
+        return { ok: true };
+      }
+
+      // 409 = process này không có runtime cho engine đó (vd engine torch trong process
+      // ONNX). Không phải lỗi — đi đường cũ để spawn runtime riêng của engine.
+      if (res.status === 409) {
+        console.log(`[tts:engine-switch] '${engineId}' không nạp được trong process hiện tại — dùng đường restart.`);
+        return { ok: false };
+      }
+
+      const body = await res.json().catch(() => null);
+      const detail = body?.detail;
+      const msg = (typeof detail === 'object' ? detail?.error : detail) ?? `HTTP ${res.status}`;
+      return { ok: false, fatal: true, error: String(msg) };
+    } catch (err) {
+      // Server cũ chưa có endpoint này, hoặc mất kết nối → im lặng lùi về đường cũ.
+      console.log(`[tts:engine-switch] fast switch không dùng được (${err instanceof Error ? err.message : String(err)}) — dùng đường restart.`);
+      return { ok: false };
+    }
+  }
+
+  // Đổi engine đang dùng: guard on-stage → THỬ ĐỔI TẠI CHỖ → (nếu không được) verify →
+  // ghi config → restart → health → rollback VieNeu nếu engine mới không lên.
   ipcMain.handle('tts:engine-switch', async (_e, { engineId }: { engineId: string }) => {
     const { isOnStage } = await import('./engine-installer');
     if (isOnStage()) {
@@ -996,79 +1004,55 @@ export function registerIpcHandlers() {
     const port = getPythonPort();
     if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
 
-    // Engine mở rộng: verify load được trước khi đổi (VieNeu bundled bỏ qua).
-    if (engineId !== 'vieneu') {
-      const { getInstaller } = await import('./engine-installer');
-      const { getServerDir, getPythonPath } = await import('./python-server');
-      const { ttsEngineDir, ttsEnginesDir, vieneuDir } = await import('./data/paths');
-      const { join } = await import('node:path');
-      const { existsSync } = await import('node:fs');
-      const serverDir = getServerDir();
-      if (!serverDir) return { ok: false, error: 'Bản đóng gói chưa hỗ trợ engine mở rộng (cần bản dev).' };
-      const engineRuntime = join(ttsEngineDir(engineId), 'runtime');
-      const runtimePy = process.platform === 'win32'
-        ? join(engineRuntime, 'python.exe') : join(engineRuntime, 'bin', 'python');
-      const pythonBin = existsSync(runtimePy) ? runtimePy : getPythonPath();
-      const inst = getInstaller(engineId, () => {});
-      const v = await inst.verify(pythonBin, serverDir, join(engineRuntime, 'site-packages'), {
-        HF_HOME: vieneuDir(), HF_HUB_OFFLINE: '1', VIENEU_ENGINES_DIR: ttsEnginesDir(),
-      });
-      if (!v.ok) return { ok: false, error: `Engine không load được: ${v.error ?? 'lỗi'}` };
+    // ── Đường nhanh: đổi tại chỗ, không restart ────────────────────────────────
+    // Python tự ghi config.engine khi đổi thành công nên không cần PUT /config ở đây.
+    const fast = await tryFastSwitch(port, engineId);
+    if (fast.ok) return { ok: true };
+    if (fast.fatal) return { ok: false, error: `Engine không load được: ${fast.error}` };
+
+    // ── Đường nhóm riêng: engine cần runtime của chính nó ─────────────────────
+    // Blue-green (GĐ B): dựng tiến trình mới trên port trống TRONG KHI tiến trình hiện
+    // tại VẪN phục vụ bình thường. Hai điểm được lợi so với cơ chế stop→start cũ:
+    //   1. Bỏ hẳn bước verify dry-run — health-check của tiến trình mới CHÍNH LÀ verify,
+    //      nên model chỉ nạp MỘT lần thay vì ba.
+    //   2. Không cần rollback: tiến trình cũ chưa hề bị đụng tới, hỏng thì chỉ việc
+    //      không chuyển sang, người dùng vẫn đọc được bằng engine đang dùng.
+    // Tiến trình cũ được GIỮ SỐNG, nên đổi ngược lại về engine cũ sau này là tức thì.
+    const { vieneuDir } = await import('./data/paths');
+    const { ensureTierForEngine, setActiveTier, getActiveTier, markTierEngine } = await import('./python-server');
+
+    const prevTier = getActiveTier();
+    const ensured = await ensureTierForEngine(engineId, vieneuDir());
+    if (!ensured.ok) {
+      return {
+        ok: false,
+        error: `Khởi động engine thất bại (vẫn đang dùng engine cũ): ${ensured.error ?? 'không rõ nguyên nhân'}`,
+      };
     }
 
-    // Ghi config.engine qua server (PUT /config), rồi restart.
-    try {
-      await fetch(`http://127.0.0.1:${port}/config`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: engineId }), signal: AbortSignal.timeout(5000),
-      });
-    } catch (err) {
-      return { ok: false, error: `Không ghi được config: ${err instanceof Error ? err.message : String(err)}` };
-    }
+    setActiveTier(ensured.tier);
 
-    // Restart để áp engine mới.
-    try {
-      stopPythonServer();
-      await startPythonServer(vieneuDir());
-    } catch (err) {
-      // Restart lỗi → rollback config về vieneu + restart lại.
-      await rollbackToVieneu();
-      return { ok: false, error: `Khởi động engine thất bại, đã quay lại VieNeu: ${err instanceof Error ? err.message : String(err)}` };
+    // Tiến trình vừa dựng đã mang đúng engine (spawn kèm VIENEU_ENGINE). Nhưng nếu nhóm
+    // đó ĐANG SẴN chạy từ trước và phục vụ engine khác thì phải bảo nó đổi — đây là lượt
+    // đổi tại chỗ, tức thì nếu engine đã giữ ấm.
+    const afterSwitch = await tryFastSwitch(getPythonPort(), engineId);
+    if (!afterSwitch.ok && afterSwitch.fatal) {
+      setActiveTier(prevTier);   // nhóm cũ vẫn sống → quay lại là tức thì
+      return { ok: false, error: `Engine không load được: ${afterSwitch.error}` };
     }
+    // Switch tại chỗ thành công (không respawn) → ghi nhận tier NAY thật sự phục vụ
+    // engine nào, để lượt đổi tiếp theo (vd sang 1 engine torch khác) biết đúng trạng
+    // thái thay vì tưởng tier vẫn còn phục vụ engine lúc spawn ban đầu.
+    if (afterSwitch.ok) markTierEngine(ensured.tier, engineId);
 
-    // Kiểm health sau restart: engine mới phải trả /engines current đúng.
+    // Xác nhận nhóm đang phục vụ đúng engine yêu cầu (vòng đầu khớp là trả ngay).
     const healthy = await verifyEngineActive(engineId);
     if (!healthy) {
-      await rollbackToVieneu();
-      return { ok: false, error: 'Engine mới không phản hồi sau khi khởi động — đã quay lại VieNeu.' };
+      setActiveTier(prevTier);
+      return { ok: false, error: 'Engine mới không phản hồi — vẫn đang dùng engine cũ.' };
     }
     return { ok: true };
   });
-
-  async function rollbackToVieneu() {
-    const port = getPythonPort();
-    try {
-      if (port) {
-        await fetch(`http://127.0.0.1:${port}/config`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine: 'vieneu' }), signal: AbortSignal.timeout(5000),
-        }).catch(() => {});
-      }
-      // Ghi thẳng config file phòng khi server chết (không PUT được).
-      const { vieneuConfigPath } = await import('./data/paths');
-      const p = vieneuConfigPath();
-      if (existsSync(p)) {
-        const cfg = JSON.parse(readFileSync(p, 'utf-8'));
-        cfg.engine = 'vieneu';
-        writeFileSync(p, JSON.stringify(cfg, null, 2), 'utf-8');
-      }
-      stopPythonServer();
-      const { vieneuDir } = await import('./data/paths');
-      await startPythonServer(vieneuDir());
-    } catch (err) {
-      console.error('[tts:engine-switch] rollback failed:', err);
-    }
-  }
 
   async function verifyEngineActive(engineId: string): Promise<boolean> {
     const port = getPythonPort();
@@ -1086,58 +1070,113 @@ export function registerIpcHandlers() {
     return false;
   }
 
-  // Cài thư viện tăng tốc (onnxruntime-gpu) theo nhu cầu — CHỈ bản dev (có venv+pip).
-  // Bản đóng gói dùng PyInstaller binary, không có pip → báo rõ không hỗ trợ.
+  /**
+   * Cài thư viện tăng tốc phần cứng (onnxruntime-gpu / -directml) theo nhu cầu.
+   *
+   * Hai đường khác hẳn nhau:
+   *  - DEV: có venv sẵn → pip install thẳng vào venv đó, xong là dùng được.
+   *  - ĐÓNG GÓI: VieNeu chạy bằng binary PyInstaller đã đóng băng onnxruntime CPU, cài
+   *    thêm gói ra ngoài KHÔNG tác động tới nó. Nên phải dựng một runtime Python rời
+   *    (tải về) rồi cài TRỌN BỘ dependency server + gói tăng tốc vào đó; sau đó
+   *    python-server.ts sẽ spawn main.py bằng runtime này khi người dùng chọn GPU
+   *    (xem resolveAccelSpawn).
+   */
   ipcMain.handle('tts:install-accel', async (_e, { packageName }: { packageName: string }) => {
-    if (app.isPackaged) {
-      return {
-        ok: false,
-        error: 'Bản cài đặt sẵn không hỗ trợ tải thêm thư viện tăng tốc. Cần chạy từ mã nguồn (dev) để cài onnxruntime-gpu.',
-      };
-    }
     // Whitelist package để tránh chạy pip install tuỳ ý.
     const ALLOWED = new Set(['onnxruntime-gpu', 'onnxruntime-directml']);
     if (!ALLOWED.has(packageName)) {
       return { ok: false, error: `Gói không hợp lệ: ${packageName}` };
     }
-    const py = getPythonPath();
-    return await new Promise<{ ok: boolean; error?: string; log?: string }>((resolve) => {
-      const proc = spawn(py, ['-m', 'pip', 'install', packageName], { windowsHide: true });
-      let out = '';
-      proc.stdout?.on('data', (d) => { out += d.toString(); });
-      proc.stderr?.on('data', (d) => { out += d.toString(); });
-      proc.on('error', (err) => resolve({ ok: false, error: err.message, log: out }));
-      proc.on('close', (code) => {
-        if (code === 0) resolve({ ok: true, log: out });
-        else resolve({ ok: false, error: `pip install thoát code ${code}`, log: out.slice(-2000) });
+
+    const runPip = (py: string, args: string[]) =>
+      new Promise<{ ok: boolean; error?: string; log?: string }>((resolve) => {
+        const proc = spawn(py, args, { windowsHide: true });
+        let out = '';
+        proc.stdout?.on('data', (d) => { out += d.toString(); });
+        proc.stderr?.on('data', (d) => { out += d.toString(); });
+        proc.on('error', (err) => resolve({ ok: false, error: err.message, log: out }));
+        proc.on('close', (code) => {
+          if (code === 0) resolve({ ok: true, log: out.slice(-2000) });
+          else resolve({ ok: false, error: `pip install thoát code ${code}`, log: out.slice(-2000) });
+        });
       });
-    });
+
+    if (!app.isPackaged) {
+      return await runPip(getPythonPath(), ['-m', 'pip', 'install', packageName]);
+    }
+
+    // ── Bản đóng gói: dựng runtime riêng ─────────────────────────────────────
+    // GĐ C (2026-08-11): dùng chung cơ chế `ttsRuntimeDir` với engine mở rộng thay vì
+    // thư mục `tts-accel` tách biệt trước đây — cùng 1 kind ('onnx-accel') là cùng chỗ,
+    // không tạo thêm 1 bản Python + site-packages riêng nữa.
+    const { ttsRuntimeDir } = await import('./data/paths');
+    const { ensurePythonRuntime } = await import('./python-runtime');
+    const { getServerDir } = await import('./python-server');
+
+    const serverDir = getServerDir();
+    if (!serverDir) {
+      return { ok: false, error: 'Không tìm thấy mã nguồn server (python-backend) trong bản cài đặt.' };
+    }
+    const runtimeRoot = ttsRuntimeDir('onnx-accel');
+    const sitePackages = join(runtimeRoot, 'site-packages');
+
+    let py: string;
+    try {
+      py = await ensurePythonRuntime(runtimeRoot, new AbortController().signal);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+
+    // Trọn bộ dependency server + gói tăng tốc, cùng một lần pip để giải phụ thuộc
+    // một lượt (tránh onnxruntime CPU được kéo về rồi ghi đè bản GPU).
+    const reqFile = join(serverDir, 'requirements.txt');
+    const pipArgs = ['-m', 'pip', 'install', '--no-cache-dir', '--target', sitePackages];
+    if (existsSync(reqFile)) pipArgs.push('-r', reqFile);
+    pipArgs.push(packageName);
+
+    const res = await runPip(py, pipArgs);
+    if (!res.ok) return res;
+    return { ok: true, log: res.log };
   });
 
   // ── Clone voice ──────────────────────────────────────────────────────────────
   // Mở dialog chọn file audio (WAV) để clone giọng
   ipcMain.handle('tts:pick-audio-file', async () => {
     const win = getMainWindow();
+    // 'multiSelections' — một giọng giờ clone được từ NHIỀU file mẫu (ghép lại cho model
+    // nhiều ngữ cảnh hơn, xem audio_dsp.py's combine_voice_samples). Vẫn trả về được đúng
+    // 1 file như trước, chỉ là dạng mảng 1 phần tử — không phá caller nào chỉ cần 1 file
+    // (vd thêm sample cho voice đã có, xem tts:add-voice-sample bên dưới).
     const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined!, {
-      title: 'Chọn file audio để clone giọng',
-      properties: ['openFile'],
-      filters: [{ name: 'Audio WAV', extensions: ['wav'] }],
+      title: 'Chọn (các) file audio để clone giọng',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Audio WAV/MP3', extensions: ['wav', 'mp3'] }],
     });
     if (canceled || filePaths.length === 0) return { ok: false };
-    return { ok: true, filePath: filePaths[0] };
+    return { ok: true, filePaths };
   });
 
-  // Clone giọng từ file WAV: gửi multipart tới Python /voices/clone
-  ipcMain.handle('tts:clone-voice', async (_e, { filePath, label, gender, region }: {
-    filePath: string; label: string; gender?: string; region?: string;
+  // Clone giọng từ NHIỀU file WAV: gửi multipart tới Python /voices/clone (mỗi file 1
+  // sample của cùng 1 voice — xem docstring clone_voice ở main.py).
+  ipcMain.handle('tts:clone-voice', async (_e, { samples, label, gender, region }: {
+    samples: Array<{ filePath: string; refText?: string }>;
+    label: string; gender?: string; region?: string;
   }) => {
     const port = getPythonPort();
     if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
-    if (!existsSync(filePath)) return { ok: false, error: 'File không tồn tại' };
+    if (!samples?.length) return { ok: false, error: 'Cần ít nhất 1 file audio mẫu' };
+    for (const s of samples) {
+      if (!existsSync(s.filePath)) return { ok: false, error: `File không tồn tại: ${s.filePath}` };
+    }
     try {
-      const buf = readFileSync(filePath);
       const form = new FormData();
-      form.append('file', new Blob([buf], { type: 'audio/wav' }), basename(filePath));
+      for (const s of samples) {
+        const buf = readFileSync(s.filePath);
+        form.append('files', new Blob([buf], { type: 'audio/wav' }), basename(s.filePath));
+        // Cùng số lượng và THỨ TỰ với 'files' — server gom theo tên field lặp lại, khớp
+        // vị trí. Luôn gửi (kể cả rỗng) để server tự quyết định bắt buộc theo engine.
+        form.append('ref_texts', s.refText ?? '');
+      }
       form.append('label', label);
       form.append('gender', gender ?? 'female');
       form.append('region', region ?? 'Bắc');
@@ -1153,15 +1192,84 @@ export function registerIpcHandlers() {
     }
   });
 
-  // Ẩn/hiện giọng (PUT /voices/{id})
-  ipcMain.handle('tts:update-voice', async (_e, { voiceId, hidden }: { voiceId: string; hidden: boolean }) => {
+  // Thêm 1 mẫu audio cho voice clone ĐÃ CÓ.
+  ipcMain.handle('tts:add-voice-sample', async (_e, { voiceId, filePath, refText }: {
+    voiceId: string; filePath: string; refText?: string;
+  }) => {
     const port = getPythonPort();
     if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    if (!existsSync(filePath)) return { ok: false, error: 'File không tồn tại' };
+    try {
+      const buf = readFileSync(filePath);
+      const form = new FormData();
+      form.append('file', new Blob([buf], { type: 'audio/wav' }), basename(filePath));
+      form.append('ref_text', refText ?? '');
+      const res = await fetch(`http://127.0.0.1:${port}/voices/${encodeURIComponent(voiceId)}/samples`, {
+        method: 'POST',
+        body: form,
+        signal: AbortSignal.timeout(60000),
+      });
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
+      return { ok: true, sample: await res.json() };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('tts:delete-voice-sample', async (_e, { voiceId, sampleId }: {
+    voiceId: string; sampleId: string;
+  }) => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      // `voiceId` trong path KHÔNG dùng để tra sample (server tự tra theo sampleId thật,
+      // đã duy nhất toàn registry) — nhưng vẫn PHẢI truyền đúng: server dùng nó để xoá
+      // đúng ref-codes cache của VOICE ĐÓ sau khi xoá sample thành công
+      // (main.py's delete_voice_sample → _ref_cache_forget_voice(voice_id)). Placeholder
+      // giả ở đây sẽ để cache cũ (bản ghép audio đã THIẾU sample vừa xoá) sống sót tới
+      // lần restart tiếp theo.
+      const res = await fetch(
+        `http://127.0.0.1:${port}/voices/${encodeURIComponent(voiceId)}/samples/${encodeURIComponent(sampleId)}`,
+        { method: 'DELETE', signal: AbortSignal.timeout(10000) },
+      );
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('tts:list-voice-samples', async (_e, { voiceId }: { voiceId: string }) => {
+    const port = getPythonPort();
+    if (!port) return [];
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/voices/${encodeURIComponent(voiceId)}/samples`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  });
+
+  // Ẩn/hiện giọng và/hoặc sửa bản chép lời (PUT /voices/{id})
+  ipcMain.handle('tts:update-voice', async (_e, { voiceId, hidden, refText }: {
+    voiceId: string; hidden?: boolean; refText?: string;
+  }) => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    // Chỉ gửi field được truyền — server phân biệt "không đụng tới" (vắng mặt) với
+    // "xoá đi" (chuỗi rỗng), nên gửi thừa `refText: undefined` sẽ thành xoá ngoài ý muốn.
+    const body: Record<string, unknown> = {};
+    if (hidden !== undefined) body.hidden = hidden;
+    if (refText !== undefined) body.ref_text = refText;
+    if (Object.keys(body).length === 0) return { ok: false, error: 'Không có gì để cập nhật' };
     try {
       const res = await fetch(`http://127.0.0.1:${port}/voices/${encodeURIComponent(voiceId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hidden }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
@@ -1226,33 +1334,35 @@ export function registerIpcHandlers() {
   // ── TTS Pre-Generation ──────────────────────────────────────────────────────
   let pregenQueue: PreGenQueue | null = null;
 
+  /** Batch cache voice pregen giờ gắn với Event active (giai đoạn "bỏ Student", 2026-07-22) —
+   * trước đây dùng graduation_batch_id (field đặc thù sinh viên, không có trong CanonicalRecord
+   * core), giờ mỗi Event có 1 thư mục cache riêng, đúng bản chất "pregen gắn với 1 đợt lễ cụ
+   * thể", không phải thuộc tính dữ liệu người tham dự. */
   function getPregenBatchId(): string {
-    // Dùng graduation_batch_id của lô dữ liệu hiện tại, fallback về 'default'
-    const students = ceremonyStore.getStudents();
-    return students?.[0]?.graduation_batch_id || 'default';
+    const active = getCurrentActiveEvent(ceremonyStore.getExecutor());
+    return active?.id ?? 'default';
   }
 
   ipcMain.handle('tts:pregen-start', async (_e, payload: {
     regenerate?: boolean;
     config: { template: string; ttsModel: string; ttsSpeed: number; ttsConditions?: any[] };
   }) => {
-    const students = ceremonyStore.getStudents();
-    if (!students || students.length === 0) {
-      return { ok: false, error: 'Chưa có dữ liệu sinh viên' };
+    const records = ceremonyStore.getRecords();
+    if (!records || records.length === 0) {
+      return { ok: false, error: 'Chưa có dữ liệu người tham dự' };
     }
     const batchId = getPregenBatchId();
 
     // Tạo queue mới nếu batchId đổi, config đổi (giọng/tốc độ/template), hoặc số
-    // lượng SV đổi (re-import cùng batch_id — ví dụ sửa/nạp lại dữ liệu mà
-    // graduation_batch_id giữ nguyên) — nếu không, queue cũ (đang giữ danh sách SV
-    // cũ trong bộ nhớ) tiếp tục báo total theo số cũ dù dữ liệu đã đổi.
+    // lượng record đổi (re-import cùng Event — sửa/nạp lại dữ liệu) — nếu không, queue cũ
+    // (đang giữ danh sách cũ trong bộ nhớ) tiếp tục báo total theo số cũ dù dữ liệu đã đổi.
     if (
       !pregenQueue ||
       pregenQueue.getBatchId() !== batchId ||
       pregenQueue.configChanged(payload.config) ||
-      pregenQueue.getStatus().total !== students.length
+      pregenQueue.getStatus().total !== records.length
     ) {
-      pregenQueue = new PreGenQueue(batchId, students, payload.config, (status: PreGenStatus) => {
+      pregenQueue = new PreGenQueue(batchId, records, payload.config, (status: PreGenStatus) => {
         getMainWindow()?.webContents.send('tts:pregen-progress', status);
       });
     }
@@ -1278,37 +1388,41 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle('tts:pregen-status', () => {
-    const students = ceremonyStore.getStudents();
-    if (!pregenQueue || (students && students.length > 0 && pregenQueue.getStatus().total !== students.length)) {
-      if (!students || students.length === 0) return pregenQueue?.getStatus() ?? null;
+    const records = ceremonyStore.getRecords();
+    if (!pregenQueue || (records && records.length > 0 && pregenQueue.getStatus().total !== records.length)) {
+      if (!records || records.length === 0) return pregenQueue?.getStatus() ?? null;
       const batchId = getPregenBatchId();
       const config = getTtsPregenConfig();
-      pregenQueue = new PreGenQueue(batchId, students, config, (status: PreGenStatus) => {
+      pregenQueue = new PreGenQueue(batchId, records, config, (status: PreGenStatus) => {
         getMainWindow()?.webContents.send('tts:pregen-progress', status);
       });
     }
     return pregenQueue.getStatus();
   });
 
-  ipcMain.handle('tts:pregen-requeue', (_e, { studentCode }: { studentCode: string }) => {
+  ipcMain.handle('tts:pregen-requeue', (_e, { id }: { id: string }) => {
     if (!pregenQueue) return { ok: false, error: 'Không có queue đang chạy' };
-    const result = pregenQueue.requeueOne(studentCode);
+    const result = pregenQueue.requeueOne(id);
     return { ok: result };
   });
 
-  ipcMain.handle('tts:pregen-get-audio', (_e, { studentCode }: { studentCode: string }) => {
+  ipcMain.handle('tts:pregen-get-audio', (_e, { id }: { id: string }) => {
     const batchId = getPregenBatchId();
-    const wavPath = ttsPregenWavPath(batchId, studentCode);
-    console.log(`[TTS PreGen] get-audio batchId=${batchId} studentCode=${studentCode} wavPath=${wavPath} exists=${existsSync(wavPath)}`);
+    const wavPath = ttsPregenWavPath(batchId, id);
+    console.log(`[TTS PreGen] get-audio batchId=${batchId} id=${id} wavPath=${wavPath} exists=${existsSync(wavPath)}`);
     if (!existsSync(wavPath)) {
       return { ok: false, error: 'File WAV chưa được tạo' };
     }
     try {
       const buffer = readFileSync(wavPath);
-      console.log(`[TTS PreGen] get-audio ok studentCode=${studentCode} bytes=${buffer.length}`);
-      return { ok: true, buffer };
+      // Trả kèm tần số đọc từ header — renderer bỏ 44 byte header rồi phát PCM thô nên
+      // KHÔNG tự biết được tần số. Trước đây nó hardcode 48000, sai gấp đôi tốc độ với
+      // file do Qwen (24kHz) sinh ra.
+      const sampleRate = readWavSampleRate(buffer);
+      console.log(`[TTS PreGen] get-audio ok id=${id} bytes=${buffer.length} sr=${sampleRate}`);
+      return { ok: true, buffer, sampleRate };
     } catch (err) {
-      console.error(`[TTS PreGen] get-audio error studentCode=${studentCode} wavPath=${wavPath}`, err);
+      console.error(`[TTS PreGen] get-audio error id=${id} wavPath=${wavPath}`, err);
       return { ok: false, error: String(err) };
     }
   });

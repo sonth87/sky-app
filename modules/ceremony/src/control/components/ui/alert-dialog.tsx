@@ -1,8 +1,8 @@
 import * as React from "react"
 import { AlertDialog as AlertDialogPrimitive } from "radix-ui"
 
-import { cn } from "../../lib/cn"
-import { ButtonPrimitive as Button } from "./button-primitive"
+import { cn } from "@sky-app/ui"
+import { ButtonPrimitive as Button } from "@sky-app/ui"
 import { usePortalContainer } from "../../PortalContainerContext"
 
 function AlertDialog({

@@ -77,6 +77,17 @@ export async function deleteHistoryEntry(id: string): Promise<void> {
   db.close();
 }
 
+export async function deleteAllHistoryEntries(): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
 /** Giữ tối đa MAX_ENTRIES bản ghi — xoá bản cũ nhất (theo createdAt) khi vượt. */
 async function pruneOldEntries(db: IDBDatabase): Promise<void> {
   const ids = await new Promise<string[]>((resolve, reject) => {

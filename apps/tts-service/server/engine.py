@@ -140,8 +140,14 @@ def analyze_quality(
 class TTSEngine(Protocol):
     """Minimal interface mà bất kỳ TTS engine nào phải implement."""
 
-    def encode_reference(self, wav_path: str) -> object:
-        """Encode WAV file thành voice embedding. Kết quả cache được."""
+    def encode_reference(self, wav_path: str, ref_text: str | None = None) -> object:
+        """Encode WAV file thành voice embedding. Kết quả cache được.
+
+        `ref_text` — bản chép lời của audio mẫu, lấy từ registry (xem voice_registry.py).
+        Engine clone kiểu in-context (Qwen/VoxCPM) cần nó để căn text↔codec; engine
+        không dùng thì bỏ qua. Optional để 5 engine hiện có đều tương thích ngược:
+        engine nào chưa nhận tham số này vẫn gọi được với 1 đối số như trước.
+        """
         ...
 
     def synthesize(
@@ -221,7 +227,22 @@ class VieneuEngine:
             "sample_rate": SAMPLE_RATE,
             "supports_clone": True,
             "supports_preset": True,
-            "supports_emotion": False,  # v3 emotion path chưa expose ổn định
+            "supports_emotion": False,  # v3 emotion path chưa expose ổn định — TODO Phase 3: enable sau khi test kỹ
+            "supports_sampling": True,
+            # `sampling_params` KHÔNG chỉ để UI render slider — main.py's _run_synthesis
+            # dùng chính danh sách key này để lọc khối `infer` global trước khi rót
+            # xuống engine (engine không khai key nào thì không nhận key đó). Thiếu 1 key
+            # ở đây = engine im lặng mất tính năng đó, nên phải khai ĐỦ mọi key
+            # `_merge_kwargs` chấp nhận.
+            "sampling_params": {
+                "temperature": {"min": 0.0, "max": 2.0, "default": 0.1},
+                "top_k": {"min": 1, "max": 40, "default": 5},
+                "top_p": {"min": 0.0, "max": 1.0, "default": 0.95},
+                "repetition_penalty": {"min": 1.0, "max": 2.0, "default": 1.3},
+                # None = tự tính theo độ dài text (_max_new_frames). Bounds khớp
+                # config_store.py's _INFER_BOUNDS.
+                "max_new_frames": {"min": 40, "max": 800, "default": None},
+            },
             "providers": self.providers,
         }
 

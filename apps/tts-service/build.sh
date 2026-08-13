@@ -32,13 +32,13 @@ FORCE_REFRESH=0
 # nội bộ tts-service sang đích SHELL_RESOURCES — build.sh/build-win.js chỉ
 # ĐỌC REF_DIR làm input (smoke test, generate preview), không tự tạo.
 TTS_SERVICE_RESOURCES="$(cd "$(dirname "$0")" && pwd)/resources"
-if [ -d "$TTS_SERVICE_RESOURCES/voice-ref" ] && [ ! -d "$REF_DIR" ]; then
-  echo "[Build] Copy voice-ref vào $REF_DIR ..."
-  mkdir -p "$SHELL_RESOURCES"
-  cp -r "$TTS_SERVICE_RESOURCES/voice-ref" "$REF_DIR"
+if [ -d "$TTS_SERVICE_RESOURCES/voice-ref" ]; then
+  echo "[Build] Đồng bộ voice-ref vào $REF_DIR ..."
+  mkdir -p "$REF_DIR"
+  cp -r "$TTS_SERVICE_RESOURCES/voice-ref/"* "$REF_DIR/"
 fi
-if [ -f "$TTS_SERVICE_RESOURCES/voice-registry.json" ] && [ ! -f "$SHELL_RESOURCES/voice-registry.json" ]; then
-  echo "[Build] Copy voice-registry.json vào $SHELL_RESOURCES ..."
+if [ -f "$TTS_SERVICE_RESOURCES/voice-registry.json" ]; then
+  echo "[Build] Đồng bộ voice-registry.json vào $SHELL_RESOURCES ..."
   mkdir -p "$SHELL_RESOURCES"
   cp "$TTS_SERVICE_RESOURCES/voice-registry.json" "$SHELL_RESOURCES/voice-registry.json"
 fi
@@ -180,13 +180,18 @@ else
 fi
 
 # ─── Đóng gói bằng PyInstaller (spec file) ────────────────────────────────
-echo "[Build] Đóng gói vieneu-server bằng PyInstaller..."
+echo "[Build] Đóng gói 'Sky App TTS' bằng PyInstaller..."
 pyinstaller --clean vieneu-server.spec
 
 # ─── Copy binary vào apps/shell-electron/resources/ ───────────────────────
+# Tên có DẤU CÁCH ("Sky App TTS") — đây là tên tiến trình người dùng thấy trong Activity
+# Monitor, xem comment ở vieneu-server.spec. Mọi tham chiếu phải quote đầy đủ.
 echo "[Build] Copy binary vào $SHELL_RESOURCES ..."
 mkdir -p "$SHELL_RESOURCES"
-cp dist/vieneu-server "$SHELL_RESOURCES/vieneu-server"
+cp "dist/Sky App TTS" "$SHELL_RESOURCES/Sky App TTS"
+# Dọn binary tên cũ còn sót lại từ lần build trước — để lại sẽ khiến bản đóng gói mang
+# theo 2 file ~82MB giống hệt nhau.
+rm -f "$SHELL_RESOURCES/vieneu-server"
 
 echo "[Build] Đóng gói hoàn tất!"
-echo "[Build] Binary: $SHELL_RESOURCES/vieneu-server"
+echo "[Build] Binary: $SHELL_RESOURCES/Sky App TTS"

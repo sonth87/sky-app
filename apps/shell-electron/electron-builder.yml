@@ -22,6 +22,11 @@
 appId: com.skyapp.shell
 productName: Sky-App
 
+# build-assets/icons/icon.png (2026-07-30, nguồn build-assets/icons/icon.svg) — 1 PNG
+# ≥512×512 nền trong suốt là đủ, electron-builder tự sinh .icns (mac)/.ico (win) từ đây,
+# không cần chuẩn bị sẵn cả 2 định dạng (xem build-assets/icons/README.md).
+icon: build-assets/icons/icon.png
+
 directories:
   # PHẢI khác "dist" (renderer output của electron-vite) và "dist-electron"
   # (main/preload output) để tránh electron-builder ghi đè build renderer.
@@ -31,6 +36,19 @@ files:
   - dist-electron/**/*
   - dist/**/*
   - package.json
+  # @sonth87/device-layout (GitHub dep, UI shell) khai next/next-pwa/sharp/nuqs làm
+  # dependency thật trong package.json của chính nó (dùng cho demo/dev app nội bộ của nó,
+  # không phải runtime của sky-app) — pnpm hoist các package này lên node_modules gốc, và
+  # electron-builder tự asarUnpack vì @img/sharp-* có .node native binding, kéo app bundle
+  # phình thêm ~130MB không cần thiết. Loại trừ tường minh — không package nào trong
+  # apps/shell-electron hay modules/* import next/sharp/nuqs lúc runtime. Xác nhận lại
+  # (đếm bytes app.asar.unpacked) nếu build lỗi thiếu module sau khi thêm dòng này.
+  - "!**/node_modules/next/**"
+  - "!**/node_modules/@next/**"
+  - "!**/node_modules/sharp/**"
+  - "!**/node_modules/@img/**"
+  - "!**/node_modules/@ducanh2912/**"
+  - "!**/node_modules/nuqs/**"
 
 # TTS bundled resources — sinh ra bởi `pnpm --filter @sky-app/tts-service
 # build:mac`/`build:win` (chạy TRƯỚC electron-builder, xem package.json's
@@ -57,12 +75,23 @@ extraResources:
     to: voice-previews
   - from: resources/voice-registry.json
     to: voice-registry.json
+  # Mã nguồn server Python. Bản đóng gói chạy bằng binary PyInstaller (vieneu-server)
+  # cho engine mặc định, NHƯNG engine mở rộng phải chạy main.py bằng runtime Python
+  # tải riêng (xem resolveExtensionEngineSpawn trong python-server.ts) — thiếu thư mục
+  # này thì getServerDir() trả '' và mọi engine mở rộng không khởi động được.
+  - from: ../tts-service/server
+    to: python-backend
+    filter:
+      - '**/*.py'
+      - '!venv'
+      - '!__pycache__'
+      - '!**/__pycache__'
+  # Danh sách dependency của server — cần khi dựng runtime GPU (xem ipc 'tts:install-accel').
+  # Ship file thay vì chép cứng danh sách vào TypeScript để không có 2 nguồn sự thật.
+  - from: ../tts-service/requirements.txt
+    to: python-backend/requirements.txt
 
 mac:
-  # TODO: icon: build-assets/icons/icon.icns (chưa có asset — xem
-  # build-assets/icons/README.md). Thiếu icon → dùng icon mặc định Electron,
-  # không chặn build.
-  #
   # zip (cạnh dmg): KHÔNG chỉ để phân phối thêm — Squirrel.Mac (cơ chế
   # electron-updater dùng để auto-update trên macOS, xem `publish:` dưới)
   # BẮT BUỘC định dạng .zip, không đọc .dmg trực tiếp. Chuẩn bị sẵn để
@@ -77,13 +106,12 @@ mac:
   hardenedRuntime: false
   gatekeeperAssess: false
   extraResources:
-    - from: resources/vieneu-server
-      to: vieneu-server
+    # Tên file = tên tiến trình hiện trong Activity Monitor (macOS gán từ tên file thực
+    # thi lúc exec, tiến trình không tự đổi được). Xem apps/tts-service/vieneu-server.spec.
+    - from: resources/Sky App TTS
+      to: Sky App TTS
 
 win:
-  # TODO: icon: build-assets/icons/icon.ico (chưa có asset — xem
-  # build-assets/icons/README.md).
-  #
   # portable: bản .exe chạy thẳng không cần cài đặt, tiện test nhanh trên
   # máy không muốn cài. nsis vẫn là target chính cho máy hội trường (production).
   target:
@@ -93,8 +121,8 @@ win:
   # user chọn "More info → Run anyway".
   signAndEditExecutable: false
   extraResources:
-    - from: resources/vieneu-server.exe
-      to: vieneu-server.exe
+    - from: resources/Sky App TTS.exe
+      to: Sky App TTS.exe
 
 nsis:
   oneClick: false

@@ -1,5 +1,5 @@
 import { app } from 'electron';
-import { existsSync } from 'node:fs';
+import { existsSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Thư mục dữ liệu offline của buổi lễ trong userData */
@@ -7,8 +7,51 @@ export function ceremonyDataDir(): string {
   return join(app.getPath('userData'), 'ceremony-data');
 }
 
+/** @deprecated Giai đoạn 0 chuyển sang SQLite — giữ hàm này chỉ để cancelImport/commitStaging
+ * dọn dẹp file bundle.json cũ có thể còn sót từ bản cài trước, không còn được ghi mới. */
 export function bundleJsonPath(): string {
   return join(ceremonyDataDir(), 'bundle.json');
+}
+
+/**
+ * File SQLite DÙNG CHUNG cho toàn app — không phải của riêng Ceremony.
+ *
+ * Tên cũ `ceremony.db` là di sản của module đầu tiên dùng nó; thực tế file này chứa bảng của
+ * layout designer, event/data-source, media library, TTS… (xem packages/app-db/src/migrations).
+ * Đổi tên 2026-08-12 cho khớp thực tế — kèm `migrateLegacyDbName()` để bản cài cũ không mất
+ * dữ liệu.
+ */
+export function skyAppDbPath(): string {
+  return join(ceremonyDataDir(), 'sky-app.db');
+}
+
+/** Đường dẫn cũ, CHỈ dùng cho bước đổi tên một lần. Không mở kết nối vào đây. */
+function legacyDbPath(): string {
+  return join(ceremonyDataDir(), 'ceremony.db');
+}
+
+/**
+ * Đổi tên DB của bản cài cũ sang tên mới. Gọi TRƯỚC khi mở kết nối đầu tiên.
+ *
+ * Đổi cả 3 file: `.db`, `-wal`, `-shm`. Bỏ sót `-wal` là mất những giao dịch chưa
+ * checkpoint (WAL có thể giữ lượng ghi đáng kể — app không bao giờ đóng kết nối nên
+ * checkpoint chỉ xảy ra tự động theo ngưỡng).
+ *
+ * Không làm gì nếu file mới đã có (đã đổi rồi, hoặc máy mới) — kể cả khi file cũ vẫn còn,
+ * vì lúc đó file cũ là rác chứ không phải nguồn sự thật. Lỗi đổi tên KHÔNG được nuốt: thà
+ * dừng có thông báo còn hơn âm thầm tạo DB rỗng rồi người dùng tưởng mất sạch dữ liệu.
+ */
+export function migrateLegacyDbName(): void {
+  const target = skyAppDbPath();
+  const legacy = legacyDbPath();
+  if (existsSync(target) || !existsSync(legacy)) return;
+
+  console.log(`[DB] Đổi tên ${legacy} → ${target}`);
+  renameSync(legacy, target);
+  // -wal/-shm có thể không tồn tại (DB đã checkpoint sạch lúc thoát) — không phải lỗi.
+  for (const suffix of ['-wal', '-shm']) {
+    if (existsSync(legacy + suffix)) renameSync(legacy + suffix, target + suffix);
+  }
 }
 
 export function appConfigJsonPath(): string {
@@ -21,6 +64,12 @@ export function sessionJsonPath(): string {
 
 export function assetsDir(): string {
   return join(ceremonyDataDir(), 'assets');
+}
+
+/** Ảnh do layout-designer chọn (nền/avatar tĩnh) — thư mục con riêng trong assets/, tránh trộn
+ * lẫn với ảnh sinh viên nhập qua ZIP (image/, assets/ gốc — xem resolveLocalAsset dưới). */
+export function layoutAssetsDir(): string {
+  return join(assetsDir(), 'layout');
 }
 
 export function autoPlayJsonPath(): string {
@@ -131,8 +180,9 @@ export function vieneuConfigPath(): string {
 
 /**
  * Thư mục gốc chứa các engine TTS mở rộng TẢI THEO NHU CẦU (ngoài VieNeu bundled).
- * Mỗi engine tự chứa: runtime (Python embeddable + torch...), model, manifest.
- * Cấu trúc: <root>/<engineId>/{runtime, model, install-state.json, manifest.json}.
+ * Mỗi engine tự chứa: model, manifest, install-state — KHÔNG còn runtime riêng (xem
+ * `ttsRuntimeDir`, đổi 2026-08-11/GĐ C).
+ * Cấu trúc: <root>/<engineId>/{model, install-state.json, manifest.json}.
  */
 export function ttsEnginesDir(): string {
   return join(app.getPath('userData'), 'tts-engines');
@@ -143,6 +193,28 @@ export function ttsEngineDir(engineId: string): string {
   // Chặn path traversal: engineId chỉ nhận ký tự an toàn.
   const safe = engineId.replace(/[^a-zA-Z0-9_-]/g, '_');
   return join(ttsEnginesDir(), safe);
+}
+
+/**
+ * Runtime Python (interpreter tải rời + site-packages) DÙNG CHUNG cho mọi engine cùng
+ * `runtime_kind` — GĐ C (2026-08-11) của docs/roadmap/plans/tts-engine-architecture.md.
+ *
+ * Trước đây mỗi engine mở rộng có `runtime/site-packages` RIÊNG (nằm trong
+ * `ttsEngineDir(engineId)`) — cài 2 engine cùng cần torch (vd VoxCPM + engine torch
+ * tương lai) là torch bị tải VÀ LƯU 2 LẦN, ~2.5GB lãng phí mỗi bản trùng lặp.
+ *
+ * `kind`: 'torch' | 'onnx-ext' | 'onnx-accel' (không có 'onnx-bundled' — VieNeu chạy
+ * bằng binary PyInstaller, không có runtime rời để dùng chung).
+ * Cấu trúc: <root>/_runtime/<kind>/{python, site-packages}.
+ *
+ * `_runtime` có dấu gạch dưới để không trùng ký tự an toàn của bất kỳ `engineId` thật
+ * nào (engineId đã bị lọc qua `ttsEngineDir`'s regex, không chứa `_` ở đầu theo quy ước
+ * đặt tên hiện tại) — tránh nhầm thư mục runtime dùng chung với thư mục 1 engine cụ thể
+ * khi liệt kê `ttsEnginesDir()`.
+ */
+export function ttsRuntimeDir(kind: string): string {
+  const safe = kind.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return join(ttsEnginesDir(), '_runtime', safe);
 }
 
 /** Thư mục chứa file WAV đã pre-gen cho 1 batch */

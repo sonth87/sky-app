@@ -7,6 +7,7 @@ import { resolveAsset } from '../../../lib/assets';
 import {
   DynamicBackdropView,
   resolveTemplateVariant,
+  canonicalToStudent,
   type BackdropAspectRatio,
   type BackdropTemplateMap,
   type BackdropTemplate,
@@ -36,7 +37,7 @@ export function LayoutConfigContent() {
   const socket = useSocketRef();
   const ceremony = useControlStore((s) => s.ceremony);
   const layoutOverrides = useControlStore((s) => s.layoutOverrides || {});
-  const students = useControlStore((s) => s.students);
+  const records = useControlStore((s) => s.records);
 
   const [layouts, setLayouts] = useState<BackdropTemplateMap | null>(null);
   const [selectedLayoutKey, setSelectedLayoutKey] = useState<string>('layout-1');
@@ -136,12 +137,14 @@ export function LayoutConfigContent() {
     return () => ro.disconnect();
   }, [selectedLayoutKey]);
 
-  // Fake student for preview
-  const sampleStudent: Student = students[0] ?? {
+  // Fake student for preview — adapter TẠM cho DynamicBackdropView (hệ template cũ), xem PHỤ
+  // LỤC "giữ BackdropView tạm" trong plan.
+  const sampleStudent: Student = (records[0] ? canonicalToStudent(records[0], 0) : null) ?? {
     id: '1',
     student_code: 'SV001',
     display_order: 1,
     full_name: 'Nguyễn Văn Mẫu',
+    gender: 'Nam',
     date_of_birth: '2000-01-01',
     major_name: 'Công nghệ thông tin',
     faculty_name: 'CNTT',

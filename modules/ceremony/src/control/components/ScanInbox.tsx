@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useControlStore } from '../store';
 import { useSocketRef } from '../SocketContext';
 import { resolveAsset } from '../../lib/assets';
-import { formatGpa } from '@sky-app/slide-shared';
+import { flattenCanonicalRecord } from '@sky-app/slide-shared';
 
 export function ScanInbox() {
   const { t } = useTranslation();
@@ -11,9 +11,11 @@ export function ScanInbox() {
   const lastScan = useControlStore((s) => s.lastScan);
   const socket = useSocketRef();
 
-  const isAbsent = pending?.absent || pending?.status === 'absent';
+  const record = pending?.record ?? null;
+  const flat = record ? flattenCanonicalRecord(record) : null;
+  const isAbsent = flat?.absent === 'true' || flat?.absent === '1' || pending?.runtimeState.status === 'absent';
 
-  if (!pending) {
+  if (!record || !flat) {
     return (
       <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
         {t('scanInbox.noStudentScanned')}
@@ -23,7 +25,7 @@ export function ScanInbox() {
 
   return (
     <motion.div
-      key={lastScan?.ts ?? pending.student_code}
+      key={lastScan?.ts ?? record.id}
       initial={{ boxShadow: '0 0 0 0 rgba(251,191,36,0)' }}
       animate={{
         boxShadow: [
@@ -43,14 +45,14 @@ export function ScanInbox() {
       >
         {isAbsent ? `⚠ ${t('scanInbox.studentMarkedAbsent')}` : t('scanInbox.justScanned')}
       </div>
-      {isAbsent && pending.absent_reason && (
-        <div className="mb-2 text-xs text-destructive">{t('scanInbox.reason', { reason: pending.absent_reason })}</div>
+      {isAbsent && flat.absent_reason && (
+        <div className="mb-2 text-xs text-destructive">{t('scanInbox.reason', { reason: flat.absent_reason })}</div>
       )}
       <div className="flex gap-4">
-        {pending.image_relative_path ? (
+        {record.image_relative_path ? (
           <img
-            src={resolveAsset(pending.image_relative_path)}
-            alt={pending.full_name}
+            src={resolveAsset(record.image_relative_path)}
+            alt={record.full_name}
             className="h-28 w-20 rounded bg-muted object-cover"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
@@ -62,19 +64,19 @@ export function ScanInbox() {
           </div>
         )}
         <div className="flex-1">
-          <div className="text-lg font-bold">{pending.full_name}</div>
-          <div className="font-mono text-xs text-muted-foreground">{pending.student_code}</div>
+          <div className="text-lg font-bold">{record.full_name}</div>
+          <div className="font-mono text-xs text-muted-foreground">{record.identifierCode ?? record.id}</div>
           <div className="mt-1 text-sm text-foreground">
-            {pending.major_name} · {pending.faculty_name}
+            {flat.major_name} · {flat.faculty_name}
           </div>
           <div className="text-sm text-foreground">
-            {pending.classification} · GPA {formatGpa(pending.gpa)}
+            {flat.classification} · GPA {flat.gpa}
           </div>
         </div>
       </div>
       <div className="mt-3 flex gap-2">
         <button
-          onClick={() => socket.current?.emit('cmd:show', { student_code: pending.student_code, source: 'manual' })}
+          onClick={() => socket.current?.emit('cmd:show', { id: record.id, source: 'manual' })}
           className={`rounded-md px-4 py-2 text-sm font-semibold ${
             isAbsent
               ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'

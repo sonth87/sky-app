@@ -15,6 +15,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
+  "dependencies": {
+    "@sky-app/slide-shared": "workspace:*"
+  },
   "devDependencies": {
     "@sky-app/tsconfig": "workspace:*",
     "typescript": "^5.9.3"

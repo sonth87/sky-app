@@ -1,121 +1,42 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AppConfig, Ceremony, Student } from '@sky-app/slide-shared';
+import { mkdirSync } from 'node:fs';
+import type { AppConfig, Ceremony, CanonicalRecord } from '@sky-app/slide-shared';
+import {
+  BetterSqlite3Executor,
+  runMigrations,
+  getCeremonyWithConfig,
+  saveCeremonyWithConfig,
+  defaultCeremony,
+} from '@sky-app/app-db/node';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const DATA_DIR = join(__dirname, '..', 'data');
-const BUNDLE_PATH = join(DATA_DIR, 'bundle.json');
-const SAMPLE_STUDENTS_PATH = join(__dirname, '..', '..', 'shell-electron', 'sample-bundle', 'data', 'students.json');
+// `sky-app.db`, không phải `ceremony.db`: file này chứa bảng của mọi module (layout, event,
+// asset, TTS…), không riêng Ceremony. Data-service là DB dev/web RIÊNG — không dùng chung
+// file với Electron — nên đổi tên thẳng, không cần bước migrate như `paths.ts` phải làm cho
+// dữ liệu thật của người dùng.
+const DB_PATH = join(DATA_DIR, 'sky-app.db');
 
+const ROOM_ID = 'default';
+
+/**
+ * Shape RIÊNG của data-service — không có room_id/session_state (data-service không quản lý
+ * multi-room hay session vận hành, chỉ dùng cho dev local, không có Event/DataSource như
+ * Electron). Giai đoạn "bỏ Student" (2026-07-22): danh sách người tham dự giờ là
+ * CanonicalRecord[] — data-service KHÔNG còn tự seed từ sample-bundle (RawStudent/mapRawStudent
+ * đã xoá cùng luồng Import ZIP legacy), records mặc định rỗng, chỉ ghi được qua writeRecords()
+ * nếu cần test thủ công.
+ */
 export interface CeremonyBundle {
   ceremony: Ceremony;
   config: AppConfig;
-  students: Student[];
+  records: CanonicalRecord[];
   syncedAt: string | null;
 }
 
-interface RawStudent {
-  id: string;
-  graduation_batch_id: string;
-  batch_name: string;
-  display_order: number;
-  student_code: string;
-  full_name: string;
-  gender?: string;
-  date_of_birth: string;
-  identity_number?: string;
-  major_name: string;
-  faculty_name: string;
-  class_code: string;
-  course_code: string;
-  phone_number?: string;
-  email: string;
-  gpa: number;
-  classification: string;
-  classification_type: number;
-  achievement_title: string;
-  award_type: string;
-  award_type_code: string | null;
-  award_content: string;
-  quote: string | null;
-  image_file_name: string;
-  image_relative_path?: string;
-  presentation_template_type: string;
-  presentation_template_type_code: string | null;
-  registration_status: string;
-  degree_award_status: string;
-}
-
-/** Map registration_status (portal) → StudentStatus nội bộ — cùng mapping với apps/shell-electron/electron/slide/data/sync.ts's mapStatus(). */
-function mapStatus(raw: string): Student['status'] {
-  switch (raw) {
-    case 'on_stage': return 'on_stage';
-    case 'returned':
-    case 'received_hardcopy': return 'returned';
-    case 'checked_in': return 'checked_in';
-    case 'called': return 'called';
-    case 'absent': return 'absent';
-    default: return 'registered';
-  }
-}
-
-function mapRawStudent(r: RawStudent): Student {
-  return {
-    id: r.id,
-    student_code: r.student_code,
-    display_order: r.display_order,
-    full_name: r.full_name,
-    gender: r.gender || 'Nam',
-    date_of_birth: r.date_of_birth,
-    major_name: r.major_name,
-    faculty_name: r.faculty_name,
-    class_code: r.class_code,
-    course_code: r.course_code,
-    phone_number: r.phone_number ?? '',
-    identity_number: r.identity_number ?? '',
-    email: r.email,
-    gpa: r.gpa,
-    classification: r.classification,
-    classification_type: r.classification_type,
-    achievement_title: r.achievement_title,
-    award_type: r.award_type,
-    award_type_code: r.award_type_code,
-    award_content: r.award_content,
-    presentation_template_type: r.presentation_template_type,
-    presentation_template_type_code: r.presentation_template_type_code,
-    quote: r.quote,
-    image_file_name: r.image_file_name,
-    image_relative_path: r.image_relative_path ?? '',
-    graduation_batch_id: r.graduation_batch_id,
-    batch_name: r.batch_name,
-    degree_award_status: r.degree_award_status,
-    status: mapStatus(r.registration_status),
-    ts_checkin: null,
-    ts_called: null,
-    ts_on_stage: null,
-    ts_returned: null,
-    src_on_stage: null,
-    staff_presenter: null,
-  };
-}
-
-function defaultCeremony(): Ceremony {
-  return {
-    id: 1,
-    name: 'Lễ Trao Bằng Tốt Nghiệp',
-    graduation_year: new Date().getFullYear().toString(),
-    date: new Date().toISOString().slice(0, 10),
-    venue: 'Trường ĐH Đại Nam',
-    university_name: 'TRƯỜNG ĐẠI HỌC ĐẠI NAM',
-    ministry_name: 'BỘ GIÁO DỤC VÀ ĐÀO TẠO',
-    title_line1: 'LỄ TRAO BẰNG TỐT NGHIỆP',
-    title_line2: '',
-    logo: 'logo.png',
-    backdrops_config: 'assets/2026/backdrops_layouts.json',
-  };
-}
-
+// defaultCeremony gom về @sky-app/app-db (seed.ts). Chỉ defaultConfig giữ RIÊNG vì
+// data-service dùng giá trị mặc định KHÁC Electron (port 8766, mode manual, kiosk off...).
 function defaultConfig(): AppConfig {
   return {
     ws_port: 8765,
@@ -131,53 +52,40 @@ function defaultConfig(): AppConfig {
   };
 }
 
-function seedFromSample(): CeremonyBundle {
-  const raw = JSON.parse(readFileSync(SAMPLE_STUDENTS_PATH, 'utf-8')) as RawStudent[];
-  return {
-    ceremony: defaultCeremony(),
-    config: defaultConfig(),
-    students: raw.map(mapRawStudent),
-    syncedAt: null,
-  };
+let cachedRecords: CanonicalRecord[] = [];
+
+let executor: BetterSqlite3Executor | null = null;
+
+/** Dùng chung bởi routes/layout.ts — cùng 1 file DB, tránh mở 2 kết nối SQLite song song. */
+export function getExecutor(): BetterSqlite3Executor {
+  if (!executor) {
+    mkdirSync(DATA_DIR, { recursive: true });
+    executor = new BetterSqlite3Executor(DB_PATH);
+    runMigrations(executor);
+  }
+  return executor;
 }
 
 export function readBundle(): CeremonyBundle {
-  if (!existsSync(BUNDLE_PATH)) return seedFromSample();
-  return JSON.parse(readFileSync(BUNDLE_PATH, 'utf-8')) as CeremonyBundle;
+  const loaded = getCeremonyWithConfig(getExecutor(), ROOM_ID);
+  if (!loaded) {
+    return { ceremony: defaultCeremony(), config: defaultConfig(), records: cachedRecords, syncedAt: null };
+  }
+  return { ceremony: loaded.ceremony, config: loaded.config, records: cachedRecords, syncedAt: null };
 }
 
 export function writeBundle(bundle: CeremonyBundle): void {
-  mkdirSync(dirname(BUNDLE_PATH), { recursive: true });
-  writeFileSync(BUNDLE_PATH, JSON.stringify(bundle, null, 2), 'utf-8');
-}
-
-export function syncFromSample(): CeremonyBundle {
-  const bundle = seedFromSample();
-  bundle.syncedAt = new Date().toISOString();
-  writeBundle(bundle);
-  return bundle;
+  saveCeremonyWithConfig(getExecutor(), {
+    roomId: ROOM_ID,
+    roomName: '',
+    ceremony: bundle.ceremony,
+    config: bundle.config,
+  });
+  cachedRecords = bundle.records;
 }
 
 export function resetAll(): CeremonyBundle {
-  const bundle = seedFromSample();
-  bundle.students = [];
-  bundle.syncedAt = null;
-  writeBundle(bundle);
-  return bundle;
-}
-
-export function resetStudentOperationalFields(): CeremonyBundle {
-  const bundle = readBundle();
-  bundle.students = bundle.students.map((s) => ({
-    ...s,
-    status: 'registered',
-    ts_checkin: null,
-    ts_called: null,
-    ts_on_stage: null,
-    ts_returned: null,
-    src_on_stage: null,
-    staff_presenter: null,
-  }));
+  const bundle: CeremonyBundle = { ceremony: defaultCeremony(), config: defaultConfig(), records: [], syncedAt: null };
   writeBundle(bundle);
   return bundle;
 }

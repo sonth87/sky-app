@@ -52,7 +52,7 @@ export function QrChip({ open, onToggle }: { open: boolean; onToggle: () => void
               />
               <StatRow
                 label={t('statusBar.qr.student')}
-                value={`${lastScan.student.full_name} (${lastScan.student.student_code})`}
+                value={`${lastScan.record.full_name} (${lastScan.record.identifierCode ?? lastScan.record.id})`}
                 tooltip={t('statusBar.qr.studentTooltip')}
               />
             </>

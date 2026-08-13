@@ -1,10 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react';
-import { type Student, type TtsCondition, type CustomVariable } from '@sky-app/slide-shared';
+import { type CanonicalRecord, type TtsCondition, type CustomVariable } from '@sky-app/slide-shared';
+import type { TtsEnginePort } from '@sky-app/service-contracts';
 import { VoicePickerPopover } from '../VoicePickerPopover';
 import { TemplateEditor } from '../TemplateEditor';
 import { AdvancedTtsConfig } from '../AdvancedTtsConfig';
-import { DeviceConfig } from '../DeviceConfig';
+import { DeviceConfig } from '@sky-app/tts-engine-ui';
+import { CeremonySafetyNote } from '../CeremonySafetyNote';
+import { usePlatform } from '../../PlatformContext';
 import { playPcm } from '../../../lib/audio';
 import { renderTemplate } from '../../../lib/renderTemplate';
 
@@ -31,8 +34,8 @@ interface ConfigColumnProps {
   onChangePlayMode: (val: 'realtime' | 'pregen' | 'pregen-fallback') => void;
   localConditions: TtsCondition[];
   hasConditions: boolean;
-  previewStudent: Student | null;
-  getVoiceForStudent: (student: Student, conditions: TtsCondition[], fallbackVoice: string) => string;
+  previewRecord: CanonicalRecord | null;
+  getVoiceForStudent: (record: CanonicalRecord, conditions: TtsCondition[], fallbackVoice: string) => string;
   onOpenCloneModal: () => void;
   customVariables?: CustomVariable[];
   onManageVariables?: () => void;
@@ -51,13 +54,15 @@ export function ConfigColumn({
   onChangePlayMode,
   localConditions,
   hasConditions,
-  previewStudent,
+  previewRecord,
   getVoiceForStudent,
   onOpenCloneModal,
   customVariables,
   onManageVariables,
 }: ConfigColumnProps) {
   const { t } = useTranslation();
+  const platform = usePlatform();
+  const enginePort = platform?.services.get<TtsEnginePort>('tts-engine');
   return (
     <div className="w-[38%] p-6 overflow-y-auto flex flex-col gap-6">
       <div className="text-xs font-bold text-primary tracking-wider uppercase">{t('ttsModal.config.sectionTitle')}</div>
@@ -73,7 +78,7 @@ export function ConfigColumn({
             </div>
           </div>
         ) : (
-          <VoicePickerPopover value={localModel} onChange={onChangeModel} />
+          <VoicePickerPopover value={localModel} onChange={onChangeModel} onAddVoice={onOpenCloneModal} />
         )}
         <button
           type="button"
@@ -124,8 +129,8 @@ export function ConfigColumn({
         <TemplateEditor
           value={localTemplate}
           onChange={onChangeTemplate}
-          previewStudent={previewStudent}
-          voiceId={previewStudent ? getVoiceForStudent(previewStudent, localConditions, localModel) : localModel}
+          previewRecord={previewRecord}
+          voiceId={previewRecord ? getVoiceForStudent(previewRecord, localConditions, localModel) : localModel}
           speed={localSpeed}
           customVariables={customVariables}
           onManageVariables={onManageVariables}
@@ -168,15 +173,15 @@ export function ConfigColumn({
 
       {/* Cấu hình chuyên sâu (advanced infer params) */}
       <AdvancedTtsConfig
-        previewDisabled={!previewStudent}
+        previewDisabled={!previewRecord}
         onPreview={async () => {
           // Nghe thử: đọc câu template cho SV mẫu bằng config vừa lưu (server-side).
-          const text = previewStudent && localTemplate
-            ? renderTemplate(localTemplate, previewStudent, customVariables)
-            : (previewStudent?.full_name ?? '');
+          const text = previewRecord && localTemplate
+            ? renderTemplate(localTemplate, previewRecord, customVariables)
+            : (previewRecord?.full_name ?? '');
           if (!text) return;
-          const voiceId = previewStudent
-            ? getVoiceForStudent(previewStudent, localConditions, localModel)
+          const voiceId = previewRecord
+            ? getVoiceForStudent(previewRecord, localConditions, localModel)
             : localModel;
           const res = await window.slide?.speak?.(text, voiceId, localSpeed);
           if (res?.ok && res.buffer) {
@@ -185,8 +190,14 @@ export function ConfigColumn({
         }}
       />
 
-      {/* Thiết bị xử lý (CPU/GPU + số luồng) */}
-      <DeviceConfig />
+      {/* Thiết bị xử lý (CPU/GPU + số luồng) + quản lý engine — UI dùng chung với TTS Studio */}
+      {enginePort && (
+        <DeviceConfig
+          port={enginePort}
+          canInstall={platform?.capabilities.has('tts-local') ?? false}
+          engineManagerNotice={<CeremonySafetyNote />}
+        />
+      )}
     </div>
   );
 }

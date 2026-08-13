@@ -2,6 +2,141 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.12.0",
+      "date": "2026-08-12",
+      "bump": "minor",
+      "summary": "Gộp Quản lý engine, Thiết bị xử lý và Xem log thành 1 cửa sổ \"Cấu hình\" duy nhất với 4 tab (Models/Engine, Hiệu ứng, Nhật ký, Cài đặt). Tab Hiệu ứng giờ tạo/sửa được preset đầy đủ (thêm/xoá/kéo-thả hiệu ứng, nghe thử). Tab Nhật ký hiện log theo thời gian thực thay vì phải chờ tải lại.",
+      "breaking": true,
+      "minAppVersion": "0.12.0",
+      "detailsRef": "history/2026-08-12-gop-cua-so-cau-hinh-tts.md"
+    },
+    {
+      "version": "0.11.3",
+      "date": "2026-08-12",
+      "bump": "patch",
+      "summary": "Fix lỗi engine TTS đã chọn (vd Qwen) không được nhớ đúng, cứ mở lại app là quay về engine mặc định.",
+      "breaking": true,
+      "minAppVersion": "0.11.3",
+      "detailsRef": "history/2026-08-12-config-store-ghi-de-engine-2-tien-trinh.md"
+    },
+    {
+      "version": "0.11.2",
+      "date": "2026-08-12",
+      "bump": "patch",
+      "summary": "Fix lỗi giọng đọc dựng sẵn vẫn báo thiếu bản chép lời khi dùng engine Qwen dù đã nhập/đồng bộ transcript.",
+      "breaking": true,
+      "minAppVersion": "0.11.2",
+      "detailsRef": "history/2026-08-12-backfill-ref-text-bo-sot-voice-da-import.md"
+    },
+    {
+      "version": "0.11.1",
+      "date": "2026-08-12",
+      "bump": "patch",
+      "summary": "Fix lỗi tạo audio giọng clone bị lỗi 500 khi dùng engine mặc định (bundled).",
+      "breaking": true,
+      "minAppVersion": "0.11.1",
+      "detailsRef": "history/2026-08-12-fix-encode-reference-2-doi-so.md"
+    },
+    {
+      "version": "0.11.0",
+      "date": "2026-08-12",
+      "bump": "minor",
+      "summary": "Sửa lỗi các giọng đọc dựng sẵn báo lỗi khi tạo audio với engine Qwen do thiếu bản chép lời audio mẫu. Khi tạo giọng mới bằng cách sao chép giọng nói, giờ chọn được cả file mp3, không chỉ wav.",
+      "breaking": true,
+      "minAppVersion": "0.11.0",
+      "detailsRef": "history/2026-08-12-catalog-ref-text-va-mp3-clone.md"
+    },
+    {
+      "version": "0.10.0",
+      "date": "2026-08-12",
+      "bump": "minor",
+      "summary": "Khi tạo giọng đọc mới bằng cách sao chép giọng nói, giờ có thể chọn NHIỀU file âm thanh mẫu cùng lúc thay vì chỉ 1 — model học được nhiều ngữ cảnh về giọng hơn, cho ra giọng clone giống bản gốc hơn. Mỗi file mẫu có ô nhập nội dung riêng.",
+      "breaking": true,
+      "minAppVersion": "0.10.0",
+      "detailsRef": "history/2026-08-12-mot-giong-nhieu-mau-multi-sample.md"
+    },
+    {
+      "version": "0.9.0",
+      "date": "2026-08-12",
+      "bump": "minor",
+      "summary": "Tiến trình xử lý giọng nói giờ có thể lưu danh sách giọng đọc trực tiếp vào cơ sở dữ liệu dùng chung của app thay vì file riêng — nền tảng để thêm các tính năng giọng nói mới sau này (nhiều mẫu âm thanh cho 1 giọng, lịch sử tạo audio...). Không ảnh hưởng gì tới giọng đọc hiện có — dữ liệu cũ được giữ nguyên và có đường lùi nếu cần.",
+      "breaking": true,
+      "minAppVersion": "0.9.0",
+      "detailsRef": "history/2026-08-12-python-noi-vao-db-dung-chung.md"
+    },
+    {
+      "version": "0.8.0",
+      "date": "2026-08-12",
+      "bump": "minor",
+      "summary": "Đổi tên cơ sở dữ liệu nội bộ cho đúng với thực tế (nó chứa dữ liệu của cả app, không riêng phần buổi lễ) — dữ liệu cũ được chuyển sang tên mới tự động khi mở app lần đầu, không mất gì. Sửa lỗi tiến trình giọng nói bị bỏ lại chạy ngầm khi khởi động thất bại: trước đây nó chiếm RAM cho tới khi tắt máy và không có cách nào dừng, kể cả thoát app.",
+      "breaking": true,
+      "minAppVersion": "0.8.0",
+      "detailsRef": "history/2026-08-12-db-dung-chung-doi-ten-va-nen-mong.md"
+    },
+    {
+      "version": "0.7.0",
+      "date": "2026-08-11",
+      "bump": "minor",
+      "summary": "Sửa lỗi giọng Qwen3-TTS đọc ra âm thanh hỏng hoàn toàn và chậm bất thường. Khi tạo giọng mới từ file mẫu, giờ có ô nhập \"Audio mẫu đang nói gì?\" — bắt buộc với giọng Qwen vì model cần biết nội dung file mẫu để học cách phát âm. File âm thanh mẫu được tự động làm sạch và chấm điểm chất lượng chi tiết hơn. Văn bản dài tự chia đoạn theo câu; nếu model đọc lạc thì tự đọc lại thay vì trả về file lỗi. THÊM MỚI: hiệu ứng âm thanh cho TTS Studio (vang phòng, tiếng vọng, đổi cao độ...) với 4 kiểu dựng sẵn và tự tạo kiểu riêng. Màn Quản lý mô hình giờ chia theo nhóm (sinh giọng nói / nhận dạng giọng nói / mô hình ngôn ngữ).",
+      "breaking": true,
+      "minAppVersion": "0.7.0",
+      "detailsRef": "history/2026-08-11-fix-chat-luong-audio-qwen.md"
+    },
+    {
+      "version": "0.6.1",
+      "date": "2026-08-11",
+      "bump": "patch",
+      "summary": "Sửa lỗi giọng Qwen3-TTS (0.6B/1.7B) không bao giờ được nhận là đã cài xong dù đã tải/cài đủ — do sai tên thư mục ở phần xử lý ngầm, khiến màn quản lý engine đứng mãi ở \"Đang cài thư viện...\". Sửa lỗi báo lỗi (crash) khi đang dùng Qwen trên Mac Apple Silicon. Nút Hủy giờ có xác nhận trước khi xoá dữ liệu đã tải.",
+      "breaking": true,
+      "minAppVersion": "0.6.1",
+      "detailsRef": "history/2026-08-11-fix-huy-cai-dat-am-tham-xoa-du-lieu.md"
+    },
+    {
+      "version": "0.6.0",
+      "date": "2026-08-11",
+      "bump": "minor",
+      "summary": "Trên máy Mac chip Apple Silicon (M1/M2/M3/M4), giọng Qwen3-TTS giờ chạy được thật bằng GPU tích hợp sẵn của máy (không cần card đồ hoạ rời) — đã thử nghiệm và xác nhận chạy đúng. Trên Windows/máy có card NVIDIA vẫn dùng đường cũ.",
+      "breaking": true,
+      "minAppVersion": "0.6.0",
+      "detailsRef": "history/2026-08-11-them-mlx-cho-qwen.md"
+    },
+    {
+      "version": "0.5.0",
+      "date": "2026-08-11",
+      "bump": "minor",
+      "summary": "Thêm 2 giọng đọc mới: Qwen3-TTS 0.6B và 1.7B (đa ngôn ngữ, cần máy có card đồ hoạ NVIDIA — chưa hỗ trợ ổn định trên CPU thường). Sửa lỗi khiến đổi qua lại giữa 2 giọng cùng loại (vd VoxCPM và Qwen) chậm hơn cần thiết.",
+      "breaking": true,
+      "minAppVersion": "0.5.0",
+      "detailsRef": "history/2026-08-11-them-qwen3-tts.md"
+    },
+    {
+      "version": "0.4.0",
+      "date": "2026-08-11",
+      "bump": "minor",
+      "summary": "Engine tải thêm (VoxCPM, MOSS) giờ dùng chung thư viện Python thay vì mỗi engine một bản riêng — đỡ vài GB dung lượng cho mỗi engine cần PyTorch thêm vào. Sửa lỗi khiến MOSS (giọng đa ngôn ngữ) bị khởi động thành tiến trình riêng không cần thiết, làm chậm lúc đổi engine. Màn hình quản lý engine hiện thêm dòng dung lượng thư viện dùng chung.",
+      "breaking": true,
+      "minAppVersion": "0.4.0",
+      "detailsRef": "history/2026-08-11-runtime-dung-chung-theo-kind.md"
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-08-10",
+      "bump": "minor",
+      "summary": "Đổi giọng đọc (engine TTS) giờ gần như tức thì thay vì phải chờ vài phút — engine đã dùng được giữ sẵn, quay lại không phải tải lại. Màn hình quản lý engine làm mới: danh sách gọn, bấm vào từng engine để xem chi tiết và nguồn model, có nút mở thư mục lưu trữ và nút giải phóng bộ nhớ (vẫn giữ nguyên dữ liệu đã tải). Sửa lỗi engine tải thêm không khởi động được ở bản cài đặt sẵn.",
+      "breaking": true,
+      "minAppVersion": "0.3.0",
+      "detailsRef": "history/2026-08-10-doi-engine-tts-tai-cho.md"
+    },
+    {
+      "version": "0.2.1",
+      "date": "2026-07-28",
+      "bump": "patch",
+      "summary": "Sửa lỗi màn hình trình chiếu không cập nhật ngay khi đổi cấu hình layout/màn chờ của sự kiện đang diễn ra.",
+      "breaking": true,
+      "minAppVersion": "0.2.1",
+      "detailsRef": "history/2026-07-28-fix-event-live-sync-va-ux.md"
+    },
+    {
       "version": "0.2.0",
       "date": "2026-07-14",
       "bump": "minor",

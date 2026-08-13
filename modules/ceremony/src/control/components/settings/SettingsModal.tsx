@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Settings2, Palette, Volume2, Variable, LayoutTemplate, Globe, DatabaseBackup, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useControlStore, type SettingsTab } from '../../store';
-import { cn } from '../../lib/cn';
+import { cn } from '@sky-app/ui';
 import { Modal } from '../ui/Modal';
 import { TooltipSimple as Tooltip } from '../ui/TooltipSimple';
 import { GeneralSettingsContent } from './GeneralSettingsContent';

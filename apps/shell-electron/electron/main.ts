@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, nativeImage, protocol, dialog, ipcMain } from 'electron';
 import { existsSync, cpSync, mkdirSync, readFileSync } from 'node:fs';
 import { copyFile, mkdir } from 'node:fs/promises';
 import { extname, join, basename } from 'node:path';
@@ -13,22 +13,26 @@ import { ceremonyStore } from './slide/data/store.js';
 import { sessionStore } from './slide/session-store.js';
 import {
   autoLoadFirstIfConfigured,
-  getUseSampleData,
   setBackdropAspectRatioListener,
+  setCustomVariablesFromEvent,
   startSocketServer,
   stopSocketServer,
 } from './slide/socket-server.js';
+import { getCurrentActiveEvent, defaultCeremony } from '@sky-app/app-db/node';
+import type { AppConfig } from '@sky-app/slide-shared';
 import { startHttpServer, stopHttpServer } from './slide/http-server.js';
 import { startPythonServer, stopPythonServer } from './slide/python-server.js';
 import { apiLogger } from './slide/api-logger.js';
 import { notifyBackdropState, registerIpcHandlers as registerSlideIpcHandlers } from './slide/ipc.js';
+import { syncCeremonyStoreForEvent } from './ipc.js';
 import {
   closeBackdropWindow,
   resizeBackdropForAspectRatio,
   setBackdropStateListener,
+  setContextMenuAttacher,
   setMainWindow,
 } from './slide/windows.js';
-import { setAppMenu } from './slide/menu.js';
+import { attachEditContextMenu, setAppMenu } from './slide/menu.js';
 
 // Built as CJS (package.json has no "type": "module") — __dirname is native here.
 let mainWindow: BrowserWindow | null = null;
@@ -75,31 +79,50 @@ function ensureDefaultAssets() {
  * Backdrop vẫn là BrowserWindow riêng ngoài device-layout (kiosk, màn phụ) —
  * mở qua windows.ts's openBackdropWindow(), gọi từ IPC 'backdrop:toggle'.
  */
+const DEFAULT_APP_CONFIG: AppConfig = {
+  ws_port: 8765,
+  http_port: 8080,
+  mode: 'auto',
+  delay_seconds: 0,
+  auto_open_browser: true,
+  kiosk_mode: true,
+  auto_load_first: true,
+  slide_display_seconds: 20,
+  idle_timeout_enabled: false,
+  idle_timeout_seconds: 60,
+};
+
 async function bootstrapSlideBackend() {
   apiLogger.init();
   ensureDefaultAssets();
-  const { cleanupImportStaging } = await import('./slide/data/sync.js');
-  cleanupImportStaging();
-  if (getUseSampleData()) {
-    const { syncBundle } = await import('./slide/data/sync.js');
-    const result = await syncBundle({ useSample: true });
-    // Sample data thất bại (vd sample-bundle/ thiếu trong bản build) không được để
-    // Ceremony trắng trơn nếu đĩa đã có bundle.json thật từ lần import trước — nếu
-    // không fallback, ceremonyStore rỗng và Backdrop kẹt "Đang tải…" vĩnh viễn dù dữ
-    // liệu thật vẫn còn nguyên (GĐ7.5 audit runtime, không phải bug port).
-    if (!result.ok && !ceremonyStore.hasData()) {
-      ceremonyStore.loadFromDisk();
-    }
-  } else {
-    ceremonyStore.loadFromDisk();
+  // Giai đoạn "bỏ Student" (2026-07-22) — không còn luồng Import ZIP legacy/sample data ở
+  // bootstrap. Đọc ceremony/config đã lưu; nếu chưa có (lần đầu chạy app), tạo mặc định.
+  // Danh sách người tham dự (records) KHÔNG nạp ở đây — chỉ nạp khi Event active đổi, qua
+  // syncCeremonyStoreForEvent() (electron/ipc.ts), gọi lúc setActiveEvent()/khởi động (dưới).
+  if (!ceremonyStore.loadFromDisk()) {
+    ceremonyStore.saveCeremony(defaultCeremony(), DEFAULT_APP_CONFIG);
   }
-  sessionStore.init(ceremonyStore.getInitialSession());
+  sessionStore.init();
 
   const config = ceremonyStore.getConfig();
   const wsPort = config?.ws_port ?? DEFAULT_WS_PORT;
   const httpPort = config?.http_port ?? DEFAULT_HTTP_PORT;
 
   await startSocketServer(wsPort);
+  // Giai đoạn 4c mở rộng (2026-07-20) — đồng bộ customVariables với Event đang active SẴN trong
+  // DB lúc khởi động app (không qua setActive()/save() trong phiên này, VD app tắt/mở lại giữa
+  // lễ) — nếu không, socket-server giữ giá trị cũ từ app_config.json (loadAppConfig(), dòng
+  // module-level phía trên), lệch với Event thật đang chạy. Fail-soft: lỗi đọc DB không chặn
+  // khởi động app, chỉ log — customVariables giữ nguyên giá trị cũ trong trường hợp đó.
+  try {
+    const active = getCurrentActiveEvent(ceremonyStore.getExecutor());
+    if (active) {
+      setCustomVariablesFromEvent(active.customVariables);
+      syncCeremonyStoreForEvent(active);
+    }
+  } catch (err) {
+    console.error('[shell-electron] Failed to sync customVariables/records from active event on startup:', err);
+  }
   await startHttpServer(httpPort);
   startPythonServer(vieneuDir()); // non-blocking: warmup chạy nền
 
@@ -125,11 +148,20 @@ function resolveRendererEntry(): string {
   return join(__dirname, '../../dist/index.html');
 }
 
+// Icon lúc chạy KHÔNG đóng gói (dev:app) — build-assets/icons/icon.png (2026-07-30) KHÔNG nằm
+// trong `files`/`extraResources` của electron-builder.yml (chỉ dùng để electron-builder tự sinh
+// .icns/.ico lúc đóng gói, xem file đó's top-level `icon:`), nên đường dẫn này CHỈ hợp lệ khi
+// !app.isPackaged (__dirname trỏ thẳng vào cây source thật, không phải app.asar). Bản đóng gói
+// không cần set icon runtime — icon đã có sẵn ở app bundle (Info.plist/.exe resource) qua chính
+// electron-builder.yml, KHÔNG rơi về icon mặc định Electron như trước.
+const DEV_ICON_PATH = join(__dirname, '../../build-assets/icons/icon.png');
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
     title: 'Sky-App',
+    icon: app.isPackaged ? undefined : nativeImage.createFromPath(DEV_ICON_PATH),
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
@@ -147,6 +179,8 @@ function createMainWindow() {
     mainWindow = null;
   });
 
+  attachEditContextMenu(mainWindow.webContents);
+
   // Ceremony's Control UI render TRONG mainWindow (qua device-layout, không
   // phải BrowserWindow riêng — xem docs/dev/history.md GĐ5) nên các event
   // backend→Control (backdrop:state, tts:*-progress, menu:action, ...) phải
@@ -163,6 +197,20 @@ protocol.registerSchemesAsPrivileged([
 const wallpaperImportDir = () => join(app.getPath('userData'), 'wallpapers');
 
 app.whenReady().then(() => {
+  // Set app name — displays in macOS menu bar, dock, and About dialog
+  app.setName('Sky-App');
+
+  // Dock icon lúc dev:app (macOS) — packaged app đã có icon riêng qua Info.plist (electron-
+  // builder.yml's icon:), không cần gọi lại. app.dock chỉ tồn tại trên macOS (undefined ở
+  // Windows/Linux, optional chain xử lý sẵn).
+  if (!app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(DEV_ICON_PATH));
+
+  // Đăng ký TRƯỚC createMainWindow()/createBackdropWindow() — windows.ts gọi
+  // attachContextMenu?.() ngay khi tạo webContents mới, phải có sẵn hàm thật trước đó.
+  // Inject qua setter (không import menu.ts thẳng trong windows.ts) để tránh circular import
+  // (menu.ts đã import getMainWindow/getBackdropWindow từ windows.ts).
+  setContextMenuAttacher(attachEditContextMenu);
+
   // Sớm nhất có thể — process.env.RENDERER_MANIFEST_URL (GĐ8 OTA) và mọi biến
   // .env khác phải sẵn sàng trước createMainWindow()/bootstrapSlideBackend().
   loadEnv();
@@ -273,21 +321,21 @@ app.on('before-quit', (event) => {
         defaultId: 0,
         cancelId: 0,
       })
-      .then((result) => {
+      .then(async (result) => {
         if (result.response === 1) {
           closeBackdropWindow();
           stopSocketServer();
           stopHttpServer();
-          stopPythonServer();
+          await stopPythonServer();
           app.exit(0);
         }
       });
   }
 });
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
   stopSocketServer();
   stopHttpServer();
-  stopPythonServer();
+  await stopPythonServer();
   if (process.platform !== 'darwin') app.quit();
 });

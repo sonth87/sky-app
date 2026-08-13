@@ -1,0 +1,14 @@
+{
+  "extends": "@sky-app/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "dist-cjs",
+    "rootDir": "src",
+    "declaration": false,
+    "resolveJsonModule": true,
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src"],
+  "exclude": ["dist", "dist-cjs", "node_modules", "src/**/*.test.ts"]
+}

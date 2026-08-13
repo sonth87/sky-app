@@ -1,4 +1,4 @@
-import type { TtsPort } from '@sky-app/service-contracts';
+import { languageFromSourceLang, type TtsPort, type Voice } from '@sky-app/service-contracts';
 import type { SlideApi } from '@sky-app/slide-shared';
 
 declare global {
@@ -64,17 +64,73 @@ export function createElectronTtsPort(): TtsPort {
     },
     async listVoices() {
       const voices = await window.slide.listVoices();
-      return voices.map((v) => ({ id: v.id, name: v.label, language: v.region, gender: v.gender }));
+      return voices.map((v): Voice => ({
+        id: v.id,
+        name: v.label,
+        language: languageFromSourceLang(v.source_lang),
+        gender: v.gender,
+        type: v.type,
+        accent: v.accent,
+        category: v.category,
+        tags: v.tags,
+        tagline: (v as any).tagline,
+        description: (v as any).description,
+        sourceCatalogId: v.source_catalog_id,
+      }));
     },
     async synthesizeBuffer(text, opts) {
       // Kênh riêng tts-studio:synthesize (không cache/log/pregen) — khác window.slide.speak
       // dùng bởi Ceremony. Xem apps/shell-electron/electron/slide/tts-studio.ts.
-      const res = await window.slide.synthesizeTts(text, opts?.voiceId, opts?.speed);
+      const res = await window.slide.synthesizeTts(
+        text, opts?.voiceId, opts?.speed, opts?.engine_overrides, opts?.effectsChain,
+      );
       if (!res.ok || !res.buffer) throw new Error(res.error ?? 'TTS synthesize failed');
       return { buffer: res.buffer, sampleRate: res.sampleRate ?? 48000 };
     },
     async getPreviewUrl(voiceId) {
       return window.slide.getTtsPreviewUrl(voiceId);
+    },
+    async listVoiceCatalog(lang) {
+      return window.slide.listVoiceCatalog(lang);
+    },
+    async getCatalogAudioUrl(lang, entryId) {
+      return window.slide.getCatalogAudioUrl(lang, entryId);
+    },
+    async cloneVoice(opts) {
+      const samples = opts.samples.map((s) => {
+        if (typeof s.filePath !== 'string') {
+          throw new Error('Electron cloneVoice requires string filePaths');
+        }
+        return { filePath: s.filePath, refText: s.refText };
+      });
+      return window.slide.cloneVoice({
+        samples, label: opts.label, gender: opts.gender, region: opts.region,
+      });
+    },
+    async addVoiceSample(voiceId, filePath, refText) {
+      if (typeof filePath !== 'string') {
+        throw new Error('Electron addVoiceSample requires a string filePath');
+      }
+      return window.slide.addVoiceSample(voiceId, filePath, refText);
+    },
+    async deleteVoiceSample(voiceId, sampleId) {
+      return window.slide.deleteVoiceSample(voiceId, sampleId);
+    },
+    async listVoiceSamples(voiceId) {
+      return window.slide.listVoiceSamples(voiceId);
+    },
+    async updateVoiceRefText(voiceId, refText) {
+      // `hidden` để undefined = không đụng tới; chỉ sửa mỗi bản chép lời.
+      return window.slide.updateVoice(voiceId, undefined, refText);
+    },
+    async deleteVoice(voiceId) {
+      return window.slide.deleteVoice(voiceId);
+    },
+    async pickAudioFile() {
+      return window.slide.pickAudioFile();
+    },
+    async listEffectTypes() {
+      return window.slide.listEffectTypes();
     },
   };
 }

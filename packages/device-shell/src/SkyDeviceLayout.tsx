@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import type { AppModule, PlatformContext } from '@sky-app/kernel';
-import { APPS_CONFIG, DeviceLayout, type AppConfig, type ImportWallpaperFn, type WallpaperConfig, type UpdateActions } from '@sonth87/device-layout';
+import { APPS_CONFIG, DeviceLayout, type AppConfig, type ImportWallpaperFn, type WallpaperConfig, type UpdateActions, type SimpleModeProp } from '@sonth87/device-layout';
 import { toDeviceAppConfigs } from './to-device-app-config.js';
 import { type BuiltInAppId } from './built-in-apps.js';
+import { useTtsStatusMenuBarItem } from './TtsStatusMenuBarItem.js';
 
 export interface SkyDeviceLayoutProps {
   apps: AppModule[];
@@ -38,6 +39,11 @@ export interface SkyDeviceLayoutProps {
    * as-is to DeviceLayout.
    */
   updateActions?: UpdateActions;
+  /**
+   * If true, hides the desktop wallpaper and dock, leaving only the app
+   * window(s) visible. Forwarded as-is to DeviceLayout.
+   */
+  isSimpleMode?: SimpleModeProp;
 }
 
 function resolveBuiltInApps(option: SkyDeviceLayoutProps['builtInApps']): AppConfig[] {
@@ -52,19 +58,28 @@ function resolveBuiltInApps(option: SkyDeviceLayoutProps['builtInApps']): AppCon
  * AppModule[] + PlatformContext and mounts them inside device-layout's
  * desktop-OS chrome (window manager, dock, menu bar).
  */
-export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps, onImportWallpaper, wallpapers, updateActions }: SkyDeviceLayoutProps) {
+export function SkyDeviceLayout({ apps, platform, assetBaseUrl, builtInApps, onImportWallpaper, wallpapers, updateActions, isSimpleMode }: SkyDeviceLayoutProps) {
   const deviceApps = useMemo(() => {
     const builtIn = resolveBuiltInApps(builtInApps);
     return [...builtIn, ...toDeviceAppConfigs(apps, platform)];
   }, [apps, platform, builtInApps]);
 
+  // Icon trạng thái TTS trên menu bar — global, không thuộc app nào, xem doc comment
+  // trong TtsStatusMenuBarItem.tsx cho lý do phải lắp ráp ở đúng tầng này.
+  const { item: ttsStatusItem, modals: ttsStatusModals } = useTtsStatusMenuBarItem(platform);
+
   return (
-    <DeviceLayout
-      apps={deviceApps}
-      assetBaseUrl={assetBaseUrl}
-      onImportWallpaper={onImportWallpaper}
-      wallpapers={wallpapers}
-      updateActions={updateActions}
-    />
+    <>
+      <DeviceLayout
+        apps={deviceApps}
+        assetBaseUrl={assetBaseUrl}
+        onImportWallpaper={onImportWallpaper}
+        wallpapers={wallpapers}
+        updateActions={updateActions}
+        isSimpleMode={isSimpleMode}
+        menuBarExtras={ttsStatusItem ? [ttsStatusItem] : []}
+      />
+      {ttsStatusModals}
+    </>
   );
 }

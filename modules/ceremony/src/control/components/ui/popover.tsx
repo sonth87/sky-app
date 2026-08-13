@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Popover as PopoverPrimitive } from "radix-ui"
 
-import { cn } from "../../lib/cn"
+import { cn } from "@sky-app/ui"
 import { usePortalContainer } from "../../PortalContainerContext"
 
 function Popover({

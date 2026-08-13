@@ -1,0 +1,1045 @@
+[
+  {
+    "id": "gia_bao",
+    "name": "Gia Bảo",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Test voice (WAV)",
+    "description": "Southern Vietnamese male voice, added for mp3-vs-wav testing.",
+    "tags": [
+      "test"
+    ],
+    "file": "gia_bao.wav",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Chào các bạn, hôm nay mình đi tới một quán cà phê rất xinh, các bạn cùng trải nghiệm với mình nhé."
+  },
+  {
+    "id": "bao_ngoc_gentle",
+    "name": "Bảo Ngọc",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Gentle, Calm, Genuine",
+    "description": "A gentle Southern Vietnamese female voice, suitable for review, storytelling, and travel videos.",
+    "tags": [
+      "calm",
+      "gentle"
+    ],
+    "file": "bao_ngoc_gentle.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Bạn có thể dùng giọng nói này để làm clip, review, kể chuyện hoặc du lịch đều được. Chúc bạn xây kênh thành công."
+  },
+  {
+    "id": "cam_hong",
+    "name": "Cẩm Hồng",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Sweet Girl from Ho Chi Minh City",
+    "description": "Cẩm Hồng - Southern warmth Vietnamese female voice.",
+    "tags": [
+      "friendly",
+      "warm"
+    ],
+    "file": "cam_hong.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Thật ra tôi ghét mấy câu mở đầu kiểu Xin chào quý vị lắm, nghe cứ như Robert đọc kịch bản vậy. Nên thôi, bỏ qua hết luôn. Chào buổi tối cả nhà ơi!"
+  },
+  {
+    "id": "dao_reflective",
+    "name": "Dao",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "central",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Reflective, Pensive and Emotional",
+    "description": "Ca Dao - Literary writer from Huế. Speaks in a Central Vietnamese accent, used best for storytelling, poetry, audiobooks, and narration.",
+    "tags": [],
+    "file": "dao_reflective.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Tôi được sinh ra ở Huế, lớn lên ở Huế, nhưng khi trưởng thành, đã rời gia đình, rời bỏ thành phố và ra đi biền biệt, đấy là câu chuyện của mình."
+  },
+  {
+    "id": "duc_clear",
+    "name": "Anh Đức",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "emcee",
+      "podcast"
+    ],
+    "tagline": "Clear, Calm Master of Ceremonies",
+    "description": "MC Anh Đức - Vietnamese MC from Hanoi. Perfect for podcasts, announcers, narration and TV. Northern accent.",
+    "tags": [
+      "calm",
+      "clear"
+    ],
+    "file": "duc_clear.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Miền Nam thì có hoa mai, gặp nhau phải có một hai lời chào. Miền Bắc thì có hoa đảo, gặp nhau phải có lời chào đầu tiên."
+  },
+  {
+    "id": "duyen_bright",
+    "name": "Mỹ Duyên",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "narrator",
+      "podcast"
+    ],
+    "tagline": "Bright, Clear and Captivating",
+    "description": "Mỹ Duyên - A bright, clear voice with a gentle Southern Central warmth and natural expressiveness for captivating podcasts and heartfelt storytelling.",
+    "tags": [
+      "clear",
+      "expressive",
+      "gentle",
+      "warm"
+    ],
+    "file": "duyen_bright.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Thất bại không phải là dấu chấm hết mà là một phần tất yếu trên con đường đến thành công."
+  },
+  {
+    "id": "emma_calm",
+    "name": "Emma",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "young adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Calm, Soothing and Mature",
+    "description": "Calm, soothing, mature Vietnamese young woman - Calm, soothing, mature voice of woman in their young ages, good for story telling, narrative scripts.",
+    "tags": [
+      "calm",
+      "soothing"
+    ],
+    "file": "emma_calm.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Tôi đủ lớn để hiểu rằng, mỗi năm thế giới mới đổi thay và lòng người cũng khác. Tuổi ấu thơ chỉ có một con đường để cùng nhau trúng bước."
+  },
+  {
+    "id": "ethan_clear",
+    "name": "Ethan",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "central",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Clear, Firm and Compassionate",
+    "description": "Người Miền Trung - Giọng nói của người đàn ông miền Trung mang đậm dấu ấn của vùng đất nắng gió, vừa mạnh mẽ, dứt khoát lại chứa chan sự chân thành. Âm thanh ấy như tiếng sóng biển vỗ, vang vọng khắp đại ngàn trong từng câu từ, thấm đẫm sự bền bỉ và lòng kiên nhẫn của con người nơi đây. Giọng nói ấy không chỉ truyền đạt thông tin mà còn kể cả câu chuyện của một tâm hồn giản dị, sâu sắc và đậm đà bản sắc quê hương.",
+    "tags": [
+      "clear"
+    ],
+    "file": "ethan_clear.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Giọng nói của người đàn ông miền Trung mang đầm dấu ẩn của vùng đất nắng gió."
+  },
+  {
+    "id": "giang_narrator",
+    "name": "Giang",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "educational",
+      "narrator",
+      "podcast"
+    ],
+    "tagline": "Northern female Narrator",
+    "description": "A clear, natural Northern Vietnamese female voice with distinct pronunciation. It is well-suited for storytelling, podcasts, reviews, voiceovers, and educational videos, conveying a friendly and sincere tone.",
+    "tags": [
+      "clear",
+      "friendly"
+    ],
+    "file": "giang_narrator.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "default": true,
+    "ref_text": "Có những câu chuyện chỉ cần một giọng nói đủ gần gũi để người nghe ở lại lâu hơn. Hy vọng giọng đọc này sẽ là sự lựa chọn phù hợp cho dự án của bạn."
+  },
+  {
+    "id": "giang_podcast",
+    "name": "Giang - Podcast",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "narrator",
+      "podcast"
+    ],
+    "tagline": "Podcast",
+    "description": "A warm and natural Vietnamese female voice, perfect for podcasts, storytelling, narration, and long-form content.",
+    "tags": [
+      "warm"
+    ],
+    "file": "giang_podcast.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Cảm ơn vì đã ghé qua. Hy vọng giọng nói này sẽ đồng hành cùng bạn trong những câu chuyện bạn gửi tới người nghe."
+  },
+  {
+    "id": "hanh_smooth",
+    "name": "Ái Hạnh",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "young adult",
+    "accent": "northern",
+    "category": [
+      "commercial"
+    ],
+    "tagline": "Smooth, Clear and Feminine",
+    "description": "TVC Ái Hạnh  - Young woman from Hanoi. Used for advertising, commercials, and entertainment.",
+    "tags": [
+      "clear"
+    ],
+    "file": "hanh_smooth.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Với năng lượng xanh, bạn sẽ cảm nhận khác biệt ngay lần đầu. Hãy yêu thương và chăm sóc làn da của bạn ngay hôm nay!"
+  },
+  {
+    "id": "henry_clear",
+    "name": "Henry",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "mature",
+    "accent": "central",
+    "category": [
+      "emcee"
+    ],
+    "tagline": "Clear, Firm Master of Ceremonies",
+    "description": "MC  Nổi Tiếng  - Middle-aged male with a  warm, gentle, and strangely deep voice.",
+    "tags": [
+      "clear",
+      "deep",
+      "gentle",
+      "warm"
+    ],
+    "file": "henry_clear.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Mảnh đất cổ đô ngàn năm, nơi đây không chỉ là một địa danh lịch sử mà còn là một tác phẩm nghệ thuật, sống đồng, mang đầm dấu ẩn thời gian."
+  },
+  {
+    "id": "hung_pham_deep",
+    "name": "Phạm Hùng",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "drama"
+    ],
+    "tagline": "Deep, Professional Actor",
+    "description": "Actor Pham Hung - Old Male with Saigon accent. Perfect use for television voice acting, voiceover & Narration.",
+    "tags": [
+      "deep",
+      "professional"
+    ],
+    "file": "hung_pham_deep.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Ta thấy, tương lai của con sẽ có nhiều biến đổi. Con cần kiên nhẫn và tập trung. Chỉ có như vậy mới đạt được sự thành công."
+  },
+  {
+    "id": "huy_le_calm",
+    "name": "Huy Lê",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "educational",
+      "podcast"
+    ],
+    "tagline": "Calm, Clear and Professional",
+    "description": "Le Huy  - Vietnamese voiceover, suitable for educational content and podcasts.",
+    "tags": [
+      "calm",
+      "clear",
+      "professional"
+    ],
+    "file": "huy_le_calm.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Xin chào, tôi là Huy Lê. Với chất giọng điểm tĩnh và chuyên nghiệp, tôi luôn sẵn sàng cho dự án của bạn."
+  },
+  {
+    "id": "huyen_clear",
+    "name": "Huyền",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Clear, Confident Narrator",
+    "description": "Huyen - Confident Narrator - Narrative story-teller, warm female voice.",
+    "tags": [
+      "clear",
+      "warm"
+    ],
+    "file": "huyen_clear.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Máu đỏ da vàng tôi là người Việt Nam. Tự hào là con đất Việt. Cháu vua Hùng."
+  },
+  {
+    "id": "lan_phuong_vietnamese",
+    "name": "Lan Phương",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "mature",
+    "accent": "northern",
+    "category": [
+      "commercial",
+      "educational",
+      "meditation",
+      "narrator"
+    ],
+    "tagline": "Vietnamese Narrator (Hanoi)",
+    "description": "A professional Vietnamese female voice from Hanoi with a warm, clear, and authentic tone. Ideal for audiobooks, YouTube storytelling, educational content, meditation, wellness programs, documentaries, and commercial voiceovers.\n\nThis voice delivers natural emotion, excellent pronunciation, and a friendly listening experience that keeps audiences engaged. Perfect for long-form narration, inspirational content, personal development videos, and family-friendly storytelling.",
+    "tags": [
+      "clear",
+      "friendly",
+      "professional",
+      "warm"
+    ],
+    "file": "lan_phuong_vietnamese.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Chào bạn tôi là Lan Phương, giọng nữ Hà Nội ấm áp, tự nhiên và giàu cảm xúc. Giọng đọc này phù hợp cho sách nói, kể chuyện, giáo dục."
+  },
+  {
+    "id": "minh_anh_narrator",
+    "name": "Minh Anh",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Story Narrator",
+    "description": "Works well for Storytelling, Podcasts.",
+    "tags": [],
+    "file": "minh_anh_narrator.wav",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Tết là dịp mọi người háo hức đón chào một năm mới với nhiều hy vọng và mong ước."
+  },
+  {
+    "id": "minh_dang_northern",
+    "name": "Minh Đăng",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "podcast"
+    ],
+    "tagline": "Northern Vietnamese male",
+    "description": "Young conversational male voice.",
+    "tags": [],
+    "file": "minh_dang_northern.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Xin chào, đây là giọng nam truyền cảm hứng với chất giọng trầm ấm, rõ ràng và tự nhiên."
+  },
+  {
+    "id": "nation_warm",
+    "name": "Nation",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "mature",
+    "accent": "southern",
+    "category": [
+      "emcee",
+      "narrator"
+    ],
+    "tagline": "Warm, Expressive &amp; Nuanced",
+    "description": "Deep, warm voice; fluent delivery; storytelling and narration; announcer.",
+    "tags": [
+      "deep",
+      "expressive",
+      "warm"
+    ],
+    "file": "nation_warm.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Sau nhiều năm đi làm, tôi rút ra một kinh nghiệm đau lòng. Người làm đúng hoặc hay bị chửi thường có mấy đặc điểm giống nhau."
+  },
+  {
+    "id": "ngoc_an_audiobook",
+    "name": "Ngoc An",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "central",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Warm Audiobook Narrator",
+    "description": "Warm Vietnamese female voice with a gentle Central (Da Nang) accent. Clear pronunciation, smooth pacing, and expressive yet natural delivery. Ideal for audiobooks, storytelling, narrative content, and long-form listening.",
+    "tags": [
+      "clear",
+      "expressive",
+      "gentle",
+      "warm"
+    ],
+    "file": "ngoc_an_audiobook.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Tôi biết ơn tất cả những người đã đi ngang qua cuộc đời mình, vì mỗi cuộc gặp gỡ đều để lại một bài học sâu sắc và những yêu thương chân thành."
+  },
+  {
+    "id": "ngoc_anh_news",
+    "name": "Ngoc Anh",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "news",
+    "description": "Warm Vietnamese female voice with a gentle Northern (Hanoi) accent. Clear pronunciation, smooth pacing, and expressive yet natural delivery. Ideal for audiobooks, storytelling, narrative content, and long-form listening.",
+    "tags": [
+      "clear",
+      "expressive",
+      "gentle",
+      "warm"
+    ],
+    "file": "ngoc_anh_news.wav",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Tác phẩm dự thi bảo đảm tính khoa học, tính đảng, tính chiến đấu, tính định hướng."
+  },
+  {
+    "id": "ngoc_diem_pham",
+    "name": "Ngọc Diễm",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "mature",
+    "accent": "northern",
+    "category": [
+      "educational",
+      "medical",
+      "narrator",
+      "podcast"
+    ],
+    "tagline": "Warm & Trusted Expert",
+    "description": "A high-quality, authentic Vietnamese female voice with dual-regional capabilities. When used with Turbo v2.5, it delivers a crisp, standard Hanoi accent (Northern Vietnam), perfect for professional narrations and news. When switched to Multilingual v3, it transforms into a soft, melodic Southern accent (Saigon), ideal for emotional storytelling and healing podcasts. ",
+    "tags": [
+      "clear",
+      "friendly",
+      "professional",
+      "warm"
+    ],
+    "file": "ngoc_diem_pham.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Chào bạn, mình là Ngọc Diễm. Giọng đọc của mình rất phù hợp để kể chuyện thiếu nhi và podcast. Hy vọng bạn sẽ thích chất giọng này nhé!"
+  },
+  {
+    "id": "ngoc_ngan_vietnamese",
+    "name": "Ngọc Ngân",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "mature",
+    "accent": "northern",
+    "category": [
+      "drama",
+      "narrator"
+    ],
+    "tagline": "Vietnamese Storyteller",
+    "description": "An older Vietnamese male voice with a deep, warm, and mature tone. Slow, articulate delivery with natural dramatic pauses and expressive storytelling, ideal for audiobooks, suspense, memoirs, and emotional narration.",
+    "tags": [
+      "deep",
+      "expressive",
+      "warm"
+    ],
+    "file": "ngoc_ngan_vietnamese.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Anh em nào phải người xa, cùng chung bác mẹ, một nhà cùng thân, yêu nhau như thể tay chân, anh em hòa thuận, hai thân vui vầy."
+  },
+  {
+    "id": "nhat_narrative",
+    "name": "Nhật",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "narrator",
+      "news"
+    ],
+    "tagline": "Narrative &amp; Compelling",
+    "description": "Articulate Vietnamese voice suited for news reports, documentaries, and compelling story narration.",
+    "tags": [],
+    "file": "nhat_narrative.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Xin kính chào quý bạn và các vị. Mong rằng giọng nói này sẽ phù hợp với bất kỳ dự án nào của bạn. Cảm ơn đã lựa chọn. Hãy thử ngay nhé!"
+  },
+  {
+    "id": "nhung_clear",
+    "name": "Nhung",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "young adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Clear, Formal and Professional",
+    "description": "Nhung - Young woman from Hanoi with a Northern accent. Used for formal settings, such as narration, and broadcasting. Miền Bắc.",
+    "tags": [
+      "clear",
+      "professional"
+    ],
+    "file": "nhung_clear.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Đây là Đài Tiếng Nói Việt Nam, phát thanh từ thủ đô Hà Nội, nước Cộng hòa xã hội chủ nghĩa Việt Nam."
+  },
+  {
+    "id": "phong_warm",
+    "name": "Phong",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "educational",
+      "narrator",
+      "podcast"
+    ],
+    "tagline": "Warm, Clear and Expressive",
+    "description": "Nhật Phong - Podcast - Warm and clear tone, natural expressiveness. Great for podcasts, storytelling, and educational content.",
+    "tags": [
+      "clear",
+      "expressive",
+      "warm"
+    ],
+    "file": "phong_warm.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Mùa hè năm ấy tôi và cậu trở thành một đôi Nhưng ai ngờ được rằng Lúc hè ghé về thêm một lần nữa Thì cậu và tôi đã lạc mất nhau rồi"
+  },
+  {
+    "id": "phuong_doctor",
+    "name": "Phương",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Gentle, Informative Doctor",
+    "description": "Bác sĩ Phương - Warm male voice.",
+    "tags": [
+      "professional",
+      "warm"
+    ],
+    "file": "phuong_doctor.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Quý vị có thể đang trải qua các triệu chứng như bốc hỏa, đổ mồ hôi đêm, mất ngủ và vâng cả tăng cân nữa."
+  },
+  {
+    "id": "phuong_smooth",
+    "name": "Phương",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "young adult",
+    "accent": "southern",
+    "category": [
+      "commercial",
+      "meditation",
+      "narrator"
+    ],
+    "tagline": "Smooth, Comforting and Gentle",
+    "description": "Silky Phuong - Smooth Female Vietnamese - A silky-smooth Vietnamese female voice designed to comfort and captivate. Gentle, soothing, and natural, this voice is perfect for storytelling, audiobooks, bedtime tales, and meditation content. Its calm tone also makes it ideal for advertisements, brand videos, and social media campaigns that aim to inspire trust and relaxation. Best used when you want listeners to feel at ease, immersed, and emotionally connected.",
+    "tags": [
+      "calm",
+      "gentle",
+      "soothing"
+    ],
+    "file": "phuong_smooth.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Trăng lên đỉnh núi, gió nhẹ đưa hương, người yên giấc ngủ, mộng lành theo mây."
+  },
+  {
+    "id": "quang_minh_clearly",
+    "name": "Quang Minh",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "mature",
+    "accent": "southern",
+    "category": [
+      "commercial",
+      "educational",
+      "meditation",
+      "narrator"
+    ],
+    "tagline": "news",
+    "description": "A professional Vietnamese male voice from Ho Chi Minh City",
+    "tags": [
+      "clear",
+      "friendly",
+      "professional",
+      "warm"
+    ],
+    "file": "quang_minh_clearly.wav",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Trên thực tế, các nghi ngờ đã bắt đầu xuất hiện."
+  },
+  {
+    "id": "quang_nguyen_dynamic",
+    "name": "Quang Nguyen",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "podcast"
+    ],
+    "tagline": "Warm and Dynamic",
+    "description": "Nguyen Quang - Baritone voice, warm and dynamic. Natural, friendly reading voice, suitable for entertaining podcast content, YouTube videos, or dubbing young characters.",
+    "tags": [
+      "energetic",
+      "friendly",
+      "warm"
+    ],
+    "file": "quang_nguyen_dynamic.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Cái nết đánh chết cái đẹp, đức tính quý hơn hình thức."
+  },
+  {
+    "id": "quang_tien_audiobook",
+    "name": "Quang Tiến",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "mature",
+    "accent": "northern",
+    "category": [
+      "commercial",
+      "educational",
+      "narrator"
+    ],
+    "tagline": "Audiobook",
+    "description": "Warm and natural Vietnamese male voice with a calm, confident, and professional tone. Suitable for narration, videos, educational content, documentaries, commercials, and storytelling.",
+    "tags": [
+      "calm",
+      "professional",
+      "warm"
+    ],
+    "file": "quang_tien_audiobook.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Xin chào, mình là Quang Tiến, rất vui được gặp bạn. Hy vọng giọng nói này sẽ mang đến cho bạn những trải nghiệm tự nhiên và gần gũi."
+  },
+  {
+    "id": "rin_dinh_deep",
+    "name": "Rin Dinh",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "central",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Deep, Warm and Serious",
+    "description": "Dinh Rin - Deep and warm male voice.",
+    "tags": [
+      "deep",
+      "warm"
+    ],
+    "file": "rin_dinh_deep.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Người tính không bằng trời tính, mưu sự tại nhân, thành sự tại thiên."
+  },
+  {
+    "id": "son_tran_casual",
+    "name": "Sơn Trần",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "young adult",
+    "accent": "northern",
+    "category": [
+      "podcast"
+    ],
+    "tagline": "Casual and Conversational",
+    "description": "Son Tran ST3G - A young Vietnamese male voice talent, he can read books, and voice over for your video.",
+    "tags": [
+      "casual",
+      "conversational"
+    ],
+    "file": "son_tran_casual.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Dự kiến 1 giờ lên game trong group, anh sẽ cử nói thẳng là tàn cho quà DC vì luật mới của FP, nên anh sẽ nói mẹ mé."
+  },
+  {
+    "id": "tam_nguyen_fairy",
+    "name": "Tâm Nguyễn",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "children",
+      "narrator"
+    ],
+    "tagline": "Fairy Tail &amp; children Friendly",
+    "description": "A voice suitable for reading fairy tales, ideal for children's audiobooks.",
+    "tags": [
+      "friendly"
+    ],
+    "file": "tam_nguyen_fairy.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Giọng đọc chuyên cho chuyện cổ tích, phù hợp với các sản phẩm cho thiếu nhi."
+  },
+  {
+    "id": "thanh_clear",
+    "name": "Thanh",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "mature",
+    "accent": "southern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Storyteller",
+    "description": "Thanh Đọc Sách - High-quality Saigon female voice, suitable for reading news, making audiobooks, and teaching.",
+    "tags": [
+      "professional",
+      "warm"
+    ],
+    "file": "thanh_clear.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Năng lượng không tự sinh ra, cũng không tự mất đi. Nó là dạng chuyển hóa từ dạng này sang dạng khác."
+  },
+  {
+    "id": "thanh_storyteller",
+    "name": "Thành - Storyteller",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "mature",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Storyteller",
+    "description": "Warm, professional Northern Vietnamese female voice. Perfect for audiobooks, storytelling, and narrative content.",
+    "tags": [
+      "professional",
+      "warm"
+    ],
+    "file": "thanh_storyteller.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Cái nết đánh chết cái đẹp, đức tính quý hơn hình thức"
+  },
+  {
+    "id": "thao_soft",
+    "name": "Mai Thảo",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "young adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Soft, Calm and Gentle",
+    "description": "Mai Thảo - Young Vietnamese woman with a soft Northern accent, ideal for TVCs and storytelling.",
+    "tags": [
+      "calm",
+      "gentle"
+    ],
+    "file": "thao_soft.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Tôi bước lên gác xếp. Ánh sáng rơi từ ô cửa nhỏ, xiên vào bụi như những sợi chỉ bạc."
+  },
+  {
+    "id": "thám_giọng",
+    "name": "Thắm",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Giọng Nữ Miền Bắc",
+    "description": "Trẻ trung, nhẹ nhàng, ấm áp, tạo cảm giác gần gũi và tin cậy.",
+    "tags": [
+      "gentle"
+    ],
+    "file": "thám_giọng.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Mùa thu Hà Nội như một bản nhạc dịu êm, khẽ chạm vào lòng người, gió nhẹ len qua từng con phố nhỏ, mang theo hương hoa sữa nồng nàn và vị ngọt lành."
+  },
+  {
+    "id": "thuy_story",
+    "name": "Thủy",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Story Narrator",
+    "description": "Works well for Storytelling.",
+    "tags": [],
+    "file": "thuy_story.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Chào mừng đến với Chạm vào lịch sử, kênh khám phá những trang sử vàng và nhân vật kiệt xuất của Việt Nam."
+  },
+  {
+    "id": "thuy_tien_narrator",
+    "name": "Thủy Tiên",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Clear, Confident Narrator",
+    "description": "A natural, clear, and friendly Vietnamese female voice. Suitable for storytelling, videos, educational content, beauty-related material, and voiceovers.",
+    "tags": [
+      "clear",
+      "warm"
+    ],
+    "file": "thuy_tien_narrator.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Xin chào, hãy thử sử dụng tôi cho video, podcast và các dự án sáng tạo, cùng biến những ý tưởng của bạn thành nội dung cuốn hút hơn nhé!"
+  },
+  {
+    "id": "trang_clear",
+    "name": "Huyền Trang",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Clear, Smooth and Direct",
+    "description": "HuyenTrang - The voice of a Vietnamese girl will be used to create videos on tiktok.",
+    "tags": [
+      "clear"
+    ],
+    "file": "trang_clear.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Người ta là hoa đất, học ăn, học nói, học gói, học mở."
+  },
+  {
+    "id": "truc_lam",
+    "name": "Truc Lam",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "storyteller"
+    ],
+    "tagline": "Cheerful Southern Vietnamese",
+    "description": "Cheerful Southern Vietnamese vibes - Natural storyteller who connects through authentic, casual conversation with humor and warmth perfect for everyday chat and sharing real moments.",
+    "tags": [
+      "conversational",
+      "friendly",
+      "warm"
+    ],
+    "file": "truc_lam.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Cái nết đánh chết cái đẹp, đức tính quý hơn hình thức"
+  },
+  {
+    "id": "tuan_anh_and",
+    "name": "Tuấn Anh",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "mature",
+    "accent": "northern",
+    "category": [
+      "commercial",
+      "educational",
+      "narrator"
+    ],
+    "tagline": "Deep &amp; Narrative",
+    "description": "Professional Vietnamese male voice with a deep, warm, and authoritative tone. Expertly suited for mysterious documentaries, long-form narration, corporate branding, and educational storytelling. High-fidelity studio quality with clear articulation and engaging pacing.",
+    "tags": [
+      "clear",
+      "deep",
+      "professional",
+      "warm"
+    ],
+    "file": "tuan_anh_and.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Chào bạn, tôi là Tuấn Anh. Với chất giọng trầm ấm và đầy nội lực, tôi sẽ mang đến sự sống động và chiều sâu cho mọi kịch bản của bạn. Hãy chọn tôi nha."
+  },
+  {
+    "id": "viet_linh",
+    "name": "Viết Linh",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "northern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Deep, Warm and Atmospheric",
+    "description": "Vietnamese male narrator with deep, warm, and atmospheric voice.",
+    "tags": [
+      "deep",
+      "warm"
+    ],
+    "file": "viet_linh.mp3",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Thời gian là vàng, không ai giàu ba họ, không ai khó ba đời."
+  },
+  {
+    "id": "hoai_my",
+    "name": "Hoài My",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "female",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Warm, natural Vietnamese female voice",
+    "description": "Hoài My - Natural Vietnamese female voice, well-suited for narration, storytelling, and general-purpose reading.",
+    "tags": [
+      "clear",
+      "natural",
+      "warm"
+    ],
+    "file": "hoai_my.wav",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Cuộc sống mà bạn đang sống bây giờ cũng là giấc mơ của hàng triệu người. Vì vậy, hãy luôn hài lòng với cuộc sống của bạn hãy hạnh phúc trong từng khoảnh khắc của cuộc sống."
+  },
+  {
+    "id": "nam_minh",
+    "name": "Nam Minh",
+    "lang": "vi-VN",
+    "language": "Vietnamese",
+    "gender": "male",
+    "age": "adult",
+    "accent": "southern",
+    "category": [
+      "narrator"
+    ],
+    "tagline": "Clear, natural Vietnamese male voice",
+    "description": "Nam Minh - Natural Vietnamese male voice, well-suited for narration, storytelling, and general-purpose reading.",
+    "tags": [
+      "clear",
+      "natural"
+    ],
+    "file": "nam_minh.wav",
+    "clonable": true,
+    "source": "vendor",
+    "ref_text": "Cuộc sống mà bạn đang sống bây giờ cũng là giấc mơ của hàng triệu người. Vì vậy, hãy luôn hài lòng với cuộc sống của bạn hãy hạnh phúc trong từng khoảnh khắc của cuộc sống."
+  }
+]

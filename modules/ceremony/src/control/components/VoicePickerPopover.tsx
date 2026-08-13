@@ -1,37 +1,30 @@
-import { useState, useRef, useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Download } from 'lucide-react';
+import { Download } from 'lucide-react';
 import type { TtsPort } from '@sky-app/service-contracts';
+import { VoicePickerCombobox, getVoiceCoverPath, type PreviewState, type VoiceListItem } from '@sky-app/voice-catalog-ui';
 import { useControlStore } from '../store';
 import { stopPcm } from '../../lib/audio';
 import { usePlatform } from '../PlatformContext';
 import { useSlide } from '../lib/slide';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { VoicePickerRow } from './VoicePickerRow';
-import { cn } from '../lib/cn';
-import { type VoiceInfo, translateStyle, useVoiceCatalog } from './voiceCatalog';
+import { cn } from '@sky-app/ui';
+import { useVoiceCatalog } from './voiceCatalog';
 
-export type { VoiceInfo };
-export { translateStyle, useVoiceCatalog };
+export { useVoiceCatalog };
 
-/** @deprecated dùng useVoiceCatalog() thay thế */
-export const VOICE_CATALOG: VoiceInfo[] = [];
-
-const PREVIEW_TEXT = 'Xin chúc mừng tân kỹ sư Nguyễn Văn An.';
-
-type PreviewState = 'idle' | 'loading' | 'playing' | 'error';
+const PREVIEW_TEXT = 'Xin chúc mừng Nguyễn Văn An.';
 
 interface Props {
   value: string;
   onChange: (id: string) => void;
   compact?: boolean;
+  onAddVoice?: () => void;
 }
 
-export function VoicePickerPopover({ value, onChange, compact }: Props) {
+export function VoicePickerPopover({ value, onChange, compact, onAddVoice }: Props) {
   const { t } = useTranslation();
   const platform = usePlatform();
   const slide = useSlide('tts-preview-url');
-  const [open, setOpen] = useState(false);
   const [previewStates, setPreviewStates] = useState<Record<string, PreviewState>>({});
   const stopFnRef = useRef<(() => void) | null>(null);
 
@@ -40,7 +33,27 @@ export function VoicePickerPopover({ value, onChange, compact }: Props) {
   const modelDownloaded = pythonStatus === 'ready';
 
   const catalog = useVoiceCatalog();
-  const selected = catalog.find((v) => v.id === value) ?? catalog[0];
+
+  const handleDeleteVoice = useCallback(async (id: string) => {
+    const rawId = id.replace(/^vieneu-/, '');
+    const voiceItem = catalog.find((v) => v.id === id);
+    const label = voiceItem ? voiceItem.name : rawId;
+    if (!confirm(t('voiceClone.confirms.deleteVoice', { label }))) return;
+
+    const tts = platform?.services.get<TtsPort>('tts');
+    if (!tts?.deleteVoice) return;
+
+    try {
+      const res = await tts.deleteVoice(rawId);
+      if (res.ok) {
+        useControlStore.getState().refreshVoiceCatalog();
+      } else {
+        alert(res.error || 'Xóa giọng đọc thất bại');
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }, [platform, catalog, t]);
 
   const stopCurrent = useCallback(() => {
     stopFnRef.current?.();
@@ -49,14 +62,32 @@ export function VoicePickerPopover({ value, onChange, compact }: Props) {
     setPreviewStates({});
   }, []);
 
-  const handlePreview = useCallback(async (voice: VoiceInfo, e: React.MouseEvent) => {
+  const handlePreview = useCallback(async (item: VoiceListItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    const ps = previewStates[voice.id] ?? 'idle';
+    const ps = previewStates[item.id] ?? 'idle';
     if (ps === 'playing') { stopCurrent(); return; }
     stopCurrent();
-    setPreviewStates((p) => ({ ...p, [voice.id]: 'loading' }));
+    setPreviewStates((p) => ({ ...p, [item.id]: 'loading' }));
 
-    const speakerId = voice.id.replace(/^vieneu-/, '');
+    // Catalog entry chưa từng dùng: nghe file mẫu gốc (chưa có trong registry để
+    // live-synthesize) — chọn nó ở handleSelect mới kích hoạt encode ngầm.
+    if (item.source === 'catalog' && item.catalogLang) {
+      try {
+        const url = await platform?.services.get<TtsPort>('tts')?.getCatalogAudioUrl?.(item.catalogLang, item.id);
+        if (!url) throw new Error('no catalog audio url');
+        const audio = new Audio(url);
+        audio.onended = () => setPreviewStates((p) => ({ ...p, [item.id]: 'idle' }));
+        audio.onerror = () => setPreviewStates((p) => ({ ...p, [item.id]: 'error' }));
+        await audio.play();
+        setPreviewStates((p) => ({ ...p, [item.id]: 'playing' }));
+        stopFnRef.current = () => { audio.pause(); audio.currentTime = 0; };
+      } catch {
+        setPreviewStates((p) => ({ ...p, [item.id]: 'error' }));
+      }
+      return;
+    }
+
+    const speakerId = item.id.replace(/^vieneu-/, '');
 
     if (modelDownloaded) {
       // Model đã tải: dùng TTS engine tổng hợp realtime qua TtsPort (tự phát
@@ -64,12 +95,12 @@ export function VoicePickerPopover({ value, onChange, compact }: Props) {
       const tts = platform?.services.get<TtsPort>('tts');
       try {
         if (!tts) throw new Error('TtsPort không khả dụng');
-        setPreviewStates((p) => ({ ...p, [voice.id]: 'playing' }));
-        await tts.speak(PREVIEW_TEXT, { voiceId: voice.id, speed: 1.0 });
-        setPreviewStates((p) => ({ ...p, [voice.id]: 'idle' }));
+        setPreviewStates((p) => ({ ...p, [item.id]: 'playing' }));
+        await tts.speak(PREVIEW_TEXT, { voiceId: item.id, speed: 1.0 });
+        setPreviewStates((p) => ({ ...p, [item.id]: 'idle' }));
         stopFnRef.current = null;
       } catch {
-        setPreviewStates((p) => ({ ...p, [voice.id]: 'error' }));
+        setPreviewStates((p) => ({ ...p, [item.id]: 'error' }));
       }
     } else {
       // Model chưa tải: phát WAV mẫu bundled qua /preview endpoint — chỉ
@@ -78,110 +109,71 @@ export function VoicePickerPopover({ value, onChange, compact }: Props) {
         const url = await slide?.getTtsPreviewUrl?.(speakerId);
         if (!url) throw new Error('no preview url');
         const audio = new Audio(url);
-        audio.onended = () => setPreviewStates((p) => ({ ...p, [voice.id]: 'idle' }));
-        audio.onerror = () => setPreviewStates((p) => ({ ...p, [voice.id]: 'error' }));
+        audio.onended = () => setPreviewStates((p) => ({ ...p, [item.id]: 'idle' }));
+        audio.onerror = () => setPreviewStates((p) => ({ ...p, [item.id]: 'error' }));
         await audio.play();
-        setPreviewStates((p) => ({ ...p, [voice.id]: 'playing' }));
+        setPreviewStates((p) => ({ ...p, [item.id]: 'playing' }));
         stopFnRef.current = () => { audio.pause(); audio.currentTime = 0; };
       } catch {
-        setPreviewStates((p) => ({ ...p, [voice.id]: 'error' }));
+        setPreviewStates((p) => ({ ...p, [item.id]: 'error' }));
       }
     }
   }, [previewStates, stopCurrent, modelDownloaded, platform, slide]);
 
-  const handleSelect = (voice: VoiceInfo) => {
-    if (!modelDownloaded) return; // Không cho chọn khi chưa tải
+  const handleChange = useCallback((id: string) => {
     stopCurrent();
-    onChange(voice.id);
-    setOpen(false);
-  };
+    onChange(id);
+    // Nếu id vừa chọn là 1 catalog voice chưa từng dùng, /synthesize lần tới sẽ tự
+    // encode ngầm (main.py's _ensure_voice_ready) — không cần gọi gì thêm ở đây.
+  }, [onChange, stopCurrent]);
 
-  const handleDownload = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDownload = () => {
     window.open('https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo', '_blank');
   };
 
-  if (!selected) {
-    return (
-      <div className={cn(
-        'w-full flex items-center rounded border border-border bg-muted text-muted-foreground text-sm',
-        compact ? 'px-2 py-1.5' : 'px-3 py-2'
-      )}>
-        {t('voicePickerPopover.loadingVoice')}
-      </div>
-    );
-  }
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            'w-full flex items-center justify-between rounded border bg-card transition-colors focus:outline-none',
-            compact ? 'px-2 py-1.5 text-sm' : 'px-3 py-2 text-sm',
-            open ? 'border-primary/60 ring-1 ring-primary/30' : 'border-border hover:border-primary/60'
-          )}
-        >
-          <span className="flex items-center gap-1.5 text-foreground min-w-0">
-            <span className={cn('inline-block w-1.5 h-1.5 rounded-full flex-shrink-0', selected.gender === 'female' ? 'bg-pink-400' : 'bg-blue-400')} />
-            <span className="font-medium truncate">{selected.label}</span>
-            <span className="text-muted-foreground flex-shrink-0">·</span>
-            <span className="text-muted-foreground text-xs flex-shrink-0">{translateStyle(t, selected.style)}</span>
-          </span>
-          <ChevronDown size={16} className={cn('text-muted-foreground flex-shrink-0 transition-transform', open && 'rotate-180')} />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[360px] p-0 overflow-hidden">
-        {/* Banner cảnh báo nếu model chưa tải */}
-        {!modelDownloaded && (
-          <div className="flex items-start gap-2.5 px-3 py-2.5 bg-warning/10 border-b border-warning/30">
-            <svg className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19h-17L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
-            </svg>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-warning-foreground">{t('voicePickerPopover.modelNotDownloaded')}</p>
-              <p className="text-xxs text-warning-foreground mt-0.5">{t('voicePickerPopover.modelNotDownloadedHint')}</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleDownload}
-              className="flex-shrink-0 flex items-center gap-1 rounded px-2 py-1 text-xxs font-semibold bg-warning/25 text-warning-foreground hover:bg-warning/35 transition-colors"
-            >
-              <Download size={12} />
-              {t('voicePickerPopover.downloadModel')}
-            </button>
+    <div className="flex flex-col gap-1.5">
+      {!modelDownloaded && (
+        <div className="flex items-start gap-2.5 rounded border border-warning/30 bg-warning/10 px-3 py-2.5">
+          <svg className="h-4 w-4 flex-shrink-0 mt-0.5 text-warning" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19h-17L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+          </svg>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-warning-foreground">{t('voicePickerPopover.modelNotDownloaded')}</p>
+            <p className="mt-0.5 text-xxs text-warning-foreground">{t('voicePickerPopover.modelNotDownloadedHint')}</p>
           </div>
-        )}
-
-        {/* Danh sách giọng */}
-        <div className="divide-y divide-border max-h-[360px] overflow-y-auto">
-          {catalog.length === 0 && (
-            <div className="px-3 py-4 text-center text-xs text-muted-foreground">{t('voicePickerPopover.loadingVoiceList')}</div>
-          )}
-          {catalog.map((voice) => (
-            <VoicePickerRow
-              key={voice.id}
-              voice={voice}
-              isSelected={voice.id === value}
-              canSelect={modelDownloaded}
-              previewState={previewStates[voice.id] ?? 'idle'}
-              isPreviewOnly={!modelDownloaded}
-              onSelect={() => handleSelect(voice)}
-              onPreview={(e) => handlePreview(voice, e)}
-            />
-          ))}
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="flex flex-shrink-0 items-center gap-1 rounded bg-warning/25 px-2 py-1 text-xxs font-semibold text-warning-foreground hover:bg-warning/35 transition-colors"
+          >
+            <Download size={12} />
+            {t('voicePickerPopover.downloadModel')}
+          </button>
         </div>
+      )}
 
-        {/* Footer hint */}
-        <div className="border-t border-border px-3 py-1.5 bg-muted">
-          {!modelDownloaded ? (
-            <p className="text-2xs text-muted-foreground">{t('voicePickerPopover.footerHintNoModel')}</p>
-          ) : (
-            <p className="text-2xs text-muted-foreground">{t('voicePickerPopover.footerHintReady')}</p>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+      <VoicePickerCombobox
+        items={catalog}
+        value={value}
+        onChange={handleChange}
+        previewStates={previewStates}
+        onPreview={handlePreview}
+        getCoverUrl={(item) => platform?.assetUrl(getVoiceCoverPath(item.id)) ?? getVoiceCoverPath(item.id)}
+        defaultLanguage="Vietnamese"
+        loading={catalog.length === 0}
+        loadingLabel={t('voicePickerPopover.loadingVoiceList')}
+        placeholder={t('voicePickerPopover.loadingVoice')}
+        compact={compact}
+        canSelect={modelDownloaded}
+        tabLabels={{ system: t('voicePickerPopover.tabSystem'), custom: t('voicePickerPopover.tabCustom') }}
+        onAddVoice={onAddVoice}
+        onDeleteVoice={handleDeleteVoice}
+      />
+
+      <p className={cn('text-2xs text-muted-foreground', compact && 'hidden')}>
+        {modelDownloaded ? t('voicePickerPopover.footerHintReady') : t('voicePickerPopover.footerHintNoModel')}
+      </p>
+    </div>
   );
 }

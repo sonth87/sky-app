@@ -30,14 +30,14 @@ function syncStaticVoiceAssets() {
   const ttsServiceResources = join(cwd, 'resources');
   const srcRef = join(ttsServiceResources, 'voice-ref');
   const srcRegistry = join(ttsServiceResources, 'voice-registry.json');
-  if (existsSync(srcRef) && !existsSync(voiceRefDir)) {
-    log(`Copy voice-ref vao ${voiceRefDir} ...`);
-    mkdirSync(shellResourcesDir, { recursive: true });
+  if (existsSync(srcRef)) {
+    log(`Dong bo voice-ref vao ${voiceRefDir} ...`);
+    mkdirSync(voiceRefDir, { recursive: true });
     cpSync(srcRef, voiceRefDir, { recursive: true });
   }
   const dstRegistry = join(shellResourcesDir, 'voice-registry.json');
-  if (existsSync(srcRegistry) && !existsSync(dstRegistry)) {
-    log(`Copy voice-registry.json vao ${shellResourcesDir} ...`);
+  if (existsSync(srcRegistry)) {
+    log(`Dong bo voice-registry.json vao ${shellResourcesDir} ...`);
     mkdirSync(shellResourcesDir, { recursive: true });
     copyFileSync(srcRegistry, dstRegistry);
   }
@@ -289,7 +289,7 @@ stageBundledModels();
 
 // ─── FIX: Dùng spec file thay vì --onefile main.py ────────────────────────
 // Spec file xử lý: collect_all(vieneu/onnxruntime/soxr), sea_g2p.bin, pathex
-log('Dong goi vieneu-server bang PyInstaller (spec file)...');
+log('Dong goi "Sky App TTS" bang PyInstaller (spec file)...');
 const pyinstallerBin = join(cwd, 'venv', 'Scripts', 'pyinstaller.exe');
 if (!existsSync(pyinstallerBin)) fail(`Khong tim thay pyinstaller.exe: ${pyinstallerBin}`);
 
@@ -299,10 +299,14 @@ if (!run(pyinstallerBin, ['--clean', 'vieneu-server.spec'])) fail('PyInstaller t
 log(`Copy binary vao ${shellResourcesDir} ...`);
 if (!existsSync(shellResourcesDir)) mkdirSync(shellResourcesDir, { recursive: true });
 
-const sourceExe = join(cwd, 'dist', 'vieneu-server.exe');
-const targetExe = join(shellResourcesDir, 'vieneu-server.exe');
+// Ten co DAU CACH ("Sky App TTS.exe") — day la ten tien trinh nguoi dung thay trong Task
+// Manager, xem comment o vieneu-server.spec.
+const sourceExe = join(cwd, 'dist', 'Sky App TTS.exe');
+const targetExe = join(shellResourcesDir, 'Sky App TTS.exe');
 if (!existsSync(sourceExe)) fail(`Khong tim thay binary output: ${sourceExe}`);
 copyFileSync(sourceExe, targetExe);
+// Don binary ten cu con sot lai tu lan build truoc (neu khong se mang theo 2 file ~82MB).
+try { rmSync(join(shellResourcesDir, 'vieneu-server.exe'), { force: true }); } catch { /* ignore */ }
 
 log('Dong goi hoan tat!');
 log(`Binary: ${targetExe}`);

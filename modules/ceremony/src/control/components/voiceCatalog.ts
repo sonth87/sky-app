@@ -1,62 +1,110 @@
 import { useState, useEffect, useMemo } from 'react';
+import type { VoiceListItem, VoiceListOrigin } from '@sky-app/voice-catalog-ui';
 import { useControlStore } from '../store';
-
-export interface VoiceInfo {
-  id: string;
-  label: string;
-  gender: 'female' | 'male';
-  region: 'Bắc' | 'Nam';
-  style: string;
-  modelUrl: string;
-}
+import { usePlatform } from '../PlatformContext';
+import type { TtsPort, Voice } from '@sky-app/service-contracts';
 
 const HF_MODEL_URL = 'https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo';
 
-// Style lưu dạng key nội bộ ('gentle' | 'clear' | 'builtin'), dịch khi hiển thị qua translateStyle().
-const FALLBACK_VOICE_CATALOG: VoiceInfo[] = [
-  { id: 'vieneu-NF', label: 'Lan Anh', gender: 'female', region: 'Bắc', style: 'gentle', modelUrl: HF_MODEL_URL },
-  { id: 'vieneu-NF2', label: 'Ngọc Huyền', gender: 'female', region: 'Bắc', style: 'gentle', modelUrl: HF_MODEL_URL },
-  { id: 'vieneu-SF', label: 'Mai Linh', gender: 'female', region: 'Nam', style: 'gentle', modelUrl: HF_MODEL_URL },
-  { id: 'vieneu-NM1', label: 'Minh Quân', gender: 'male', region: 'Bắc', style: 'clear', modelUrl: HF_MODEL_URL },
-  { id: 'vieneu-SM', label: 'Gia Huy', gender: 'male', region: 'Nam', style: 'clear', modelUrl: HF_MODEL_URL },
-  { id: 'vieneu-ADAM', label: 'Adam', gender: 'male', region: 'Bắc', style: 'clear', modelUrl: HF_MODEL_URL },
+/** Giọng registry (đã sẵn sàng synthesize) khi window.slide chưa trả kịp lúc mount. */
+const FALLBACK_VOICE_ITEMS: VoiceListItem[] = [
+  { source: 'registry', origin: 'system', id: 'vieneu-NF', name: 'Lan Anh', gender: 'female', language: 'Vietnamese', accent: 'northern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-NF2', name: 'Ngọc Huyền', gender: 'female', language: 'Vietnamese', accent: 'northern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-SF', name: 'Mai Linh', gender: 'female', language: 'Vietnamese', accent: 'southern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-NM1', name: 'Minh Quân', gender: 'male', language: 'Vietnamese', accent: 'northern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-SM', name: 'Gia Huy', gender: 'male', language: 'Vietnamese', accent: 'southern', category: [], tags: [] },
+  { source: 'registry', origin: 'system', id: 'vieneu-ADAM', name: 'Adam', gender: 'male', language: 'Vietnamese', accent: 'northern', category: [], tags: [] },
 ];
 
-function serverVoiceToInfo(v: { id: string; label: string; gender: string; region: string; type: string }): VoiceInfo {
+/** @deprecated giữ lại tên export cũ cho code chưa migrate — dùng modelUrl cố định của VieNeu. */
+export const HF_VOICE_MODEL_URL = HF_MODEL_URL;
+
+interface RawCatalogEntry {
+  id: string;
+  name: string;
+  language: string;
+  gender: string;
+  accent: string;
+  category: string[];
+  tags: string[];
+  tagline: string;
+  lang: string;
+}
+
+function registryVoiceToItem(v: Voice): VoiceListItem {
+  // preset (built-in engine) và cloned từ catalog vendor đều là "hệ thống cung cấp
+  // sẵn"; chỉ cloned KHÔNG có sourceCatalogId (user tự upload qua VoiceCloneModal)
+  // mới là "custom" — chia tab System/Custom trên UI dựa vào field này.
+  const origin: VoiceListOrigin = v.type === 'cloned' && !v.sourceCatalogId ? 'custom' : 'system';
   return {
-    id: `vieneu-${v.id}`,
-    label: v.label,
+    source: 'registry',
+    origin,
+    id: v.id.startsWith('vieneu-') ? v.id : `vieneu-${v.id}`,
+    name: v.name,
     gender: v.gender === 'male' ? 'male' : 'female',
-    region: v.region === 'Nam' ? 'Nam' : 'Bắc',
-    style: v.type === 'preset' ? 'builtin' : v.gender === 'female' ? 'gentle' : 'clear',
-    modelUrl: HF_MODEL_URL,
+    language: v.language,
+    accent: v.accent,
+    category: v.category ?? [],
+    tags: v.tags ?? (v.type === 'preset' ? ['builtin'] : []),
   };
 }
 
-/** Dịch style key nội bộ ('gentle'|'clear'|'builtin') sang text hiển thị theo ngôn ngữ hiện tại. */
-export function translateStyle(t: (key: string) => string, style: string): string {
-  const known = ['gentle', 'clear', 'builtin'];
-  return known.includes(style) ? t(`voicePickerPopover.styles.${style}`) : style;
-}
-
-export function useVoiceCatalog(): VoiceInfo[] {
-  const [voices, setVoices] = useState<VoiceInfo[]>([]);
+/**
+ * Danh sách hợp nhất: registry voices (đã sẵn sàng, gồm preset/system-cloned/user-custom)
+ * + catalog 'hệ thống' chưa từng được chọn dùng. Catalog entry đã có bản registry tương
+ * ứng (sourceCatalogId khớp) bị loại khỏi phần catalog — tránh hiện trùng 2 dòng cho
+ * cùng 1 giọng (bản registry đã sẵn sàng dùng ngay, nên ưu tiên hiện bản đó).
+ */
+export function useVoiceCatalog(): VoiceListItem[] {
+  const [rawRegistry, setRawRegistry] = useState<Voice[]>([]);
+  const [rawCatalog, setRawCatalog] = useState<RawCatalogEntry[]>([]);
   const pythonStatus = useControlStore((s) => s.pythonStatus);
   const nonce = useControlStore((s) => s.voiceCatalogNonce);
+  const platform = usePlatform();
 
   useEffect(() => {
-    if (pythonStatus !== 'ready') return;
-    window.slide?.listVoices?.().then((list) => {
-      // Luôn set (kể cả rỗng) để phản ánh việc xoá giọng.
-      setVoices((list ?? []).map(serverVoiceToInfo));
+    const tts = platform?.services.get<TtsPort>('tts');
+    if (!tts) return;
+
+    // Ở Electron, ta muốn đợi pythonStatus === 'ready' để tránh lỗi log hoặc timeout.
+    // Ở Web, pythonStatus có thể không bao giờ chuyển sang 'ready' do thiếu IPC event, nên fetch trực tiếp.
+    const isElectron = typeof window !== 'undefined' && !!window.slide;
+    if (isElectron && pythonStatus !== 'ready') return;
+
+    tts.listVoices?.().then((list) => {
+      setRawRegistry(list ?? []);
     }).catch(() => {});
-  }, [pythonStatus, nonce]);
+
+    tts.listVoiceCatalog?.().then((list) => {
+      setRawCatalog((list ?? []) as RawCatalogEntry[]);
+    }).catch(() => {});
+  }, [platform, pythonStatus, nonce]);
 
   return useMemo(() => {
-    const byId = new Map(FALLBACK_VOICE_CATALOG.map((voice) => [voice.id, voice]));
-    for (const voice of voices) {
-      byId.set(voice.id, voice);
-    }
-    return Array.from(byId.values());
-  }, [voices]);
+    const registryItems = rawRegistry.map(registryVoiceToItem);
+    const importedCatalogIds = new Set(
+      rawRegistry.map((v) => v.sourceCatalogId).filter((id): id is string => !!id),
+    );
+
+    const byId = new Map(FALLBACK_VOICE_ITEMS.map((item) => [item.id, item]));
+    for (const item of registryItems) byId.set(item.id, item);
+
+    const catalogItems: VoiceListItem[] = rawCatalog
+      .filter((e) => !importedCatalogIds.has(e.id))
+      .map((e) => ({
+        source: 'catalog',
+        origin: 'system',
+        id: e.id,
+        name: e.name,
+        gender: e.gender,
+        language: e.language,
+        accent: e.accent,
+        category: e.category,
+        tags: e.tags,
+        tagline: e.tagline,
+        catalogLang: e.lang,
+      }));
+
+    return [...byId.values(), ...catalogItems];
+  }, [rawRegistry, rawCatalog]);
 }

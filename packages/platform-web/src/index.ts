@@ -1,5 +1,16 @@
 export { createWebPlatform } from './create-web-platform.js';
 export type { CreateWebPlatformOptions } from './create-web-platform.js';
 export { createWebTtsPort } from './adapters/tts.js';
+export { createWebTtsEnginePort } from './adapters/tts-engine.js';
 export { createWebLicensePort } from './adapters/license.js';
 export type { CreateWebLicensePortOptions } from './adapters/license.js';
+export { createWebDataPort } from './adapters/data.js';
+export { createSqliteWasmDataPort } from './adapters/sqlite-wasm-data.js';
+export type { SqliteWasmDataPortOptions } from './adapters/sqlite-wasm-data.js';
+export { createWebLayoutPort } from './adapters/layout.js';
+export { createSqliteWasmLayoutPort } from './adapters/sqlite-wasm-layout.js';
+export type { SqliteWasmLayoutPortOptions } from './adapters/sqlite-wasm-layout.js';
+export { createWebAssetPort } from './adapters/asset.js';
+export { createWasmAssetPort } from './adapters/wasm-asset.js';
+export { createWebEventPort } from './adapters/event.js';
+export { createWebDataSourcePort } from './adapters/data-source.js';

@@ -1,4 +1,4 @@
-import { Slider } from './ui/slider';
+import { Slider } from '@sky-app/ui';
 import { useTtsStudioStore } from '../store';
 
 export function SpeedSlider() {

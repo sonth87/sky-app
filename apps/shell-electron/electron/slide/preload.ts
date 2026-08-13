@@ -4,8 +4,6 @@ import type {
   ApiEnvironment,
   SlideApi,
   SlideMeta,
-  SyncResult,
-  SyncProgress,
   DisplayInfo,
   TtsConfig,
   TtsEngines,
@@ -13,6 +11,8 @@ import type {
   TtsEnginePreflight,
   TtsCapabilities,
   PreGenStatus,
+  VoiceCatalogEntry,
+  TtsLogLine,
 } from '@sky-app/slide-shared';
 
 // Re-export for the few call-sites elsewhere in electron/slide/* that still
@@ -22,10 +22,6 @@ export type {
   ApiEnvironment,
   SlideApi,
   SlideMeta,
-  InvalidStudent,
-  ImportPreview,
-  SyncResult,
-  SyncProgress,
   DisplayInfo,
   TtsConfig,
   TtsEngineInfo,
@@ -34,22 +30,12 @@ export type {
   TtsEnginePreflight,
   TtsCapabilities,
   PreGenStatus,
+  VoiceCatalogEntry,
+  TtsLogLine,
 } from '@sky-app/slide-shared';
 
 const api: SlideApi = {
   getMeta: (): Promise<SlideMeta> => ipcRenderer.invoke('data:meta'),
-  syncData: (payload?: { url?: string; zipPath?: string }): Promise<SyncResult> =>
-    ipcRenderer.invoke('data:sync', payload),
-  openBundleFile: (): Promise<string | null> => ipcRenderer.invoke('data:openFile'),
-  statBundleFile: (filePath: string): Promise<{ size: number }> => ipcRenderer.invoke('data:statFile', filePath),
-  confirmImport: (): Promise<SyncResult> => ipcRenderer.invoke('data:confirmImport'),
-  cancelImport: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('data:cancelImport'),
-  exportData: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('data:export'),
-  onSyncProgress: (cb: (p: SyncProgress) => void): (() => void) => {
-    const handler = (_e: unknown, p: SyncProgress) => cb(p);
-    ipcRenderer.on('data:progress', handler);
-    return () => ipcRenderer.removeListener('data:progress', handler);
-  },
   updateConfig: (patch: Partial<any>): Promise<any> => ipcRenderer.invoke('config:update', patch),
   getApiEnvironment: (): Promise<ApiEnvironment> => ipcRenderer.invoke('config:getApiEnvironment'),
   setApiEnvironment: (env: ApiEnvironment): Promise<ApiEnvironment> => ipcRenderer.invoke('config:setApiEnvironment', env),
@@ -88,8 +74,6 @@ const api: SlideApi = {
     ipcRenderer.on('menu:action', handler);
     return () => ipcRenderer.removeListener('menu:action', handler);
   },
-  getUseSampleData: (): Promise<boolean> => ipcRenderer.invoke('config:getUseSampleData'),
-  setUseSampleData: (val: boolean): Promise<SyncResult> => ipcRenderer.invoke('config:setUseSampleData', val),
   saveAutoPlay: (state: {
     scannedCodes: string[];
     playedCodes: string[];
@@ -133,8 +117,8 @@ const api: SlideApi = {
       return { ok: res.ok, error: res.error };
     }),
   // tts-studio: channel riêng, KHÔNG cache/log/pregen (khác tts:speak dùng bởi Ceremony).
-  synthesizeTts: (text: string, voiceId?: string, speed?: number): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }> =>
-    ipcRenderer.invoke('tts-studio:synthesize', { text, voiceId, speed }).then((res) => {
+  synthesizeTts: (text: string, voiceId?: string, speed?: number, engineOverrides?: Record<string, Record<string, any>>, effectsChain?: unknown[]): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }> =>
+    ipcRenderer.invoke('tts-studio:synthesize', { text, voiceId, speed, engine_overrides: engineOverrides, effectsChain }).then((res) => {
       if (res.ok && res.buffer) {
         return {
           ok: true,
@@ -147,8 +131,13 @@ const api: SlideApi = {
       }
       return { ok: res.ok, error: res.error };
     }),
+  listEffectTypes: (): Promise<Array<{ type: string; label: string; description: string; params: Record<string, { default: number; min: number; max: number; step: number; description: string }> }>> =>
+    ipcRenderer.invoke('tts:list-effect-types'),
   warmupTts: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('tts:warmup'),
+  // TODO: fix TTS type definition — getEngineCapabilities not in SlideApi interface yet
+  // getEngineCapabilities: (): Promise<Record<string, any>> =>
+  //   ipcRenderer.invoke('tts:capabilities'),
   getTtsDebug: (): Promise<{
     port: number; processAlive: boolean; processPid: number | null;
     executableUsed: string; lastStartupError: string | null;
@@ -169,6 +158,10 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:preview-url', { speakerId }),
   listVoices: (): Promise<Array<{ id: string; label: string; gender: string; region: string; type: string; hidden: boolean }>> =>
     ipcRenderer.invoke('tts:list-voices'),
+  listVoiceCatalog: (lang?: string): Promise<VoiceCatalogEntry[]> =>
+    ipcRenderer.invoke('tts:list-voice-catalog', lang),
+  getCatalogAudioUrl: (lang: string, entryId: string): Promise<string> =>
+    ipcRenderer.invoke('tts:catalog-audio-url', { lang, entryId }),
   // ---- Advanced config + capabilities ----
   getTtsConfig: (): Promise<TtsConfig | null> =>
     ipcRenderer.invoke('tts:get-config'),
@@ -202,21 +195,52 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:engine-delete', { engineId }),
   engineDiskUsage: (engineId: string): Promise<{ bytes: number }> =>
     ipcRenderer.invoke('tts:engine-disk-usage', { engineId }),
+  runtimeDiskUsage: (): Promise<Array<{ kind: string; bytes: number; engineIds: string[] }>> =>
+    ipcRenderer.invoke('tts:runtime-disk-usage'),
+  ttsEnginesDir: (): Promise<{ path: string }> =>
+    ipcRenderer.invoke('tts:engines-dir'),
+  openTtsEnginesDir: (): Promise<{ ok: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke('tts:open-engines-dir'),
+  engineUnload: (engineId: string): Promise<{ ok: boolean; error?: string; freedProcess?: boolean; unloaded?: boolean }> =>
+    ipcRenderer.invoke('tts:engine-unload', { engineId }),
   onEngineInstallProgress: (cb: (p: EngineInstallProgress) => void): (() => void) => {
     const handler = (_e: unknown, p: EngineInstallProgress) => cb(p);
     ipcRenderer.on('tts:engine-install-progress', handler);
     return () => ipcRenderer.removeListener('tts:engine-install-progress', handler);
   },
+  // Dòng stdout/stderr thô của tiến trình Python, đẩy realtime — nguồn cho tab "Nhật ký"
+  // cuộn liên tục (xem python-server.ts's broadcastLogLine). KHÔNG lọc theo tier ở đây.
+  onTtsLogLine: (cb: (entry: TtsLogLine) => void): (() => void) => {
+    const handler = (_e: unknown, entry: TtsLogLine) => cb(entry);
+    ipcRenderer.on('tts:log-line', handler);
+    return () => ipcRenderer.removeListener('tts:log-line', handler);
+  },
+  // Buffer log gần nhất (xem python-server.ts's getRecentLogLines) — gọi lúc mount để
+  // nạp lại lịch sử, vì onTtsLogLine chỉ đẩy các dòng phát sinh SAU khi đăng ký.
+  getTtsLogLines: (): Promise<TtsLogLine[]> => ipcRenderer.invoke('tts:get-log-lines'),
   // ---- Clone voice ----
-  pickAudioFile: (): Promise<{ ok: boolean; filePath?: string }> =>
+  // Chọn được NHIỀU file cùng lúc (multiSelections) — 1 giọng giờ clone được từ nhiều mẫu.
+  pickAudioFile: (): Promise<{ ok: boolean; filePaths?: string[] }> =>
     ipcRenderer.invoke('tts:pick-audio-file'),
-  cloneVoice: (payload: { filePath: string; label: string; gender?: string; region?: string }): Promise<{
+  cloneVoice: (payload: {
+    samples: Array<{ filePath: string; refText?: string }>;
+    label: string; gender?: string; region?: string;
+  }): Promise<{
     ok: boolean;
     voice?: { id: string; label: string; gender: string; region: string; type: string; warnings?: string[] };
     error?: string;
   }> => ipcRenderer.invoke('tts:clone-voice', payload),
-  updateVoice: (voiceId: string, hidden: boolean): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('tts:update-voice', { voiceId, hidden }),
+  addVoiceSample: (voiceId: string, filePath: string, refText?: string): Promise<{
+    ok: boolean;
+    sample?: { id: string; ref_file: string; ref_text?: string; warnings?: string[] };
+    error?: string;
+  }> => ipcRenderer.invoke('tts:add-voice-sample', { voiceId, filePath, refText }),
+  deleteVoiceSample: (voiceId: string, sampleId: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('tts:delete-voice-sample', { voiceId, sampleId }),
+  listVoiceSamples: (voiceId: string): Promise<Array<{ id: string; ref_file: string; ref_text?: string }>> =>
+    ipcRenderer.invoke('tts:list-voice-samples', { voiceId }),
+  updateVoice: (voiceId: string, hidden?: boolean, refText?: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('tts:update-voice', { voiceId, hidden, refText }),
   deleteVoice: (voiceId: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('tts:delete-voice', { voiceId }),
   getSystemStats: (): Promise<{
@@ -243,10 +267,10 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:pregen-cancel'),
   pregenGetStatus: (): Promise<import('./pregen-queue').PreGenStatus | null> =>
     ipcRenderer.invoke('tts:pregen-status'),
-  pregenRequeue: (studentCode: string): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('tts:pregen-requeue', { studentCode }),
-  pregenGetAudio: (studentCode: string): Promise<{ ok: boolean; buffer?: ArrayBuffer; error?: string }> =>
-    ipcRenderer.invoke('tts:pregen-get-audio', { studentCode }).then((res) => {
+  pregenRequeue: (id: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('tts:pregen-requeue', { id }),
+  pregenGetAudio: (id: string): Promise<{ ok: boolean; buffer?: ArrayBuffer; sampleRate?: number; error?: string }> =>
+    ipcRenderer.invoke('tts:pregen-get-audio', { id }).then((res) => {
       if (res.ok && res.buffer) {
         return {
           ok: true,

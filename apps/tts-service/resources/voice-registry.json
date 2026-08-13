@@ -1,54 +1,6 @@
 {
   "version": 1,
   "voices": {
-    "NF": {
-      "type": "cloned",
-      "label": "Lan Anh",
-      "gender": "female",
-      "region": "Bắc",
-      "ref_file": "nu-bac.wav",
-      "hidden": false
-    },
-    "NF2": {
-      "type": "cloned",
-      "label": "Ngọc Huyền",
-      "gender": "female",
-      "region": "Bắc",
-      "ref_file": "nu-bac-2.wav",
-      "hidden": false
-    },
-    "SF": {
-      "type": "cloned",
-      "label": "Mai Linh",
-      "gender": "female",
-      "region": "Nam",
-      "ref_file": "nu-nam.wav",
-      "hidden": false
-    },
-    "NM1": {
-      "type": "cloned",
-      "label": "Minh Quân",
-      "gender": "male",
-      "region": "Bắc",
-      "ref_file": "nam-bac.wav",
-      "hidden": false
-    },
-    "SM": {
-      "type": "cloned",
-      "label": "Gia Huy",
-      "gender": "male",
-      "region": "Nam",
-      "ref_file": "nam-nam.wav",
-      "hidden": false
-    },
-    "ADAM": {
-      "type": "cloned",
-      "label": "Adam",
-      "gender": "male",
-      "region": "Bắc",
-      "ref_file": "adam-low-tone.wav",
-      "hidden": false
-    },
     "preset-NgocLan": {
       "type": "preset",
       "label": "Ngọc Lan",

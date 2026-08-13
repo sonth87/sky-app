@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Toaster } from 'sonner';
+import { X } from 'lucide-react';
 import { useStore as useDeviceLayoutStore, useMenuAction } from '@sonth87/device-layout';
 import type { PlatformContext } from '@sky-app/kernel';
 import type { DataPort } from '@sky-app/service-contracts';
+import type { EventPort, DataSourcePort, LayoutPort, AssetPort } from '@sky-app/service-contracts';
 import { useControlStore } from './store';
+import { useEventStore } from './eventStore';
+import { EventGate } from './EventGate';
+import { EventHubModal } from './EventHubModal';
 import { useSocket } from './hooks/useSocket';
 import { useGlobalCardReader } from './hooks/useGlobalCardReader';
 import { playErrorBeep } from './lib/sound';
@@ -16,7 +21,7 @@ import { PortalContainerContext } from './PortalContainerContext';
 import { PlatformProvider } from './PlatformContext';
 import { useSlide } from './lib/slide';
 import { buildCeremonyThemeStyle } from './theme';
-import { cn } from './lib/cn';
+import { cn } from '@sky-app/ui';
 import { ScanInbox } from './components/ScanInbox';
 import { NowOnStage } from './components/NowOnStage';
 import { PreviewPanel } from './components/PreviewPanel';
@@ -24,7 +29,6 @@ import { IdlePanel } from './components/IdlePanel';
 import { StudentPanels } from './components/StudentPanels';
 import { ModeSwitch } from './components/ModeSwitch';
 import { HallSelector } from './components/HallSelector';
-import { SyncPanel } from './components/SyncPanel';
 import { DisplayPicker } from './components/DisplayPicker';
 import { BackdropToggleCompact } from './components/BackdropToggle';
 import { StatusBar } from './components/StatusBar';
@@ -35,7 +39,8 @@ import { AboutModal } from './components/AboutModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { ConfirmModal } from './components/ui/ConfirmModal';
 import { showSuccessToast } from './lib/toast';
-import { IMPORT_WARN_SIZE, formatGB } from '@sky-app/slide-shared';
+import { SAMPLE_DATA_SOURCE_ID, SAMPLE_EVENT_ID, SAMPLE_RECORDS } from './lib/sampleCanonicalData';
+import { buildCeremonyMenuBarMenus } from '../menuBarMenus';
 
 /** Bỏ ký tự không phải chữ-số để khớp mã thẻ (CCCD đôi khi kèm khoảng trắng). */
 const normalizeCode = (s: string | null | undefined) => {
@@ -68,16 +73,42 @@ export interface ControlAppProps {
 export function ControlApp({ appId, platform, isActive = true }: ControlAppProps = {}) {
   const { t } = useTranslation();
   const {
-    ceremony, setMeta, students, setPythonStatus, logsDrawerOpen,
+    setMeta, records, setPythonStatus, logsDrawerOpen,
     language, aboutModalOpen, setAboutModalOpen, openSettingsModal,
     resetConfirmOpen, setResetConfirmOpen, deleteModalOpen, setDeleteModalOpen,
     themeMode, themePalette, appFont, letterSpacing, appSpacing, shadowLevel,
+    eventHubLayoutModalOpen, setEventHubLayoutModalOpen,
   } = useControlStore();
   const socketRef = useSocket();
   const { togglePlay, replayCode, countdown, progress, smoothProgress } = useAutoPlay();
   const [resetting, setResetting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const ceremonyRootRef = useRef<HTMLDivElement>(null);
+
+  // Gate (Giai đoạn 3 kế hoạch Event) — thay việc đi thẳng vào dashboard, xem
+  // docs/roadmap/plans/layout-designer/13-ceremony-mo-rong.md §"Cập nhật luồng tổng". Chỉ chạy
+  // khi có EventPort đăng ký (Electron/web đã hoàn thiện adapter) — môi trường test/Storybook
+  // (platform=undefined) bỏ qua Gate, activeEvent giữ null nhưng loading cũng false ngay từ đầu
+  // (initial state), tránh treo màn hình "đang tải" vô thời hạn.
+  const { activeEvent, loading: eventLoading, checkGate, exitToGate, sampleDataEnabled, setSampleDataEnabled } = useEventStore();
+  const [confirmExitEvent, setConfirmExitEvent] = useState(false);
+  const eventPort = platform?.services.get<EventPort>('event');
+  const dataSourcePortForGate = platform?.services.get<DataSourcePort>('dataSource');
+  const layoutPort = platform?.services.get<LayoutPort>('layout');
+  const assetPort = platform?.services.get<AssetPort>('asset');
+  useEffect(() => {
+    if (eventPort) {
+      // checkGate() rethrow nếu getCurrentActive()/loadStudentsForEvent() lỗi (mất kết nối IPC/
+      // network) — bắt lại đây để báo toast, tránh unhandled rejection im lặng khiến user thấy
+      // Gate mà không hiểu vì sao (bug phát hiện qua review lại code, 2026-07-19; activateEvent()
+      // đã có try/catch+toast ở caller EventGate.tsx, checkGate() lúc mount thì chưa).
+      checkGate(eventPort, dataSourcePortForGate).catch((err: unknown) => {
+        showErrorToast(t('eventGate.activateError', { message: err instanceof Error ? err.message : String(err) }));
+      });
+    } else {
+      useEventStore.setState({ loading: false });
+    }
+  }, [eventPort, dataSourcePortForGate, checkGate, t]);
 
   // mode === 'system' kế thừa theme từ shell (device-layout) thay vì OS trực
   // tiếp — đúng trong ngữ cảnh app con chạy trong desktop-shell ảo. Không dùng
@@ -111,24 +142,24 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
       const code = normalizeCode(rawCode);
       if (!code) return;
 
-      const student = students.find(
-        (s) =>
-          s.student_code === code ||
-          normalizeCode(s.identity_number) === code ||
-          normalizeCode(s.phone_number) === code ||
-          (s.card_code && normalizeCode(s.card_code) === code),
+      const record = records.find(
+        (r) =>
+          (r.identifierCode && normalizeCode(r.identifierCode) === code) ||
+          normalizeCode(r.id) === code ||
+          normalizeCode(r.identityNumber) === code ||
+          normalizeCode(r.phone) === code,
       );
 
-      if (!student) {
+      if (!record) {
         showErrorToast(t('controlApp.studentNotFound', { code }));
         playErrorBeep();
         return;
       }
 
-      showSuccessToast(t('controlApp.studentAdded', { name: student.full_name }));
-      socketRef.current?.emit('scan:qr', { student_code: student.student_code });
+      showSuccessToast(t('controlApp.studentAdded', { name: record.full_name }));
+      socketRef.current?.emit('scan:qr', { id: record.id });
     },
-    [socketRef, students, t],
+    [socketRef, records, t],
   );
 
   const slideForPython = useSlide('tts-python-status');
@@ -178,7 +209,7 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
     getMeta?.then((raw) => {
       const meta = raw as {
         ceremony: unknown;
-        students: unknown;
+        records: unknown;
         syncedAt: string | null;
         config?: { ws_port?: number; mode?: string; delay_seconds?: number; idle_timeout_enabled?: boolean; idle_timeout_seconds?: number } | null;
         apiEnvironment?: string;
@@ -186,7 +217,7 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
       console.log('[ControlApp] Got meta, ws_port:', meta.config?.ws_port);
       setMeta({
         ceremony: meta.ceremony as Parameters<typeof setMeta>[0]['ceremony'],
-        students: meta.students as Parameters<typeof setMeta>[0]['students'],
+        records: meta.records as Parameters<typeof setMeta>[0]['records'],
         syncedAt: meta.syncedAt ?? null,
         wsPort: meta.config?.ws_port ?? 8765,
         mode: (meta.config?.mode as Parameters<typeof setMeta>[0]['mode']) ?? 'manual',
@@ -204,7 +235,6 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
   }, [setMeta, platform, slideForMeta]);
 
   const slideForLanguage = useSlide('app-language');
-  const slideForImportExport = useSlide('data-import-export');
   const slideForMenu = useSlide('native-menu');
   const slideForReset = useSlide('data-reset');
 
@@ -213,66 +243,62 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
     slideForLanguage?.setAppLanguage(language);
   }, [language, slideForLanguage]);
 
-  const handleImportZip = useCallback(async () => {
-    const slide = slideForImportExport;
-    if (!slide) return;
-    const zipPath = await slide.openBundleFile();
-    if (!zipPath) return;
-    // Cảnh báo file nặng — nhất quán với SyncPanel.
-    const { size } = await slide.statBundleFile(zipPath);
-    if (size >= IMPORT_WARN_SIZE) {
-      if (!window.confirm(t('debugMenu.largeFileConfirm', { size: formatGB(size) }))) return;
-    }
-    try {
-      showSuccessToast(t('debugMenu.checkingData'));
-      const result = await slide.syncData({ zipPath });
+  // Đồng bộ dấu check "Dùng dữ liệu mẫu" trong menu Develop theo đúng state thật (localStorage,
+  // xem eventStore.ts's sampleDataEnabled) — menuBarMenus khai TĨNH ở index.ts (luôn bắt đầu
+  // checked=false), nên cần vá lại NGAY lúc mount + mỗi khi bật/tắt qua device-layout's
+  // updateAppConfig (≥0.6.0, tự sửa thêm ở repo device-layout riêng, 2026-07-30) — `apps` trong
+  // store của nó đã đọc reactive sẵn (MenuBar.tsx), patch xong tự re-render, không cần cơ chế nào
+  // khác. Bỏ qua khi appId chưa có (test/Storybook, ControlApp mount ngoài device-shell).
+  useEffect(() => {
+    if (!appId) return;
+    useDeviceLayoutStore.getState().updateAppConfig(appId, { menuBarMenus: buildCeremonyMenuBarMenus(sampleDataEnabled) });
+  }, [appId, sampleDataEnabled]);
 
-      // Import 2 pha: verify xong → hỏi xác nhận trước khi ghi đè.
-      if (result.pendingConfirm) {
-        const p = result.pendingConfirm;
-        const ok = window.confirm(
-          p.invalid.length > 0
-            ? t('debugMenu.importConfirmWithErrors', { valid: p.valid, invalid: p.invalid.length, total: p.total })
-            : t('debugMenu.importConfirm', { valid: p.valid, total: p.total })
-        );
-        if (!ok) { await slide.cancelImport(); return; }
-        const committed = await slide.confirmImport();
-        if (committed.ok) {
-          showSuccessToast(t('debugMenu.importSuccess'));
-          setTimeout(() => window.location.reload(), 1000);
-        } else {
-          alert(t('debugMenu.importError', { message: committed.message }));
-        }
+  // "Dùng dữ liệu mẫu" (menu Develop) — TOGGLE bật/tắt (2026-07-30, thay hành vi "tạo 1 lần" cũ,
+  // phản hồi thật: dữ liệu mẫu chỉ để xem thử app hoạt động ra sao, cần ẩn/hiện được, không phải
+  // tạo-rồi-để-mãi). Tắt KHÔNG xoá Event/DataSource khỏi DB — đã khảo sát kỹ, EventPort/
+  // DataSourcePort chưa có delete() nào (không có sẵn ở ceremony-db/Electron IPC/data-service
+  // web, thêm mới là việc lớn hơn nhiều so với giá trị tính năng này) — chỉ ẩn khỏi UI qua
+  // sampleDataEnabled (xem EventGate.tsx's filter), bật lại hiện NGUYÊN data cũ ngay, không tạo
+  // lại. Lần bật ĐẦU TIÊN mới thật sự tạo mới (Event/DataSource chưa từng tồn tại).
+  const handleToggleSampleData = useCallback(async () => {
+    if (!eventPort || !dataSourcePortForGate) return;
+    try {
+      if (sampleDataEnabled) {
+        setSampleDataEnabled(false);
+        // Đang xem chính Event mẫu lúc tắt → tự thoát ra danh sách Event (yêu cầu thật,
+        // 2026-07-30) — CHỈ điều hướng UI cục bộ (exitToGate không đổi status DB), giống hành vi
+        // nút X sẵn có, không cần confirm vì đây là data mẫu, không phải lễ thật đang chạy dở.
+        if (useEventStore.getState().activeEvent?.id === SAMPLE_EVENT_ID) exitToGate();
+        showSuccessToast(t('developMenu.sampleDataDisabled'));
         return;
       }
 
-      if (result.ok) {
-        showSuccessToast(t('debugMenu.importSuccess'));
-        setTimeout(() => window.location.reload(), 1000);
-      } else {
-        alert(t('debugMenu.importError', { message: result.message }));
+      const existing = await eventPort.get(SAMPLE_EVENT_ID);
+      if (!existing) {
+        await dataSourcePortForGate.create({
+          id: SAMPLE_DATA_SOURCE_ID,
+          label: 'Dữ liệu mẫu',
+          mode: 'pooled',
+          naturalKeyField: 'id',
+        });
+        await dataSourcePortForGate.importRecords(SAMPLE_DATA_SOURCE_ID, SAMPLE_RECORDS);
+        await eventPort.create({
+          id: SAMPLE_EVENT_ID,
+          name: '🧪 Dữ liệu mẫu (demo)',
+          status: 'draft',
+          dataSourceId: SAMPLE_DATA_SOURCE_ID,
+          customVariables: [],
+          layoutRefs: [],
+        });
       }
+      setSampleDataEnabled(true);
+      showSuccessToast(t('developMenu.sampleDataEnabled'));
+      await useEventStore.getState().refreshList(eventPort);
     } catch (err) {
-      alert(t('debugMenu.genericError', { message: err instanceof Error ? err.message : String(err) }));
+      showErrorToast(t('eventGate.activateError', { message: err instanceof Error ? err.message : String(err) }));
     }
-  }, [t, slideForImportExport]);
-
-  const handleExportZip = useCallback(async () => {
-    const slide = slideForImportExport;
-    if (!slide) return;
-    try {
-      const result = await slide.exportData();
-      if (result.ok) {
-        showSuccessToast(t('debugMenu.exportSuccess'));
-      } else {
-        if (result.message !== 'Đã hủy xuất file') {
-          alert(t('debugMenu.exportError', { message: result.message }));
-        }
-      }
-    } catch (err) {
-      alert(t('debugMenu.genericError', { message: err instanceof Error ? err.message : String(err) }));
-    }
-  }, [t, slideForImportExport]);
+  }, [eventPort, dataSourcePortForGate, sampleDataEnabled, setSampleDataEnabled, exitToGate, t]);
 
   // Xử lý action từ menu — dùng chung cho cả 2 nguồn dispatch:
   // 1. window.slide.onMenuAction (Electron native OS menu, kênh cũ — guard qua slideForMenu).
@@ -303,12 +329,6 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
       case 'settings:backup':
         openSettingsModal('backup');
         break;
-      case 'data:import':
-        handleImportZip();
-        break;
-      case 'data:export':
-        handleExportZip();
-        break;
       case 'data:reset:qr':
         setDeleteModalOpen('scans');
         break;
@@ -319,13 +339,20 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
         setDeleteModalOpen('cache');
         break;
       case 'develop:sampleData':
-        slideForMenu?.getUseSampleData().then((val) => slideForMenu.setUseSampleData(!val).then(() => window.location.reload()));
+        void handleToggleSampleData();
         break;
       case 'develop:apiTest':
         openSettingsModal('api');
         break;
+      case 'event:exitToGate':
+        // No-op nếu đang ở Gate (chưa có Event active) — MenuBarItem không tự ẩn theo runtime
+        // state (xem comment ở index.ts's menuBarMenus), nên item LUÔN hiện trong menu bar dù
+        // không phải lúc nào cũng có tác dụng. Giữ đúng hành vi nút X trong header: luôn hỏi
+        // xác nhận trước khi rời, KHÔNG gọi thẳng exitToGate().
+        if (activeEvent) setConfirmExitEvent(true);
+        break;
     }
-  }, [isActive, handleImportZip, handleExportZip, openSettingsModal, setAboutModalOpen, setDeleteModalOpen, slideForMenu]);
+  }, [isActive, activeEvent, openSettingsModal, setAboutModalOpen, setDeleteModalOpen, handleToggleSampleData]);
 
   useEffect(() => {
     const unsub = slideForMenu?.onMenuAction(handleMenuAction);
@@ -365,43 +392,111 @@ export function ControlApp({ appId, platform, isActive = true }: ControlAppProps
         style={themeStyle.style}
       >
         <Toaster position="top-center" richColors closeButton />
-        {/* Header */}
-        <header className="flex items-center gap-4 border-b border-border bg-card px-5 py-3">
-          <h1 className="text-base font-bold">{ceremony?.name ?? t('controlApp.title')}</h1>
-          <ModeSwitch />
-          <HallSelector />
-          <div className="ml-auto flex items-center gap-4">
-            <BackdropToggleCompact />
-          </div>
-        </header>
+        {/* Gate (Giai đoạn 3 kế hoạch Event) — activeEvent null → Gate thay vì dashboard. Khi
+           eventPort chưa có (test/Storybook, platform=undefined) hoặc chưa từng kích hoạt Event
+           nào, activeEvent giữ null vĩnh viễn và Gate hiện thay vì treo màn hình. */}
+        {!activeEvent ? (
+          eventLoading ? (
+            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+              {t('common.loading')}
+            </div>
+          ) : (
+            <EventGate />
+          )
+        ) : (
+          <>
+            {/* Header */}
+            <header className="flex items-center gap-4 border-b border-border bg-card px-5 py-3">
+              {/* Tiêu đề = tên Event đang chạy (Giai đoạn 4b) — TRƯỚC ĐÓ hiện `ceremony?.name`
+                 (config Ceremony cũ, mặc định "Lễ Trao Bằng Tốt Nghiệp", KHÔNG liên quan Event
+                 nào đang chọn) gây trùng lặp/nhầm lẫn với chip tên Event bên cạnh (phát hiện qua
+                 review UI thật, 2026-07-19) — bỏ hẳn `ceremony?.name` khỏi header, chỉ còn 1 nơi
+                 hiện tên duy nhất. Nút X (câu hỏi mở 17-prompt-claude-design-control.md §5 chốt
+                 qua AskUserQuestion 2026-07-19) quay lại màn Danh sách Event — CHỈ điều hướng UI
+                 cục bộ (exitToGate KHÔNG đổi status DB), luôn hỏi xác nhận trước vì rời dashboard
+                 dễ khiến người vận hành quên đang có lễ chạy dở. */}
+              <button
+                type="button"
+                onClick={() => setConfirmExitEvent(true)}
+                className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                aria-label={t('controlApp.exitEventButton') as string}
+                title={t('controlApp.exitEventButton') as string}
+              >
+                <X size={16} />
+              </button>
+              <h1 className="max-w-xs truncate text-lg font-bold text-foreground" title={activeEvent.name}>
+                {activeEvent.name}
+              </h1>
+              <div className="h-6 w-px shrink-0 bg-border" />
+              <ModeSwitch />
+              <HallSelector />
+              <div className="ml-auto flex items-center gap-4">
+                <BackdropToggleCompact />
+              </div>
+            </header>
 
-        {/* Body: 2 cột */}
-        <div className="grid flex-1 grid-cols-[1fr_360px] gap-4 overflow-hidden p-4">
-          {/* Trái: 2 bảng SV song song (tất cả + đã quét) — min-w-0 để không đẩy cột phải ra ngoài */}
-          <div className="min-w-0">
-            <StudentPanels
-              onCardScan={handleCardScan}
-              togglePlay={togglePlay}
-              replayCode={replayCode}
-              countdown={countdown}
-              progress={progress}
-            />
-          </div>
+            {/* Body: 2 cột */}
+            <div className="grid flex-1 grid-cols-[1fr_360px] gap-4 overflow-hidden p-4">
+              {/* Trái: 2 bảng SV song song (tất cả + đã quét) — min-w-0 để không đẩy cột phải ra ngoài */}
+              <div className="min-w-0">
+                <StudentPanels
+                  onCardScan={handleCardScan}
+                  togglePlay={togglePlay}
+                  replayCode={replayCode}
+                  countdown={countdown}
+                  progress={progress}
+                />
+              </div>
 
-          {/* Phải: hộp quét + xem trước + on stage + idle + sync + display */}
-          <div className="flex flex-col gap-4 overflow-auto">
-            <ScanInbox />
-            <NowOnStage progress={smoothProgress} />
-            <PreviewPanel />
-            <IdlePanel />
-            <SyncPanel />
-            <DisplayPicker />
-          </div>
-        </div>
+              {/* Phải: hộp quét + xem trước + on stage + idle + sync + display */}
+              <div className="flex flex-col gap-4 overflow-auto">
+                <ScanInbox />
+                <NowOnStage progress={smoothProgress} />
+                <PreviewPanel />
+                <IdlePanel />
+                <DisplayPicker />
+              </div>
+            </div>
+          </>
+        )}
         {logsDrawerOpen && <LogsDrawer />}
         <StatusBar />
         <AboutModal open={aboutModalOpen} onClose={() => setAboutModalOpen(false)} />
         <SettingsModal />
+        {/* Mở thẳng EventHubModal (view 'layout') cho Event đang chạy — trigger từ nút icon ở
+           IdlePanel.tsx khi màn chờ chưa gán layout nào (2026-07-29). key={activeEvent.id} đảm
+           bảo state nội bộ của EventHubModal luôn khớp đúng Event hiện tại, cùng lý do EventGate.
+           tsx's instance sửa đã áp dụng (React không tự re-init useState khi prop đổi). */}
+        {eventPort && activeEvent && eventHubLayoutModalOpen && (
+          <EventHubModal
+            key={activeEvent.id}
+            open={eventHubLayoutModalOpen}
+            onClose={() => setEventHubLayoutModalOpen(false)}
+            eventPort={eventPort}
+            dataSourcePort={dataSourcePortForGate}
+            layoutPort={layoutPort}
+            assetPort={assetPort}
+            initialEvent={activeEvent}
+            initialView="layout"
+            onChanged={() => {
+              void eventPort.get(activeEvent.id).then((updated) => {
+                if (updated) useEventStore.setState({ activeEvent: updated });
+              });
+            }}
+          />
+        )}
+        <ConfirmModal
+          open={confirmExitEvent}
+          title={t('controlApp.exitEventConfirmTitle')}
+          message={t('controlApp.exitEventConfirmMessage')}
+          danger={false}
+          confirmLabel={t('controlApp.exitEventButton') as string}
+          onCancel={() => setConfirmExitEvent(false)}
+          onConfirm={() => {
+            setConfirmExitEvent(false);
+            exitToGate();
+          }}
+        />
         <ConfirmModal
           open={resetConfirmOpen}
           title={t('debugMenu.confirmResetTitle')}

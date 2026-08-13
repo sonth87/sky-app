@@ -1,8 +1,14 @@
 import { createPlatformContext, type PlatformContext } from '@sky-app/kernel';
 import { resolveEntitlementsFromPort } from '@sky-app/licensing';
 import { createElectronTtsPort } from './adapters/tts.js';
+import { createElectronTtsEnginePort } from './adapters/tts-engine.js';
 import { createElectronDisplayPort } from './adapters/display.js';
 import { createElectronLicensePort } from './adapters/license.js';
+import { createElectronLayoutPort } from './adapters/layout.js';
+import { createElectronAssetPort } from './adapters/asset.js';
+import { createElectronEventPort } from './adapters/event.js';
+import { createElectronDataSourcePort } from './adapters/data-source.js';
+import { createElectronEffectPresetPort } from './adapters/effect-preset.js';
 
 export interface CreateElectronPlatformOptions {
   assetUrl?: (path: string) => string;
@@ -43,7 +49,13 @@ export async function createElectronPlatform(
   });
 
   platform.services.register('tts', createElectronTtsPort());
+  platform.services.register('tts-engine', createElectronTtsEnginePort());
   platform.services.register('display', createElectronDisplayPort());
+  platform.services.register('layout', createElectronLayoutPort());
+  platform.services.register('asset', createElectronAssetPort());
+  platform.services.register('event', createElectronEventPort());
+  platform.services.register('dataSource', createElectronDataSourcePort());
+  platform.services.register('effectPreset', createElectronEffectPresetPort());
 
   return platform;
 }

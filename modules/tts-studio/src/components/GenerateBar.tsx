@@ -1,6 +1,9 @@
-import { Loader2, Play, Sparkles } from 'lucide-react';
-import { ButtonPrimitive } from './ui/button-primitive';
+import { Loader2, Pause, Play, Sparkles } from 'lucide-react';
+import { ButtonPrimitive } from '@sky-app/ui';
 import { useTtsStudioStore } from '../store';
+import { useAudioPlayingId } from '../lib/audioPlayer';
+
+export const QUICK_PLAY_ID = 'quickplay';
 
 export interface GenerateBarProps {
   onGenerate?: () => void;
@@ -12,11 +15,12 @@ export function GenerateBar({ onGenerate, onQuickPlay, canQuickPlay }: GenerateB
   const text = useTtsStudioStore((s) => s.text);
   const isGenerating = useTtsStudioStore((s) => s.isGenerating);
   const selectedVoiceId = useTtsStudioStore((s) => s.selectedVoiceId);
+  const isQuickPlaying = useAudioPlayingId() === QUICK_PLAY_ID;
 
   const disabled = isGenerating || !text.trim() || !selectedVoiceId;
 
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex items-center justify-end gap-2 pb-2">
       <ButtonPrimitive
         type="button"
         variant="outline"
@@ -24,7 +28,7 @@ export function GenerateBar({ onGenerate, onQuickPlay, canQuickPlay }: GenerateB
         disabled={!canQuickPlay || isGenerating}
         onClick={onQuickPlay}
       >
-        <Play size={14} /> Phát nhanh
+        {isQuickPlaying ? <Pause size={14} /> : <Play size={14} />} {isQuickPlaying ? 'Dừng' : 'Phát nhanh'}
       </ButtonPrimitive>
       <ButtonPrimitive type="button" size="sm" disabled={disabled} onClick={onGenerate}>
         {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}

@@ -32,6 +32,14 @@ export interface DownloadProgress {
 
 export type ProgressCb = (p: DownloadProgress) => void;
 
+/** Bug thật phát hiện 2026-08-03 (phản hồi: "ấn tải model không có tác dụng gì cả") —
+ * `fetch()` gọi HF KHÔNG có timeout, chỉ phụ thuộc `signal` (chỉ abort khi user tự pause/cancel).
+ * Nếu server không phản hồi (mạng chặn/chậm bất thường tới domain HF) → treo VĨNH VIỄN, không
+ * lỗi, không tiến độ, không gì cả — y hệt triệu chứng đã gặp. Timeout này CHỈ áp cho việc CHỜ
+ * PHẢN HỒI ban đầu (không tính thời gian tải cả file — file lớn vẫn tải bình thường một khi đã
+ * bắt đầu nhận byte). */
+const RESPONSE_TIMEOUT_MS = 20_000;
+
 export class DownloadError extends Error {
   constructor(message: string, readonly kind: 'network' | 'checksum' | 'aborted' | 'io') {
     super(message);
@@ -66,12 +74,21 @@ export async function downloadFile(
     const headers: Record<string, string> = {};
     if (offset > 0) headers['Range'] = `bytes=${offset}-`;
 
+    // Timeout CHỈ áp cho việc chờ response ban đầu — dùng AbortController + setTimeout riêng
+    // (không phải AbortSignal.timeout thẳng) để clearTimeout được ngay khi có response, tránh
+    // nó tự bắn abort giữa lúc đang stream file lớn (bug thật 2026-08-03: model 440MB bị hủy
+    // giữa chừng với lỗi "aborted due to timeout" vì AbortSignal.timeout còn sống suốt cả
+    // fetch(), kể cả phần đọc body — không chỉ lúc chờ header).
+    const timeoutCtrl = new AbortController();
+    const timeoutTimer = setTimeout(() => timeoutCtrl.abort(), RESPONSE_TIMEOUT_MS);
     let res: Response;
     try {
-      res = await fetch(spec.url, { headers, signal });
+      res = await fetch(spec.url, { headers, signal: AbortSignal.any([signal, timeoutCtrl.signal]) });
     } catch (e) {
       if (signal.aborted) throw new DownloadError('Đã tạm dừng tải', 'aborted');
-      throw new DownloadError(`Lỗi mạng: ${(e as Error).message}`, 'network');
+      throw new DownloadError(`Lỗi mạng (không phản hồi sau ${RESPONSE_TIMEOUT_MS / 1000}s hoặc lỗi kết nối): ${(e as Error).message}`, 'network');
+    } finally {
+      clearTimeout(timeoutTimer);
     }
 
     // 200 = server bỏ qua Range (tải lại từ đầu) → reset offset. 206 = resume OK.

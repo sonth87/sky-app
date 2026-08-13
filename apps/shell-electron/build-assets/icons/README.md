@@ -1,20 +1,18 @@
-# Icon app đóng gói (chưa có — TODO)
+# Icon app đóng gói
 
-Đặt icon thương hiệu Sky-App vào đây khi có asset thật, rồi khai trong
-`../../electron-builder.yml`:
+`icon.svg` — nguồn gốc (ocean-sea-splash). `icon.png` — bản render 1024×1024 nền trong
+suốt (qua `sharp`, `density: 384` để nét ở kích thước lớn), dùng trực tiếp cho:
 
-```yaml
-mac:
-  icon: build-assets/icons/icon.icns
-win:
-  icon: build-assets/icons/icon.ico
+- `../../electron-builder.yml`'s top-level `icon:` — electron-builder tự sinh `.icns`
+  (mac)/`.ico` (win) từ 1 PNG ≥512×512, không cần chuẩn bị sẵn cả 2 định dạng.
+- `../../electron/main.ts` — dock icon lúc `dev:app` (macOS, `app.dock.setIcon()`) + window/
+  taskbar icon (`BrowserWindow`'s `icon` option, mọi platform).
+
+**Đổi icon khác:** thay `icon.svg`, rồi render lại PNG:
+
+```bash
+node -e "require('sharp')('icon.svg', { density: 384 }).resize(1024, 1024, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toFile('icon.png')"
 ```
-
-electron-builder cũng chấp nhận 1 `icon.png` (≥512×512, nền trong suốt) và
-tự sinh `.icns`/`.ico` — không bắt buộc chuẩn bị sẵn cả 2 định dạng.
 
 Không đặt icon trong `apps/shell-electron/resources/` — thư mục đó bị
 `.gitignore` (là đích build TTS, xem `docs/dev/build-and-release.md`).
-
-Cho tới khi có icon thật, `.dmg`/`.exe` build ra dùng icon mặc định của
-Electron — không phải lỗi, chỉ chưa hoàn thiện thương hiệu.

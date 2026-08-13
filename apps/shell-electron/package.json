@@ -1,6 +1,6 @@
 {
   "name": "@sky-app/shell-electron",
-  "version": "0.2.0",
+  "version": "0.12.0",
   "private": true,
   "main": "./dist-electron/main/main.js",
   "scripts": {
@@ -14,14 +14,17 @@
     "build:renderer-bundle": "node scripts/build-renderer-bundle.mjs"
   },
   "dependencies": {
+    "@sky-app/app-db": "workspace:*",
     "@sky-app/device-shell": "workspace:*",
     "@sky-app/licensing": "workspace:*",
     "@sky-app/module-ceremony": "workspace:*",
+    "@sky-app/module-layout-designer": "workspace:*",
     "@sky-app/module-mock-app": "workspace:*",
     "@sky-app/module-tts-studio": "workspace:*",
     "@sky-app/platform-electron": "workspace:*",
     "@sky-app/slide-shared": "workspace:*",
-    "@sonth87/device-layout": "github:sonth87/device-layout#v0.1.0",
+    "@sky-app/tts-engine-ui": "workspace:*",
+    "@sonth87/device-layout": "catalog:",
     "adm-zip": "^0.6.0",
     "archiver": "^8.0.0",
     "dotenv": "^17.4.2",

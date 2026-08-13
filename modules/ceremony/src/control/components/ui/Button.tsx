@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
-import { cn } from '../../lib/cn';
-import { buttonVariants } from './button-primitive';
+import { cn } from '@sky-app/ui';
+import { buttonVariants } from '@sky-app/ui';
 
 type ButtonVariant =
   | 'primary'

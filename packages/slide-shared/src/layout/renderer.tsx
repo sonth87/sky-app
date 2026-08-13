@@ -1,0 +1,541 @@
+// LayoutRenderer — render 1 LayoutContent thuần ra DOM, dùng chung bởi layout-designer (preview)
+// và ceremony/backdrop (runtime). Theo docs/roadmap/plans/layout-designer/04-schema-layout-
+// document.md (resolveVariant/computeScale/toRenderBox) + 11-canonical-da-loai-va-loop.md
+// (render LoopItem theo CanonicalGroup.members).
+
+import { useMemo, useRef, type CSSProperties } from 'react';
+import type { Background, Box, LayoutContent, LayoutItem, LayoutVariant, RichTextContent } from './types.js';
+import type { CanonicalGroup, CanonicalRecord, CanonicalSubject } from './canonical.js';
+import { isCanonicalGroup, resolveCanonicalField } from './canonical.js';
+import { computeLoopLayout, renderOverflowMoreText } from './loop.js';
+import { resolveTokens, resolveContentTokens } from './tokens.js';
+import { SHAPE_CLIP_PATHS } from './shapeClipPaths.js';
+import { useAutoFitFontSize } from './useAutoFitFontSize.js';
+import { getFilterDef, buildCssFilter, collectSvgFilterDefs } from './imageFilters.js';
+import { getSpecialPreset } from './imageFrames.js';
+
+/** Chọn variant khớp tỷ lệ màn hình gần nhất (04-schema-layout-document.md). */
+export function resolveVariant(content: LayoutContent, screen: { w: number; h: number }): LayoutVariant | null {
+  if (content.variants.length === 0) return null;
+  const target = screen.w / screen.h;
+  let best = content.variants[0]!;
+  let bestDiff = Infinity;
+  for (const v of content.variants) {
+    const diff = Math.abs(v.aspect.w / v.aspect.h - target);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = v;
+    }
+  }
+  return best;
+}
+
+/**
+ * 2 scale RIÊNG BIỆT (không phải 1 scale chung) — khi variant khớp tỷ lệ màn thì scaleX=scaleY
+ * (không méo); khi lệch thì STRETCH (kéo giãn méo, KHÔNG letterbox — quyết định file 04 #9).
+ */
+export function computeScale(variant: LayoutVariant, screen: { w: number; h: number }): { scaleX: number; scaleY: number } {
+  return { scaleX: screen.w / variant.refW, scaleY: screen.h / variant.refH };
+}
+
+function toRenderBox(box: Box, scaleX: number, scaleY: number): CSSProperties {
+  return {
+    position: 'absolute',
+    left: box.x * scaleX,
+    top: box.y * scaleY,
+    width: box.w * scaleX,
+    height: box.h * scaleY,
+    transform: box.rotation ? `rotate(${box.rotation}deg)` : undefined,
+    zIndex: box.z,
+  };
+}
+
+/** fontSize khi stretch (scaleX≠scaleY): min(scaleX,scaleY) — chữ không tràn box (chốt GĐ1). */
+function fontScale(scaleX: number, scaleY: number): number {
+  return Math.min(scaleX, scaleY);
+}
+
+function getShadowCSS(shadow: boolean | import('./types.js').TextShadow | undefined): string | undefined {
+  if (!shadow) return undefined;
+  if (typeof shadow === 'boolean') {
+    return '0 2px 4px rgba(0,0,0,0.35)';
+  }
+  return `${shadow.offsetX ?? 0}px ${shadow.offsetY ?? 0}px ${shadow.blur ?? 0}px ${shadow.color ?? 'rgba(0,0,0,0.4)'}`;
+}
+
+export interface LayoutRendererProps {
+  content: LayoutContent;
+  /** Kích thước thật của khung hiển thị (px), dùng để chọn variant + tính scale-to-fit. */
+  screen: { w: number; h: number };
+  /** Record đưa vào render — 1 cá nhân hoặc 1 nhóm (11-canonical-da-loai-va-loop.md). */
+  record: CanonicalRecord;
+  /** Giá trị demo/preview khi record không phải nguồn thật (editor dùng để xem trước). */
+  resolveAsset?: (relativePath: string) => string;
+  className?: string;
+  style?: CSSProperties;
+}
+
+export function LayoutRenderer({ content, screen, record, resolveAsset, className, style }: LayoutRendererProps) {
+  const variant = useMemo(() => resolveVariant(content, screen), [content, screen]);
+  const scale = useMemo(() => (variant ? computeScale(variant, screen) : null), [variant, screen]);
+
+  if (!variant || !scale) {
+    // 07-luong-hoat-dong.md: resolveLayout/variant null → màn nền trung tính, không throw.
+    return <div className={className} style={{ width: '100%', height: '100%', background: '#000', ...style }} />;
+  }
+
+  const resolveAssetSafe = resolveAsset ?? ((p: string) => p);
+
+  return (
+    <div
+      className={className}
+      style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', ...style }}
+    >
+      {variant.background && (
+        <BackgroundLayer background={variant.background} resolveAsset={resolveAssetSafe} />
+      )}
+      {variant.items.map((item) => (
+        <ItemRenderer key={item.id} item={item} scaleX={scale.scaleX} scaleY={scale.scaleY} record={record} resolveAsset={resolveAssetSafe} />
+      ))}
+    </div>
+  );
+}
+
+function BackgroundLayer({ background, resolveAsset }: { background: Background; resolveAsset: (p: string) => string }) {
+  const style: CSSProperties = { position: 'absolute', inset: 0 };
+  if (background.kind === 'image' && background.src) {
+    style.backgroundImage = `url("${resolveAsset(background.src)}")`;
+    style.backgroundSize = '100% 100%';
+    style.backgroundPosition = 'center';
+  } else if (background.kind === 'color' && background.color) {
+    style.backgroundColor = background.color;
+  } else if (background.kind === 'gradient' && background.gradient) {
+    style.background = background.gradient;
+  }
+  return <div style={style} />;
+}
+
+interface ItemRendererProps {
+  item: LayoutItem;
+  scaleX: number;
+  scaleY: number;
+  record: CanonicalRecord;
+  resolveAsset: (p: string) => string;
+}
+
+function ItemRenderer({ item, scaleX, scaleY, record, resolveAsset }: ItemRendererProps) {
+  if (item.hidden) return null;
+
+  switch (item.type) {
+    case 'text':
+      return <TextItemView item={item} scaleX={scaleX} scaleY={scaleY} record={record} />;
+    case 'ribbon':
+      return <RibbonItemView item={item} scaleX={scaleX} scaleY={scaleY} record={record} />;
+    case 'image':
+      return <ImageItemView item={item} scaleX={scaleX} scaleY={scaleY} record={record} resolveAsset={resolveAsset} />;
+    case 'shape':
+      return <ShapeItemView item={item} scaleX={scaleX} scaleY={scaleY} />;
+    case 'loop':
+      return <LoopItemView item={item} scaleX={scaleX} scaleY={scaleY} record={record} resolveAsset={resolveAsset} />;
+    case 'gallery':
+      return <GalleryItemView item={item} scaleX={scaleX} scaleY={scaleY} resolveAsset={resolveAsset} />;
+    default: {
+      const _exhaustive: never = item;
+      return _exhaustive;
+    }
+  }
+}
+
+/** ctx: subject hiện tại để resolve token — record gốc (ngoài loop) hoặc 1 member (trong loop).
+ * `content` có thể là string (RibbonItem LUÔN, TextItem layout cũ) hoặc RichTextContent (TextItem
+ * đã qua rich-text editor, Bước 12) — resolveContentTokens trả ĐÚNG CÙNG KIỂU với input. */
+function resolveContent<T extends string | RichTextContent>(content: T, ctx: CanonicalSubject | CanonicalGroup): T {
+  return resolveContentTokens(content, (key) => resolveCanonicalField(ctx, key)) as T;
+}
+
+function TextItemView({
+  item,
+  scaleX,
+  scaleY,
+  record,
+}: {
+  item: Extract<LayoutItem, { type: 'text' }>;
+  scaleX: number;
+  scaleY: number;
+  record: CanonicalRecord;
+}) {
+  const textRef = useRef<HTMLElement>(null);
+  const fScale = fontScale(scaleX, scaleY);
+  const resolved = resolveContent(item.content, record);
+  const requestedPx = item.fontSize * fScale;
+  const fittedPx = useAutoFitFontSize(textRef, {
+    text: typeof resolved === 'string' ? resolved : resolved.html,
+    boxWidthPx: item.box.w * scaleX,
+    boxHeightPx: item.box.h * scaleY,
+    requestedFontSizePx: requestedPx,
+    minFontSizePx: requestedPx * 0.4,
+    wrap: false,
+    enabled: item.overflow === 'shrink',
+  });
+  const style: CSSProperties = {
+    ...toRenderBox(item.box, scaleX, scaleY),
+    opacity: item.opacity != null ? item.opacity / 100 : undefined,
+    fontFamily: item.fontFamily,
+    fontSize: fittedPx,
+    fontWeight: item.fontWeight,
+    color: item.color,
+    textAlign: item.align,
+    fontStyle: item.italic ? 'italic' : undefined,
+    textTransform: item.uppercase ? 'uppercase' : undefined,
+    lineHeight: item.lineHeight,
+    display: 'flex',
+    alignItems: item.vAlign === 'top' ? 'flex-start' : item.vAlign === 'bottom' ? 'flex-end' : 'center',
+    justifyContent: item.align === 'left' ? 'flex-start' : item.align === 'right' ? 'flex-end' : 'center',
+    overflow: item.overflow === 'clip' ? 'hidden' : undefined,
+    whiteSpace: item.overflow === 'wrap' ? 'pre-wrap' : 'pre',
+    textShadow: item.shadow
+      ? typeof item.shadow === 'boolean'
+        ? '0 2px 4px rgba(0,0,0,0.4)'
+        : `${item.shadow.offsetX ?? 0}px ${item.shadow.offsetY ?? 0}px ${item.shadow.blur ?? 0}px ${item.shadow.color ?? 'rgba(0,0,0,0.4)'}`
+      : undefined,
+  };
+  if (typeof resolved === 'string') {
+    return <div ref={textRef as any} style={style}>{resolved}</div>;
+  }
+  return <div ref={textRef as any} style={style} dangerouslySetInnerHTML={{ __html: resolved.html }} />;
+}
+
+function RibbonItemView({
+  item,
+  scaleX,
+  scaleY,
+  record,
+}: {
+  item: Extract<LayoutItem, { type: 'ribbon' }>;
+  scaleX: number;
+  scaleY: number;
+  record: CanonicalRecord;
+}) {
+  const fScale = fontScale(scaleX, scaleY);
+  const text = resolveContent(item.content, record);
+  const bgValue = typeof item.bg === 'string' ? item.bg : (item.bg?.kind === 'gradient' ? item.bg.value : undefined);
+  const shadowCSS = getShadowCSS(item.shadow);
+  const style: CSSProperties = {
+    ...toRenderBox(item.box, scaleX, scaleY),
+    opacity: item.opacity != null ? item.opacity / 100 : undefined,
+    background: bgValue,
+    color: item.color,
+    fontSize: item.fontSize * fScale,
+    fontWeight: item.fontWeight,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: item.borderW ? `${item.borderW * Math.min(scaleX, scaleY)}px solid ${item.borderColor ?? '#000'}` : undefined,
+    boxShadow: shadowCSS,
+  };
+  return <div style={style}>{text}</div>;
+}
+
+/** 4 dải "băng dính" góc — port từ my-builder's TapeDecoration (Image.tsx), dùng khi
+ * ImageItem.specialFrame === 'tape'. Container cha PHẢI overflow:visible (băng dính lồi ra ngoài
+ * khung). Kích thước giữ NGUYÊN px tuyệt đối (không nhân scale) — hiệu ứng trang trí phụ, chấp
+ * nhận lệch nhẹ ở scale cực đoan, giống cách my-builder không co giãn theo canvas scale. */
+function TapeDecoration() {
+  const tapes: Array<CSSProperties & { rotate: string }> = [
+    { top: '-10px', left: '18px', rotate: '-20deg' },
+    { top: '-10px', right: '18px', rotate: '20deg' },
+    { bottom: '-10px', left: '18px', rotate: '15deg' },
+    { bottom: '-10px', right: '18px', rotate: '-15deg' },
+  ];
+  return (
+    <>
+      {tapes.map(({ rotate, ...pos }, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            width: 36,
+            height: 14,
+            background: 'rgba(215,205,165,0.72)',
+            transform: `rotate(${rotate})`,
+            pointerEvents: 'none',
+            zIndex: 2,
+            ...pos,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+/** SVG ẩn chứa toàn bộ <filter> def (3D/Ink) — chèn 1 lần mỗi ảnh dùng filter mode="svg" để
+ * `filter: url(#id)` resolve được. Trùng id giữa nhiều ảnh không sao (trình duyệt lấy def đầu
+ * tiên khớp), port nguyên trạng cách làm của my-builder. */
+function ImageSvgFilterDefs() {
+  const defs = collectSvgFilterDefs();
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: `<defs>${defs}</defs>` }}
+    />
+  );
+}
+
+function ImageItemView({
+  item,
+  scaleX,
+  scaleY,
+  record,
+  resolveAsset,
+}: {
+  item: Extract<LayoutItem, { type: 'image' }>;
+  scaleX: number;
+  scaleY: number;
+  record: CanonicalRecord;
+  resolveAsset: (p: string) => string;
+}) {
+  const relPath = item.varKey ? resolveCanonicalField(record as CanonicalSubject, item.varKey) : item.src;
+  const fScale = Math.min(scaleX, scaleY);
+
+  const filterDef = getFilterDef(item.filter);
+  const cssFilter = buildCssFilter(filterDef);
+  const combinedFilter = [cssFilter, item.dropShadow].filter(Boolean).join(' ') || undefined;
+  const hasSvgFilter = filterDef?.mode === 'svg';
+  const hasFilterOverlay = filterDef?.mode === 'overlay' && !!filterDef.overlayColor;
+
+  const specialFrame = item.specialFrame ?? 'none';
+  const specialPreset = getSpecialPreset(specialFrame);
+  const isTape = specialFrame === 'tape';
+
+  const boxShadowCSS = item.boxShadow ?? getShadowCSS(item.shadow);
+  const borderRadiusCSS = item.clipPath
+    ? undefined
+    : item.borderRadius != null
+      ? (typeof item.borderRadius === 'number' ? item.borderRadius * fScale : item.borderRadius)
+      : item.shape === 'circle'
+        ? '50%'
+        : item.shape === 'round'
+          ? 12
+          : undefined;
+
+  const style: CSSProperties = {
+    ...toRenderBox(item.box, scaleX, scaleY),
+    opacity: item.opacity != null ? item.opacity / 100 : undefined,
+    overflow: isTape ? 'visible' : 'hidden',
+    borderRadius: borderRadiusCSS,
+    clipPath: item.clipPath ?? undefined,
+    border: item.borderW ? `${item.borderW * fScale}px ${item.borderStyle ?? 'solid'} ${item.borderColor ?? '#fff'}` : undefined,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#0002',
+    boxShadow: boxShadowCSS,
+    // Special CSS-only presets (polaroid/vintage) — áp thẳng lên container, xem imageFrames.ts.
+    ...(specialPreset && !specialPreset.requiresCustomMarkup ? (specialPreset.cssStyle as CSSProperties | undefined) : undefined),
+  };
+  if (!relPath) {
+    return <div style={style}>{item.fallbackText ?? ''}</div>;
+  }
+  const focalX = (item.focalX ?? 0.5) * 100;
+  const focalY = (item.focalY ?? 0.5) * 100;
+  return (
+    <div style={style}>
+      {hasSvgFilter && <ImageSvgFilterDefs />}
+      <img
+        src={resolveAsset(relPath)}
+        alt=""
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: item.fit ?? 'cover',
+          objectPosition: (item.fit ?? 'cover') !== 'fill' ? `${focalX}% ${focalY}%` : undefined,
+          filter: combinedFilter,
+        }}
+      />
+      {/* Overlay màu của filter mode="overlay" (VD Faded/Kerouac...) */}
+      {hasFilterOverlay && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: filterDef!.overlayColor,
+            opacity: filterDef!.overlayOpacity ?? 0.3,
+            mixBlendMode: (filterDef!.overlayBlend ?? 'multiply') as CSSProperties['mixBlendMode'],
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {/* Overlay màu THỦ CÔNG, độc lập với overlay của filter (có thể cộng dồn cả 2) */}
+      {(item.overlayOpacity ?? 0) > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: item.overlayColor ?? '#000000',
+            opacity: (item.overlayOpacity ?? 0) / 100,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {isTape && <TapeDecoration />}
+    </div>
+  );
+}
+
+function ShapeItemView({ item, scaleX, scaleY }: { item: Extract<LayoutItem, { type: 'shape' }>; scaleX: number; scaleY: number }) {
+  const fScale = Math.min(scaleX, scaleY);
+  const fillValue = typeof item.fill === 'string' ? item.fill : (item.fill?.kind === 'gradient' ? item.fill.value : undefined);
+  const shadowCSS = getShadowCSS(item.shadow);
+  const outerStyle = toRenderBox(item.box, scaleX, scaleY);
+  const opacity = item.opacity != null ? item.opacity / 100 : undefined;
+
+  // 'line' — không phải "cắt hình", là 1 đường kẻ mảnh nằm giữa box (khớp ItemContent.tsx's
+  // ShapeItemContent, GĐ10 2026-08-06 — trước đó renderer.tsx THIẾU HẲN nhánh này, chỉ editor
+  // preview có, gây lệch WYSIWYG editor-vs-backdrop thật).
+  if (item.shape === 'line') {
+    return (
+      <div style={{ ...outerStyle, opacity }}>
+        <div style={{ width: '100%', height: item.strokeW ? item.strokeW * fScale : 2, background: item.stroke ?? fillValue ?? '#000', marginTop: '50%' }} />
+      </div>
+    );
+  }
+  // 'frame' — khung viền RỖNG (không fill giữa), mặc định viền 2px nếu strokeW chưa set (chọn
+  // hình này mà không viền thì vô hình, không có ý nghĩa).
+  if (item.shape === 'frame') {
+    const border = item.strokeW ? `${item.strokeW * fScale}px solid ${item.stroke ?? '#000'}` : `${2 * fScale}px solid ${item.stroke ?? fillValue ?? '#000'}`;
+    return <div style={{ ...outerStyle, opacity, background: 'transparent', border, boxShadow: shadowCSS }} />;
+  }
+
+  const style: CSSProperties = {
+    ...outerStyle,
+    opacity,
+    background: fillValue,
+    border: item.strokeW ? `${item.strokeW * fScale}px solid ${item.stroke ?? '#000'}` : undefined,
+    borderRadius: item.shape === 'circle' ? '50%' : item.shape === 'rect' ? item.radius : undefined,
+    clipPath: SHAPE_CLIP_PATHS[item.shape],
+    boxShadow: shadowCSS,
+  };
+  return <div style={style} />;
+}
+
+function LoopItemView({
+  item,
+  scaleX,
+  scaleY,
+  record,
+  resolveAsset,
+}: {
+  item: Extract<LayoutItem, { type: 'loop' }>;
+  scaleX: number;
+  scaleY: number;
+  record: CanonicalRecord;
+  resolveAsset: (p: string) => string;
+}) {
+  // LoopItem chỉ áp dụng khi record là group; cá nhân → tự ẩn (11 §resolveVariant/render).
+  const members = isCanonicalGroup(record) ? record.members : undefined;
+  const result = useMemo(() => computeLoopLayout(item, members), [item, members]);
+
+  if (result.cells.length === 0) return null;
+
+  const outerStyle = toRenderBox(item.box, scaleX, scaleY);
+
+  return (
+    <div style={outerStyle}>
+      {result.cells.map((cell) => (
+        <div
+          key={cell.member.id}
+          style={{
+            position: 'absolute',
+            left: cell.x * scaleX,
+            top: cell.y * scaleY,
+            width: item.itemBox.w * scaleX * cell.itemScale,
+            height: item.itemBox.h * scaleY * cell.itemScale,
+          }}
+        >
+          {item.itemTemplate.map((subItem) => (
+            <ItemRenderer
+              key={subItem.id}
+              item={subItem}
+              scaleX={scaleX * cell.itemScale}
+              scaleY={scaleY * cell.itemScale}
+              record={cell.member}
+              resolveAsset={resolveAsset}
+            />
+          ))}
+        </div>
+      ))}
+      {result.overflowed && result.overflowCount > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            bottom: 0,
+            fontSize: 14 * Math.min(scaleX, scaleY),
+            color: '#fff',
+            opacity: 0.85,
+          }}
+        >
+          {renderOverflowMoreText(item.overflowMoreText, result.overflowCount)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GalleryItemView({ item, scaleX, scaleY, resolveAsset }: { item: Extract<LayoutItem, { type: 'gallery' }>; scaleX: number; scaleY: number; resolveAsset: (p: string) => string }) {
+  const gap = (item.gap ?? 8) * Math.min(scaleX, scaleY);
+  const gridStyle: CSSProperties = item.layout === 'grid'
+    ? { display: 'grid', gridTemplateColumns: `repeat(${item.columns ?? 3}, 1fr)`, gap }
+    : { display: 'flex', flexDirection: item.layout === 'row' ? 'row' : 'column', gap };
+
+  if (item.images.length === 0) {
+    return (
+      <div style={{
+        ...toRenderBox(item.box, scaleX, scaleY),
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#7c7c8c',
+        fontSize: 12 * Math.min(scaleX, scaleY),
+        background: 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
+      }}>
+        Bộ ảnh trống
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...toRenderBox(item.box, scaleX, scaleY), ...gridStyle }}>
+      {item.images.map((img) => (
+        <GalleryImageCell key={img.id} entry={img} fit={item.fit} showCaption={item.showCaption} resolveAsset={resolveAsset} scaleX={scaleX} scaleY={scaleY} />
+      ))}
+    </div>
+  );
+}
+
+function GalleryImageCell({ entry, fit, showCaption, resolveAsset, scaleX, scaleY }: { entry: any; fit: 'cover' | 'contain'; showCaption: boolean; resolveAsset: (p: string) => string; scaleX: number; scaleY: number }) {
+  const resolvedUrl = entry.src ? resolveAsset(entry.src) : null;
+  const focalX = (entry.focalX ?? 0.5) * 100;
+  const focalY = (entry.focalY ?? 0.5) * 100;
+  const minScale = Math.min(scaleX, scaleY);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 * minScale }}>
+      <div style={{
+        aspectRatio: '1',
+        background: resolvedUrl
+          ? `url(${resolvedUrl})`
+          : 'repeating-linear-gradient(45deg,#c9c9d6 0 8px,#e4e4ee 8px 16px)',
+        backgroundSize: fit === 'cover' ? 'cover' : 'contain',
+        backgroundPosition: fit === 'cover' ? `${focalX}% ${focalY}%` : 'center',
+        backgroundRepeat: 'no-repeat',
+        borderRadius: 4 * minScale,
+      }} />
+      {showCaption && entry.caption && (
+        <div style={{ fontSize: 11 * minScale, color: '#5c5d6e', textAlign: 'center' }}>{entry.caption}</div>
+      )}
+    </div>
+  );
+}
