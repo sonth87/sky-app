@@ -1,5 +1,5 @@
 export type { VoiceListItem, VoiceListSource, VoiceListOrigin, VoiceFilterState } from './types.js';
-export { voiceToListItem, catalogEntryToListItem, EMPTY_FILTER } from './types.js';
+export { voiceToListItem, catalogEntryToListItem, enrichVoicesFromCatalog, EMPTY_FILTER } from './types.js';
 export { useVoiceFilter } from './useVoiceFilter.js';
 export type { VoiceFilterOptions } from './useVoiceFilter.js';
 export { FilterChip } from './FilterChip.js';

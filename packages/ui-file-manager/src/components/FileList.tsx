@@ -6,7 +6,7 @@ interface FileListProps {
   selectedIds: Set<string>;
   onItemClick: (id: string, e: React.MouseEvent) => void;
   onContextMenu: (id: string, x: number, y: number) => void;
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
   cardRectsRef: React.MutableRefObject<Map<string, DOMRect>>;
   itemSize?: number;
 }

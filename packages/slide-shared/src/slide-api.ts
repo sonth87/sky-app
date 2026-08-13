@@ -202,6 +202,17 @@ export interface VoiceCatalogEntry {
   imported: boolean;
 }
 
+/** 1 dòng stdout/stderr thô của tiến trình Python — nguồn cho tab "Nhật ký" cuộn realtime
+ *  (tham khảo voicebox's ServerTab/LogsPage.tsx). Phát qua IPC event 'tts:log-line', xem
+ *  `broadcastLogLine()` ở python-server.ts. `ts` gán ở PHÍA GỬI (Date.now() lúc nhận được
+ *  chunk từ child process) — log gốc của uvicorn/Python không tự có timestamp trong text. */
+export interface TtsLogLine {
+  tier: 'bundled' | 'ext';
+  stream: 'stdout' | 'stderr';
+  line: string;
+  ts: number;
+}
+
 export interface SlideApi {
   getMeta(): Promise<SlideMeta>;
   updateConfig(patch: Partial<unknown>): Promise<unknown>;
@@ -312,6 +323,8 @@ export interface SlideApi {
   /** Nhả RAM của engine đang giữ ấm, GIỮ NGUYÊN dữ liệu đã tải trên đĩa. */
   engineUnload(engineId: string): Promise<{ ok: boolean; error?: string; freedProcess?: boolean; unloaded?: boolean }>;
   onEngineInstallProgress(cb: (p: EngineInstallProgress) => void): () => void;
+  /** Dòng stdout/stderr thô realtime — nguồn cho tab "Nhật ký" cuộn liên tục. */
+  onTtsLogLine(cb: (entry: TtsLogLine) => void): () => void;
   /** Chọn được NHIỀU file cùng lúc — 1 giọng clone được từ nhiều mẫu (ghép lại cho model
    * nhiều ngữ cảnh hơn khi synthesize, xem audio_dsp.py's combine_voice_samples). */
   pickAudioFile(): Promise<{ ok: boolean; filePaths?: string[] }>;

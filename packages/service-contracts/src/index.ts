@@ -11,6 +11,7 @@ export type {
   TtsCapabilities,
   TtsProcessStatus,
   TtsDebugInfo,
+  TtsLogLine,
 } from './tts-engine.js';
 export type { DataPort, SyncProgress } from './data.js';
 export type { DisplayPort, DisplayInfo } from './display.js';

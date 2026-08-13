@@ -91,6 +91,9 @@ importers:
       '@sky-app/slide-shared':
         specifier: workspace:*
         version: link:../../packages/slide-shared
+      '@sky-app/tts-engine-ui':
+        specifier: workspace:*
+        version: link:../../packages/tts-engine-ui
       '@sonth87/device-layout':
         specifier: 'catalog:'
         version: https://codeload.github.com/sonth87/device-layout/tar.gz/937fd3a88aab0f6342d569e355413d8928ee140e(@babel/core@7.29.7)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/extension-list@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/extensions@3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)(@types/babel__core@7.20.5)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(use-sync-external-store@1.6.0(react@19.2.8))(webpack@5.109.2(lightningcss@1.33.0))
@@ -762,9 +765,21 @@ importers:
 
   packages/tts-engine-ui:
     dependencies:
+      '@dnd-kit/core':
+        specifier: ^6.3.1
+        version: 6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@dnd-kit/sortable':
+        specifier: ^10.0.0
+        version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      '@dnd-kit/utilities':
+        specifier: ^3.2.2
+        version: 3.2.2(react@19.2.8)
       '@sky-app/service-contracts':
         specifier: workspace:*
         version: link:../service-contracts
+      '@sky-app/voice-catalog-ui':
+        specifier: workspace:*
+        version: link:../voice-catalog-ui
     devDependencies:
       '@sky-app/tsconfig':
         specifier: workspace:*
@@ -845,12 +860,25 @@ importers:
       '@sky-app/ui':
         specifier: workspace:*
         version: link:../ui
+    devDependencies:
+      '@sky-app/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
       react:
         specifier: ^19.2.7
         version: 19.2.8
       react-dom:
         specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/voice-catalog-ui:
     dependencies:

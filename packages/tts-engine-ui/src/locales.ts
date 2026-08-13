@@ -103,6 +103,8 @@ export const ttsEngineLocales = {
       "auto": "auto",
       "processor": "Bộ xử lý",
       "processorInfo": "Chọn phần cứng tạo giọng đọc. CPU = bộ xử lý trung tâm (mọi máy đều có, ổn định). GPU = card đồ hoạ, xử lý AI song song nên NHANH hơn — nhưng chỉ máy có GPU rời (thường NVIDIA) mới dùng được và phải tải thêm thư viện.",
+      "relevanceFull": "Engine đang dùng áp dụng trực tiếp lựa chọn bộ xử lý bên dưới.",
+      "relevanceLimited": "Engine đang dùng chỉ dùng lựa chọn này để cân nhắc bật GPU (CUDA) khi có — trên máy không có GPU CUDA (vd Apple Silicon), đổi bộ xử lý ở đây có thể không tạo ra khác biệt.",
       "gpuHelpToggle": "GPU là gì? Có nên dùng không?",
       "gpuHelp": {
         "intro": "<b class=\"text-slate-700\">GPU (card đồ hoạ)</b> xử lý nhiều phép tính song song, nên với AI thường nhanh hơn CPU. <b class=\"text-slate-700\">CPU</b> là bộ xử lý chung, máy nào cũng có.",
@@ -125,6 +127,15 @@ export const ttsEngineLocales = {
       "installedRestartToCheck": "Đã cài {{pkg}}. Khởi động lại engine để kiểm tra.",
       "installFailed": "Cài đặt thất bại"
     },
+    "configWindow": {
+      "title": "Cấu hình",
+      "tabs": {
+        "engine": "Models/Engine",
+        "effects": "Hiệu ứng",
+        "logs": "Nhật ký",
+        "settings": "Cài đặt"
+      }
+    },
     "ttsStatus": {
       "ready": "Sẵn sàng",
       "starting": "Đang khởi động",
@@ -136,6 +147,7 @@ export const ttsEngineLocales = {
       "threadsAuto": "tự động",
       "manageEngine": "Quản lý engine…",
       "deviceSettings": "Thiết bị xử lý…",
+      "openConfig": "Cấu hình…",
       "viewLogs": "Xem log…",
       "logsNotAvailable": "Không xem được log trên nền tảng này (chỉ hỗ trợ ở ứng dụng máy tính).",
       "loading": "Đang tải…",
@@ -240,6 +252,8 @@ export const ttsEngineLocales = {
       "auto": "auto",
       "processor": "Processor",
       "processorInfo": "Choose the hardware used to generate speech. CPU = central processing unit (every machine has one, stable). GPU = graphics card, processes AI in parallel so it's FASTER — but only works on machines with a discrete GPU (usually NVIDIA) and requires downloading an extra library.",
+      "relevanceFull": "The current engine applies the processor choice below directly.",
+      "relevanceLimited": "The current engine only uses this choice to decide whether to enable GPU (CUDA) when available — on machines without a CUDA GPU (e.g. Apple Silicon), changing the processor here may make no difference.",
       "gpuHelpToggle": "What is a GPU? Should I use one?",
       "gpuHelp": {
         "intro": "<b class=\"text-slate-700\">GPU (graphics card)</b> processes many calculations in parallel, so it's usually faster than CPU for AI. <b class=\"text-slate-700\">CPU</b> is the general-purpose processor every machine has.",
@@ -262,6 +276,15 @@ export const ttsEngineLocales = {
       "installedRestartToCheck": "Installed {{pkg}}. Restart the engine to verify.",
       "installFailed": "Installation failed"
     },
+    "configWindow": {
+      "title": "Configuration",
+      "tabs": {
+        "engine": "Models/Engine",
+        "effects": "Effects",
+        "logs": "Logs",
+        "settings": "Settings"
+      }
+    },
     "ttsStatus": {
       "ready": "Ready",
       "starting": "Starting",
@@ -273,6 +296,7 @@ export const ttsEngineLocales = {
       "threadsAuto": "auto",
       "manageEngine": "Manage engine…",
       "deviceSettings": "Processing device…",
+      "openConfig": "Configuration…",
       "viewLogs": "View logs…",
       "logsNotAvailable": "Logs aren't available on this platform (desktop app only).",
       "loading": "Loading…",

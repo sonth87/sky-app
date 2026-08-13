@@ -106,6 +106,24 @@ async function findFreePort(preferred: number): Promise<number> {
   return preferred;
 }
 
+/**
+ * Đẩy 1 dòng stdout/stderr thô sang mọi renderer window — nguồn cho tab "Nhật ký" (Logs)
+ * kiểu cuộn realtime tham khảo voicebox (xem `TtsLogPanel.tsx`). Phát cho MỌI tier, không
+ * lọc theo `activeTier` như `pushStatus` — đây là log gỡ lỗi thô, hữu ích thấy cả tier đang
+ * chạy nền (blue-green đổi engine), không chỉ tier đang phục vụ request.
+ *
+ * 1 event = 1 lần `data` từ stdout/stderr, KHÔNG tách theo dấu xuống dòng thật — giữ đúng
+ * cách `recentStderr`/`console.log` ở 2 nơi gọi hàm này đã làm từ trước (limitation có sẵn,
+ * không phải lỗi mới): 1 chunk có thể chứa nhiều dòng hoặc 1 dòng dở, nhưng tách đúng nghĩa
+ * là việc khác, ngoài phạm vi lần sửa này.
+ */
+function broadcastLogLine(tier: PythonTier, stream: 'stdout' | 'stderr', line: string) {
+  const payload = { tier, stream, line, ts: Date.now() };
+  BrowserWindow.getAllWindows().forEach((w) => {
+    w.webContents.send('tts:log-line', payload);
+  });
+}
+
 function pushStatus(tier: PythonTier, status: PythonStatus, detail?: string) {
   const st = tiers.get(tier);
   if (st) {
@@ -708,6 +726,7 @@ async function startPythonServerOnce(
     proc.stdout?.on('data', (data: Buffer) => {
       const line = data.toString().trim();
       console.log(`[Python Server stdout][${tier}] ${line}`);
+      broadcastLogLine(tier, 'stdout', line);
 
       // Ghi log stdout vào rolling buffer
       st.recentStderr.push(`[${new Date().toLocaleTimeString('vi-VN')}] [stdout] ${line}`);
@@ -727,6 +746,7 @@ async function startPythonServerOnce(
     proc.stderr?.on('data', (data: Buffer) => {
       const line = data.toString().trim();
       console.warn(`[Python Server stderr][${tier}] ${line}`);
+      broadcastLogLine(tier, 'stderr', line);
 
       // Ghi log stderr vào rolling buffer
       st.recentStderr.push(`[${new Date().toLocaleTimeString('vi-VN')}] [stderr] ${line}`);

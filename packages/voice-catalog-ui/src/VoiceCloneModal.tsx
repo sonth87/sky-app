@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Upload, Play, Trash2, Loader2, AlertTriangle, X } from 'lucide-react';
+import { Upload, Play, Trash2, Loader2, AlertTriangle, X, Pencil } from 'lucide-react';
 import type { TtsPort, Voice } from '@sky-app/service-contracts';
 
 export interface VoiceCloneModalProps {
@@ -17,6 +17,16 @@ interface DraftSample {
   filePath: string | File;
   fileName: string;
   refText: string;
+}
+
+/** 1 sample THẬT của 1 voice đã có — khác `DraftSample` (chưa gửi lên). Chỉ mẫu ĐẦU
+ * (`index === 0` trong danh sách trả về từ `listVoiceSamples`) sửa được transcript qua
+ * `updateVoiceRefText` — server chưa có endpoint sửa transcript riêng cho mẫu thứ 2 trở đi
+ * (xem `PUT /voices/{voice_id}` trong main.py, luôn sửa sample đầu). Mẫu sau chỉ xoá được. */
+interface ExistingSample {
+  id: string;
+  ref_file: string;
+  ref_text?: string;
 }
 
 const PREVIEW_TEXT = 'Xin chúc mừng tân cử nhân đã tốt nghiệp.';
@@ -43,6 +53,15 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
   // đang chạy thay vì hard-code danh sách engine ở đây: engine mới thêm sau chỉ cần khai
   // `requires_ref_text` là UI tự đúng.
   const [refTextRequired, setRefTextRequired] = useState(false);
+
+  // Quản lý mẫu cho voice ĐÃ CÓ — panel riêng, mở đè lên modal chính (khác `samples` ở trên,
+  // dùng cho form tạo mới). `editingVoice` khác null = panel đang mở cho voice đó.
+  const [editingVoice, setEditingVoice] = useState<Voice | null>(null);
+  const [editSamples, setEditSamples] = useState<ExistingSample[]>([]);
+  const [editSamplesLoading, setEditSamplesLoading] = useState(false);
+  const [editRefTextDraft, setEditRefTextDraft] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !ttsPort?.getEngineCapabilities) return;
@@ -173,6 +192,112 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
     const res = await ttsPort.deleteVoice(voiceId);
     if (res?.ok) onRefresh();
     else setError(res?.error ?? 'Xóa giọng thất bại');
+  };
+
+  const openEditSamples = async (v: Voice) => {
+    setEditingVoice(v);
+    setEditError(null);
+    setEditSamplesLoading(true);
+    try {
+      const list = (await ttsPort?.listVoiceSamples?.(v.id)) ?? [];
+      setEditSamples(list);
+      setEditRefTextDraft(list[0]?.ref_text ?? '');
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEditSamplesLoading(false);
+    }
+  };
+
+  const closeEditSamples = () => {
+    setEditingVoice(null);
+    setEditSamples([]);
+    setEditRefTextDraft('');
+    setEditError(null);
+  };
+
+  const addSamplesToEditingVoice = async (files: Array<{ filePath: string | File; fileName: string }>) => {
+    if (!editingVoice || !ttsPort?.addVoiceSample || files.length === 0) return;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      for (const f of files) {
+        const res = await ttsPort.addVoiceSample(editingVoice.id, f.filePath);
+        if (!res?.ok) {
+          setEditError(res?.error ?? `Thêm mẫu "${f.fileName}" thất bại`);
+          break;
+        }
+      }
+      const list = (await ttsPort.listVoiceSamples?.(editingVoice.id)) ?? [];
+      setEditSamples(list);
+      onRefresh();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const pickSampleForEditingVoice = async () => {
+    setEditError(null);
+    if (!ttsPort?.pickAudioFile) {
+      document.getElementById('voice-edit-sample-input')?.click();
+      return;
+    }
+    const res = await ttsPort.pickAudioFile();
+    if (res?.ok && res.filePaths?.length) {
+      await addSamplesToEditingVoice(
+        res.filePaths.map((p) => ({ filePath: p, fileName: p.split(/[\\/]/).pop() ?? p })),
+      );
+    }
+  };
+
+  const handleEditSampleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    void addSamplesToEditingVoice(files.map((f) => ({ filePath: f, fileName: f.name })));
+  };
+
+  const deleteEditingSample = async (sampleId: string) => {
+    if (!editingVoice || !ttsPort?.deleteVoiceSample) return;
+    if (!confirm('Xoá mẫu audio này?')) return;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      const res = await ttsPort.deleteVoiceSample(editingVoice.id, sampleId);
+      if (!res?.ok) {
+        setEditError(res?.error ?? 'Xoá mẫu thất bại');
+        return;
+      }
+      const list = (await ttsPort.listVoiceSamples?.(editingVoice.id)) ?? [];
+      setEditSamples(list);
+      setEditRefTextDraft(list[0]?.ref_text ?? '');
+      onRefresh();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const saveEditingRefText = async () => {
+    if (!editingVoice || !ttsPort?.updateVoiceRefText) return;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      const res = await ttsPort.updateVoiceRefText(editingVoice.id, editRefTextDraft.trim());
+      if (!res?.ok) {
+        setEditError(res?.error ?? 'Lưu bản chép lời thất bại');
+        return;
+      }
+      setEditSamples((prev) =>
+        prev.map((s, i) => (i === 0 ? { ...s, ref_text: editRefTextDraft.trim() } : s)),
+      );
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEditBusy(false);
+    }
   };
 
   return (
@@ -449,6 +574,14 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
                       </button>
                       <button
                         type="button"
+                        onClick={() => openEditSamples(v)}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors animate-all"
+                        title="Sửa mẫu / bản chép lời"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => deleteVoice(v.id, v.name)}
                         className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors animate-all"
                         title="Xóa giọng"
@@ -463,6 +596,116 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
           </div>
         </div>
       </div>
+
+      {/* Panel sửa mẫu cho voice ĐÃ CÓ — đè lên modal chính, cùng containing block (ancestor
+          `absolute` gần nhất, xem comment ở div ngoài cùng), không portal ra ngoài. */}
+      {editingVoice && (
+        <div
+          className="absolute inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onClick={closeEditSamples}
+        >
+          <input
+            type="file"
+            id="voice-edit-sample-input"
+            accept=".wav,.mp3"
+            multiple
+            className="hidden"
+            onChange={handleEditSampleFileChange}
+          />
+
+          <div
+            className="flex min-w-0 flex-col w-[560px] max-w-full rounded-xl bg-card border border-border shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <span className="truncate text-base font-bold text-foreground">Sửa mẫu — {editingVoice.name}</span>
+              <button
+                onClick={closeEditSamples}
+                className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3.5 p-6 max-h-[70vh] overflow-y-auto">
+              <button
+                type="button"
+                onClick={pickSampleForEditingVoice}
+                disabled={editBusy}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3.5 py-2.5 text-xs font-semibold text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <Upload size={14} /> Thêm file mẫu
+              </button>
+
+              {editSamplesLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 size={18} className="animate-spin" />
+                </div>
+              ) : editSamples.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">Chưa có mẫu nào.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {editSamples.map((s, i) => (
+                    <div key={s.id} className="flex flex-col gap-1.5 rounded-lg border border-border p-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-medium text-foreground">
+                          {i === 0 && (
+                            <span className="mr-1.5 rounded bg-primary/15 px-1.5 py-0.5 text-2xs text-primary">
+                              Mẫu chính
+                            </span>
+                          )}
+                          {s.ref_file}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => deleteEditingSample(s.id)}
+                          disabled={editBusy || editSamples.length <= 1}
+                          title={editSamples.length <= 1 ? 'Voice phải có ít nhất 1 mẫu' : 'Xoá mẫu này'}
+                          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                      {i === 0 ? (
+                        <div className="flex flex-col gap-1.5">
+                          <textarea
+                            value={editRefTextDraft}
+                            onChange={(e) => setEditRefTextDraft(e.target.value)}
+                            placeholder="Gõ đúng từng chữ mà file audio đang đọc..."
+                            rows={2}
+                            className="text-xs px-2.5 py-1.5 rounded-lg border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none resize-none transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={saveEditingRefText}
+                            disabled={editBusy || editRefTextDraft.trim() === (s.ref_text ?? '').trim()}
+                            className="self-end rounded-lg bg-primary px-3 py-1 text-2xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
+                          >
+                            Lưu bản chép lời
+                          </button>
+                        </div>
+                      ) : (
+                        s.ref_text && <p className="text-xs italic text-muted-foreground">{s.ref_text}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {editError && (
+                <div className="flex items-start gap-1.5 text-xs text-destructive bg-destructive/10 rounded-lg p-2.5">
+                  <AlertTriangle size={15} className="mt-0.5 shrink-0" /> <span>{editError}</span>
+                </div>
+              )}
+
+              <p className="text-[11px] text-muted-foreground">
+                Chỉ mẫu chính sửa được bản chép lời tại đây — mẫu bổ sung chỉ xoá được, muốn đổi
+                transcript thì xoá rồi thêm lại.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

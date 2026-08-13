@@ -9,14 +9,19 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./styles.css": "./src/styles.css"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@sky-app/service-contracts": "workspace:*"
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@sky-app/service-contracts": "workspace:*",
+    "@sky-app/voice-catalog-ui": "workspace:*"
   },
   "devDependencies": {
     "@sky-app/tsconfig": "workspace:*",

@@ -44,4 +44,5 @@ export type {
   PreGenStatus,
   PreGenStudentStatus,
   VoiceCatalogEntry,
+  TtsLogLine,
 } from './slide-api.js';

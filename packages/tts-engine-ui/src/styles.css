@@ -1,0 +1,74 @@
+@import "tailwindcss";
+@source "./**/*.{ts,tsx}";
+@source "../../../packages/voice-catalog-ui/src/**/*.{ts,tsx}";
+
+/*
+ * KHÔNG có @theme/root-scope riêng ở đây — package này render ở tầng device-shell
+ * (global, không nằm trong subtree của app cụ thể nào có root class riêng như
+ * .tts-studio-root/.ceremony-root). Token màu (--color-primary, --color-foreground...)
+ * đã được định nghĩa GLOBAL (@theme luôn emit ra :root, xem comment trong
+ * modules/tts-studio/src/styles.css) bởi các bundle module khác đã load trong
+ * apps/shell-electron/src/main.tsx — file này chỉ cần khai @source để Tailwind SINH RA
+ * đúng những utility class package này dùng (vd `grid-cols-[240px_1fr]`), không cần định
+ * nghĩa lại giá trị token.
+ *
+ * Đánh đổi đã biết: thiếu `.dark` scope riêng nên nội dung ở đây luôn dùng FALLBACK màu
+ * sáng (`var(--primary, <fallback light>)`) của bất kỳ bundle nào định nghĩa `@theme`
+ * trước, KHÔNG tự đổi theo dark mode của app đang mở — chấp nhận được cho chrome toàn cục
+ * (popover trạng thái TTS, cửa sổ Cấu hình), sửa sau nếu cần khớp dark mode chính xác.
+ */
+
+/*
+ * `<input type="range">` mặc định của trình duyệt (thumb/track thô, không theo theme) —
+ * không có Tailwind utility built-in cho phần này, phải tự viết CSS riêng cho track+thumb
+ * (cả 2 tiền tố -webkit-/-moz-, mỗi engine yêu cầu khai TÁCH RIÊNG, không gộp chung 1
+ * selector được — khai chung sẽ khiến CẢ HAI rule bị trình duyệt coi là không hợp lệ và bỏ
+ * qua toàn bộ). Dùng biến theme sẵn có (--color-primary/--color-muted) để tự đổi màu theo
+ * theme đang áp dụng, không hard-code màu riêng ở đây.
+ */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--color-muted);
+  outline: none;
+  cursor: pointer;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  border: 2px solid var(--color-card);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+input[type='range']::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  border: 2px solid var(--color-card);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+input[type='range']::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--color-muted);
+}
+input[type='range']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

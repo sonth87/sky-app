@@ -40,6 +40,12 @@ export interface EngineManagerProps {
   portalContainer?: HTMLElement | null;
 }
 
+export interface EngineManagerContentProps {
+  port: TtsEnginePort;
+  canInstall?: boolean;
+  notice?: ReactNode;
+}
+
 /** Trạng thái UI dẫn xuất cho 1 engine (từ install_status + progress đang chạy). */
 type UiPhase = EngineInstallProgress['phase'] | 'idle';
 
@@ -47,7 +53,16 @@ type UiPhase = EngineInstallProgress['phase'] | 'idle';
  * thiếu lớp neo này nó sẽ bám theo viewport thay vì khung cửa sổ. */
 const CONTENT_CLASS = 'relative flex w-full flex-1 min-h-0 flex-col gap-3 overflow-y-auto p-5';
 
-export function EngineManager({ open, onClose, port, canInstall = false, notice, portalContainer }: EngineManagerProps) {
+/**
+ * Nội dung thuần của "Quản lý engine" — không tự bọc `FloatingWindow`. Tách khỏi
+ * `EngineManager` (giờ chỉ còn là wrapper mỏng bên dưới) để dùng làm 1 tab trong
+ * `ConfigWindow` (gộp Models/Engine + Effects + Logs + Settings vào 1 cửa sổ).
+ *
+ * Không nhận `open`: caller (ConfigWindow) quyết định mount hay không thay vì gate bằng
+ * prop — mount = coi như "đang mở", unmount khi chuyển tab khác (huỷ subscribe tiến độ
+ * cài đặt, giống hành vi đóng cửa sổ cũ).
+ */
+export function EngineManagerContent({ port, canInstall = false, notice }: EngineManagerContentProps) {
   const { t } = useTranslation();
   const [engines, setEngines] = useState<TtsEngines | null>(null);
   const [progress, setProgress] = useState<Record<string, EngineInstallProgress>>({});
@@ -100,16 +115,16 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
     }
   }, [port]);
 
-  useEffect(() => { if (open) void refresh(); }, [open, refresh]);
+  // Không còn prop `open` — component chỉ được mount khi "đang mở" (caller quyết định qua
+  // việc render hay không), nên mọi effect dưới đây coi mount = open, chạy ngay khi mount
+  // thay vì chờ 1 flag riêng.
+  useEffect(() => { void refresh(); }, [refresh]);
 
   // Đường dẫn thư mục lưu engine — chỉ nền tảng cài đặt tại chỗ mới có (Electron).
   useEffect(() => {
-    if (!open || !port.enginesDir) return;
+    if (!port.enginesDir) return;
     void port.enginesDir().then((r) => setEnginesDir(r.path));
-  }, [open, port]);
-
-  // Đóng cửa sổ rồi mở lại thì quay về danh sách, không giữ lại bảng chi tiết cũ.
-  useEffect(() => { if (!open) setDetailId(null); }, [open]);
+  }, [port]);
 
   // Bug thật 2026-08-04: mở "Quản lý engine TTS" TRƯỚC KHI tts-service kịp start (vd vừa mở
   // app) → listEngines() trả về null (getPythonPort() chưa có), refresh() ở trên bỏ qua luôn
@@ -117,13 +132,13 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
   // đóng/mở lại cửa sổ. Theo dõi serviceStatus (đã có sẵn, dùng chung icon menu bar) để tự
   // refresh() ngay khi service chuyển sang 'ok', không cần người dùng đóng/mở lại.
   useEffect(() => {
-    if (open && serviceStatus === 'ok' && prevServiceStatusRef.current !== 'ok') void refresh();
+    if (serviceStatus === 'ok' && prevServiceStatusRef.current !== 'ok') void refresh();
     prevServiceStatusRef.current = serviceStatus;
-  }, [open, serviceStatus, refresh]);
+  }, [serviceStatus, refresh]);
 
   // Subscribe tiến độ cài đặt.
   useEffect(() => {
-    if (!open || !port.onInstallProgress) return;
+    if (!port.onInstallProgress) return;
     const unsub = port.onInstallProgress((p) => {
       progressRef.current[p.engineId] = p;
       setProgress({ ...progressRef.current });
@@ -132,7 +147,7 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
       if (p.phase === 'canceled') setEngineMsg(p.engineId, t('engineManager.canceledMsg'));
     });
     return () => { unsub(); };
-  }, [open, port, refresh]);
+  }, [port, refresh]);
 
   const setEngineMsg = (id: string, m: string) => setMsg((prev) => ({ ...prev, [id]: m }));
 
@@ -198,24 +213,8 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
   /** Engine đang giữ ấm trong RAM → đổi sang là tức thì. Server cũ không trả `loaded`. */
   const isLoaded = (id: string) => !!engines?.loaded?.includes(id);
 
-  // FloatingWindow không tự gate theo `open` (không có prop đó) — caller (device-shell,
-  // TTS Studio) luôn mount component này, ẩn/hiện qua chính prop `open`. Đặt gate SAU mọi
-  // hook ở trên, không phải trước — return sớm trước hook sẽ vi phạm Rules of Hooks.
-  if (!open) return null;
-
   return (
-    <FloatingWindow
-      onClose={onClose}
-      title={t('engineManager.title')}
-      width={560}
-      height={520}
-      blocking={false}
-      resizable
-      minWidth={420}
-      minHeight={360}
-      contentClassName={CONTENT_CLASS}
-      container={portalContainer}
-    >
+    <div className={CONTENT_CLASS}>
       <p className="text-xxs text-muted-foreground">{t('engineManager.description')}</p>
 
       {notice}
@@ -517,6 +516,40 @@ export function EngineManager({ open, onClose, port, canInstall = false, notice,
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+/**
+ * Wrapper mỏng giữ nguyên API cũ (`open`/`onClose`/`portalContainer`) cho caller chưa
+ * chuyển sang `ConfigWindow` — bọc `EngineManagerContent` trong `FloatingWindow`, y hệt
+ * hành vi trước khi tách. KHÔNG xoá export này: tương thích ngược cho mọi nơi còn gọi
+ * `<EngineManager open onClose ... />` trực tiếp.
+ */
+export function EngineManager({ open, onClose, port, canInstall = false, notice, portalContainer }: EngineManagerProps) {
+  const { t } = useTranslation();
+  if (!open) return null;
+  return (
+    <FloatingWindow
+      onClose={onClose}
+      title={t('engineManager.title')}
+      width={560}
+      height={520}
+      blocking={false}
+      resizable
+      minWidth={420}
+      minHeight={360}
+      // Neutral, không padding/select-none: FloatingWindow mặc định dùng layout cho nội
+      // dung ngắn kiểu "About" (`items-center px-8 py-6 select-none`) — EngineManagerContent
+      // tự áp CONTENT_CLASS (scroll, padding, gap) trên chính div gốc của nó, double-wrap
+      // 2 lớp padding/behaviour khác nhau sẽ sai layout nếu không reset ở đây.
+      // min-h-0 BẮT BUỘC (xem comment ở FloatingWindow.tsx's contentClassName): thiếu nó,
+      // danh sách engine dài sẽ tràn ra ngoài rồi bị overflow-hidden của khung cửa sổ cắt
+      // mất, thay vì được vùng cuộn bên trong EngineManagerContent xử lý đúng.
+      contentClassName="flex min-h-0 flex-1 w-full flex-col"
+      container={portalContainer}
+    >
+      <EngineManagerContent port={port} canInstall={canInstall} notice={notice} />
     </FloatingWindow>
   );
 }

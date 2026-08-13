@@ -121,8 +121,11 @@ xác nhận không liên quan qua đối chiếu tên test.
   chất lượng giữa clone 1 mẫu và nhiều mẫu). Toàn bộ kiểm chứng ở trên là test tự động với
   audio tổng hợp (sine wave) — đủ để chốt đúng thuật toán/luồng dữ liệu, chưa đủ để nghe
   chất lượng thật.
-- **UI thêm/xoá sample cho voice ĐÃ CÓ** (nút "+" trong danh sách giọng, dùng
-  `addVoiceSample`/`deleteVoiceSample`/`listVoiceSamples` đã có ở tầng port) — chưa làm ở
-  Phase này, `VoiceCloneModal` chỉ hỗ trợ multi-sample lúc TẠO MỚI. Sửa giọng đã có vẫn chỉ
-  sửa được transcript của sample đầu (qua `updateVoiceRefText` cũ).
+- ~~UI thêm/xoá sample cho voice ĐÃ CÓ~~ — làm xong 2026-08-12 (cùng ngày, sau khi phát hiện
+  qua các bugfix ref_text): `VoiceCloneModal` thêm nút "Sửa mẫu" mở panel riêng, dùng
+  `listVoiceSamples`/`addVoiceSample`/`deleteVoiceSample`/`updateVoiceRefText` (đều đã có sẵn
+  ở tầng port từ Phase này, chỉ thiếu UI). Giới hạn còn lại: chỉ sample ĐẦU sửa được
+  transcript tại chỗ (khớp đúng khả năng thật của `updateVoiceRefText`) — sample sau muốn đổi
+  transcript phải xoá rồi thêm lại, vì server chưa có endpoint sửa transcript riêng cho từng
+  sample theo id.
 - Phase 3 (lịch sử sinh audio trong DB) là bước tiếp theo trong kế hoạch.

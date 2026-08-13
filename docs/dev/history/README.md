@@ -6,6 +6,7 @@
 
 ## Mục lục (mới nhất trên cùng)
 
+- [2026-08-12 — Gộp 3 mục menu TTS thành 1 cửa sổ "Cấu hình" 4 tab](./2026-08-12-gop-cua-so-cau-hinh-tts.md)
 - [2026-08-12 — `ConfigStore` bị 2 tiến trình ghi đè ngược engine đã chọn](./2026-08-12-config-store-ghi-de-engine-2-tien-trinh.md)
 - [2026-08-12 — Backfill `ref_text` bỏ sót voice catalog ĐÃ import trước đó](./2026-08-12-backfill-ref-text-bo-sot-voice-da-import.md)
 - [2026-08-12 — Sửa `encode_reference()` vỡ khi engine không nhận `ref_text`](./2026-08-12-fix-encode-reference-2-doi-so.md)

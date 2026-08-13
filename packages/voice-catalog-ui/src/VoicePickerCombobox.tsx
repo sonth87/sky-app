@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Loader2 } from 'lucide-react';
 import { useVoiceFilter } from './useVoiceFilter.js';
@@ -74,29 +74,50 @@ export function VoicePickerCombobox({
 
   const selected = useMemo(() => items.find((i) => i.id === value) ?? null, [items, value]);
 
-  useEffect(() => {
-    if (!open || !ref.current) {
+  // Tự lật lên trên khi bên dưới trigger không đủ chỗ (vd trigger nằm gần đáy FloatingWindow) —
+  // dropdownHeight=0 ở lần đo đầu (chưa mount, chưa biết chiều cao thật) nên tạm đặt bên dưới;
+  // effect thứ 2 đo lại kích thước THẬT sau khi đã mount rồi mới quyết định lật hay không. Cả
+  // 2 đều dùng useLayoutEffect nên các lần setCoords nối tiếp nhau đều được React flush xong
+  // TRƯỚC khi trình duyệt vẽ khung hình — không bị chớp vị trí sai 1 nhịp.
+  const measurePosition = () => {
+    if (!ref.current) return null;
+    const rect = ref.current.getBoundingClientRect();
+    const dropdownHeight = dropdownRef.current?.offsetHeight ?? 0;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openUp = dropdownHeight > 0 && spaceBelow < dropdownHeight + 8 && spaceAbove > spaceBelow;
+    return {
+      top: openUp ? rect.top + window.scrollY - dropdownHeight - 4 : rect.bottom + window.scrollY + 4,
+      left: rect.left + window.scrollX,
+      width: rect.width,
+    };
+  };
+
+  useLayoutEffect(() => {
+    if (!open) {
       setCoords(null);
       return;
     }
-    const updateCoords = () => {
-      if (ref.current) {
-        const rect = ref.current.getBoundingClientRect();
-        setCoords({
-          top: rect.bottom + window.scrollY,
-          left: rect.left + window.scrollX,
-          width: rect.width,
-        });
-      }
-    };
-    updateCoords();
-    
+    setCoords(measurePosition());
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open || !coords || !dropdownRef.current) return;
+    const next = measurePosition();
+    if (next && (Math.abs(next.top - coords.top) > 0.5 || Math.abs(next.left - coords.left) > 0.5)) {
+      setCoords(next);
+    }
+  }, [open, coords]);
+
+  useEffect(() => {
+    if (!open) return;
     // Lắng nghe scroll ở chế độ capture để bắt được scroll của bất cứ scrollable container nào
-    window.addEventListener('scroll', updateCoords, true);
-    window.addEventListener('resize', updateCoords);
+    const onScrollResize = () => setCoords(measurePosition());
+    window.addEventListener('scroll', onScrollResize, true);
+    window.addEventListener('resize', onScrollResize);
     return () => {
-      window.removeEventListener('scroll', updateCoords, true);
-      window.removeEventListener('resize', updateCoords);
+      window.removeEventListener('scroll', onScrollResize, true);
+      window.removeEventListener('resize', onScrollResize);
     };
   }, [open]);
 
@@ -144,13 +165,12 @@ export function VoicePickerCombobox({
             <Loader2 size={13} className="animate-spin" /> {loadingLabel}
           </span>
         ) : selected ? (
-          // Bug thật 2026-08-04: name KHÔNG có flex-shrink-0 trong khi dấu "·" và tagline CÓ —
-          // trong hàng flex chật, name (thứ cần ưu tiên hiển thị, "Hoài My") là phần tử co được
-          // DUY NHẤT nên bị bóp gần như về 0, còn tagline (phụ, "Warm, natural Vietnamese female
-          // voice") lại chiếm hết chỗ vì được bảo vệ khỏi co — ngược hoàn toàn với ưu tiên mong
-          // muốn. Đảo lại: name shrink-0 (luôn hiện đủ, chỉ cắt bớt trong max-w riêng nếu CHÍNH
-          // nó quá dài), tagline min-w-0 + flex-1 (chiếm phần còn lại, tự truncate khi thiếu chỗ).
-          <span className="flex min-w-0 items-center gap-1.5 text-foreground">
+          // flex-1 min-w-0 ở đây BẮT BUỘC: không có nó, span này co về đúng bề rộng nội dung
+          // (flex item mặc định không tự giãn), khiến `max-w-[60%]` bên trong tính theo 60%
+          // của 1 hộp đã tự co nhỏ thay vì 60% bề rộng trigger thật — name bị cắt còn vài ký tự
+          // dù trigger còn thừa rất nhiều chỗ trống. name giữ shrink-0 (ưu tiên hiện đủ), tagline
+          // giữ min-w-0/flex-1 (co trước khi hết chỗ thật).
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 text-foreground">
             <span className="max-w-[60%] shrink-0 truncate font-medium">{selected.name}</span>
             {selected.tagline && <span className="shrink-0 text-muted-foreground">·</span>}
             {selected.tagline && <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{selected.tagline}</span>}
@@ -164,10 +184,18 @@ export function VoicePickerCombobox({
       {open && coords && createPortal(
         <div
           ref={dropdownRef}
-          className="absolute z-50 w-[480px] max-w-[95vw] md:w-[500px] overflow-hidden rounded-md border border-border bg-popover shadow-lg"
+          className="absolute w-[480px] max-w-[95vw] md:w-[500px] overflow-hidden rounded-md border border-border bg-popover shadow-lg"
           style={{
             top: `${coords.top + 4}px`,
             left: `${coords.left}px`,
+            // z-50 KHÔNG đủ khi trigger nằm trong FloatingWindow (device-layout dùng
+            // zIndex 99999 cho mọi chrome "luôn nổi trên cùng" — dropdown portal thẳng ra
+            // document.body nên là SIBLING của FloatingWindow, thua z-index sẽ bị window
+            // đè lên, chỉ phần lòi ra ngoài đáy window mới thấy được. 100000 vượt mọi giá
+            // trị z-index cao nhất đang dùng trong repo (xem device-layout's FloatingWindow/
+            // menu bar/dialog), không ảnh hưởng consumer khác (TTS Studio/Ceremony) — dropdown
+            // vốn dĩ LUÔN phải nổi trên trigger của nó bất kể ngữ cảnh nào.
+            zIndex: 100000,
           }}
         >
           {tabLabels && (

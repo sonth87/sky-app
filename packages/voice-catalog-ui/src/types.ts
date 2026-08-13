@@ -46,6 +46,24 @@ export function voiceToListItem(v: Voice, origin: VoiceListOrigin = 'system'): V
   };
 }
 
+/** Bù `tagline`/`description`/`category`/`tags` còn thiếu ở voice đã import (registry) từ
+ * catalog entry gốc, khớp qua `sourceCatalogId` — 1 số voice mặc định (vd Hoài My/Nam Minh)
+ * chỉ lưu các field mô tả này ở catalog lúc bundle, không copy vào registry entry khi import. */
+export function enrichVoicesFromCatalog(voices: Voice[], catalog: VoiceCatalogEntry[]): Voice[] {
+  const catalogMap = new Map(catalog.map((c) => [c.id, c]));
+  return voices.map((v) => {
+    const cat = v.sourceCatalogId ? catalogMap.get(v.sourceCatalogId) : undefined;
+    if (!cat) return v;
+    return {
+      ...v,
+      category: v.category ?? cat.category,
+      tags: v.tags ?? cat.tags,
+      tagline: v.tagline ?? cat.tagline,
+      description: v.description ?? cat.description,
+    };
+  });
+}
+
 export function catalogEntryToListItem(e: VoiceCatalogEntry): VoiceListItem {
   return {
     source: 'catalog',

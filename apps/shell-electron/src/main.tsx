@@ -15,6 +15,7 @@ import "@sonth87/device-layout/style.css";
 import "@sky-app/module-ceremony/styles.css";
 import "@sky-app/module-tts-studio/styles.css";
 import "@sky-app/module-layout-designer/styles.css";
+import "@sky-app/tts-engine-ui/styles.css";
 
 // Wallpaper picker's "Add a Photo" — opens a native file picker via IPC
 // (apps/shell-electron/electron/main.ts's kernel:wallpaper:import), which

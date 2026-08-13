@@ -1,6 +1,6 @@
 {
   "name": "@sky-app/shell-electron",
-  "version": "0.11.3",
+  "version": "0.12.0",
   "private": true,
   "main": "./dist-electron/main/main.js",
   "scripts": {
@@ -23,6 +23,7 @@
     "@sky-app/module-tts-studio": "workspace:*",
     "@sky-app/platform-electron": "workspace:*",
     "@sky-app/slide-shared": "workspace:*",
+    "@sky-app/tts-engine-ui": "workspace:*",
     "@sonth87/device-layout": "catalog:",
     "adm-zip": "^0.6.0",
     "archiver": "^8.0.0",

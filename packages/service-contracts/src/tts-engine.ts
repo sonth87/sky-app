@@ -25,6 +25,7 @@ import type {
   TtsCapabilities,
   TtsProcessStatus,
   TtsDebugInfo,
+  TtsLogLine,
 } from '@sky-app/slide-shared';
 
 export type {
@@ -36,6 +37,7 @@ export type {
   TtsCapabilities,
   TtsProcessStatus,
   TtsDebugInfo,
+  TtsLogLine,
 };
 
 /** Kết quả chung của các thao tác thay đổi trạng thái. */
@@ -128,4 +130,12 @@ export interface TtsEnginePort {
   /** Debug chi tiết (PID, exit code, stderr gần nhất, nhật ký hoạt động) — nguồn dữ liệu
    * cho cửa sổ xem log. */
   getDebugInfo?(): Promise<TtsDebugInfo>;
+  /**
+   * Dòng stdout/stderr thô realtime của tiến trình Python — nguồn cho tab "Nhật ký" cuộn
+   * liên tục kiểu voicebox (khác `getDebugInfo`'s `recentStderr`, giới hạn cứng 60 dòng và
+   * phải poll). Chỉ Electron có (tiến trình con thuộc quyền client) — Web adapter không
+   * implement, tab Logs tự ẩn phần realtime khi thiếu, giống cách xử lý `getDebugInfo`.
+   * Trả hàm huỷ đăng ký (theo mẫu `CardReaderPort.onScan`).
+   */
+  subscribeLogLines?(handler: (entry: TtsLogLine) => void): () => void;
 }

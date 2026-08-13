@@ -127,5 +127,8 @@ export function createElectronTtsEnginePort(): TtsEnginePort {
       if (!info) throw new Error('Bridge không hỗ trợ getTtsDebug');
       return info;
     },
+    subscribeLogLines(handler) {
+      return window.slide.onTtsLogLine?.(handler) ?? (() => {});
+    },
   };
 }

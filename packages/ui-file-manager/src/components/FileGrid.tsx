@@ -8,7 +8,7 @@ interface FileGridProps {
   onContextMenu: (id: string, x: number, y: number) => void;
   itemRenderer?: (item: FileItem, isSelected: boolean) => React.ReactNode;
   dragBoxStyle?: React.CSSProperties;
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
   cardRectsRef: React.MutableRefObject<Map<string, DOMRect>>;
   itemSize?: number;
 }

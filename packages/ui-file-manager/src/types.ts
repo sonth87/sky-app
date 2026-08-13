@@ -115,6 +115,7 @@ export interface FileLibraryConfig {
   onSelectionChange?: (selectedIds: Set<string>) => void;
   onViewChange?: (viewMode: string) => void;
   onSizeChange?: (size: number) => void;
+  onDelete?: (itemIds: string[]) => void;
 }
 
 /** Drag box state */

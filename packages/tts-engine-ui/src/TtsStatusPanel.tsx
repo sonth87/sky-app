@@ -21,16 +21,14 @@ export interface TtsStatusPanelProps {
   port: TtsEnginePort;
   status: TtsStatusLevel;
   detail: string;
-  onManageEngine: () => void;
-  onDeviceSettings: () => void;
-  /** Bỏ trống = ẩn hẳn mục "Xem log" — chỉ hiện khi port.getDebugInfo tồn tại (Electron). */
-  onViewLogs?: () => void;
+  /** Mở cửa sổ "Cấu hình" gộp (ConfigWindow) — thay 3 lối tắt tách rời cũ (Quản lý engine/
+   *  Thiết bị xử lý/Xem log) bằng 1 mục duy nhất, cửa sổ đó tự có tab cho từng phần. */
+  onOpenConfig: () => void;
 }
 
 /**
- * Nội dung popover khi bấm icon trạng thái TTS trên menu bar — 3 phần theo đúng yêu cầu:
- * trạng thái hiện tại, thông tin engine/thiết bị đang dùng, và lối tắt tới 2 hộp thoại quản
- * lý sẵn có + cửa sổ log (nếu nền tảng hỗ trợ).
+ * Nội dung popover khi bấm icon trạng thái TTS trên menu bar — trạng thái hiện tại, thông
+ * tin engine/thiết bị đang dùng, và 1 lối tắt duy nhất mở cửa sổ "Cấu hình" gộp.
  *
  * Chỉ trả về nội dung THUẦN — không tự bọc Popover/FloatingWindow. Nơi lắp ráp (package
  * device-shell, nơi đã phụ thuộc device-layout) quyết định hiển thị bằng cơ chế nào; package
@@ -40,9 +38,7 @@ export function TtsStatusPanel({
   port,
   status,
   detail,
-  onManageEngine,
-  onDeviceSettings,
-  onViewLogs,
+  onOpenConfig,
 }: TtsStatusPanelProps) {
   const { t } = useTranslation();
   const [engines, setEngines] = useState<TtsEngines | null>(null);
@@ -91,17 +87,9 @@ export function TtsStatusPanel({
       <div className="h-px bg-border" />
 
       <div className="flex flex-col gap-0.5">
-        <button onClick={onManageEngine} className={MENU_ITEM_CLASS}>
-          {t('ttsStatus.manageEngine')}
+        <button onClick={onOpenConfig} className={MENU_ITEM_CLASS}>
+          {t('ttsStatus.openConfig')}
         </button>
-        <button onClick={onDeviceSettings} className={MENU_ITEM_CLASS}>
-          {t('ttsStatus.deviceSettings')}
-        </button>
-        {onViewLogs && (
-          <button onClick={onViewLogs} className={MENU_ITEM_CLASS}>
-            {t('ttsStatus.viewLogs')}
-          </button>
-        )}
       </div>
     </div>
   );

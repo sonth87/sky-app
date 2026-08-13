@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Mic } from 'lucide-react';
 import type { PlatformContext } from '@sky-app/kernel';
-import type { TtsEnginePort } from '@sky-app/service-contracts';
-import { useTtsStatus, TtsStatusPanel, TtsLogPanel, EngineManager, DeviceSettingsModal, ensureTtsEngineI18n } from '@sky-app/tts-engine-ui';
-import { FloatingWindow, type MenuBarExtraItem } from '@sonth87/device-layout';
+import type { TtsEnginePort, EffectPresetPort, TtsPort } from '@sky-app/service-contracts';
+import { useTtsStatus, TtsStatusPanel, ConfigWindow, ensureTtsEngineI18n } from '@sky-app/tts-engine-ui';
+import type { MenuBarExtraItem } from '@sonth87/device-layout';
 
 // Side-effect module-level, chạy đúng 1 lần khi file này được import lần đầu — device-shell
 // luôn mount TRƯỚC mọi app (Ceremony/TTS Studio lazy-load theo nhu cầu khi mở cửa sổ), nên
@@ -14,8 +14,8 @@ export interface UseTtsStatusMenuBarItemResult {
   /** Truyền thẳng vào `<DeviceLayout menuBarExtras>`. `null` khi platform không có port
    * 'tts-engine' đăng ký (không nên xảy ra trong sky-app, nhưng an toàn phòng hờ). */
   item: MenuBarExtraItem | null;
-  /** Render cùng cấp `<DeviceLayout>` — các hộp thoại icon mở ra (Quản lý engine/Thiết bị
-   * xử lý/Xem log), tách khỏi `item` vì `MenuBarExtraItem.content` chỉ chứa popover, không
+  /** Render cùng cấp `<DeviceLayout>` — cửa sổ "Cấu hình" gộp (Models/Engine, Effects,
+   * Logs, Settings), tách khỏi `item` vì `MenuBarExtraItem.content` chỉ chứa popover, không
    * chứa modal full-screen. */
   modals: React.ReactNode;
 }
@@ -32,12 +32,12 @@ export interface UseTtsStatusMenuBarItemResult {
  */
 export function useTtsStatusMenuBarItem(platform: PlatformContext): UseTtsStatusMenuBarItemResult {
   const enginePort = platform.services.get<TtsEnginePort>('tts-engine');
+  const ttsPort = platform.services.get<TtsPort>('tts');
+  const effectPresetPort = platform.services.get<EffectPresetPort>('effectPreset');
   const { status, detail } = useTtsStatus(enginePort);
   const canInstall = platform.capabilities.has('tts-local');
 
-  const [showEngineManager, setShowEngineManager] = useState(false);
-  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
-  const [showLogs, setShowLogs] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
 
   if (!enginePort) {
     return { item: null, modals: null };
@@ -53,47 +53,21 @@ export function useTtsStatusMenuBarItem(platform: PlatformContext): UseTtsStatus
         port={enginePort}
         status={status}
         detail={detail}
-        onManageEngine={() => setShowEngineManager(true)}
-        onDeviceSettings={() => setShowDeviceSettings(true)}
-        onViewLogs={enginePort.getDebugInfo ? () => setShowLogs(true) : undefined}
+        onOpenConfig={() => setConfigOpen(true)}
       />
     ),
   };
 
   const modals = (
-    <>
-      <EngineManager
-        open={showEngineManager}
-        onClose={() => setShowEngineManager(false)}
-        port={enginePort}
-        canInstall={canInstall}
-      />
-      <DeviceSettingsModal
-        open={showDeviceSettings}
-        onClose={() => setShowDeviceSettings(false)}
-        port={enginePort}
-        canInstall={canInstall}
-      />
-      {showLogs && (
-        // blocking=false — cửa sổ log là công cụ tiện ích muốn để mở song song, không phải
-        // hộp thoại kiểu About cần đóng mới thao tác được app khác. resizable=true + kích
-        // thước mặc định lớn hơn — cửa sổ trước đó "hơi nhỏ" cho danh sách log dài.
-        // Xem FloatingWindow.tsx.
-        <FloatingWindow
-          onClose={() => setShowLogs(false)}
-          title="TTS Logs"
-          width={600}
-          height={520}
-          blocking={false}
-          resizable
-          minWidth={420}
-          minHeight={320}
-          contentClassName="h-full w-full flex-1 min-h-0"
-        >
-          <TtsLogPanel port={enginePort} />
-        </FloatingWindow>
-      )}
-    </>
+    <ConfigWindow
+      open={configOpen}
+      onClose={() => setConfigOpen(false)}
+      port={enginePort}
+      ttsPort={ttsPort}
+      effectPresetPort={effectPresetPort}
+      canInstall={canInstall}
+      assetUrl={platform.assetUrl}
+    />
   );
 
   return { item, modals };

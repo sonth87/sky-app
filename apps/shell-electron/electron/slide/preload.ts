@@ -12,6 +12,7 @@ import type {
   TtsCapabilities,
   PreGenStatus,
   VoiceCatalogEntry,
+  TtsLogLine,
 } from '@sky-app/slide-shared';
 
 // Re-export for the few call-sites elsewhere in electron/slide/* that still
@@ -30,6 +31,7 @@ export type {
   TtsCapabilities,
   PreGenStatus,
   VoiceCatalogEntry,
+  TtsLogLine,
 } from '@sky-app/slide-shared';
 
 const api: SlideApi = {
@@ -205,6 +207,13 @@ const api: SlideApi = {
     const handler = (_e: unknown, p: EngineInstallProgress) => cb(p);
     ipcRenderer.on('tts:engine-install-progress', handler);
     return () => ipcRenderer.removeListener('tts:engine-install-progress', handler);
+  },
+  // Dòng stdout/stderr thô của tiến trình Python, đẩy realtime — nguồn cho tab "Nhật ký"
+  // cuộn liên tục (xem python-server.ts's broadcastLogLine). KHÔNG lọc theo tier ở đây.
+  onTtsLogLine: (cb: (entry: TtsLogLine) => void): (() => void) => {
+    const handler = (_e: unknown, entry: TtsLogLine) => cb(entry);
+    ipcRenderer.on('tts:log-line', handler);
+    return () => ipcRenderer.removeListener('tts:log-line', handler);
   },
   // ---- Clone voice ----
   // Chọn được NHIỀU file cùng lúc (multiSelections) — 1 giọng giờ clone được từ nhiều mẫu.

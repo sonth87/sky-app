@@ -1,5 +1,5 @@
-export { EngineManager } from './EngineManager.js';
-export type { EngineManagerProps } from './EngineManager.js';
+export { EngineManager, EngineManagerContent } from './EngineManager.js';
+export type { EngineManagerProps, EngineManagerContentProps } from './EngineManager.js';
 export { DeviceConfig } from './DeviceConfig.js';
 export type { DeviceConfigProps } from './DeviceConfig.js';
 export { DeviceSettingsModal } from './DeviceSettingsModal.js';
@@ -12,3 +12,9 @@ export { TtsStatusPanel } from './TtsStatusPanel.js';
 export type { TtsStatusPanelProps } from './TtsStatusPanel.js';
 export { TtsLogPanel } from './TtsLogPanel.js';
 export type { TtsLogPanelProps } from './TtsLogPanel.js';
+export { ConfigWindow } from './ConfigWindow.js';
+export type { ConfigWindowProps, ConfigTab } from './ConfigWindow.js';
+export { EffectsManagerPanel } from './EffectsManagerPanel.js';
+export type { EffectsManagerPanelProps } from './EffectsManagerPanel.js';
+export { EffectsChainEditor, toEffectsChain, fromEffectsChain, newLocalId } from './EffectsChainEditor.js';
+export type { EffectsChainEditorProps, WorkingEffect } from './EffectsChainEditor.js';
