@@ -215,6 +215,9 @@ const api: SlideApi = {
     ipcRenderer.on('tts:log-line', handler);
     return () => ipcRenderer.removeListener('tts:log-line', handler);
   },
+  // Buffer log gần nhất (xem python-server.ts's getRecentLogLines) — gọi lúc mount để
+  // nạp lại lịch sử, vì onTtsLogLine chỉ đẩy các dòng phát sinh SAU khi đăng ký.
+  getTtsLogLines: (): Promise<TtsLogLine[]> => ipcRenderer.invoke('tts:get-log-lines'),
   // ---- Clone voice ----
   // Chọn được NHIỀU file cùng lúc (multiSelections) — 1 giọng giờ clone được từ nhiều mẫu.
   pickAudioFile: (): Promise<{ ok: boolean; filePaths?: string[] }> =>

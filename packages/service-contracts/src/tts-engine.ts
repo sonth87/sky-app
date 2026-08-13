@@ -138,4 +138,10 @@ export interface TtsEnginePort {
    * Trả hàm huỷ đăng ký (theo mẫu `CardReaderPort.onScan`).
    */
   subscribeLogLines?(handler: (entry: TtsLogLine) => void): () => void;
+  /**
+   * Buffer log gần nhất, gọi 1 lần lúc mount để nạp lại lịch sử — `subscribeLogLines` chỉ
+   * đẩy các dòng phát sinh SAU khi đăng ký nên remount (chuyển tab/mở lại cửa sổ) trước đây
+   * luôn thấy trống rỗng dù tiến trình Python vẫn đang chạy.
+   */
+  getLogLines?(): Promise<TtsLogLine[]>;
 }

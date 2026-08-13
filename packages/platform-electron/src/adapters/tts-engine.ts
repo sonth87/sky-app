@@ -130,5 +130,8 @@ export function createElectronTtsEnginePort(): TtsEnginePort {
     subscribeLogLines(handler) {
       return window.slide.onTtsLogLine?.(handler) ?? (() => {});
     },
+    async getLogLines() {
+      return (await window.slide.getTtsLogLines?.()) ?? [];
+    },
   };
 }

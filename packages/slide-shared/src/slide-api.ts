@@ -325,6 +325,8 @@ export interface SlideApi {
   onEngineInstallProgress(cb: (p: EngineInstallProgress) => void): () => void;
   /** Dòng stdout/stderr thô realtime — nguồn cho tab "Nhật ký" cuộn liên tục. */
   onTtsLogLine(cb: (entry: TtsLogLine) => void): () => void;
+  /** Buffer log gần nhất — gọi lúc mount để nạp lại lịch sử trước khi nhận tiếp qua onTtsLogLine. */
+  getTtsLogLines(): Promise<TtsLogLine[]>;
   /** Chọn được NHIỀU file cùng lúc — 1 giọng clone được từ nhiều mẫu (ghép lại cho model
    * nhiều ngữ cảnh hơn khi synthesize, xem audio_dsp.py's combine_voice_samples). */
   pickAudioFile(): Promise<{ ok: boolean; filePaths?: string[] }>;

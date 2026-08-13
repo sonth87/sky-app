@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'node:child_process';
 import { appendFileSync, existsSync, chmodSync, mkdirSync, readdirSync, copyFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow } from 'electron';
+import type { TtsLogLine } from '@sky-app/slide-shared';
 import { vieneuRefDir, vieneuRegistryPath, vieneuConfigPath, ttsEnginesDir, ttsRuntimeDir, skyAppDbPath } from './data/paths';
 import { resolveRuntimePython } from './python-runtime';
 const DEBUG_LOG_FILE = join(app.getPath('userData'), 'tts-debug.log');
@@ -106,6 +107,16 @@ async function findFreePort(preferred: number): Promise<number> {
   return preferred;
 }
 
+// Đệm các dòng log gần nhất để cửa sổ Logs nạp lại lịch sử khi mount (chuyển tab/mở lại
+// cửa sổ) — trước đây chỉ phát realtime nên remount là mất trắng, xem TtsLogPanel.tsx.
+const MAX_LOG_LINES = 2000;
+const recentLogLines: TtsLogLine[] = [];
+
+/** Trả buffer log gần nhất để renderer nạp khi vừa mount, trước khi nhận tiếp qua push. */
+export function getRecentLogLines(): TtsLogLine[] {
+  return recentLogLines;
+}
+
 /**
  * Đẩy 1 dòng stdout/stderr thô sang mọi renderer window — nguồn cho tab "Nhật ký" (Logs)
  * kiểu cuộn realtime tham khảo voicebox (xem `TtsLogPanel.tsx`). Phát cho MỌI tier, không
@@ -119,6 +130,8 @@ async function findFreePort(preferred: number): Promise<number> {
  */
 function broadcastLogLine(tier: PythonTier, stream: 'stdout' | 'stderr', line: string) {
   const payload = { tier, stream, line, ts: Date.now() };
+  recentLogLines.push(payload);
+  if (recentLogLines.length > MAX_LOG_LINES) recentLogLines.shift();
   BrowserWindow.getAllWindows().forEach((w) => {
     w.webContents.send('tts:log-line', payload);
   });
@@ -710,6 +723,17 @@ async function startPythonServerOnce(
         VIENEU_ONNX_PROVIDERS: device.providers,
         VIENEU_ONNX_THREADS: String(device.threads),
         LOG_FILE_PATH: logFilePath,
+        // Tắt đúng 3 numpy RuntimeWarning vô hại từ lượt inference ĐẦU TIÊN sau khi model
+        // vừa nạp (vieneu's onnx_runtime_lite.py — arena buffer của ONNX Runtime chưa "ấm"
+        // ở lượt đầu, hết ngay từ lượt 2). Đã xác nhận thủ công: audio warmup/thật đều
+        // không NaN/Inf (main.py's /synthesize tự chặn nếu có) — chỉ là log nhiễu vô ích,
+        // lặp lại mỗi lần khởi động. Lọc đúng message text, KHÔNG ignore RuntimeWarning nói
+        // chung, để cảnh báo thật (nếu có) ở nơi khác vẫn hiện bình thường.
+        PYTHONWARNINGS: [
+          'ignore:divide by zero encountered in matmul',
+          'ignore:overflow encountered in matmul',
+          'ignore:invalid value encountered in matmul',
+        ].join(','),
         ...extraEnv,
       },
     });

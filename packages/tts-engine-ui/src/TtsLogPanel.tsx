@@ -55,12 +55,24 @@ export function TtsLogPanel({ port }: TtsLogPanelProps) {
     };
   }, [port]);
 
+  // Đăng ký nhận dòng mới TRƯỚC, rồi mới nạp lịch sử — nạp sau cùng để dòng phát sinh
+  // đúng lúc round-trip IPC của getLogLines() không bị rớt (mất) giữa 2 bước.
   useEffect(() => {
     if (!port.subscribeLogLines) return;
     const unsub = port.subscribeLogLines((entry) => {
       setLogLines((prev) => {
         const next = [...prev, entry];
         return next.length > MAX_LOG_LINES ? next.slice(next.length - MAX_LOG_LINES) : next;
+      });
+    });
+    port.getLogLines?.().then((history) => {
+      if (history.length === 0) return;
+      setLogLines((prev) => {
+        // `ts` set 1 lần lúc main process phát dòng đó — trùng ts nghĩa là cùng 1 dòng đã
+        // vào `prev` qua push trong lúc round-trip getLogLines() còn đang chạy.
+        const seen = new Set(prev.map((l) => l.ts));
+        const merged = [...history.filter((l) => !seen.has(l.ts)), ...prev];
+        return merged.length > MAX_LOG_LINES ? merged.slice(merged.length - MAX_LOG_LINES) : merged;
       });
     });
     return unsub;

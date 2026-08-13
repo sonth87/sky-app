@@ -6,7 +6,7 @@ import { ceremonyStore } from './data/store';
 import { ceremonyDataDir, autoPlayJsonPath, piperBinPath, piperModelPath, ttsPregenWavPath, ttsPregenDir, ttsPregenManifestPath, vieneuDir } from './data/paths';
 import { runVieneu, warmupVieneu } from './vieneu-tts';
 import { synthesizeTtsStudio } from './tts-studio';
-import { getTtsDebugInfo, getPythonStatus, getPythonPort, stopPythonServer, startPythonServer, getPythonPath } from './python-server';
+import { getTtsDebugInfo, getPythonStatus, getPythonPort, stopPythonServer, startPythonServer, getPythonPath, getRecentLogLines } from './python-server';
 import { PreGenQueue } from './pregen-queue';
 import type { PreGenStatus, ManifestEntry } from './pregen-queue';
 import {
@@ -567,6 +567,12 @@ export function registerIpcHandlers() {
   ipcMain.handle('tts:debug', async () => {
     const info = await getTtsDebugInfo();
     return { ...info, cacheSize: ttsCache.size, activityLog: [...ttsActivityLog].reverse() };
+  });
+
+  // Nạp lại buffer log gần nhất khi renderer vừa mount tab "Nhật ký" — bù cho
+  // `tts:log-line` chỉ push realtime, remount (chuyển tab/mở lại cửa sổ) trước đây mất trắng.
+  ipcMain.handle('tts:get-log-lines', async () => {
+    return getRecentLogLines();
   });
 
   // Restart Python/VieNeu TTS server
