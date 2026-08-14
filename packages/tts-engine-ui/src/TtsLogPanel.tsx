@@ -1,19 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowDown } from 'lucide-react';
-import type { TtsEnginePort, TtsDebugInfo, TtsLogLine } from '@sky-app/service-contracts';
+import type { TtsEnginePort, TtsPort, TtsDebugInfo, TtsLogLine } from '@sky-app/service-contracts';
+import { TtsHistoryList } from './TtsHistoryList.js';
+import { TtsRawLogView } from './TtsRawLogView.js';
 
 const POLL_INTERVAL_MS = 1500;
-/** Cap buffer log thô — tương đương voicebox's `MAX_LOG_ENTRIES`. Dòng cũ nhất bị bỏ khi
- *  vượt, không phải giới hạn để tiết kiệm bộ nhớ tuyệt đối (renderer thừa sức giữ nhiều hơn)
- *  mà để tránh danh sách phình vô hạn trong 1 phiên chạy dài không ai bấm Xoá. */
-const MAX_LOG_LINES = 2000;
-/** Ngưỡng (px) tính "đang ở cuối" — dưới ngưỡng này vẫn coi là đã cuộn tới đáy dù còn dư vài
- *  px do làm tròn subpixel, khớp cách voicebox's LogsPage làm. */
-const AT_BOTTOM_THRESHOLD_PX = 40;
+/** Cap buffer log thô — PHẢI khớp MAX_LOG_LINES ở python-server.ts (buffer phía main process
+ *  dùng để seed lúc mount, xem getRecentLogLines/broadcastLogLine) để tab "Nhật ký" cuộn-lên-
+ *  xem-thêm (TtsRawLogView.tsx) có đủ dữ liệu tải tới hết. Không phải "vô hạn" — vẫn có trần
+ *  để tránh phình RAM vô thời hạn trong 1 phiên chạy dài không ai bấm Xoá; 10000 đủ rộng cho
+ *  vài vòng cuộn-lên-tải-thêm (bước 500 dòng/lần) trước khi chạm trần. */
+const MAX_LOG_LINES = 10000;
 
 export interface TtsLogPanelProps {
   port: TtsEnginePort;
+  /** Cần cho tab "Lịch sử" (Phase 4) — thiếu thì tab đó tự ẩn (vd Web adapter chưa
+   *  implement listHistory). */
+  ttsPort?: TtsPort;
 }
 
 /**
@@ -30,14 +33,20 @@ export interface TtsLogPanelProps {
  * KHÔNG tự bọc FloatingWindow — nơi lắp ráp (device-shell) quyết định hiển thị bằng cơ chế
  * nào, với `blocking={false}` để không chặn thao tác app khác trong lúc cửa sổ log mở.
  */
-export function TtsLogPanel({ port }: TtsLogPanelProps) {
+type LogSubTab = 'raw' | 'activity' | 'history';
+
+export function TtsLogPanel({ port, ttsPort }: TtsLogPanelProps) {
   const { t } = useTranslation();
   const [debug, setDebug] = useState<TtsDebugInfo | null>(null);
   const [visibleCount, setVisibleCount] = useState(30);
 
   const [logLines, setLogLines] = useState<TtsLogLine[]>([]);
-  const [autoScroll, setAutoScroll] = useState(true);
-  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 3 tab con (Nhật ký thô | Hoạt động | Lịch sử) — CHỈ đổi phần JSX hiển thị, không unmount
+  // gì: state + subscribe log realtime ở trên vẫn sống xuyên suốt dù đang xem tab nào, nên
+  // chuyển qua lại các tab này không mất dữ liệu, khác hẳn lỗi đã sửa trước đó (ConfigWindow's
+  // tab ngoài thật sự unmount/mount lại cả TtsLogPanel).
+  const [activeSubTab, setActiveSubTab] = useState<LogSubTab>('raw');
 
   useEffect(() => {
     if (!port.getDebugInfo) return;
@@ -78,32 +87,22 @@ export function TtsLogPanel({ port }: TtsLogPanelProps) {
     return unsub;
   }, [port]);
 
-  // Tự cuộn xuống dòng mới nhất TRỪ KHI người dùng đã tự cuộn lên xem log cũ — theo dõi qua
-  // onScroll bên dưới, đúng UX voicebox's LogsPage (autoScroll tắt ngay khi rời đáy, bật lại
-  // khi bấm nút "Cuộn xuống cuối" hoặc tự cuộn về đáy).
-  useEffect(() => {
-    if (!autoScroll || !scrollRef.current) return;
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [logLines, autoScroll]);
-
-  const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < AT_BOTTOM_THRESHOLD_PX;
-    setAutoScroll(atBottom);
-  };
-
-  const jumpToBottom = () => {
-    setAutoScroll(true);
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  };
-
   if (!port.getDebugInfo) {
     return <p className="p-4 text-xs text-muted-foreground">{t('ttsStatus.logsNotAvailable')}</p>;
   }
   if (!debug) {
     return <p className="p-4 text-xs text-muted-foreground">{t('ttsStatus.loading')}</p>;
   }
+
+  // Web adapter chưa implement subscribeLogLines/listHistory (xem TtsPort's docstring) —
+  // khi thiếu cả 2 thì chỉ còn 1 view (Hoạt động), không cần thanh tab cho đúng 1 mục.
+  const hasRawLog = !!port.subscribeLogLines;
+  const hasHistory = !!ttsPort?.listHistory;
+  const showTabBar = hasRawLog || hasHistory;
+  const effectiveTab: LogSubTab =
+    (activeSubTab === 'raw' && !hasRawLog) || (activeSubTab === 'history' && !hasHistory)
+      ? 'activity'
+      : activeSubTab;
 
   return (
     // w-full h-full — LẤP ĐẦY khung do caller cấp (FloatingWindow's contentClassName),
@@ -127,88 +126,75 @@ export function TtsLogPanel({ port }: TtsLogPanelProps) {
         {debug.lastStartupError && <span className="text-destructive">{debug.lastStartupError}</span>}
       </div>
 
-      {/* Log thô realtime — phần chính, chiếm nhiều chỗ nhất (flex-1), style hộp sáng kiểu
-          voicebox's Server Logs (không phải terminal nền tối). */}
-      {port.subscribeLogLines && (
-        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-foreground">
-              Nhật ký <span className="text-xs font-normal text-muted-foreground">· {logLines.length} dòng</span>
-            </span>
+      {/* Thanh tab ngang, gạch chân — tham khảo voicebox's ServerTab/SettingsLayout (cùng
+          kiểu underline-tab dùng cho trang cấu hình), đổi sang token màu của sky-app. */}
+      {showTabBar && (
+        <nav className="flex shrink-0 gap-1 border-b border-border">
+          {(
+            [
+              ...(hasRawLog
+                ? [{ id: 'raw' as const, label: t('ttsStatus.rawLog'), count: logLines.length }]
+                : []),
+              { id: 'activity' as const, label: t('ttsStatus.activity'), count: debug.activityLog.length },
+              ...(hasHistory ? [{ id: 'history' as const, label: t('ttsStatus.history'), count: null }] : []),
+            ]
+          ).map((tab) => (
             <button
+              key={tab.id}
               type="button"
-              onClick={() => setLogLines([])}
-              className="rounded-lg border border-border px-2.5 py-1 text-2xs text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => setActiveSubTab(tab.id)}
+              className={`-mb-px border-b-2 px-3 py-1.5 text-xs font-medium transition-colors ${
+                effectiveTab === tab.id
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground'
+              }`}
             >
-              Xoá
+              {tab.label}
+              {tab.count !== null && <span className="text-2xs font-normal"> ({tab.count})</span>}
             </button>
-          </div>
-          <div className="relative min-h-0 flex-1">
-            <div
-              ref={scrollRef}
-              onScroll={handleScroll}
-              className="h-full overflow-y-auto rounded-xl border border-border bg-muted/40 p-3 font-mono text-2xs leading-relaxed"
-            >
-              {logLines.length === 0 ? (
-                <span className="text-muted-foreground">Chưa có dòng log nào.</span>
-              ) : (
-                logLines.map((entry, i) => (
-                  <div
-                    key={i}
-                    className={`whitespace-pre-wrap break-all py-0.5 ${entry.stream === 'stderr' ? 'text-destructive' : 'text-foreground/80'}`}
-                  >
-                    <span className="text-muted-foreground">
-                      {new Date(entry.ts).toLocaleTimeString('vi-VN')} [{entry.tier}]
-                    </span>{' '}
-                    {entry.line}
-                  </div>
-                ))
-              )}
-            </div>
-            {!autoScroll && (
-              <button
-                type="button"
-                onClick={jumpToBottom}
-                className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-primary px-3 py-1 text-2xs text-primary-foreground shadow-lg hover:bg-primary/90"
-              >
-                <ArrowDown size={11} /> Cuộn xuống cuối
-              </button>
+          ))}
+        </nav>
+      )}
+
+      {/* Log thô realtime — style hộp sáng kiểu voicebox's Server Logs (không phải terminal
+          nền tối). Luôn giữ subscribe/state ở trên dù đang xem tab nào — chuyển tab chỉ ẩn/
+          hiện JSX, không unmount, nên không mất dòng nào (khác lỗi tab NGOÀI đã sửa trước đó). */}
+      {hasRawLog && effectiveTab === 'raw' && (
+        <TtsRawLogView lines={logLines} onClear={() => setLogLines([])} />
+      )}
+
+      {effectiveTab === 'activity' && (
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-muted/40 p-2.5 font-mono text-2xs leading-relaxed">
+            {debug.activityLog.length === 0 ? (
+              <span className="text-muted-foreground">{t('ttsStatus.noEvents')}</span>
+            ) : (
+              debug.activityLog.slice(0, visibleCount).map((e, i) => (
+                <div key={i} className={e.ok ? 'text-foreground/80' : 'text-destructive'}>
+                  <span className="text-muted-foreground">{e.time}</span>{' '}
+                  [{e.action}] {e.ok ? '✓' : '✗'}
+                  {e.cacheHit ? ' 💾' : ''}{' '}
+                  &quot;{e.text}&quot;{' '}
+                  <span className="text-muted-foreground">
+                    {e.model} {e.durationMs}ms
+                  </span>
+                  {e.error && <span className="text-destructive"> → {e.error}</span>}
+                </div>
+              ))
             )}
           </div>
+          {visibleCount < debug.activityLog.length && (
+            <button
+              onClick={() => setVisibleCount((n) => n + 30)}
+              className="self-start text-xs text-muted-foreground underline hover:text-foreground"
+            >
+              {t('ttsStatus.loadMore', { count: debug.activityLog.length - visibleCount })}
+            </button>
+          )}
         </div>
       )}
 
-      <div className="flex max-h-40 min-h-0 shrink-0 flex-col gap-1.5">
-        <span className="text-xs font-semibold text-muted-foreground">
-          {t('ttsStatus.activity')} ({debug.activityLog.length})
-        </span>
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-muted/40 p-2.5 font-mono text-2xs leading-relaxed">
-          {debug.activityLog.length === 0 ? (
-            <span className="text-muted-foreground">{t('ttsStatus.noEvents')}</span>
-          ) : (
-            debug.activityLog.slice(0, visibleCount).map((e, i) => (
-              <div key={i} className={e.ok ? 'text-foreground/80' : 'text-destructive'}>
-                <span className="text-muted-foreground">{e.time}</span>{' '}
-                [{e.action}] {e.ok ? '✓' : '✗'}
-                {e.cacheHit ? ' 💾' : ''}{' '}
-                &quot;{e.text}&quot;{' '}
-                <span className="text-muted-foreground">
-                  {e.model} {e.durationMs}ms
-                </span>
-                {e.error && <span className="text-destructive"> → {e.error}</span>}
-              </div>
-            ))
-          )}
-        </div>
-        {visibleCount < debug.activityLog.length && (
-          <button
-            onClick={() => setVisibleCount((n) => n + 30)}
-            className="self-start text-xs text-muted-foreground underline hover:text-foreground"
-          >
-            {t('ttsStatus.loadMore', { count: debug.activityLog.length - visibleCount })}
-          </button>
-        )}
-      </div>
+      {hasHistory && effectiveTab === 'history' && <TtsHistoryList ttsPort={ttsPort!} />}
     </div>
   );
 }

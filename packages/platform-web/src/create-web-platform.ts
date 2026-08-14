@@ -4,6 +4,8 @@ import type { AssetPort, DataPort, DataSourcePort, EventPort, LayoutPort } from 
 import { createWebTtsPort } from './adapters/tts.js';
 import { createWebEffectPresetPort } from './adapters/effect-preset.js';
 import { createWebTtsEnginePort } from './adapters/tts-engine.js';
+import { createWebSttPort } from './adapters/stt.js';
+import { createWebSttEnginePort } from './adapters/stt-engine.js';
 import { createWebLicensePort } from './adapters/license.js';
 import { createWebDataPort } from './adapters/data.js';
 import { createSqliteWasmDataPort } from './adapters/sqlite-wasm-data.js';
@@ -128,6 +130,10 @@ export async function createWebPlatform(opts: CreateWebPlatformOptions = {}): Pr
 
   platform.services.register('tts', createWebTtsPort(opts.ttsBaseUrl));
   platform.services.register('tts-engine', createWebTtsEnginePort(opts.ttsBaseUrl));
+  // STT dùng CHUNG tts-service với TTS (cùng process, cùng base URL) — xem
+  // docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md.
+  platform.services.register('stt', createWebSttPort(opts.ttsBaseUrl));
+  platform.services.register('stt-engine', createWebSttEnginePort(opts.ttsBaseUrl));
   platform.services.register('data', await resolveDataPort(opts, dataBaseUrl, dataServiceAvailable));
   platform.services.register('layout', await resolveLayoutPort(opts, dataBaseUrl, dataServiceAvailable));
   platform.services.register('asset', resolveAssetPort(dataBaseUrl, dataServiceAvailable));

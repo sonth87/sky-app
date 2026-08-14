@@ -2,6 +2,15 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.14.0",
+      "date": "2026-08-14",
+      "bump": "minor",
+      "summary": "Nền tảng nhận dạng giọng nói (Speech-to-Text) — thêm engine Whisper (cài đặt qua đúng màn Quản lý engine hiện có, nhóm \"Nhận dạng giọng nói\") và khả năng chuyển audio thành văn bản, chạy song song không ảnh hưởng tới giọng đọc đang phục vụ buổi lễ. Đây là nền móng — nút bấm sử dụng thật trong màn hình sẽ có ở bản sau.",
+      "breaking": true,
+      "minAppVersion": "0.14.0",
+      "detailsRef": "history/2026-08-14-stt-nen-tang-giai-doan-1.md"
+    },
+    {
       "version": "0.13.0",
       "date": "2026-08-13",
       "bump": "minor",

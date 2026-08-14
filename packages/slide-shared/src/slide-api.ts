@@ -119,6 +119,45 @@ export interface TtsEngines {
   loaded?: string[];
 }
 
+/** 1 engine STT đăng ký (Phase 1, xem docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md)
+ * — mirror hình dạng `TtsEngineInfo` (cùng field passthrough thô từ JSON của Python) nhưng
+ * `capabilities` STT-shaped, KHÔNG tái dùng `TtsEngineInfo` vì `supports_clone`/
+ * `supports_preset` sai ngữ nghĩa cho STT. */
+export interface SttEngineInfo {
+  id: string;
+  label: string;
+  description: string;
+  implemented: boolean;
+  bundled: boolean;
+  install_status: 'installed' | 'partial' | 'missing';
+  runtime_kind?: 'onnx-bundled' | 'onnx-ext' | 'torch' | 'mlx';
+  category?: 'tts' | 'stt' | 'llm';
+  install?: {
+    model?: { source?: string; repo?: string; total_mb?: number };
+    runtime?: { python_version?: string; pip_packages?: string[] };
+  } | null;
+  requirements: {
+    min_ram_gb?: number;
+    recommended_ram_gb?: number;
+    needs_gpu?: boolean;
+    disk_headroom_factor?: number;
+  } | null;
+  capabilities: {
+    id: string;
+    label: string;
+    /** `null` = đa ngôn ngữ không giới hạn danh sách cụ thể (vd Whisper ~99 ngôn ngữ). */
+    languages: string[] | null;
+    supports_language_hint: boolean;
+  } | null;
+}
+
+export interface SttEngines {
+  engines: SttEngineInfo[];
+  /** engine_id đang giữ ấm, hoặc `null` nếu chưa engine nào được nạp — bình thường trước
+   * lần dùng đầu tiên, khác `TtsEngines.current` (luôn có giá trị fallback). */
+  current: string | null;
+}
+
 export interface EngineInstallProgress {
   engineId: string;
   /** 'canceled' = người dùng bấm Hủy — khác 'paused' (giữ .part để Tiếp tục): cancel() XOÁ
@@ -390,6 +429,21 @@ export interface SlideApi {
   getTtsHistoryAudioUrl(id: string): Promise<string>;
   deleteTtsHistoryEntry(id: string): Promise<{ ok: boolean; error?: string }>;
   clearTtsHistory(): Promise<{ ok: boolean; error?: string; count?: number }>;
+
+  // ── STT (Phase 1 — nhận dạng giọng nói, xem
+  //    docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md) ────────────────────────
+  /** Danh sách engine STT đăng ký + engine đang giữ ấm. Cài đặt/tải model: dùng
+   * `preflight`/`installStart` (bộ method TTS ở trên) với cùng engine_id — 1 registry
+   * dùng chung cho cả TTS/STT, phân biệt qua `category`. */
+  sttListEngines(): Promise<SttEngines | null>;
+  /** Đổi engine STT đang dùng — đơn giản hơn TTS (chỉ 1 instance giữ ấm, không LRU). */
+  sttEngineSwitch(engineId: string): Promise<{ ok: boolean; error?: string }>;
+  /** Phiên âm 1 file audio thành text. `language` rỗng = engine tự nhận diện.
+   * `engineId` rỗng = dùng engine đang giữ ấm, hoặc lazy-activate mặc định (whisper-base). */
+  sttTranscribe(
+    filePath: string,
+    opts?: { language?: string; engineId?: string },
+  ): Promise<{ ok: boolean; text?: string; language?: string; durationSec?: number; error?: string }>;
   /** Thư viện voice mẫu 'hệ thống' (resources/voice-ref/{lang}/catalog.json) — search/preview
    * trước khi chọn dùng. Không cần bước import riêng: chọn synthesize lần đầu server tự
    * encode ngầm, voice đó tự xuất hiện trong listVoices() từ đó về sau. */

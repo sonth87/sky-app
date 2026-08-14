@@ -36,6 +36,8 @@ export type {
   TtsConfig,
   TtsEngineInfo,
   TtsEngines,
+  SttEngineInfo,
+  SttEngines,
   EngineInstallProgress,
   TtsEnginePreflight,
   TtsCapabilities,

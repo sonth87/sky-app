@@ -49,6 +49,11 @@ def _make_voxcpm():
     return VoxCpmEngine()
 
 
+def _make_whisper_base():
+    from engine_whisper_onnx import WhisperOnnxEngine
+    return WhisperOnnxEngine()
+
+
 # Qwen: 2 implementation khác hẳn nhau theo nền tảng (xem _qwen_runtime_variant bên dưới
 # cho lý do) — factory tự chọn đúng class, engine_id/label giữ nguyên nên UI/registry
 # không thấy khác biệt gì ngoài field runtime_kind.
@@ -262,6 +267,45 @@ _ENGINES: dict[str, dict] = {
             },
         },
     },
+    # STT (Phase 1, xem docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md) — Whisper
+    # đa ngôn ngữ (gồm tiếng Việt) qua sherpa-onnx, ONNX/CPU TORCH-FREE (cùng triết lý
+    # VieNeu/MOSS). Đã spike trước khi thêm entry: phiên âm 1 mẫu audio tiếng Việt thật ra
+    # kết quả đọc hiểu được, ~1.5-1.8s cho 8.5s audio trên CPU 4 luồng.
+    "whisper-base": {
+        "label": "Whisper Base (nhận dạng giọng nói, đa ngôn ngữ)",
+        "factory": _make_whisper_base,
+        "description": "Whisper base qua sherpa-onnx — phiên âm audio thành văn bản, đa ngôn ngữ gồm tiếng Việt, chạy CPU/ONNX torch-free.",
+        "implemented": True,
+        "bundled": False,
+        "runtime_kind": "onnx-ext",
+        "category": "stt",
+        "install": {
+            "runtime": {
+                "python_version": "3.11",
+                "pip_packages": [
+                    "sherpa-onnx>=1.13,<2.0",
+                    "soundfile",
+                    "soxr>=0.3,<0.4",
+                    "numpy>=1.24",
+                ],
+            },
+            "model": {
+                "source": "hf",
+                "repo": "csukuangfj/sherpa-onnx-whisper-base",
+                # Repo HF có cả bản fp32 (~292MB) lẫn int8 (~161MB) — engine chỉ dùng int8,
+                # lọc rõ để không tải phí gần gấp đôi dung lượng không dùng tới (xem
+                # engine-installer.ts's resolveHfFiles's allowFiles).
+                "files": ["base-encoder.int8.onnx", "base-decoder.int8.onnx", "base-tokens.txt"],
+                "total_mb": 161,  # đo thật qua HF API 2026-08-14 (29.1 + 131 + 0.8)
+            },
+            "requirements": {
+                "min_ram_gb": 2,
+                "recommended_ram_gb": 4,
+                "needs_gpu": False,
+                "disk_headroom_factor": 2.0,
+            },
+        },
+    },
 }
 
 
@@ -305,6 +349,17 @@ def _static_caps(engine_id: str) -> dict | None:
             "supports_emotion": False,
         }
     return None
+
+
+def engine_exists(engine_id: str) -> bool:
+    """`engine_id` có đăng ký trong `_ENGINES` không — dùng để phân biệt "id lạ, chưa từng
+    tồn tại" (nên báo 404 unknown_engine) với "id thật nhưng sai category" (nên báo 400
+    wrong_category). `engine_category()` một mình không phân biệt được 2 trường hợp này vì
+    nó mặc định trả 'tts' cho CẢ id lạ lẫn entry quên khai category (có chủ đích, xem
+    docstring của nó) — bug thật phát hiện lúc viết test cho guard category (2026-08-14):
+    guard gọi thẳng engine_category() sẽ chặn nhầm id lạ bằng lỗi 400 sai, đè mất đúng lỗi
+    404 unknown_engine mà caller (Electron) cần để phân biệt 2 tình huống khác nhau."""
+    return engine_id in _ENGINES
 
 
 def engine_category(engine_id: str) -> str:

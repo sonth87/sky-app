@@ -117,7 +117,7 @@ export function ConfigWindow({
         {activeTab === 'effects' && (
           <EffectsManagerPanel effectPresetPort={effectPresetPort} ttsPort={ttsPort} assetUrl={assetUrl} />
         )}
-        {activeTab === 'logs' && <TtsLogPanel port={port} />}
+        {activeTab === 'logs' && <TtsLogPanel port={port} ttsPort={ttsPort} />}
         {activeTab === 'settings' && (
           <DeviceConfig
             port={port}

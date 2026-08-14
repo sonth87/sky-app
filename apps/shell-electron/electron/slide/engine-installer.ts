@@ -327,7 +327,12 @@ const HF_BASE = 'https://huggingface.co';
 /** Resolve danh sách file model từ HF API (path + size + sha256 LFS). Timeout riêng (bug thật
  * 2026-08-03: fetch không timeout → mạng chặn/không phản hồi thì treo vĩnh viễn, im lặng hoàn
  * toàn, giống hệt download-task.ts's RESPONSE_TIMEOUT_MS — xem comment ở đó). */
-async function resolveHfFiles(repo: string, modelDir: string, signal: AbortSignal): Promise<FileSpec[]> {
+async function resolveHfFiles(
+  repo: string,
+  modelDir: string,
+  signal: AbortSignal,
+  allowFiles?: string[],
+): Promise<FileSpec[]> {
   const api = `${HF_BASE}/api/models/${repo}/tree/main?recursive=true`;
   let res: Response;
   try {
@@ -338,11 +343,16 @@ async function resolveHfFiles(repo: string, modelDir: string, signal: AbortSigna
   }
   if (!res.ok) throw new DownloadError(`Không lấy được danh sách file HF (HTTP ${res.status})`, 'network');
   const tree = (await res.json()) as Array<{ path: string; type: string; size: number; lfs?: { oid: string } }>;
+  // `allowFiles` không rỗng = chỉ tải ĐÚNG các file này (registry's install.model.files) —
+  // dùng khi repo chứa nhiều biến thể model hơn engine thực sự cần (vd Whisper: repo có cả
+  // fp32 lẫn int8, engine chỉ dùng int8). Rỗng/undefined = tải nguyên repo, hành vi cũ.
+  const allowSet = allowFiles && allowFiles.length > 0 ? new Set(allowFiles) : null;
   const specs: FileSpec[] = [];
   for (const f of tree) {
     if (f.type !== 'file') continue;
     // Bỏ file phụ không cần cho runtime (README, .gitattributes).
     if (/^(\.|README|LICENSE)/i.test(f.path)) continue;
+    if (allowSet && !allowSet.has(f.path)) continue;
     specs.push({
       url: `${HF_BASE}/${repo}/resolve/main/${f.path}`,
       dest: join(modelDir, f.path),
@@ -416,6 +426,12 @@ export class EngineInstaller {
   private stageMonitor: ReturnType<typeof setInterval> | null = null;
   private offStageSince = 0;
   private repo: string | null = null;
+  // Lọc file tải từ repo HF — undefined/rỗng = tải NGUYÊN repo (hành vi cũ, mọi engine
+  // trước STT vẫn dùng vậy). Whisper (2026-08-14) là engine đầu tiên cần lọc: repo HF
+  // của nó chứa cả bản fp32 lẫn int8 (~453MB), engine chỉ dùng bản int8 (~161MB) — tải hết
+  // phí gấp gần 3 lần dung lượng không dùng tới. Lưu lại (giống `repo`) để tự-resume sau
+  // khi tạm dừng lễ (dòng dưới) vẫn lọc đúng, không tải nhầm về đủ cả 453MB.
+  private allowFiles: string[] | null = null;
   private readonly RESUME_DEBOUNCE_MS = 5000;   // hết SV ổn định 5s mới tự resume
   private readonly MONITOR_INTERVAL_MS = 800;
 
@@ -461,7 +477,7 @@ export class EngineInstaller {
         else if (Date.now() - this.offStageSince >= this.RESUME_DEBOUNCE_MS) {
           this.offStageSince = 0;
           this.autoPaused = false;
-          this.downloadFromHf(this.repo);  // resume từ install-state.json
+          this.downloadFromHf(this.repo, this.allowFiles ?? undefined);  // resume từ install-state.json
         }
       } else if (onStage) {
         this.offStageSince = 0;  // reset debounce nếu SV lại lên
@@ -476,10 +492,13 @@ export class EngineInstaller {
 
   /**
    * Bắt đầu/tiếp tục tải model từ HF. Resume nếu đã có state.
-   * `engineMeta`: lấy từ /engines (install.model.repo).
+   * `engineMeta`: lấy từ /engines (install.model.repo). `allowFiles` (install.model.files) —
+   * lọc còn đúng các file này trong repo, undefined/rỗng = tải nguyên repo (xem
+   * resolveHfFiles's comment).
    */
-  async downloadFromHf(repo: string): Promise<void> {
+  async downloadFromHf(repo: string, allowFiles?: string[]): Promise<void> {
     this.repo = repo;
+    this.allowFiles = allowFiles && allowFiles.length > 0 ? allowFiles : null;
     this.paused = false;
     this.canceling = false; // lượt MỚI — dọn cờ cancel() của lượt trước (nếu có), xem comment ở cancel()
     this.ac = new AbortController();
@@ -501,7 +520,7 @@ export class EngineInstaller {
       let state = this.loadState();
       if (!state || state.source !== 'hf' || state.files.length === 0) {
         this.emit(this.prog('resolving', [], [], 0, 0, 0, ''));
-        const files = await resolveHfFiles(repo, this.modelDir(), signal);
+        const files = await resolveHfFiles(repo, this.modelDir(), signal, this.allowFiles ?? undefined);
         state = { engineId: this.engineId, source: 'hf', files, doneFiles: [] };
         this.saveState(state);
       }

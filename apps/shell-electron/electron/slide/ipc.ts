@@ -697,8 +697,10 @@ export function registerIpcHandlers() {
     return await preflight(engineId);
   });
 
-  // Lấy repo HF của engine từ /engines (để tải model).
-  async function getEngineModelRepo(engineId: string): Promise<string | null> {
+  // Lấy repo HF + danh sách file cần lọc (nếu có) của engine từ /engines (để tải model).
+  // `files` rỗng/thiếu = tải nguyên repo (hành vi cũ) — chỉ engine nào khai
+  // install.model.files (vd Whisper — repo HF có cả bản không dùng tới) mới lọc.
+  async function getEngineModelRepo(engineId: string): Promise<{ repo: string; files: string[] } | null> {
     const port = getPythonPort();
     if (!port) return null;
     try {
@@ -706,7 +708,9 @@ export function registerIpcHandlers() {
       if (!res.ok) return null;
       const data = await res.json();
       const e = (data.engines ?? []).find((x: { id: string }) => x.id === engineId);
-      return e?.install?.model?.repo ?? null;
+      const repo = e?.install?.model?.repo;
+      if (!repo) return null;
+      return { repo, files: Array.isArray(e?.install?.model?.files) ? e.install.model.files : [] };
     } catch {
       return null;
     }
@@ -738,8 +742,8 @@ export function registerIpcHandlers() {
     const { getPythonPath } = await import('./python-server');
     const pf = await preflight(engineId);
     if (!pf.ok) return { ok: false, error: pf.blocks.join(' '), preflight: pf };
-    const repo = await getEngineModelRepo(engineId);
-    if (!repo) return { ok: false, error: 'Engine không có nguồn model HF' };
+    const modelRepo = await getEngineModelRepo(engineId);
+    if (!modelRepo) return { ok: false, error: 'Engine không có nguồn model HF' };
     const { pipPackages, runtimeKind } = await getEngineRuntimeMeta(engineId);
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
@@ -753,7 +757,7 @@ export function registerIpcHandlers() {
     // installRuntime tự tải Python relocatable về runtime dùng chung (python-runtime.ts).
     inst.setRuntimeInstall(pipPackages, app.isPackaged ? null : getPythonPath(), runtimeKind);
     // Không await — chạy nền, báo tiến độ qua event.
-    inst.downloadFromHf(repo);
+    inst.downloadFromHf(modelRepo.repo, modelRepo.files);
     return { ok: true };
   });
 
@@ -766,8 +770,8 @@ export function registerIpcHandlers() {
   ipcMain.handle('tts:engine-install-resume', async (_e, { engineId }: { engineId: string }) => {
     const { getInstaller } = await import('./engine-installer');
     const { getPythonPath } = await import('./python-server');
-    const repo = await getEngineModelRepo(engineId);
-    if (!repo) return { ok: false, error: 'Engine không có nguồn model HF' };
+    const modelRepo = await getEngineModelRepo(engineId);
+    if (!modelRepo) return { ok: false, error: 'Engine không có nguồn model HF' };
     const { pipPackages, runtimeKind } = await getEngineRuntimeMeta(engineId);
     const inst = getInstaller(engineId, (p) => {
       getMainWindow()?.webContents.send('tts:engine-install-progress', p);
@@ -779,7 +783,7 @@ export function registerIpcHandlers() {
     // 'model_ready') nhưng KHÔNG BAO GIỜ chạy installRuntime() → manifest không bao giờ lên
     // 'installed' → UI mãi hiện "Tải dở"/nút Tiếp tục dù file đã tải xong hoàn toàn trên đĩa.
     inst.setRuntimeInstall(pipPackages, app.isPackaged ? null : getPythonPath(), runtimeKind);
-    inst.downloadFromHf(repo);  // resume từ install-state.json
+    inst.downloadFromHf(modelRepo.repo, modelRepo.files);  // resume từ install-state.json
     return { ok: true };
   });
 
@@ -1345,6 +1349,86 @@ export function registerIpcHandlers() {
         signal: AbortSignal.timeout(10000),
       });
       if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
+      return await res.json();
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  // ── STT (Phase 1 — nhận dạng giọng nói, xem
+  //    docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md) ──────────────────────
+  // Cài đặt/tải model (Whisper...) tái dùng NGUYÊN các kênh tts:engine-* ở trên (cùng
+  // registry Python, phân biệt qua category — xem
+  // packages/service-contracts/src/stt-engine.ts's docstring). 3 kênh dưới đây là phần
+  // thật sự riêng của STT.
+
+  ipcMain.handle('stt:list-engines', async () => {
+    const port = getPythonPort();
+    if (!port) return null;
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/stt/engines`, { signal: AbortSignal.timeout(3000) });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  });
+
+  // Đổi engine STT đang giữ ấm. Đơn giản hơn tts:engine-switch — 1 instance duy nhất,
+  // không cache đa-instance/tier, nên không cần đường "fast switch rồi rơi về restart"
+  // như TTS: process hiện tại (dù tier nào) đều có sẵn route /stt/* (xem
+  // python-server.ts — cả 2 tier chạy chung main.py), và create_engine() bên Python tự
+  // sys.path.append runtime onnx-ext khi cần, không đòi hỏi Electron chọn lại tier.
+  ipcMain.handle('stt:engine-switch', async (_e, { engineId }: { engineId: string }) => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/stt/engines/switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engine_id: engineId }),
+        // Rộng tay như tts:engine-switch — có thể đang nạp model STT lần đầu.
+        signal: AbortSignal.timeout(300_000),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const detail = body?.detail;
+        const msg = (typeof detail === 'object' ? (detail?.error ?? detail?.reason) : detail) ?? `HTTP ${res.status}`;
+        return { ok: false, error: String(msg) };
+      }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  // Phiên âm 1 file audio: đọc từ đĩa, build multipart, POST /stt/transcribe (mirror
+  // tts:clone-voice's cách đọc file + FormData). File tạm, KHÔNG copy vào thư mục voice
+  // reference nào — server cũng chỉ ghi tempfile rồi dọn ngay sau khi phiên âm xong.
+  ipcMain.handle('stt:transcribe', async (_e, { filePath, language, engineId }: {
+    filePath: string; language?: string; engineId?: string;
+  }) => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    if (!existsSync(filePath)) return { ok: false, error: `File không tồn tại: ${filePath}` };
+    try {
+      const buf = readFileSync(filePath);
+      const form = new FormData();
+      form.append('file', new Blob([buf]), basename(filePath));
+      if (language) form.append('language', language);
+      if (engineId) form.append('engine_id', engineId);
+      const res = await fetch(`http://127.0.0.1:${port}/stt/transcribe`, {
+        method: 'POST',
+        body: form,
+        // Audio dài hơn cần thời gian phiên âm dài hơn — rộng tay như tts:clone-voice.
+        signal: AbortSignal.timeout(60000),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const detail = body?.detail;
+        const msg = (typeof detail === 'object' ? (detail?.error ?? detail?.reason) : detail) ?? `HTTP ${res.status}`;
+        return { ok: false, error: String(msg) };
+      }
       return await res.json();
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };

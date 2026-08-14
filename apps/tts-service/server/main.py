@@ -85,6 +85,21 @@ _CACHE_MAX_TORCH = max(1, int(os.environ.get("VIENEU_CACHE_MAX_TORCH", "1")))
 # cache nhiều engine chung process — nên sửa cùng lúc với _engines.
 _ref_codes_cache: dict[str, dict[str, object]] = {}   # engine_id -> voice_id -> embedding
 
+# ── STT (Phase 1, xem docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md) ─────────
+# State RIÊNG với TTS ở trên — KHÔNG dùng chung `_engines`/`_engine_lru`/`_evict_engines()`/
+# `_ref_codes_cache`: những thứ đó gắn với ngữ nghĩa TTS (bucket RAM torch/onnx, cache
+# embedding voice-clone) mà STT không có nhu cầu tương đương. STT cũng ĐƠN GIẢN HƠN có chủ
+# đích — chỉ giữ 1 instance hiện hành, không cache đa-instance kiểu LRU: STT dùng theo yêu
+# cầu (bấm nút, chờ vài giây), không cần hot-swap độ trễ thấp giữa buổi lễ như TTS.
+_stt_engine = None
+_current_stt_engine_id: str | None = None
+# 1 khoá DUY NHẤT cho cả switch lẫn transcribe (khác TTS tách _load_lock/_synth_lock) — hợp
+# lý vì không có cache đa-instance nào cần bảo vệ khỏi race điều kiện đổi-engine-giữa-chừng
+# phức tạp như TTS; và QUAN TRỌNG NHẤT: lock này TÁCH HẲN `_synth_lock` để STT không bao giờ
+# chờ TTS (hoặc ngược lại) — 2 loại request chạy song song thật sự, khớp đúng yêu cầu Whisper
+# phải sống cạnh VieNeu chứ không giành tài nguyên với nó.
+_stt_lock = asyncio.Lock()
+
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 
@@ -334,12 +349,23 @@ def _touch_engine(engine_id: str) -> None:
     _engine_lru.append(engine_id)
 
 
+def _activate_stt_engine_sync(engine_id: str):
+    """Nạp engine STT. CHẶN — gọi qua to_thread. Tái dùng `engine_registry.create_engine()`
+    KHÔNG đổi — hàm đó đã tổng quát theo engine_id, không quan tâm TTS hay STT.
+
+    Khác `_activate_engine_sync()`: không có cache đa-instance — chỉ 1 engine STT giữ ấm
+    tại một thời điểm (xem lý do ở khối global `_stt_engine` phía trên)."""
+    from engine_registry import create_engine
+    return create_engine(engine_id)
+
+
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _engine, _registry, _config, _preview_dir, _ref_dir, _catalog_dir, _LOG_FILE
     global _current_engine_id, _history
+    global _stt_engine, _current_stt_engine_id
 
     # FIX: đọc tất cả env vars tại đây — KHÔNG tại module level
     log_path = os.environ.get("LOG_FILE_PATH", "")
@@ -435,6 +461,8 @@ async def lifespan(app: FastAPI):
     _engines.clear()
     _engine_lru.clear()
     _ref_codes_cache.clear()
+    _stt_engine = None
+    _current_stt_engine_id = None
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -574,6 +602,21 @@ async def switch_engine(req: EngineSwitchRequest):
     if not engine_id:
         raise HTTPException(400, "Thiếu engine_id")
 
+    # Chặn engine STT lọt vào đây — /engines/switch chỉ dành cho TTS, đổi con trỏ
+    # `_current_engine_id` sẽ cướp mất engine TTS đang phục vụ (vd giữa buổi lễ) nếu 1 dòng
+    # UI tương lai vô tình gọi nhầm. Dùng /stt/engines/switch cho engine STT.
+    #
+    # CHỈ chặn khi engine_id THẬT SỰ TỒN TẠI và sai category — id lạ (chưa từng đăng ký)
+    # phải rơi xuống nhánh create_engine() bên dưới để báo đúng 404 unknown_engine, không
+    # bị đè bởi 400 wrong_category (engine_category() mặc định 'tts' cho CẢ id lạ, xem
+    # engine_exists()'s docstring — bug thật bắt được lúc viết test cho guard này).
+    from engine_registry import engine_category, engine_exists
+    if engine_exists(engine_id) and engine_category(engine_id) != "tts":
+        raise HTTPException(400, detail={
+            "reason": "wrong_category",
+            "error": f"'{engine_id}' không phải engine TTS — dùng /stt/engines/switch",
+        })
+
     async with _load_lock:
         if engine_id == _current_engine_id and _engine is not None:
             _touch_engine(engine_id)
@@ -633,6 +676,13 @@ async def unload_engine(req: EngineSwitchRequest):
     if not engine_id:
         raise HTTPException(400, "Thiếu engine_id")
 
+    from engine_registry import engine_category, engine_exists
+    if engine_exists(engine_id) and engine_category(engine_id) != "tts":
+        raise HTTPException(400, detail={
+            "reason": "wrong_category",
+            "error": f"'{engine_id}' không phải engine TTS",
+        })
+
     async with _load_lock:
         if engine_id == _current_engine_id:
             raise HTTPException(400, "Không thể giải phóng engine ĐANG dùng — chuyển sang engine khác trước.")
@@ -647,6 +697,147 @@ async def unload_engine(req: EngineSwitchRequest):
         gc.collect()
         _write_log(f"[TTS] unloaded engine '{engine_id}'")
         return {"ok": True, "unloaded": True, "loaded": list(_engine_lru)}
+
+
+# ── STT (Phase 1) ─────────────────────────────────────────────────────────────
+# Whisper chạy SONG SONG với TTS — state/lock riêng (xem khối global `_stt_engine` phía
+# trên), route riêng `/stt/*`, KHÔNG đụng gì tới `/engines`/`/synthesize`.
+
+_DEFAULT_STT_ENGINE_ID = "whisper-base"
+
+
+@app.get("/stt/engines")
+def get_stt_engines():
+    """Liệt kê engine STT đăng ký (lọc category='stt' từ registry chung) + engine đang dùng."""
+    from engine_registry import list_engines
+    engines = [e for e in list_engines() if e.get("category") == "stt"]
+    return {"engines": engines, "current": _current_stt_engine_id}
+
+
+@app.post("/stt/engines/switch")
+async def switch_stt_engine(req: EngineSwitchRequest):
+    """Đổi engine STT đang dùng. Đơn giản hơn hẳn /engines/switch: chỉ 1 instance giữ ấm,
+    không cache/evict đa-instance (xem lý do ở khối global `_stt_engine`)."""
+    global _stt_engine, _current_stt_engine_id
+
+    engine_id = (req.engine_id or "").strip()
+    if not engine_id:
+        raise HTTPException(400, "Thiếu engine_id")
+
+    from engine_registry import engine_category, engine_exists
+    if engine_exists(engine_id) and engine_category(engine_id) != "stt":
+        raise HTTPException(400, detail={
+            "reason": "wrong_category",
+            "error": f"'{engine_id}' không phải engine STT — dùng /engines/switch",
+        })
+
+    async with _stt_lock:
+        if engine_id == _current_stt_engine_id and _stt_engine is not None:
+            return {"ok": True, "current": engine_id, "reused": True}
+        try:
+            eng = await asyncio.to_thread(_activate_stt_engine_sync, engine_id)
+        except (ImportError, NotImplementedError) as e:
+            _write_log(f"[TTS] stt switch '{engine_id}' — không có runtime trong process này: {e}")
+            raise HTTPException(409, detail={"reason": "unavailable_in_process", "engine_id": engine_id, "error": str(e)})
+        except ValueError as e:
+            raise HTTPException(404, detail={"reason": "unknown_engine", "error": str(e)})
+        except Exception as e:
+            traceback.print_exc()
+            _write_log(f"[TTS] stt switch '{engine_id}' lỗi: {type(e).__name__}: {e}")
+            raise HTTPException(500, detail={"reason": "load_failed", "error": str(e)})
+
+        _stt_engine = eng
+        _current_stt_engine_id = engine_id
+        _write_log(f"[TTS] stt switched engine -> {engine_id}")
+        return {"ok": True, "current": engine_id, "reused": False}
+
+
+@app.post("/stt/transcribe")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    language: str = Form(""),
+    engine_id: str = Form(""),
+):
+    """Phiên âm 1 file audio thành text. `language` rỗng = engine tự nhận diện (nếu hỗ
+    trợ). `engine_id` rỗng = dùng engine STT đang giữ ấm, hoặc lazy-activate mặc định
+    (whisper-base) nếu chưa engine nào được nạp — khớp UX "bấm là chạy luôn" cho nút tự
+    điền transcript (GĐ 2), không bắt người dùng tự chọn engine trước khi dùng lần đầu.
+    """
+    global _stt_engine, _current_stt_engine_id
+
+    content = await file.read()
+    if not _looks_like_audio(content):
+        raise HTTPException(400, f"File '{file.filename}' phải là WAV hoặc MP3 hợp lệ")
+    if len(content) > _CLONE_MAX_BYTES:
+        raise HTTPException(400, f"File '{file.filename}' quá lớn ({len(content) // (1024*1024)}MB) — tối đa 15MB.")
+
+    target_id = (engine_id or "").strip() or _current_stt_engine_id or _DEFAULT_STT_ENGINE_ID
+
+    # Guard category CHỈ khi engine_id được truyền tường minh — `_current_stt_engine_id`/
+    # `_DEFAULT_STT_ENGINE_ID` luôn hợp lệ sẵn (đã qua guard lúc /stt/engines/switch, hoặc
+    # là hằng số 'stt' cứng), không cần kiểm lại. Tránh lặp lại đúng lỗi phát hiện ở guard
+    # /stt/engines/switch: chỉ chặn khi engine THẬT SỰ TỒN TẠI và sai category, id lạ rơi
+    # xuống create_engine() để báo đúng unknown_engine.
+    if engine_id.strip():
+        from engine_registry import engine_category, engine_exists
+        if engine_exists(target_id) and engine_category(target_id) != "stt":
+            raise HTTPException(400, detail={
+                "reason": "wrong_category",
+                "error": f"'{target_id}' không phải engine STT",
+            })
+
+    async with _stt_lock:
+        if target_id != _current_stt_engine_id or _stt_engine is None:
+            try:
+                eng = await asyncio.to_thread(_activate_stt_engine_sync, target_id)
+            except (ImportError, NotImplementedError) as e:
+                raise HTTPException(409, detail={
+                    "reason": "unavailable_in_process", "engine_id": target_id, "error": str(e),
+                })
+            except ValueError as e:
+                raise HTTPException(404, detail={"reason": "unknown_engine", "error": str(e)})
+            except Exception as e:
+                traceback.print_exc()
+                _write_log(f"[TTS] stt activate '{target_id}' lỗi: {type(e).__name__}: {e}")
+                raise HTTPException(503, detail={
+                    "reason": "load_failed",
+                    "error": f"Engine STT '{target_id}' chưa cài hoặc lỗi nạp: {e}",
+                })
+            _stt_engine = eng
+            _current_stt_engine_id = target_id
+
+        # File tạm — input để phiên âm, KHÔNG phải voice reference cần giữ lại (khác
+        # _save_and_validate_ref_upload's _ref_dir), dọn ngay sau khi dùng xong.
+        import tempfile
+        suffix = Path(file.filename or "audio").suffix or ".wav"
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+            t0 = datetime.now()
+            result = await asyncio.to_thread(
+                _stt_engine.transcribe, tmp_path, language.strip() or None,
+            )
+            elapsed_ms = int((datetime.now() - t0).total_seconds() * 1000)
+            _write_log(f"[TTS] stt transcribe engine={target_id} lang={language or 'auto'} "
+                       f"chars={len(result['text'])} {elapsed_ms}ms")
+            return {
+                "ok": True,
+                "text": result["text"],
+                "language": result.get("language"),
+                "duration_sec": result.get("duration_sec"),
+            }
+        except Exception as e:
+            traceback.print_exc()
+            _write_log(f"[TTS] stt transcribe lỗi: {type(e).__name__}: {e}")
+            raise HTTPException(500, f"Lỗi khi phiên âm: {type(e).__name__}: {e}")
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
 
 
 # ── Voices API ────────────────────────────────────────────────────────────────

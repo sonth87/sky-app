@@ -109,7 +109,9 @@ async function findFreePort(preferred: number): Promise<number> {
 
 // Đệm các dòng log gần nhất để cửa sổ Logs nạp lại lịch sử khi mount (chuyển tab/mở lại
 // cửa sổ) — trước đây chỉ phát realtime nên remount là mất trắng, xem TtsLogPanel.tsx.
-const MAX_LOG_LINES = 2000;
+// PHẢI khớp MAX_LOG_LINES ở TtsLogPanel.tsx — tab "Nhật ký" cuộn-lên-xem-thêm
+// (TtsRawLogView.tsx) chỉ tải được tối đa tới đúng trần này.
+const MAX_LOG_LINES = 10000;
 const recentLogLines: TtsLogLine[] = [];
 
 /** Trả buffer log gần nhất để renderer nạp khi vừa mount, trước khi nhận tiếp qua push. */

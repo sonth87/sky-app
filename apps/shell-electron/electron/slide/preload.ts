@@ -7,6 +7,7 @@ import type {
   DisplayInfo,
   TtsConfig,
   TtsEngines,
+  SttEngines,
   EngineInstallProgress,
   TtsEnginePreflight,
   TtsCapabilities,
@@ -27,6 +28,8 @@ export type {
   TtsConfig,
   TtsEngineInfo,
   TtsEngines,
+  SttEngineInfo,
+  SttEngines,
   EngineInstallProgress,
   TtsEnginePreflight,
   TtsCapabilities,
@@ -254,6 +257,18 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:history-delete', { id }),
   clearTtsHistory: (): Promise<{ ok: boolean; error?: string; count?: number }> =>
     ipcRenderer.invoke('tts:history-clear'),
+  // ---- STT (Phase 1 — nhận dạng giọng nói, xem
+  //      docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md). Cài đặt/tải model:
+  //      tái dùng nguyên các binding tts:engine-* ở trên (cùng registry, phân biệt qua
+  //      category — xem service-contracts/src/stt-engine.ts's docstring). ----
+  sttListEngines: (): Promise<SttEngines | null> => ipcRenderer.invoke('stt:list-engines'),
+  sttEngineSwitch: (engineId: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('stt:engine-switch', { engineId }),
+  sttTranscribe: (
+    filePath: string,
+    opts?: { language?: string; engineId?: string },
+  ): Promise<{ ok: boolean; text?: string; language?: string; durationSec?: number; error?: string }> =>
+    ipcRenderer.invoke('stt:transcribe', { filePath, language: opts?.language, engineId: opts?.engineId }),
   getSystemStats: (): Promise<{
     appRamMb: number;
     totalRamMb: number;
