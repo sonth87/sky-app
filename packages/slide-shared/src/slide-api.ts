@@ -273,6 +273,21 @@ export interface TtsHistoryEntry {
   created_at: string;
 }
 
+/** 1 dòng nhật ký phiên âm (GĐ 3, xem apps/tts-service/server/stt_history_store.py) — shape
+ *  snake_case NGUYÊN VĂN từ JSON của Python's GET /stt/history. KHÔNG có field audio (khác
+ *  `TtsHistoryEntry`'s `has_audio`) — lịch sử STT chỉ lưu văn bản, không lưu lại audio gốc. */
+export interface SttHistoryEntry {
+  id: string;
+  source: 'speech_to_text' | 'voice_clone' | 'voice_clone_edit' | 'unknown';
+  text: string;
+  language?: string;
+  duration_sec?: number;
+  engine_id?: string;
+  source_filename?: string;
+  error?: string;
+  created_at: string;
+}
+
 export interface SlideApi {
   getMeta(): Promise<SlideMeta>;
   updateConfig(patch: Partial<unknown>): Promise<unknown>;
@@ -439,11 +454,27 @@ export interface SlideApi {
   /** Đổi engine STT đang dùng — đơn giản hơn TTS (chỉ 1 instance giữ ấm, không LRU). */
   sttEngineSwitch(engineId: string): Promise<{ ok: boolean; error?: string }>;
   /** Phiên âm 1 file audio thành text. `language` rỗng = engine tự nhận diện.
-   * `engineId` rỗng = dùng engine đang giữ ấm, hoặc lazy-activate mặc định (whisper-base). */
+   * `engineId` rỗng = dùng engine đang giữ ấm, hoặc lazy-activate mặc định (whisper-base).
+   * `source` gắn nhãn lịch sử (GĐ 3) — xem `SttPort.TranscribeOptions.source`'s docstring
+   * (service-contracts), kênh này dùng chung bởi nhiều caller. */
   sttTranscribe(
     filePath: string,
+    opts?: { language?: string; engineId?: string; source?: string },
+  ): Promise<{ ok: boolean; text?: string; language?: string; durationSec?: number; error?: string }>;
+  /** Phiên âm 1 mẫu audio ĐÃ CÓ SẴN của 1 voice clone (file đã nằm trên server, không phải
+   * file client đang giữ) — dùng cho nút "Tự động điền transcript" ở panel Sửa mẫu. Tra
+   * thẳng theo `voiceId`+`sampleId`, KHÔNG upload lại — xem `SttPort.transcribeVoiceSample`'s
+   * docstring (service-contracts) cho lý do tách khỏi `sttTranscribe` ở trên. `source` lịch
+   * sử ('voice_clone_edit') gắn CỨNG server-side — không cần field ở đây, chỉ 1 caller. */
+  sttTranscribeVoiceSample(
+    voiceId: string,
+    sampleId: string,
     opts?: { language?: string; engineId?: string },
   ): Promise<{ ok: boolean; text?: string; language?: string; durationSec?: number; error?: string }>;
+  /** Lịch sử phiên âm (GĐ 3) — lọc theo `source` để mỗi UI chỉ thấy đúng lịch sử của mình. */
+  sttListHistory(opts?: { limit?: number; source?: string }): Promise<SttHistoryEntry[]>;
+  sttDeleteHistoryEntry(id: string): Promise<{ ok: boolean; error?: string }>;
+  sttClearHistory(): Promise<{ ok: boolean; error?: string; count?: number }>;
   /** Thư viện voice mẫu 'hệ thống' (resources/voice-ref/{lang}/catalog.json) — search/preview
    * trước khi chọn dùng. Không cần bước import riêng: chọn synthesize lần đầu server tự
    * encode ngầm, voice đó tự xuất hiện trong listVoices() từ đó về sau. */

@@ -6,6 +6,7 @@ import type { ImportWallpaperFn } from "@sonth87/device-layout";
 import { mockAppModule } from "@sky-app/module-mock-app";
 import { ceremonyModule } from "@sky-app/module-ceremony";
 import { ttsStudioModule } from "@sky-app/module-tts-studio";
+import { speechToTextModule } from "@sky-app/module-speech-to-text";
 import { layoutDesignerModule } from "@sky-app/module-layout-designer";
 import { DEV_LICENSE_PUBLIC_KEY_HEX } from "@sky-app/licensing";
 import { WALLPAPERS } from "./wallpapers.js";
@@ -14,6 +15,7 @@ import "./tailwind-layer-order.css";
 import "@sonth87/device-layout/style.css";
 import "@sky-app/module-ceremony/styles.css";
 import "@sky-app/module-tts-studio/styles.css";
+import "@sky-app/module-speech-to-text/styles.css";
 import "@sky-app/module-layout-designer/styles.css";
 import "@sky-app/tts-engine-ui/styles.css";
 
@@ -38,6 +40,7 @@ async function main() {
         apps={[
           ceremonyModule,
           ttsStudioModule,
+          speechToTextModule,
           layoutDesignerModule,
           mockAppModule,
         ]}

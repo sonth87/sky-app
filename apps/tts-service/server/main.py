@@ -99,6 +99,10 @@ _current_stt_engine_id: str | None = None
 # chờ TTS (hoặc ngược lại) — 2 loại request chạy song song thật sự, khớp đúng yêu cầu Whisper
 # phải sống cạnh VieNeu chứ không giành tài nguyên với nó.
 _stt_lock = asyncio.Lock()
+# SttHistoryStore hoặc None (DB không sẵn sàng — xem stt_history_store.py). Bảng RIÊNG với
+# `_history` (TTS) — `stt_history` không lưu audio, chỉ text (GĐ 3, xem
+# docs/dev/history/2026-08-15-stt-app-rieng-va-lich-su.md).
+_stt_history = None
 
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -365,7 +369,7 @@ def _activate_stt_engine_sync(engine_id: str):
 async def lifespan(app: FastAPI):
     global _engine, _registry, _config, _preview_dir, _ref_dir, _catalog_dir, _LOG_FILE
     global _current_engine_id, _history
-    global _stt_engine, _current_stt_engine_id
+    global _stt_engine, _current_stt_engine_id, _stt_history
 
     # FIX: đọc tất cả env vars tại đây — KHÔNG tại module level
     log_path = os.environ.get("LOG_FILE_PATH", "")
@@ -430,6 +434,11 @@ async def lifespan(app: FastAPI):
     _history = create_history_store(history_dir)
     _safe_console(f"[TTS] History store {'READY' if _history else 'OFF (DB chưa sẵn sàng)'} — {history_dir}")
 
+    # Init STT history store (GĐ 3) — bảng RIÊNG, chỉ text, không audio_dir nào cần truyền.
+    from stt_history_store import create_stt_history_store
+    _stt_history = create_stt_history_store()
+    _safe_console(f"[TTS] STT history store {'READY' if _stt_history else 'OFF (DB chưa sẵn sàng)'}")
+
     # Pre-encode cloned voices lúc startup để giảm latency request đầu tiên
     _safe_console("[TTS] Pre-encoding voice references...")
     for voice in _registry.list_voices(include_hidden=True):
@@ -463,6 +472,7 @@ async def lifespan(app: FastAPI):
     _ref_codes_cache.clear()
     _stt_engine = None
     _current_stt_engine_id = None
+    _stt_history = None
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -752,24 +762,27 @@ async def switch_stt_engine(req: EngineSwitchRequest):
         return {"ok": True, "current": engine_id, "reused": False}
 
 
-@app.post("/stt/transcribe")
-async def transcribe_audio(
-    file: UploadFile = File(...),
-    language: str = Form(""),
-    engine_id: str = Form(""),
-):
-    """Phiên âm 1 file audio thành text. `language` rỗng = engine tự nhận diện (nếu hỗ
-    trợ). `engine_id` rỗng = dùng engine STT đang giữ ấm, hoặc lazy-activate mặc định
-    (whisper-base) nếu chưa engine nào được nạp — khớp UX "bấm là chạy luôn" cho nút tự
-    điền transcript (GĐ 2), không bắt người dùng tự chọn engine trước khi dùng lần đầu.
+async def _transcribe_with_stt(
+    audio_path: str,
+    language: str,
+    engine_id: str,
+    source: str,
+    source_filename: str | None = None,
+) -> dict:
+    """Lõi dùng chung: chọn engine (lazy-activate mặc định whisper-base nếu chưa có gì
+    giữ ấm) + guard category + `_stt_lock` + gọi model + log — dùng bởi CẢ `/stt/transcribe`
+    (file upload, xem bên dưới) LẪN `/voices/{voice_id}/samples/{sample_id}/transcribe`
+    (file đã có sẵn server-side, xem khối "Voices API") — 2 endpoint chỉ khác nhau đúng 1
+    chỗ: audio đến từ đâu (tempfile mới ghi vs file đã nằm sẵn trong `_ref_dir`), phần chọn
+    engine + phiên âm là MỘT.
+
+    `source` (GĐ 3, xem docs/dev/history/2026-08-15-stt-app-rieng-va-lich-su.md) gắn nhãn
+    lịch sử — bắt buộc truyền tường minh ở TỪNG call site vì `/stt/transcribe` là 1 kênh IPC
+    DÙNG CHUNG bởi nhiều caller (app Speech to Text mới, nút mic form thêm mẫu mới trong
+    VoiceCloneModal) — không suy ra được từ "endpoint nào gọi" như TTS's `source` (TTS gắn
+    theo TỪNG FILE Electron riêng biệt cho mỗi caller).
     """
     global _stt_engine, _current_stt_engine_id
-
-    content = await file.read()
-    if not _looks_like_audio(content):
-        raise HTTPException(400, f"File '{file.filename}' phải là WAV hoặc MP3 hợp lệ")
-    if len(content) > _CLONE_MAX_BYTES:
-        raise HTTPException(400, f"File '{file.filename}' quá lớn ({len(content) // (1024*1024)}MB) — tối đa 15MB.")
 
     target_id = (engine_id or "").strip() or _current_stt_engine_id or _DEFAULT_STT_ENGINE_ID
 
@@ -806,22 +819,31 @@ async def transcribe_audio(
             _stt_engine = eng
             _current_stt_engine_id = target_id
 
-        # File tạm — input để phiên âm, KHÔNG phải voice reference cần giữ lại (khác
-        # _save_and_validate_ref_upload's _ref_dir), dọn ngay sau khi dùng xong.
-        import tempfile
-        suffix = Path(file.filename or "audio").suffix or ".wav"
-        tmp_path = None
+        filename = source_filename or Path(audio_path).name
+
         try:
-            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-                tmp.write(content)
-                tmp_path = tmp.name
             t0 = datetime.now()
             result = await asyncio.to_thread(
-                _stt_engine.transcribe, tmp_path, language.strip() or None,
+                _stt_engine.transcribe, audio_path, language.strip() or None,
             )
             elapsed_ms = int((datetime.now() - t0).total_seconds() * 1000)
             _write_log(f"[TTS] stt transcribe engine={target_id} lang={language or 'auto'} "
                        f"chars={len(result['text'])} {elapsed_ms}ms")
+
+            # Lịch sử (GĐ 3) — chỉ ghi lượt ĐÃ THỬ phiên âm thật (thành công hoặc lỗi runtime
+            # ở nhánh except bên dưới), KHÔNG ghi lỗi guard trước đó (category sai, engine
+            # chưa cài...) — cùng nguyên tắc TTS history đã áp dụng (bỏ qua lỗi 400 do
+            # speaker_id sai). Lỗi ghi log KHÔNG được làm hỏng response phiên âm thật.
+            if _stt_history is not None:
+                try:
+                    await asyncio.to_thread(
+                        _stt_history.add_entry, source=source, text=result["text"],
+                        language=result.get("language"), duration_sec=result.get("duration_sec"),
+                        engine_id=target_id, source_filename=filename,
+                    )
+                except Exception as hist_err:
+                    _write_log(f"[TTS] stt history write lỗi: {hist_err}")
+
             return {
                 "ok": True,
                 "text": result["text"],
@@ -831,13 +853,82 @@ async def transcribe_audio(
         except Exception as e:
             traceback.print_exc()
             _write_log(f"[TTS] stt transcribe lỗi: {type(e).__name__}: {e}")
-            raise HTTPException(500, f"Lỗi khi phiên âm: {type(e).__name__}: {e}")
-        finally:
-            if tmp_path:
+            if _stt_history is not None:
                 try:
-                    os.unlink(tmp_path)
-                except Exception:
-                    pass
+                    await asyncio.to_thread(
+                        _stt_history.add_entry, source=source, text="", engine_id=target_id,
+                        source_filename=filename, error=f"{type(e).__name__}: {e}",
+                    )
+                except Exception as hist_err:
+                    _write_log(f"[TTS] stt history write (error path) lỗi: {hist_err}")
+            raise HTTPException(500, f"Lỗi khi phiên âm: {type(e).__name__}: {e}")
+
+
+@app.post("/stt/transcribe")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    language: str = Form(""),
+    engine_id: str = Form(""),
+    source: str = Form("unknown"),
+):
+    """Phiên âm 1 file audio thành text. `language` rỗng = engine tự nhận diện (nếu hỗ
+    trợ). `engine_id` rỗng = dùng engine STT đang giữ ấm, hoặc lazy-activate mặc định
+    (whisper-base) nếu chưa engine nào được nạp — khớp UX "bấm là chạy luôn" cho nút tự
+    điền transcript (GĐ 2), không bắt người dùng tự chọn engine trước khi dùng lần đầu.
+    `source` gắn nhãn lịch sử (GĐ 3) — kênh này dùng chung bởi nhiều caller, xem docstring
+    `_transcribe_with_stt`.
+    """
+    content = await file.read()
+    if not _looks_like_audio(content):
+        raise HTTPException(400, f"File '{file.filename}' phải là WAV hoặc MP3 hợp lệ")
+    if len(content) > _CLONE_MAX_BYTES:
+        raise HTTPException(400, f"File '{file.filename}' quá lớn ({len(content) // (1024*1024)}MB) — tối đa 15MB.")
+
+    # File tạm — input để phiên âm, KHÔNG phải voice reference cần giữ lại (khác
+    # _save_and_validate_ref_upload's _ref_dir), dọn ngay sau khi dùng xong.
+    import tempfile
+    suffix = Path(file.filename or "audio").suffix or ".wav"
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        return await _transcribe_with_stt(
+            tmp_path, language, engine_id, source.strip() or "unknown",
+            source_filename=file.filename,
+        )
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+# ── STT History (GĐ 3 — nhật ký phiên âm, xem stt_history_store.py) ────────────
+# Mọi endpoint dưới đây rơi về danh sách rỗng/404/no-op êm khi `_stt_history is None` (DB
+# chưa sẵn sàng) — cùng nguyên tắc TTS history đã áp dụng, không bao giờ 503 cả app.
+
+@app.get("/stt/history")
+def list_stt_history(limit: int = 100, source: str | None = None):
+    if _stt_history is None:
+        return []
+    return _stt_history.list_entries(limit=limit, source=source)
+
+
+@app.delete("/stt/history/{entry_id}")
+def delete_stt_history_entry(entry_id: str):
+    if _stt_history is None:
+        return {"ok": False, "error": "History store not ready"}
+    return {"ok": _stt_history.delete_entry(entry_id)}
+
+
+@app.delete("/stt/history")
+def clear_stt_history():
+    if _stt_history is None:
+        return {"ok": False, "error": "History store not ready"}
+    count = _stt_history.clear_all()
+    return {"ok": True, "count": count}
 
 
 # ── Voices API ────────────────────────────────────────────────────────────────
@@ -1259,6 +1350,37 @@ def delete_voice_sample(voice_id: str, sample_id: str):
         raise HTTPException(500, "Xoá thất bại")
     _ref_cache_forget_voice(voice_id)
     return {"ok": True}
+
+
+@app.post("/voices/{voice_id}/samples/{sample_id}/transcribe")
+async def transcribe_voice_sample(voice_id: str, sample_id: str, body: dict | None = None):
+    """Phiên âm 1 mẫu audio ĐÃ CÓ SẴN của voice clone bằng STT — nút "Tự động điền
+    transcript" ở panel Sửa mẫu (VoiceCloneModal). Endpoint RIÊNG với `/stt/transcribe`
+    (không tái dùng nó từ client): file mẫu đã nằm sẵn trên server (`_ref_dir`), bắt client
+    tải về rồi upload lại chỉ để phiên âm là lãng phí 1 vòng round-trip vô ích — ở đây chỉ
+    tra đúng file theo `voice_id`+`sample_id` rồi chạy thẳng qua `_transcribe_with_stt()`
+    (lõi dùng chung với `/stt/transcribe`, xem docstring hàm đó).
+    """
+    if _registry is None:
+        raise HTTPException(503, "Registry not ready")
+    samples = _registry.list_samples(voice_id)
+    sample = next((s for s in samples if s.get("id") == sample_id), None)
+    if sample is None:
+        raise HTTPException(404, f"Sample not found: {sample_id}")
+
+    audio_path = _ref_dir / sample["ref_file"]
+    if not audio_path.exists():
+        raise HTTPException(404, f"File audio không tồn tại trên server: {sample['ref_file']}")
+
+    body = body or {}
+    language = str(body.get("language") or "")
+    engine_id = str(body.get("engine_id") or "")
+    # source CỨNG "voice_clone_edit" — chỉ 1 caller đã biết (panel Sửa mẫu), không cần field
+    # client cho việc này (khác /stt/transcribe, dùng chung bởi nhiều caller).
+    return await _transcribe_with_stt(
+        str(audio_path), language, engine_id, "voice_clone_edit",
+        source_filename=sample["ref_file"],
+    )
 
 
 @app.put("/voices/{voice_id}")

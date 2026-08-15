@@ -14,6 +14,7 @@
     "@sky-app/module-ceremony": "workspace:*",
     "@sky-app/module-layout-designer": "workspace:*",
     "@sky-app/module-mock-app": "workspace:*",
+    "@sky-app/module-speech-to-text": "workspace:*",
     "@sky-app/module-tts-studio": "workspace:*",
     "@sky-app/platform-web": "workspace:*",
     "@sonth87/device-layout": "catalog:",

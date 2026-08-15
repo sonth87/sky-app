@@ -17,6 +17,7 @@ import { SQL_016_TTS_TABLE_PREFIX } from './016_tts_table_prefix.js';
 import { SQL_017_TTS_VOICE } from './017_tts_voice.js';
 import { SQL_018_TTS_VOICE_SAMPLE } from './018_tts_voice_sample.js';
 import { SQL_019_TTS_GENERATION_HISTORY } from './019_tts_generation_history.js';
+import { SQL_020_STT_HISTORY } from './020_stt_history.js';
 
 export interface Migration {
   version: number;
@@ -50,4 +51,5 @@ export const MIGRATIONS: Migration[] = [
   { version: 17, name: 'tts_voice', sql: SQL_017_TTS_VOICE },
   { version: 18, name: 'tts_voice_sample', sql: SQL_018_TTS_VOICE_SAMPLE },
   { version: 19, name: 'tts_generation_history', sql: SQL_019_TTS_GENERATION_HISTORY },
+  { version: 20, name: 'stt_history', sql: SQL_020_STT_HISTORY },
 ];

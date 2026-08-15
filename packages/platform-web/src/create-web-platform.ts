@@ -120,7 +120,7 @@ export async function createWebPlatform(opts: CreateWebPlatformOptions = {}): Pr
     // Web has no secondary display, no native card reader, no local TTS
     // binary, no OS keystore — those ports stay unregistered and their
     // capability stays off, so apps degrade instead of crashing.
-    capabilities: ['network', 'tts'],
+    capabilities: ['network', 'tts', 'stt'],
     entitlements,
     assetUrl: opts.assetUrl,
   });

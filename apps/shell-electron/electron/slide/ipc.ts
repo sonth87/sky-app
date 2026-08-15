@@ -1405,8 +1405,8 @@ export function registerIpcHandlers() {
   // Phiên âm 1 file audio: đọc từ đĩa, build multipart, POST /stt/transcribe (mirror
   // tts:clone-voice's cách đọc file + FormData). File tạm, KHÔNG copy vào thư mục voice
   // reference nào — server cũng chỉ ghi tempfile rồi dọn ngay sau khi phiên âm xong.
-  ipcMain.handle('stt:transcribe', async (_e, { filePath, language, engineId }: {
-    filePath: string; language?: string; engineId?: string;
+  ipcMain.handle('stt:transcribe', async (_e, { filePath, language, engineId, source }: {
+    filePath: string; language?: string; engineId?: string; source?: string;
   }) => {
     const port = getPythonPort();
     if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
@@ -1417,6 +1417,9 @@ export function registerIpcHandlers() {
       form.append('file', new Blob([buf]), basename(filePath));
       if (language) form.append('language', language);
       if (engineId) form.append('engine_id', engineId);
+      // Gắn nhãn lịch sử (GĐ 3) — kênh này dùng chung bởi nhiều caller (app Speech to Text,
+      // nút mic VoiceCloneModal), không suy ra được "ai gọi" từ phía server.
+      if (source) form.append('source', source);
       const res = await fetch(`http://127.0.0.1:${port}/stt/transcribe`, {
         method: 'POST',
         body: form,
@@ -1429,6 +1432,87 @@ export function registerIpcHandlers() {
         const msg = (typeof detail === 'object' ? (detail?.error ?? detail?.reason) : detail) ?? `HTTP ${res.status}`;
         return { ok: false, error: String(msg) };
       }
+      return await res.json();
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  // Phiên âm 1 mẫu audio ĐÃ CÓ SẴN của voice clone (server-side, không phải file client
+  // đang giữ) — nút "Tự động điền transcript" ở panel Sửa mẫu. POST JSON thuần, KHÔNG đọc
+  // file/build multipart như stt:transcribe — file đã nằm sẵn trên server, chỉ cần tra theo
+  // voiceId+sampleId (xem main.py's POST /voices/{voice_id}/samples/{sample_id}/transcribe).
+  ipcMain.handle('stt:transcribe-voice-sample', async (_e, { voiceId, sampleId, language, engineId }: {
+    voiceId: string; sampleId: string; language?: string; engineId?: string;
+  }) => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:${port}/voices/${encodeURIComponent(voiceId)}/samples/${encodeURIComponent(sampleId)}/transcribe`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ language: language || undefined, engine_id: engineId || undefined }),
+          signal: AbortSignal.timeout(60000),
+        },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const detail = body?.detail;
+        const msg = (typeof detail === 'object' ? (detail?.error ?? detail?.reason) : detail) ?? `HTTP ${res.status}`;
+        return { ok: false, error: String(msg) };
+      }
+      return await res.json();
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  // ── STT History (GĐ 3 — nhật ký phiên âm, xem apps/tts-service/server/stt_history_store.py) ──
+
+  ipcMain.handle('stt:history-list', async (_e, { limit, source }: { limit?: number; source?: string }) => {
+    const port = getPythonPort();
+    if (!port) return [];
+    try {
+      const params = new URLSearchParams();
+      if (limit !== undefined) params.set('limit', String(limit));
+      if (source) params.set('source', source);
+      const qs = params.toString();
+      const res = await fetch(`http://127.0.0.1:${port}/stt/history${qs ? `?${qs}` : ''}`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  });
+
+  ipcMain.handle('stt:history-delete', async (_e, { id }: { id: string }) => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/stt/history/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
+      return await res.json();
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('stt:history-clear', async () => {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/stt/history`, {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
       return await res.json();
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };

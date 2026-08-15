@@ -13,7 +13,7 @@ export type {
   TtsDebugInfo,
   TtsLogLine,
 } from './tts-engine.js';
-export type { SttPort, TranscribeOptions, TranscribeResult } from './stt.js';
+export type { SttPort, TranscribeOptions, TranscribeResult, SttHistoryEntry } from './stt.js';
 export type { SttEnginePort, SttEngineInfo, SttEngines } from './stt-engine.js';
 export type { DataPort, SyncProgress } from './data.js';
 export type { DisplayPort, DisplayInfo } from './display.js';

@@ -8,6 +8,7 @@ import type {
   TtsConfig,
   TtsEngines,
   SttEngines,
+  SttHistoryEntry,
   EngineInstallProgress,
   TtsEnginePreflight,
   TtsCapabilities,
@@ -30,6 +31,7 @@ export type {
   TtsEngines,
   SttEngineInfo,
   SttEngines,
+  SttHistoryEntry,
   EngineInstallProgress,
   TtsEnginePreflight,
   TtsCapabilities,
@@ -266,9 +268,25 @@ const api: SlideApi = {
     ipcRenderer.invoke('stt:engine-switch', { engineId }),
   sttTranscribe: (
     filePath: string,
+    opts?: { language?: string; engineId?: string; source?: string },
+  ): Promise<{ ok: boolean; text?: string; language?: string; durationSec?: number; error?: string }> =>
+    ipcRenderer.invoke('stt:transcribe', {
+      filePath, language: opts?.language, engineId: opts?.engineId, source: opts?.source,
+    }),
+  sttTranscribeVoiceSample: (
+    voiceId: string,
+    sampleId: string,
     opts?: { language?: string; engineId?: string },
   ): Promise<{ ok: boolean; text?: string; language?: string; durationSec?: number; error?: string }> =>
-    ipcRenderer.invoke('stt:transcribe', { filePath, language: opts?.language, engineId: opts?.engineId }),
+    ipcRenderer.invoke('stt:transcribe-voice-sample', {
+      voiceId, sampleId, language: opts?.language, engineId: opts?.engineId,
+    }),
+  sttListHistory: (opts?: { limit?: number; source?: string }): Promise<SttHistoryEntry[]> =>
+    ipcRenderer.invoke('stt:history-list', opts ?? {}),
+  sttDeleteHistoryEntry: (id: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('stt:history-delete', { id }),
+  sttClearHistory: (): Promise<{ ok: boolean; error?: string; count?: number }> =>
+    ipcRenderer.invoke('stt:history-clear'),
   getSystemStats: (): Promise<{
     appRamMb: number;
     totalRamMb: number;

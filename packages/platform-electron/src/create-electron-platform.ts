@@ -45,7 +45,7 @@ export async function createElectronPlatform(
 
   const platform = createPlatformContext({
     env: 'electron',
-    capabilities: ['network', 'fs', 'tts', 'tts-local', 'card-reader', 'secondary-display', 'keystore'],
+    capabilities: ['network', 'fs', 'tts', 'tts-local', 'stt', 'card-reader', 'secondary-display', 'keystore'],
     entitlements,
     assetUrl: opts.assetUrl,
   });

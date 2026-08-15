@@ -1,13 +1,27 @@
 import { useEffect, useState } from 'react';
-import { Upload, Play, Trash2, Loader2, AlertTriangle, X, Pencil } from 'lucide-react';
-import type { TtsPort, Voice } from '@sky-app/service-contracts';
+import { Upload, Play, Trash2, Loader2, AlertTriangle, X, Pencil, Mic } from 'lucide-react';
+import type { TtsPort, SttPort, Voice } from '@sky-app/service-contracts';
 
 export interface VoiceCloneModalProps {
   open: boolean;
   onClose: () => void;
   ttsPort: TtsPort | undefined;
+  /** Tự động điền transcript cho mẫu audio (nút mic cạnh mỗi ô transcript, xem
+   * docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md). Optional — undefined (Web
+   * chưa đăng ký port này, hoặc engine STT chưa cài) thì ẩn hẳn nút, không hiện disabled. */
+  sttPort?: SttPort;
   onRefresh: () => void;
   clonedVoices: Voice[];
+}
+
+const OVERWRITE_CONFIRM_MSG = 'Đã có bản chép lời — ghi đè bằng kết quả nhận dạng tự động?';
+
+/** `language` form state là 'vi-VN'/'en-US' (khớp voice-registry) — STT nhận mã ngắn
+ * ('vi'/'en'). Không ép cứng nếu form đang ở giá trị lạ (rỗng/tương lai thêm ngôn ngữ) —
+ * để trống thì server tự nhận diện, không phải lỗi. */
+function sttLanguageHint(formLanguage: string): string | undefined {
+  const short = formLanguage.split('-')[0];
+  return short || undefined;
 }
 
 /** 1 file mẫu đang chờ gửi — chưa phải sample thật trong registry (đó chỉ có sau khi
@@ -31,7 +45,7 @@ interface ExistingSample {
 
 const PREVIEW_TEXT = 'Xin chúc mừng tân cử nhân đã tốt nghiệp.';
 
-export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoices }: VoiceCloneModalProps) {
+export function VoiceCloneModal({ open, onClose, ttsPort, sttPort, onRefresh, clonedVoices }: VoiceCloneModalProps) {
   // Nhiều mẫu cho 1 giọng — ghép lại lúc synthesize cho model nhiều ngữ cảnh về giọng hơn
   // (port từ voicebox's combine_voice_prompts, xem audio_dsp.py's combine_voice_samples).
   const [samples, setSamples] = useState<DraftSample[]>([]);
@@ -48,6 +62,9 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  // Index của mẫu (trong `samples`) đang được STT phiên âm — chỉ 1 tại 1 thời điểm, disable
+  // đúng nút của dòng đó (không khoá cả form như `busy`, các thao tác khác vẫn dùng được).
+  const [transcribingIndex, setTranscribingIndex] = useState<number | null>(null);
   // Engine clone kiểu in-context (Qwen) BẮT BUỘC có bản chép lời cho MẪU ĐẦU TIÊN — thiếu
   // là audio hỏng hoàn toàn chứ không phải kém đi (các mẫu sau không bắt buộc). Hỏi engine
   // đang chạy thay vì hard-code danh sách engine ở đây: engine mới thêm sau chỉ cần khai
@@ -62,6 +79,7 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
   const [editRefTextDraft, setEditRefTextDraft] = useState('');
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editTranscribing, setEditTranscribing] = useState(false);
 
   useEffect(() => {
     if (!open || !ttsPort?.getEngineCapabilities) return;
@@ -120,6 +138,36 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
 
   const updateSampleRefText = (index: number, text: string) => {
     setSamples((prev) => prev.map((s, i) => (i === index ? { ...s, refText: text } : s)));
+  };
+
+  // Nút mic — nghe mẫu audio rồi tự điền `refText`. Xác nhận trước khi ghi đè nếu ô đã có
+  // nội dung (cải tiến so với voicebox, app tham chiếu — KHÔNG có bước xác nhận này, ghi
+  // đè thẳng, xem plan GĐ 2). `s.filePath` là file client ĐANG GIỮ (chưa gửi lên server) —
+  // dùng thẳng `sttPort.transcribe()`, không phải `transcribeVoiceSample()` (đó là cho mẫu
+  // ĐÃ CÓ trên server, xem panel Sửa mẫu bên dưới).
+  const transcribeSample = async (index: number) => {
+    const s = samples[index];
+    if (!s || !sttPort) return;
+    if (s.refText.trim() && !confirm(OVERWRITE_CONFIRM_MSG)) return;
+    setTranscribingIndex(index);
+    setError(null);
+    try {
+      const res = await sttPort.transcribe(s.filePath, {
+        language: sttLanguageHint(language),
+        // Gắn nhãn lịch sử (GĐ 3) — phân biệt với app Speech to Text, cùng gọi chung kênh
+        // sttTranscribe. Xem SttPort.TranscribeOptions.source's docstring (service-contracts).
+        source: 'voice_clone',
+      });
+      if (!res?.ok || !res.text) {
+        setError(res?.error ?? 'Nhận dạng giọng nói thất bại');
+        return;
+      }
+      updateSampleRefText(index, res.text);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTranscribingIndex(null);
+    }
   };
 
   const doClone = async () => {
@@ -300,6 +348,34 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
     }
   };
 
+  // Nút mic cho mẫu CHÍNH của voice ĐÃ CÓ — khác `transcribeSample` ở trên: file đã nằm
+  // sẵn trên server (client không còn giữ), nên dùng `transcribeVoiceSample(voiceId,
+  // sampleId)` (tra theo id, không upload lại) thay vì `transcribe(filePath)`. Chỉ điền vào
+  // draft — vẫn cần bấm "Lưu bản chép lời" như gõ tay, không tự lưu để người dùng còn cơ
+  // hội sửa lại trước khi ghi đè thật.
+  const transcribeEditingSample = async () => {
+    const primary = editSamples[0];
+    if (!editingVoice || !primary || !sttPort?.transcribeVoiceSample) return;
+    if (editRefTextDraft.trim() && !confirm(OVERWRITE_CONFIRM_MSG)) return;
+    setEditTranscribing(true);
+    setEditError(null);
+    try {
+      // Không ép `language`: `editingVoice.language` là tên hiển thị ("Vietnamese"...), không
+      // phải mã ngắn STT cần — để trống cho engine tự nhận diện (đã verify đáng tin cậy lúc
+      // kiểm chứng GĐ 1, xem docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md).
+      const res = await sttPort.transcribeVoiceSample(editingVoice.id, primary.id);
+      if (!res?.ok || !res.text) {
+        setEditError(res?.error ?? 'Nhận dạng giọng nói thất bại');
+        return;
+      }
+      setEditRefTextDraft(res.text);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEditTranscribing(false);
+    }
+  };
+
   return (
     // absolute (không phải fixed) — modal này nằm ngay trong DOM tree của app, không portal
     // ra ngoài. `fixed` lấy containing block là toàn màn hình Electron (viewport thật) khi
@@ -372,14 +448,31 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
                           )}
                           {s.fileName}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => removeSample(i)}
-                          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                          title="Bỏ mẫu này"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          {sttPort && (
+                            <button
+                              type="button"
+                              onClick={() => transcribeSample(i)}
+                              disabled={transcribingIndex !== null}
+                              className="rounded p-1 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-40"
+                              title="Tự động điền transcript (nghe audio mẫu)"
+                            >
+                              {transcribingIndex === i ? (
+                                <Loader2 size={13} className="animate-spin" />
+                              ) : (
+                                <Mic size={13} />
+                              )}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeSample(i)}
+                            className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                            title="Bỏ mẫu này"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                       <textarea
                         value={s.refText}
@@ -656,15 +749,34 @@ export function VoiceCloneModal({ open, onClose, ttsPort, onRefresh, clonedVoice
                           )}
                           {s.ref_file}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => deleteEditingSample(s.id)}
-                          disabled={editBusy || editSamples.length <= 1}
-                          title={editSamples.length <= 1 ? 'Voice phải có ít nhất 1 mẫu' : 'Xoá mẫu này'}
-                          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          {/* Mic chỉ cho mẫu CHÍNH (i===0) — chỉ mẫu đó sửa được transcript
+                              tại đây, xem docstring `ExistingSample` đầu file. */}
+                          {i === 0 && sttPort?.transcribeVoiceSample && (
+                            <button
+                              type="button"
+                              onClick={transcribeEditingSample}
+                              disabled={editBusy || editTranscribing}
+                              className="rounded p-1 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-40"
+                              title="Tự động điền transcript (nghe audio mẫu)"
+                            >
+                              {editTranscribing ? (
+                                <Loader2 size={13} className="animate-spin" />
+                              ) : (
+                                <Mic size={13} />
+                              )}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => deleteEditingSample(s.id)}
+                            disabled={editBusy || editSamples.length <= 1}
+                            title={editSamples.length <= 1 ? 'Voice phải có ít nhất 1 mẫu' : 'Xoá mẫu này'}
+                            className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                       {i === 0 ? (
                         <div className="flex flex-col gap-1.5">

@@ -7,6 +7,7 @@ export type Capability =
   | 'fs'
   | 'tts'
   | 'tts-local'
+  | 'stt'
   | 'card-reader'
   | 'secondary-display'
   | 'keystore';

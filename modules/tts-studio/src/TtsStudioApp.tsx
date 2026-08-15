@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppContentProps } from '@sky-app/kernel';
-import type { TtsPort, TtsEnginePort, EffectPresetPort } from '@sky-app/service-contracts';
+import type { TtsPort, TtsEnginePort, EffectPresetPort, SttPort } from '@sky-app/service-contracts';
 import { PortalContainerContext } from './PortalContainerContext';
 import { TextareaRefContext } from './TextareaRefContext';
 import { VoicePicker, previewPlayId } from './components/VoicePicker';
@@ -39,6 +39,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
   const mainRef = useRef<HTMLElement>(null);
   const textareaRef = useRef<HTMLDivElement>(null);
   const tts = platform.services.get<TtsPort>('tts');
+  const stt = platform.services.get<SttPort>('stt');
   const enginePort = platform.services.get<TtsEnginePort>('tts-engine');
   // Vắng mặt ở môi trường không có kho preset (web chưa chạy data-service) —
   // EffectsPanel tự ẩn khi đó.
@@ -402,6 +403,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
         open={showCloneModal}
         onClose={() => setShowCloneModal(false)}
         ttsPort={tts}
+        sttPort={stt}
         onRefresh={refreshVoices}
         clonedVoices={voices.filter((v) => v.type === 'cloned' && !v.sourceCatalogId)}
       />

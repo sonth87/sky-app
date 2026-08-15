@@ -2,6 +2,24 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.16.0",
+      "date": "2026-08-15",
+      "bump": "minor",
+      "summary": "Thêm ứng dụng \"Speech to Text\" riêng — chọn hoặc kéo-thả 1 file âm thanh bất kỳ, chuyển thành văn bản, sửa/sao chép/tải về dạng .txt ngay trong app, có lịch sử các lần phiên âm gần đây (chỉ lưu văn bản, không lưu lại file âm thanh gốc).",
+      "breaking": true,
+      "minAppVersion": "0.16.0",
+      "detailsRef": "history/2026-08-15-stt-app-rieng-va-lich-su.md"
+    },
+    {
+      "version": "0.15.0",
+      "date": "2026-08-14",
+      "bump": "minor",
+      "summary": "Màn Sao chép giọng đọc (Clone Voice) giờ có nút micro cạnh mỗi ô \"bản chép lời\" — bấm để tự động nghe audio mẫu và điền transcript, có hỏi xác nhận trước khi ghi đè nếu ô đó đã có nội dung. Áp dụng cho cả lúc tạo giọng mới lẫn khi sửa giọng đã có.",
+      "breaking": true,
+      "minAppVersion": "0.15.0",
+      "detailsRef": "history/2026-08-14-stt-nut-tu-dong-dien-transcript.md"
+    },
+    {
       "version": "0.14.0",
       "date": "2026-08-14",
       "bump": "minor",

@@ -40,7 +40,11 @@ from pathlib import Path
 # đủ điều kiện (17 >= 17) nhưng VoiceRegistrySqlite sẽ query nhầm bảng tts_voice_sample chưa
 # tồn tại → sqlite3.OperationalError không bắt được, thay vì rơi về JSON êm như thiết kế. Vá
 # kèm luôn trong lần bump cho tts_generation_history (Phase 3), không tách riêng.
-REQUIRED_SCHEMA_VERSION = 19
+#
+# 2026-08-15: bump 19 → 20 (bảng `stt_history`, migration 020 — xem
+# packages/app-db/src/migrations/020_stt_history.ts) — bump CÙNG commit với migration, đúng
+# bài học đã trả giá ở lần 17→19 phía trên.
+REQUIRED_SCHEMA_VERSION = 20
 
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None

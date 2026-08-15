@@ -1,6 +1,6 @@
 {
   "name": "@sky-app/shell-electron",
-  "version": "0.14.0",
+  "version": "0.16.0",
   "private": true,
   "main": "./dist-electron/main/main.js",
   "scripts": {
@@ -20,6 +20,7 @@
     "@sky-app/module-ceremony": "workspace:*",
     "@sky-app/module-layout-designer": "workspace:*",
     "@sky-app/module-mock-app": "workspace:*",
+    "@sky-app/module-speech-to-text": "workspace:*",
     "@sky-app/module-tts-studio": "workspace:*",
     "@sky-app/platform-electron": "workspace:*",
     "@sky-app/slide-shared": "workspace:*",

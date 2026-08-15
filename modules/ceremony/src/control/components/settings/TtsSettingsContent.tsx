@@ -4,7 +4,7 @@ import { useSocketRef } from '../../SocketContext';
 import { useVoiceCatalog } from '../VoicePickerPopover';
 import { VoiceCloneModal } from '@sky-app/voice-catalog-ui';
 import { usePlatform } from '../../PlatformContext';
-import type { TtsPort } from '@sky-app/service-contracts';
+import type { SttPort, TtsPort } from '@sky-app/service-contracts';
 import { type CanonicalRecord, type TtsCondition, flattenCanonicalRecord } from '@sky-app/slide-shared';
 import { ConfigColumn } from '../TtsModal/ConfigColumn';
 import { PregenColumn } from '../TtsModal/PregenColumn';
@@ -43,6 +43,7 @@ export function TtsSettingsContent() {
   const records = useControlStore((s) => s.records);
   const platform = usePlatform();
   const tts = platform?.services.get<TtsPort>('tts');
+  const stt = platform?.services.get<SttPort>('stt');
   const refreshVoiceCatalog = useControlStore((s) => s.refreshVoiceCatalog);
 
   const clonedVoices = useMemo(() => {
@@ -369,6 +370,7 @@ export function TtsSettingsContent() {
         open={showCloneModal}
         onClose={() => setShowCloneModal(false)}
         ttsPort={tts}
+        sttPort={stt}
         onRefresh={refreshVoiceCatalog}
         clonedVoices={clonedVoices}
       />
