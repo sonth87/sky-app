@@ -76,7 +76,20 @@ catalog:
   # quan): DeviceLayout.macOSAppleIcon/windowsStartIcon (custom icon Apple menu/Start button),
   # WindowChrome hover polish (traffic-light hiện icon khi hover bất kể focus, nút titlebar mờ
   # đi khi cửa sổ không focus).
-  "@sonth87/device-layout": "github:sonth87/device-layout#v0.5.13"
+  #
+  # v0.5.13 → v0.5.37 (2026-08-15) — gộp nhiều bản vá từ repo gốc /Users/skyline/PROJECTS/
+  # device-layout, không phải audit từng bản riêng lẻ (24 commit, phần lớn là chore/refactor
+  # nội bộ + migrate Tailwind CSS v4). Đáng chú ý với sky-app:
+  #   - Sửa crash khi `osTheme` lưu trong localStorage bị hỏng/lỗi thời — ThemeProvider và
+  #     WindowChromeMacOS/Windows trước đây thiếu fallback, đọc `undefined.layout` là crash.
+  #   - Sửa fullscreen macOS: title bar (3 nút traffic-light) không trượt xuống theo MenuBar
+  #     lúc hover mép trên — do title bar trước đây render trong Window, nằm DƯỚI lớp chrome
+  #     overlay nên luôn bị che bất kể z-index.
+  #   - Sửa hydrate URL params khi app bắt buộc chưa kịp registerApps() — vỡ state lúc load.
+  #   - Mở rộng `DeviceLayout` props + bỏ phụ thuộc CSS global bắt buộc.
+  # `pnpm typecheck`/`pnpm -w test` xanh sau khi đổi — không phát hiện API nào bị phá ở 4 nơi
+  # dùng qua "catalog:".
+  "@sonth87/device-layout": "github:sonth87/device-layout#v0.5.37"
 
   # Thêm 2026-07-29 — audit dependency trùng lặp giữa modules/* + packages/*ui (dựng
   # packages/ui dùng chung: cn()/color picker/primitive Radix trùng lặp 3 nơi). lucide-react
