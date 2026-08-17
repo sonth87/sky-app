@@ -78,3 +78,48 @@ def test_list_engines_khong_bi_vo_khi_them_whisper():
     engines = {e["id"]: e for e in er.list_engines()}
     assert engines["vieneu"]["category"] == "tts"
     assert engines["vieneu"]["bundled"] is True
+
+
+# ── 4 size Whisper thêm 2026-08-15 — cùng code (WhisperOnnxEngine(size)), khác repo/file ────
+
+import pytest
+
+
+@pytest.mark.parametrize("size,repo,total_mb", [
+    ("small", "csukuangfj/sherpa-onnx-whisper-small", 375),
+    ("medium", "csukuangfj/sherpa-onnx-whisper-medium", 946),
+    ("large-v3", "csukuangfj/sherpa-onnx-whisper-large-v3", 1778),
+    ("turbo", "csukuangfj/sherpa-onnx-whisper-turbo", 1037),
+])
+def test_moi_size_whisper_dung_hinh_dang(size, repo, total_mb):
+    engine_id = f"whisper-{size}"
+    engines = {e["id"]: e for e in er.list_engines()}
+    assert engine_id in engines
+    w = engines[engine_id]
+    assert w["category"] == "stt"
+    assert w["bundled"] is False
+    assert w["runtime_kind"] == "onnx-ext"
+    assert w["install"]["model"]["repo"] == repo
+    assert w["install"]["model"]["total_mb"] == total_mb
+    # Cùng quy ước đặt tên file với whisper-base: "{size}-encoder/decoder.int8.onnx" +
+    # "{size}-tokens.txt" — sai tên ở đây là _model_dir() không tìm được file lúc chạy thật.
+    assert set(w["install"]["model"]["files"]) == {
+        f"{size}-encoder.int8.onnx", f"{size}-decoder.int8.onnx", f"{size}-tokens.txt",
+    }
+
+
+@pytest.mark.parametrize("size", ["small", "medium", "large-v3", "turbo"])
+def test_moi_size_whisper_co_factory_rieng(size):
+    """Mỗi size phải có factory RIÊNG trong _ENGINES (không phải trỏ nhầm chung 1 factory
+    của size khác) — kiểm bằng cách gọi factory và xác nhận engine_id truyền vào constructor
+    đúng size, không cần model thật (patch WhisperOnnxEngine)."""
+    import unittest.mock as mock
+
+    captured = {}
+
+    def fake_ctor(self, size_arg):
+        captured["size"] = size_arg
+
+    with mock.patch("engine_whisper_onnx.WhisperOnnxEngine.__init__", fake_ctor):
+        er.create_engine(f"whisper-{size}")
+    assert captured["size"] == size

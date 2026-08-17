@@ -51,7 +51,27 @@ def _make_voxcpm():
 
 def _make_whisper_base():
     from engine_whisper_onnx import WhisperOnnxEngine
-    return WhisperOnnxEngine()
+    return WhisperOnnxEngine("base")
+
+
+def _make_whisper_small():
+    from engine_whisper_onnx import WhisperOnnxEngine
+    return WhisperOnnxEngine("small")
+
+
+def _make_whisper_medium():
+    from engine_whisper_onnx import WhisperOnnxEngine
+    return WhisperOnnxEngine("medium")
+
+
+def _make_whisper_large_v3():
+    from engine_whisper_onnx import WhisperOnnxEngine
+    return WhisperOnnxEngine("large-v3")
+
+
+def _make_whisper_turbo():
+    from engine_whisper_onnx import WhisperOnnxEngine
+    return WhisperOnnxEngine("turbo")
 
 
 # Qwen: 2 implementation khác hẳn nhau theo nền tảng (xem _qwen_runtime_variant bên dưới
@@ -301,6 +321,152 @@ _ENGINES: dict[str, dict] = {
             "requirements": {
                 "min_ram_gb": 2,
                 "recommended_ram_gb": 4,
+                "needs_gpu": False,
+                "disk_headroom_factor": 2.0,
+            },
+        },
+    },
+    # 4 size lớn hơn Base — CÙNG code (WhisperOnnxEngine("<size>"), xem
+    # engine_whisper_onnx.py's docstring), chỉ khác repo/file/RAM. Đã verify trực tiếp trên
+    # HuggingFace (2026-08-15, không suy đoán) từng repo tồn tại thật, đúng quy ước đặt tên
+    # file, và (riêng large-v3) bản int8 vẫn gộp gọn 1 file — không cần .weights external-data
+    # chỉ dùng cho bản fp32 đầy đủ. Mô tả mỗi size có so sánh + gợi ý dùng khi nào, theo yêu
+    # cầu Sonth — xem docs/dev/history/2026-08-15-them-whisper-small-medium-large-turbo.md.
+    "whisper-small": {
+        "label": "Whisper Small (nhận dạng giọng nói, đa ngôn ngữ)",
+        "factory": _make_whisper_small,
+        "description": "Chính xác hơn Base một chút, tốc độ vẫn khá nhanh (~375MB). Hợp khi "
+                        "máy yếu hoặc cần phản hồi nhanh, nhưng muốn kết quả tốt hơn Base một "
+                        "bậc — lựa chọn mặc định hợp lý nếu không chắc nên chọn size nào.",
+        "implemented": True,
+        "bundled": False,
+        "runtime_kind": "onnx-ext",
+        "category": "stt",
+        "install": {
+            "runtime": {
+                "python_version": "3.11",
+                "pip_packages": [
+                    "sherpa-onnx>=1.13,<2.0",
+                    "soundfile",
+                    "soxr>=0.3,<0.4",
+                    "numpy>=1.24",
+                ],
+            },
+            "model": {
+                "source": "hf",
+                "repo": "csukuangfj/sherpa-onnx-whisper-small",
+                "files": ["small-encoder.int8.onnx", "small-decoder.int8.onnx", "small-tokens.txt"],
+                "total_mb": 375,  # đo thật qua HF 2026-08-15 (112 + 262 + 0.8)
+            },
+            "requirements": {
+                "min_ram_gb": 2,
+                "recommended_ram_gb": 4,
+                "needs_gpu": False,
+                "disk_headroom_factor": 2.0,
+            },
+        },
+    },
+    "whisper-medium": {
+        "label": "Whisper Medium (nhận dạng giọng nói, đa ngôn ngữ)",
+        "factory": _make_whisper_medium,
+        "description": "Chính xác rõ rệt hơn Small/Base, đổi lại chậm hơn và nặng máy hơn hẳn "
+                        "(~946MB). Hợp khi chấp nhận chờ lâu hơn vài giây để đổi lấy độ chính "
+                        "xác cao hơn — ví dụ audio nhiều tạp âm, giọng khó nghe, hoặc văn bản "
+                        "quan trọng cần ít sửa lại thủ công.",
+        "implemented": True,
+        "bundled": False,
+        "runtime_kind": "onnx-ext",
+        "category": "stt",
+        "install": {
+            "runtime": {
+                "python_version": "3.11",
+                "pip_packages": [
+                    "sherpa-onnx>=1.13,<2.0",
+                    "soundfile",
+                    "soxr>=0.3,<0.4",
+                    "numpy>=1.24",
+                ],
+            },
+            "model": {
+                "source": "hf",
+                "repo": "csukuangfj/sherpa-onnx-whisper-medium",
+                "files": ["medium-encoder.int8.onnx", "medium-decoder.int8.onnx", "medium-tokens.txt"],
+                "total_mb": 946,  # đo thật qua HF 2026-08-15 (374 + 571 + 0.8)
+            },
+            "requirements": {
+                "min_ram_gb": 4,
+                "recommended_ram_gb": 6,
+                "needs_gpu": False,
+                "disk_headroom_factor": 2.0,
+            },
+        },
+    },
+    "whisper-large-v3": {
+        "label": "Whisper Large v3 (nhận dạng giọng nói, đa ngôn ngữ)",
+        "factory": _make_whisper_large_v3,
+        "description": "Chính xác NHẤT trong họ Whisper, nhưng NẶNG và CHẬM nhất (~1.8GB, cần "
+                        "nhiều RAM). Chỉ nên chọn khi ưu tiên độ chính xác tuyệt đối và chấp "
+                        "nhận chờ lâu — nếu chỉ cần nhanh mà vẫn chính xác cao, cân nhắc Turbo "
+                        "(bên dưới) trước.",
+        "implemented": True,
+        "bundled": False,
+        "runtime_kind": "onnx-ext",
+        "category": "stt",
+        "install": {
+            "runtime": {
+                "python_version": "3.11",
+                "pip_packages": [
+                    "sherpa-onnx>=1.13,<2.0",
+                    "soundfile",
+                    "soxr>=0.3,<0.4",
+                    "numpy>=1.24",
+                ],
+            },
+            "model": {
+                "source": "hf",
+                "repo": "csukuangfj/sherpa-onnx-whisper-large-v3",
+                "files": ["large-v3-encoder.int8.onnx", "large-v3-decoder.int8.onnx", "large-v3-tokens.txt"],
+                "total_mb": 1778,  # đo thật qua HF 2026-08-15 (767 + 1010 + 0.8)
+            },
+            "requirements": {
+                "min_ram_gb": 6,
+                "recommended_ram_gb": 8,
+                "needs_gpu": False,
+                "disk_headroom_factor": 2.0,
+            },
+        },
+    },
+    "whisper-turbo": {
+        "label": "Whisper Turbo (nhận dạng giọng nói, đa ngôn ngữ)",
+        "factory": _make_whisper_turbo,
+        "description": "Bản Large v3 bị cắt bớt phần giải mã (4 lớp thay vì 32) để chạy nhanh "
+                        "hơn ~8 lần — độ chính xác PHIÊN ÂM gần bằng Large v3, chỉ kém ở khả "
+                        "năng DỊCH sang tiếng Anh (không liên quan nếu chỉ cần phiên âm tiếng "
+                        "Việt). Thường là lựa chọn cân bằng tốt nhất nếu muốn nhanh mà vẫn "
+                        "chính xác cao, không phải Base/Small.",
+        "implemented": True,
+        "bundled": False,
+        "runtime_kind": "onnx-ext",
+        "category": "stt",
+        "install": {
+            "runtime": {
+                "python_version": "3.11",
+                "pip_packages": [
+                    "sherpa-onnx>=1.13,<2.0",
+                    "soundfile",
+                    "soxr>=0.3,<0.4",
+                    "numpy>=1.24",
+                ],
+            },
+            "model": {
+                "source": "hf",
+                "repo": "csukuangfj/sherpa-onnx-whisper-turbo",
+                "files": ["turbo-encoder.int8.onnx", "turbo-decoder.int8.onnx", "turbo-tokens.txt"],
+                "total_mb": 1037,  # đo thật qua HF 2026-08-15 (675 + 361 + 0.8)
+            },
+            "requirements": {
+                "min_ram_gb": 4,
+                "recommended_ram_gb": 6,
                 "needs_gpu": False,
                 "disk_headroom_factor": 2.0,
             },
