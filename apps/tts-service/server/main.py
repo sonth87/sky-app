@@ -18,6 +18,18 @@ Endpoints Phase 3 (nhật ký sinh audio, xem history_store.py):
   DELETE /history/{id}
   DELETE /history
 
+Endpoints Phase 4 (timeline nhiều track, xem stories.py):
+  GET/POST       /stories
+  GET/PUT/DELETE /stories/{id}
+  POST           /stories/{id}/items                    { history_entry_id, track? }
+  DELETE         /stories/{id}/items/{item_id}
+  PUT            /stories/{id}/items/{item_id}/move      { start_time_ms, track }
+  PUT            /stories/{id}/items/{item_id}/trim      { trim_start_ms, trim_end_ms }
+  PUT            /stories/{id}/items/{item_id}/volume    { volume }
+  POST           /stories/{id}/items/{item_id}/split     { split_time_ms }
+  POST           /stories/{id}/items/{item_id}/duplicate
+  GET            /stories/{id}/export-audio
+
 Env vars (truyền từ Electron qua python-server.ts):
   VIENEU_PORT          — port server lắng nghe
   HF_HOME              — HuggingFace model cache dir
@@ -32,6 +44,8 @@ Env vars (truyền từ Electron qua python-server.ts):
   VIENEU_REGISTRY_PATH — (optional) path tới voice-registry.json
   VIENEU_HISTORY_DIR   — (optional) thư mục lưu WAV lịch sử sinh audio (Phase 3, xem
                          history_store.py) — thiếu thì fallback cạnh VIENEU_REF_DIR
+  VIENEU_STORIES_DIR   — (optional) thư mục lưu WAV của Story (Phase 4, xem stories.py) —
+                         thiếu thì fallback cạnh VIENEU_REF_DIR
 """
 from __future__ import annotations
 
@@ -60,6 +74,7 @@ _catalog_dir: Path | None = None
 _synth_lock = asyncio.Lock()
 _LOG_FILE: Path | None = None
 _history = None          # HistoryStore hoặc None (DB không sẵn sàng — xem history_store.py)
+_stories = None          # StoryStore hoặc None (DB không sẵn sàng — xem stories.py, Phase 4)
 
 # ── Cache engine (GĐ A: đổi engine KHÔNG cần restart process) ────────────────
 # Trước đây `_engine` là biến đơn: mỗi process chỉ phục vụ đúng 1 engine, nên đổi
@@ -368,7 +383,7 @@ def _activate_stt_engine_sync(engine_id: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _engine, _registry, _config, _preview_dir, _ref_dir, _catalog_dir, _LOG_FILE
-    global _current_engine_id, _history
+    global _current_engine_id, _history, _stories
     global _stt_engine, _current_stt_engine_id, _stt_history
 
     # FIX: đọc tất cả env vars tại đây — KHÔNG tại module level
@@ -438,6 +453,14 @@ async def lifespan(app: FastAPI):
     from stt_history_store import create_stt_history_store
     _stt_history = create_stt_history_store()
     _safe_console(f"[TTS] STT history store {'READY' if _stt_history else 'OFF (DB chưa sẵn sàng)'}")
+
+    # Init story store (Phase 4) — None êm nếu DB chưa sẵn sàng, xem stories.py. Thư mục audio
+    # RIÊNG với tts-history/ (item sở hữu bản copy độc lập, không chung vòng đời với history).
+    stories_dir_env = os.environ.get("VIENEU_STORIES_DIR", "")
+    stories_dir = Path(stories_dir_env) if stories_dir_env else _ref_dir.parent / "tts-stories"
+    from stories import create_story_store
+    _stories = create_story_store(stories_dir)
+    _safe_console(f"[TTS] Story store {'READY' if _stories else 'OFF (DB chưa sẵn sàng)'} — {stories_dir}")
 
     # Pre-encode cloned voices lúc startup để giảm latency request đầu tiên
     _safe_console("[TTS] Pre-encoding voice references...")
@@ -1759,6 +1782,181 @@ def clear_history():
         return {"ok": False, "error": "History store not ready"}
     count = _history.clear_all()
     return {"ok": True, "count": count}
+
+
+# ── Stories (Phase 4 — timeline nhiều track, xem stories.py) ──────────────────
+# Mọi endpoint dưới đây trả 503 khi `_stories is None` (DB chưa sẵn sàng) — khác History
+# (rơi về danh sách rỗng êm): Story là tính năng CHỦ ĐỘNG tạo/sửa dữ liệu, im lặng cho "danh
+# sách rỗng" sẽ khiến người dùng tưởng Story của họ biến mất thay vì tính năng chưa sẵn sàng.
+
+from stories import StoryItemNotFound, StoryNotFound
+
+
+class _CreateStoryBody(BaseModel):
+    name: str
+    description: str | None = None
+
+
+class _UpdateStoryBody(BaseModel):
+    name: str | None = None
+    description: str | None = None
+
+
+class _AddItemBody(BaseModel):
+    history_entry_id: str
+    track: int = 0
+
+
+class _MoveItemBody(BaseModel):
+    start_time_ms: int
+    track: int
+
+
+class _TrimItemBody(BaseModel):
+    trim_start_ms: int
+    trim_end_ms: int
+
+
+class _VolumeItemBody(BaseModel):
+    volume: float
+
+
+class _SplitItemBody(BaseModel):
+    split_time_ms: int
+
+
+def _require_stories():
+    if _stories is None:
+        raise HTTPException(503, "Story store not ready (DB chưa sẵn sàng)")
+    return _stories
+
+
+@app.get("/stories")
+def list_stories():
+    return _require_stories().list_stories()
+
+
+@app.post("/stories")
+def create_story(body: _CreateStoryBody):
+    return _require_stories().create_story(body.name, body.description)
+
+
+@app.get("/stories/{story_id}")
+def get_story(story_id: str):
+    story = _require_stories().get_story(story_id)
+    if story is None:
+        raise HTTPException(404, f"Story not found: {story_id}")
+    return {**story, "items": _stories.list_items(story_id)}
+
+
+@app.put("/stories/{story_id}")
+def update_story(story_id: str, body: _UpdateStoryBody):
+    story = _require_stories().update_story(story_id, body.name, body.description)
+    if story is None:
+        raise HTTPException(404, f"Story not found: {story_id}")
+    return story
+
+
+@app.delete("/stories/{story_id}")
+def delete_story(story_id: str):
+    if not _require_stories().delete_story(story_id):
+        raise HTTPException(404, f"Story not found: {story_id}")
+    return {"ok": True}
+
+
+@app.post("/stories/{story_id}/items")
+def add_story_item(story_id: str, body: _AddItemBody):
+    store = _require_stories()
+    if _history is None:
+        raise HTTPException(503, "History store not ready — không có dữ liệu để thêm vào Story")
+    try:
+        return store.add_item_from_history(story_id, _history, body.history_entry_id, body.track)
+    except StoryNotFound:
+        raise HTTPException(404, f"Story not found: {story_id}")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/stories/{story_id}/items/{item_id}")
+def delete_story_item(story_id: str, item_id: str):
+    if not _require_stories().delete_item(story_id, item_id):
+        raise HTTPException(404, f"Story item not found: {item_id}")
+    return {"ok": True}
+
+
+@app.put("/stories/{story_id}/items/{item_id}/move")
+def move_story_item(story_id: str, item_id: str, body: _MoveItemBody):
+    item = _require_stories().move_item(story_id, item_id, body.start_time_ms, body.track)
+    if item is None:
+        raise HTTPException(404, f"Story item not found: {item_id}")
+    return item
+
+
+@app.put("/stories/{story_id}/items/{item_id}/trim")
+def trim_story_item(story_id: str, item_id: str, body: _TrimItemBody):
+    try:
+        return _require_stories().trim_item(story_id, item_id, body.trim_start_ms, body.trim_end_ms)
+    except StoryItemNotFound:
+        raise HTTPException(404, f"Story item not found: {item_id}")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.put("/stories/{story_id}/items/{item_id}/volume")
+def set_story_item_volume(story_id: str, item_id: str, body: _VolumeItemBody):
+    item = _require_stories().set_volume(story_id, item_id, body.volume)
+    if item is None:
+        raise HTTPException(404, f"Story item not found: {item_id}")
+    return item
+
+
+@app.post("/stories/{story_id}/items/{item_id}/split")
+def split_story_item(story_id: str, item_id: str, body: _SplitItemBody):
+    try:
+        left, right = _require_stories().split_item(story_id, item_id, body.split_time_ms)
+        return {"left": left, "right": right}
+    except StoryItemNotFound:
+        raise HTTPException(404, f"Story item not found: {item_id}")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/stories/{story_id}/items/{item_id}/duplicate")
+def duplicate_story_item(story_id: str, item_id: str):
+    try:
+        return _require_stories().duplicate_item(story_id, item_id)
+    except StoryItemNotFound:
+        raise HTTPException(404, f"Story item not found: {item_id}")
+
+
+@app.get("/stories/{story_id}/export-audio")
+def export_story_audio(story_id: str):
+    """Trả WAV THẬT (RIFF header đầy đủ), KHÁC `/synthesize` (PCM thô + header X-Sample-Rate).
+
+    `exportAudioUrl` ở StoryPort tài liệu rõ "đúng pattern getPreviewUrl/getHistoryAudioUrl"
+    — cả 2 đều serve file phát được thẳng qua `<audio src>`/`playUrlAudio` (`new Audio(url)`,
+    trình duyệt tự nhận dạng qua RIFF header, không tự parse PCM thô như `playPcmAudio` phải
+    làm cho `/synthesize`). Trả octet-stream trần ở đây sẽ khiến `new Audio(url)` không phát
+    được gì — không có header để trình duyệt biết đây là audio.
+    """
+    store = _require_stories()
+    if store.get_story(story_id) is None:
+        raise HTTPException(404, f"Story not found: {story_id}")
+    audio, sample_rate = store.export_audio(story_id)
+    if audio.size == 0:
+        raise HTTPException(400, "Story chưa có item nào để trộn")
+    int16_audio = np.clip(audio * 32767, -32768, 32767).astype(np.int16)
+
+    import io
+    import wave
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as f:
+        f.setnchannels(1)
+        f.setsampwidth(2)
+        f.setframerate(sample_rate)
+        f.writeframes(int16_audio.tobytes())
+
+    return Response(content=buf.getvalue(), media_type="audio/wav")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

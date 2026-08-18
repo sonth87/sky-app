@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ListMusic, Mic } from 'lucide-react';
 import type { AppContentProps } from '@sky-app/kernel';
-import type { TtsPort, TtsEnginePort, EffectPresetPort, SttPort } from '@sky-app/service-contracts';
+import type { TtsPort, TtsEnginePort, EffectPresetPort, SttPort, StoryPort } from '@sky-app/service-contracts';
 import { PortalContainerContext } from './PortalContainerContext';
 import { TextareaRefContext } from './TextareaRefContext';
 import { VoicePicker, previewPlayId } from './components/VoicePicker';
+import { AlertDialog } from './components/AlertDialog';
 import { SpeedSlider } from './components/SpeedSlider';
 import { EmotionInsert } from './components/EmotionInsert';
 import { EngineParamsPanel } from './components/EngineParamsPanel';
@@ -13,11 +15,14 @@ import { TextInputPanel } from './components/TextInputPanel';
 import { GenerateBar, QUICK_PLAY_ID } from './components/GenerateBar';
 import { HistoryList } from './components/HistoryList';
 import { VerticalResizeHandle } from './components/VerticalResizeHandle';
+import { StoriesTab } from './components/stories/StoriesTab';
 import { useTtsStudioStore } from './store';
 import { getPlayingId, playPcmAudio, playUrlAudio, stopAudio } from './lib/audioPlayer';
 import { VoiceCloneModal } from '@sky-app/voice-catalog-ui';
 import { EngineManager, DeviceSettingsModal } from '@sky-app/tts-engine-ui';
 import { useMenuAction } from '@sonth87/device-layout';
+
+type StudioTab = 'generate' | 'stories';
 
 const EDITOR_HEIGHT_KEY = 'tts-studio-editor-height';
 const DEFAULT_EDITOR_HEIGHT = 320;
@@ -44,9 +49,14 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
   // Vắng mặt ở môi trường không có kho preset (web chưa chạy data-service) —
   // EffectsPanel tự ẩn khi đó.
   const effectPresetPort = platform.services.get<EffectPresetPort>('effectPreset');
+  // Vắng mặt khi platform chưa đăng ký port này (bản Electron/Web cũ chưa rebuild) — tab
+  // "Câu chuyện" tự ẩn khỏi nav khi đó, xem kế hoạch Phase 4.
+  const storyPort = platform.services.get<StoryPort>('story');
+  const [activeTab, setActiveTab] = useState<StudioTab>('generate');
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [showEngineManager, setShowEngineManager] = useState(false);
   const [showDeviceSettings, setShowDeviceSettings] = useState(false);
+  const [deleteVoiceError, setDeleteVoiceError] = useState<string | null>(null);
 
   // Menu "Cài đặt" trên thanh menu (khai ở index.ts's menuBarMenus) dispatch action
   // string qua CustomEvent. Menu thuộc về cả cửa sổ nên phải bỏ qua khi app không
@@ -345,59 +355,106 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
     <div ref={rootRef} className="tts-studio-root relative flex h-full flex-col bg-background" data-env={platform.env}>
       <PortalContainerContext.Provider value={rootRef}>
         <TextareaRefContext.Provider value={textareaRef}>
-        <div className="grid h-full grid-cols-[280px_1fr] overflow-hidden">
-          <aside className="flex flex-col gap-4 overflow-y-auto border-r border-border p-3">
-            <VoicePicker
-              onPreview={handlePreview}
-              previewingId={previewingId}
-              assetUrl={platform.assetUrl}
-              loading={voicesLoading}
-              onAddVoice={() => setShowCloneModal(true)}
-              onDeleteVoice={async (voiceId) => {
-                const voiceItem = voices.find((v) => v.id === voiceId);
-                const label = voiceItem ? voiceItem.name : voiceId;
-                if (!confirm(`Bạn có chắc chắn muốn xóa giọng đọc "${label}"?`)) return;
-
-                const rawId = voiceId.replace(/^vieneu-/, '');
-                if (!tts?.deleteVoice) return;
-                const res = await tts.deleteVoice(rawId);
-                if (res.ok) {
-                  await refreshVoices();
-                } else {
-                  alert(res.error || 'Xóa giọng đọc thất bại');
+        <div className="flex h-full overflow-hidden">
+          {/* Rail icon-only, chỉ hiện khi có >1 tab (storyPort sẵn sàng) — đúng mẫu
+              ConfigWindow.tsx's nav (packages/tts-engine-ui), tham khảo voicebox. 1 tab duy
+              nhất thì rail chỉ tốn chỗ mà không phân biệt được gì. */}
+          {storyPort && (
+            <nav className="flex w-14 shrink-0 flex-col items-center gap-1.5 border-r border-border bg-muted/20 py-3">
+              <button
+                type="button"
+                onClick={() => setActiveTab('generate')}
+                title="Sinh giọng"
+                className={
+                  activeTab === 'generate'
+                    ? 'flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary'
+                    : 'flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                 }
-              }}
-            />
-            <EmotionInsert />
-            <SpeedSlider />
-            <EngineParamsPanel ttsPort={tts} />
-            <EffectsPanel effectPresetPort={effectPresetPort} ttsPort={tts} />
-            <UsageGuide />
-            {loadError && (
-              <p className="text-2xs text-destructive">Không tải được danh sách giọng: {loadError}</p>
+              >
+                <Mic size={19} className="shrink-0" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('stories')}
+                title="Câu chuyện"
+                className={
+                  activeTab === 'stories'
+                    ? 'flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary'
+                    : 'flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                }
+              >
+                <ListMusic size={19} className="shrink-0" />
+              </button>
+            </nav>
+          )}
+
+          <div className="min-w-0 flex-1 overflow-hidden">
+            {activeTab === 'generate' && (
+              <div className="grid h-full grid-cols-[280px_1fr] overflow-hidden">
+                <aside className="flex flex-col gap-4 overflow-y-auto border-r border-border p-3">
+                  <VoicePicker
+                    onPreview={handlePreview}
+                    previewingId={previewingId}
+                    assetUrl={platform.assetUrl}
+                    loading={voicesLoading}
+                    onAddVoice={() => setShowCloneModal(true)}
+                    onDeleteVoice={async (voiceId) => {
+                      const voiceItem = voices.find((v) => v.id === voiceId);
+                      const label = voiceItem ? voiceItem.name : voiceId;
+                      if (!confirm(`Bạn có chắc chắn muốn xóa giọng đọc "${label}"?`)) return;
+
+                      const rawId = voiceId.replace(/^vieneu-/, '');
+                      if (!tts?.deleteVoice) return;
+                      const res = await tts.deleteVoice(rawId);
+                      if (res.ok) {
+                        await refreshVoices();
+                      } else {
+                        setDeleteVoiceError(res.error || 'Xóa giọng đọc thất bại');
+                      }
+                    }}
+                  />
+                  <EmotionInsert />
+                  <SpeedSlider />
+                  <EngineParamsPanel ttsPort={tts} />
+                  <EffectsPanel effectPresetPort={effectPresetPort} ttsPort={tts} />
+                  <UsageGuide />
+                  {loadError && (
+                    <p className="text-2xs text-destructive">Không tải được danh sách giọng: {loadError}</p>
+                  )}
+                </aside>
+                <main ref={mainRef} className="flex min-h-0 flex-col overflow-hidden p-3">
+                  <div className="flex flex-none flex-col overflow-hidden" style={{ height: editorHeight }}>
+                    <TextInputPanel />
+                  </div>
+                  <VerticalResizeHandle getStartValue={getEditorHeight} onResize={handleEditorResize} />
+                  <div className="flex flex-none flex-col gap-3 pt-1">
+                    {genError && (
+                      <p className="text-2xs text-destructive" role="alert">{genError}</p>
+                    )}
+                    <GenerateBar
+                      onGenerate={handleGenerate}
+                      onQuickPlay={handleQuickPlay}
+                      canQuickPlay={canQuickPlay}
+                    />
+                  </div>
+                  <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1">
+                    <HistoryList ttsPort={tts} />
+                  </div>
+                </main>
+              </div>
             )}
-          </aside>
-          <main ref={mainRef} className="flex min-h-0 flex-col overflow-hidden p-3">
-            <div className="flex flex-none flex-col overflow-hidden" style={{ height: editorHeight }}>
-              <TextInputPanel />
-            </div>
-            <VerticalResizeHandle getStartValue={getEditorHeight} onResize={handleEditorResize} />
-            <div className="flex flex-none flex-col gap-3 pt-1">
-              {genError && (
-                <p className="text-2xs text-destructive" role="alert">{genError}</p>
-              )}
-              <GenerateBar
-                onGenerate={handleGenerate}
-                onQuickPlay={handleQuickPlay}
-                canQuickPlay={canQuickPlay}
-              />
-            </div>
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1">
-              <HistoryList ttsPort={tts} />
-            </div>
-          </main>
+
+            {activeTab === 'stories' && storyPort && (
+              <StoriesTab storyPort={storyPort} ttsPort={tts} />
+            )}
+          </div>
         </div>
         </TextareaRefContext.Provider>
+        <AlertDialog
+          open={deleteVoiceError !== null}
+          message={deleteVoiceError ?? ''}
+          onClose={() => setDeleteVoiceError(null)}
+        />
       </PortalContainerContext.Provider>
       <VoiceCloneModal
         open={showCloneModal}

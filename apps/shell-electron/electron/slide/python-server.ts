@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, chmodSync, mkdirSync, readdirSync, copyFile
 import { join } from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import type { TtsLogLine } from '@sky-app/slide-shared';
-import { vieneuRefDir, vieneuRegistryPath, vieneuConfigPath, ttsEnginesDir, ttsRuntimeDir, skyAppDbPath, ttsHistoryDir } from './data/paths';
+import { vieneuRefDir, vieneuRegistryPath, vieneuConfigPath, ttsEnginesDir, ttsRuntimeDir, skyAppDbPath, ttsHistoryDir, ttsStoriesDir } from './data/paths';
 import { resolveRuntimePython } from './python-runtime';
 const DEBUG_LOG_FILE = join(app.getPath('userData'), 'tts-debug.log');
 const DEFAULT_PORT = 8089;
@@ -714,6 +714,7 @@ async function startPythonServerOnce(
         VIENEU_REGISTRY_PATH: userRegistryPath,
         VIENEU_CONFIG_PATH: userConfigPath,
         VIENEU_HISTORY_DIR: ttsHistoryDir(),
+        VIENEU_STORIES_DIR: ttsStoriesDir(),
         // DB dùng chung (bảng tts_*, xem AGENTS.md §2.1 + apps/tts-service/server/db.py).
         // Chỉ ĐƯỜNG DẪN — Python tự kiểm file tồn tại + đã migrate đủ (schema_version) trước
         // khi dùng, không giả định gì thêm ở phía Electron. An toàn để truyền vô điều kiện:

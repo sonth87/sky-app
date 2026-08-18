@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { EffectPreset, EffectPresetPort, EffectTypeInfo, TtsPort } from '@sky-app/service-contracts';
 import { useTtsStudioStore } from '../store';
+import { PromptDialog } from './PromptDialog';
 
 export interface EffectsPanelProps {
   /** Port quản lý preset (app-db). Vắng mặt = môi trường không có kho preset
@@ -16,6 +17,7 @@ export function EffectsPanel({ effectPresetPort, ttsPort }: EffectsPanelProps) {
   const [presets, setPresets] = useState<EffectPreset[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
 
   const effectsChain = useTtsStudioStore((s) => s.effectsChain);
   const selectedPresetId = useTtsStudioStore((s) => s.selectedPresetId);
@@ -55,9 +57,13 @@ export function EffectsPanel({ effectPresetPort, ttsPort }: EffectsPanelProps) {
     }
   };
 
-  const saveAsNew = async () => {
-    const name = window.prompt('Tên preset mới:')?.trim();
-    if (!name) return;
+  // Bấm nút mở PromptDialog (Electron KHÔNG hỗ trợ window.prompt() — trả null ngay lập tức,
+  // không hiện UI gì, xem PromptDialog.tsx's docstring). Việc tạo thật nằm ở
+  // handleSaveAsNewSubmit, gọi khi dialog xác nhận.
+  const saveAsNew = () => setShowSavePrompt(true);
+
+  const handleSaveAsNewSubmit = async (name: string) => {
+    setShowSavePrompt(false);
     setSaving(true);
     setError(null);
     try {
@@ -183,6 +189,14 @@ export function EffectsPanel({ effectPresetPort, ttsPort }: EffectsPanelProps) {
         </p>
       )}
       {error && <p className="text-2xs text-destructive">{error}</p>}
+
+      <PromptDialog
+        open={showSavePrompt}
+        title="Tên preset mới"
+        placeholder="Vd: Giọng vang hội trường"
+        onSubmit={handleSaveAsNewSubmit}
+        onCancel={() => setShowSavePrompt(false)}
+      />
     </div>
   );
 }

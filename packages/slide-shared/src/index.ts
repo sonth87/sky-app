@@ -49,4 +49,8 @@ export type {
   VoiceCatalogEntry,
   TtsLogLine,
   TtsHistoryEntry,
+  TtsStory,
+  TtsStoryItem,
+  TtsStoryWithItems,
+  StoryIpcResult,
 } from './slide-api.js';

@@ -16,6 +16,10 @@ import type {
   VoiceCatalogEntry,
   TtsLogLine,
   TtsHistoryEntry,
+  TtsStory,
+  TtsStoryItem,
+  TtsStoryWithItems,
+  StoryIpcResult,
 } from '@sky-app/slide-shared';
 
 // Re-export for the few call-sites elsewhere in electron/slide/* that still
@@ -39,6 +43,10 @@ export type {
   VoiceCatalogEntry,
   TtsLogLine,
   TtsHistoryEntry,
+  TtsStory,
+  TtsStoryItem,
+  TtsStoryWithItems,
+  StoryIpcResult,
 } from '@sky-app/slide-shared';
 
 const api: SlideApi = {
@@ -259,6 +267,32 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:history-delete', { id }),
   clearTtsHistory: (): Promise<{ ok: boolean; error?: string; count?: number }> =>
     ipcRenderer.invoke('tts:history-clear'),
+  // ---- Stories (Phase 4 — timeline nhiều track, xem apps/tts-service/server/stories.py) ----
+  storyList: (): Promise<StoryIpcResult<TtsStory[]>> => ipcRenderer.invoke('story:list'),
+  storyCreate: (name: string, description?: string): Promise<StoryIpcResult<TtsStory>> =>
+    ipcRenderer.invoke('story:create', { name, description }),
+  storyGet: (storyId: string): Promise<StoryIpcResult<TtsStoryWithItems>> =>
+    ipcRenderer.invoke('story:get', { storyId }),
+  storyUpdate: (storyId: string, patch: { name?: string; description?: string }): Promise<StoryIpcResult<TtsStory>> =>
+    ipcRenderer.invoke('story:update', { storyId, patch }),
+  storyDelete: (storyId: string): Promise<StoryIpcResult<{ ok: boolean }>> =>
+    ipcRenderer.invoke('story:delete', { storyId }),
+  storyAddItem: (storyId: string, historyEntryId: string, track?: number): Promise<StoryIpcResult<TtsStoryItem>> =>
+    ipcRenderer.invoke('story:add-item', { storyId, historyEntryId, track }),
+  storyDeleteItem: (storyId: string, itemId: string): Promise<StoryIpcResult<{ ok: boolean }>> =>
+    ipcRenderer.invoke('story:delete-item', { storyId, itemId }),
+  storyMoveItem: (storyId: string, itemId: string, startTimeMs: number, track: number): Promise<StoryIpcResult<TtsStoryItem>> =>
+    ipcRenderer.invoke('story:move-item', { storyId, itemId, startTimeMs, track }),
+  storyTrimItem: (storyId: string, itemId: string, trimStartMs: number, trimEndMs: number): Promise<StoryIpcResult<TtsStoryItem>> =>
+    ipcRenderer.invoke('story:trim-item', { storyId, itemId, trimStartMs, trimEndMs }),
+  storySetItemVolume: (storyId: string, itemId: string, volume: number): Promise<StoryIpcResult<TtsStoryItem>> =>
+    ipcRenderer.invoke('story:set-item-volume', { storyId, itemId, volume }),
+  storySplitItem: (storyId: string, itemId: string, splitTimeMs: number): Promise<StoryIpcResult<{ left: TtsStoryItem; right: TtsStoryItem }>> =>
+    ipcRenderer.invoke('story:split-item', { storyId, itemId, splitTimeMs }),
+  storyDuplicateItem: (storyId: string, itemId: string): Promise<StoryIpcResult<TtsStoryItem>> =>
+    ipcRenderer.invoke('story:duplicate-item', { storyId, itemId }),
+  storyExportAudioUrl: (storyId: string): Promise<string> =>
+    ipcRenderer.invoke('story:export-audio-url', { storyId }),
   // ---- STT (Phase 1 — nhận dạng giọng nói, xem
   //      docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md). Cài đặt/tải model:
   //      tái dùng nguyên các binding tts:engine-* ở trên (cùng registry, phân biệt qua

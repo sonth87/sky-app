@@ -1355,6 +1355,82 @@ export function registerIpcHandlers() {
     }
   });
 
+  // ── Stories (Phase 4 — timeline nhiều track, xem apps/tts-service/server/stories.py) ──
+  //
+  // Envelope thống nhất `{ok:true, data} | {ok:false, error}` cho MỌI kênh `story:*` — 13
+  // kênh gần giống hệt nhau (khác path/method/body), gom qua 1 helper thay vì lặp try/catch
+  // 13 lần như các khối `tts:history-*`/`tts:*` phía trên đã làm (chấp nhận được ở đó vì mỗi
+  // kênh hình dạng response khác nhau nhiều; ở đây thì không). `StoryPort` phía
+  // service-contracts THROW lỗi (không trả `{ok,error}`) — envelope này là điểm
+  // platform-electron's adapter unwrap rồi throw, giữ IPC layer thuần dữ liệu.
+  async function storyFetch(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<{ ok: true; data: unknown } | { ok: false; error: string; status?: number }> {
+    const port = getPythonPort();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+        method,
+        ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) {
+        // `status` cho phép adapter phân biệt 404 (tài nguyên đã bị xoá ở nơi khác — trả
+        // null, không phải lỗi) với lỗi thật (mạng/500) — throw. Không suy ra status từ
+        // chuỗi `error` (string-match "HTTP 404" giòn hơn hẳn field số tường minh).
+        return { ok: false, error: `HTTP ${res.status}: ${await res.text()}`, status: res.status };
+      }
+      // DELETE trả {ok:true} không có body dữ liệu — 204/empty body vẫn phải parse được.
+      const text = await res.text();
+      return { ok: true, data: text ? JSON.parse(text) : null };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  ipcMain.handle('story:list', () => storyFetch('GET', '/stories'));
+
+  ipcMain.handle('story:create', (_e, { name, description }: { name: string; description?: string }) =>
+    storyFetch('POST', '/stories', { name, description }));
+
+  ipcMain.handle('story:get', (_e, { storyId }: { storyId: string }) =>
+    storyFetch('GET', `/stories/${encodeURIComponent(storyId)}`));
+
+  ipcMain.handle('story:update', (_e, { storyId, patch }: { storyId: string; patch: { name?: string; description?: string } }) =>
+    storyFetch('PUT', `/stories/${encodeURIComponent(storyId)}`, patch));
+
+  ipcMain.handle('story:delete', (_e, { storyId }: { storyId: string }) =>
+    storyFetch('DELETE', `/stories/${encodeURIComponent(storyId)}`));
+
+  ipcMain.handle('story:add-item', (_e, { storyId, historyEntryId, track }: { storyId: string; historyEntryId: string; track?: number }) =>
+    storyFetch('POST', `/stories/${encodeURIComponent(storyId)}/items`, { history_entry_id: historyEntryId, track: track ?? 0 }));
+
+  ipcMain.handle('story:delete-item', (_e, { storyId, itemId }: { storyId: string; itemId: string }) =>
+    storyFetch('DELETE', `/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}`));
+
+  ipcMain.handle('story:move-item', (_e, { storyId, itemId, startTimeMs, track }: { storyId: string; itemId: string; startTimeMs: number; track: number }) =>
+    storyFetch('PUT', `/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/move`, { start_time_ms: startTimeMs, track }));
+
+  ipcMain.handle('story:trim-item', (_e, { storyId, itemId, trimStartMs, trimEndMs }: { storyId: string; itemId: string; trimStartMs: number; trimEndMs: number }) =>
+    storyFetch('PUT', `/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/trim`, { trim_start_ms: trimStartMs, trim_end_ms: trimEndMs }));
+
+  ipcMain.handle('story:set-item-volume', (_e, { storyId, itemId, volume }: { storyId: string; itemId: string; volume: number }) =>
+    storyFetch('PUT', `/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/volume`, { volume }));
+
+  ipcMain.handle('story:split-item', (_e, { storyId, itemId, splitTimeMs }: { storyId: string; itemId: string; splitTimeMs: number }) =>
+    storyFetch('POST', `/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/split`, { split_time_ms: splitTimeMs }));
+
+  ipcMain.handle('story:duplicate-item', (_e, { storyId, itemId }: { storyId: string; itemId: string }) =>
+    storyFetch('POST', `/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/duplicate`));
+
+  // URL trỏ thẳng Python server, đúng pattern 'tts:history-audio-url' — renderer's <audio src>
+  // hoặc fetch tự tải, không round-trip buffer qua IPC.
+  ipcMain.handle('story:export-audio-url', (_e, { storyId }: { storyId: string }) => {
+    return `http://127.0.0.1:${getPythonPort()}/stories/${encodeURIComponent(storyId)}/export-audio`;
+  });
+
   // ── STT (Phase 1 — nhận dạng giọng nói, xem
   //    docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md) ──────────────────────
   // Cài đặt/tải model (Whisper...) tái dùng NGUYÊN các kênh tts:engine-* ở trên (cùng

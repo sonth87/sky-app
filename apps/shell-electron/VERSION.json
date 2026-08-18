@@ -2,6 +2,15 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.17.0",
+      "date": "2026-08-17",
+      "bump": "minor",
+      "summary": "Thêm tính năng \"Câu chuyện\" (Story) trong TTS Studio — ghép nhiều đoạn giọng nói đã tạo thành 1 bản phối hoàn chỉnh trên nhiều track, giống phần mềm dựng nhạc/podcast đơn giản. Kéo-thả để sắp xếp vị trí, kéo mép để cắt bớt đầu/cuối, chỉnh âm lượng từng đoạn, tách một đoạn thành hai, nhân bản, rồi trộn tất cả thành 1 file WAV để tải về. TTS Studio giờ có 2 mục: \"Sinh giọng\" (như trước) và \"Câu chuyện\" (mới), chuyển qua lại bằng thanh biểu tượng bên trái.",
+      "breaking": true,
+      "minAppVersion": "0.17.0",
+      "detailsRef": "history/2026-08-17-stories-timeline.md"
+    },
+    {
       "version": "0.16.0",
       "date": "2026-08-15",
       "bump": "minor",

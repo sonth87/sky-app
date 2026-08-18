@@ -185,6 +185,14 @@ export function ttsHistoryDir(): string {
   return join(app.getPath('userData'), 'tts-history');
 }
 
+/** Thư mục lưu WAV của Story (Phase 4 — xem apps/tts-service/server/stories.py). TÁCH khỏi
+ *  `ttsHistoryDir()` dù cùng là "audio đã sinh": item của Story sở hữu BẢN COPY RIÊNG, không
+ *  chung vòng đời tự-xoá (prune) với lịch sử — xoá 1 dòng lịch sử không được kéo theo mất
+ *  audio đang dùng trong Story. Xem packages/app-db/src/migrations/021_tts_story.ts. */
+export function ttsStoriesDir(): string {
+  return join(app.getPath('userData'), 'tts-stories');
+}
+
 /**
  * Thư mục gốc chứa các engine TTS mở rộng TẢI THEO NHU CẦU (ngoài VieNeu bundled).
  * Mỗi engine tự chứa: model, manifest, install-state — KHÔNG còn runtime riêng (xem

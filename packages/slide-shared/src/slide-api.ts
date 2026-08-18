@@ -273,6 +273,42 @@ export interface TtsHistoryEntry {
   created_at: string;
 }
 
+/** Story (Phase 4, xem apps/tts-service/server/stories.py) — shape snake_case NGUYÊN VĂN từ
+ *  JSON của Python. Mapping sang camelCase (`Story`/`StoryItem` của service-contracts) thuộc
+ *  về platform-electron's adapter, giống TtsHistoryEntry ở trên. */
+export interface TtsStory {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TtsStoryItem {
+  id: string;
+  story_id: string;
+  audio_file: string;
+  source_text: string | null;
+  voice_label: string | null;
+  duration_ms: number;
+  start_time_ms: number;
+  track: number;
+  trim_start_ms: number;
+  trim_end_ms: number;
+  volume: number;
+  created_at: string;
+}
+
+export interface TtsStoryWithItems extends TtsStory {
+  items: TtsStoryItem[];
+}
+
+/** Envelope thống nhất cho mọi kênh `story:*` (xem ipc.ts's `storyFetch` helper) —
+ *  `StoryPort` (service-contracts) THROW lỗi, nên adapter unwrap `ok:false` thành `throw`
+ *  thay vì để caller tự kiểm `.ok` như các API `{ok,error}` cũ (`deleteVoice`...). `status`
+ *  (khi có) cho adapter phân biệt 404 — trả `null` — với lỗi thật (mạng/500) — throw. */
+export type StoryIpcResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
+
 /** 1 dòng nhật ký phiên âm (GĐ 3, xem apps/tts-service/server/stt_history_store.py) — shape
  *  snake_case NGUYÊN VĂN từ JSON của Python's GET /stt/history. KHÔNG có field audio (khác
  *  `TtsHistoryEntry`'s `has_audio`) — lịch sử STT chỉ lưu văn bản, không lưu lại audio gốc. */
@@ -444,6 +480,22 @@ export interface SlideApi {
   getTtsHistoryAudioUrl(id: string): Promise<string>;
   deleteTtsHistoryEntry(id: string): Promise<{ ok: boolean; error?: string }>;
   clearTtsHistory(): Promise<{ ok: boolean; error?: string; count?: number }>;
+
+  // ── Stories (Phase 4 — timeline nhiều track, xem apps/tts-service/server/stories.py) ──
+  storyList(): Promise<StoryIpcResult<TtsStory[]>>;
+  storyCreate(name: string, description?: string): Promise<StoryIpcResult<TtsStory>>;
+  storyGet(storyId: string): Promise<StoryIpcResult<TtsStoryWithItems>>;
+  storyUpdate(storyId: string, patch: { name?: string; description?: string }): Promise<StoryIpcResult<TtsStory>>;
+  storyDelete(storyId: string): Promise<StoryIpcResult<{ ok: boolean }>>;
+  storyAddItem(storyId: string, historyEntryId: string, track?: number): Promise<StoryIpcResult<TtsStoryItem>>;
+  storyDeleteItem(storyId: string, itemId: string): Promise<StoryIpcResult<{ ok: boolean }>>;
+  storyMoveItem(storyId: string, itemId: string, startTimeMs: number, track: number): Promise<StoryIpcResult<TtsStoryItem>>;
+  storyTrimItem(storyId: string, itemId: string, trimStartMs: number, trimEndMs: number): Promise<StoryIpcResult<TtsStoryItem>>;
+  storySetItemVolume(storyId: string, itemId: string, volume: number): Promise<StoryIpcResult<TtsStoryItem>>;
+  storySplitItem(storyId: string, itemId: string, splitTimeMs: number): Promise<StoryIpcResult<{ left: TtsStoryItem; right: TtsStoryItem }>>;
+  storyDuplicateItem(storyId: string, itemId: string): Promise<StoryIpcResult<TtsStoryItem>>;
+  /** URL http://127.0.0.1:<port>/stories/<id>/export-audio — đúng pattern getTtsHistoryAudioUrl. */
+  storyExportAudioUrl(storyId: string): Promise<string>;
 
   // ── STT (Phase 1 — nhận dạng giọng nói, xem
   //    docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md) ────────────────────────

@@ -44,7 +44,10 @@ from pathlib import Path
 # 2026-08-15: bump 19 → 20 (bảng `stt_history`, migration 020 — xem
 # packages/app-db/src/migrations/020_stt_history.ts) — bump CÙNG commit với migration, đúng
 # bài học đã trả giá ở lần 17→19 phía trên.
-REQUIRED_SCHEMA_VERSION = 20
+#
+# 2026-08-17: bump 20 → 21 (bảng `tts_story`/`tts_story_item`, migration 021 — Phase 4, xem
+# packages/app-db/src/migrations/021_tts_story.ts).
+REQUIRED_SCHEMA_VERSION = 21
 
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None
