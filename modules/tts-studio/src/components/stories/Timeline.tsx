@@ -271,6 +271,7 @@ export function Timeline({ storyId, story, storyPort, onRefresh, onError, playba
           className="relative"
           style={{ width: canvasWidthPx, height: trackCount * TRACK_HEIGHT }}
           onPointerDown={(e) => e.stopPropagation()}
+          onClick={handleTimelineClick}
         >
           {Array.from({ length: trackCount }).map((_, i) => (
             <div

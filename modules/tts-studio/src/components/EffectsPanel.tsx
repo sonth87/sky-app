@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { EffectPreset, EffectPresetPort, EffectTypeInfo, TtsPort } from '@sky-app/service-contracts';
+import type { EffectPresetPort, EffectTypeInfo, TtsPort } from '@sky-app/service-contracts';
 import { useTtsStudioStore } from '../store';
+import { useEffectPresets } from '../lib/useEffectPresets';
+import { EffectsSelect } from './EffectsSelect';
 import { PromptDialog } from './PromptDialog';
 
 export interface EffectsPanelProps {
@@ -14,7 +16,7 @@ export interface EffectsPanelProps {
 
 export function EffectsPanel({ effectPresetPort, ttsPort }: EffectsPanelProps) {
   const [types, setTypes] = useState<Record<string, EffectTypeInfo> | null>(null);
-  const [presets, setPresets] = useState<EffectPreset[]>([]);
+  const [presets, reloadPresets] = useEffectPresets(effectPresetPort);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showSavePrompt, setShowSavePrompt] = useState(false);
@@ -40,11 +42,6 @@ export function EffectsPanel({ effectPresetPort, ttsPort }: EffectsPanelProps) {
       .catch(() => { if (alive) setTypes(null); });
     return () => { alive = false; };
   }, [ttsPort]);
-
-  const reloadPresets = () => {
-    effectPresetPort?.list().then(setPresets).catch((e) => setError(String(e)));
-  };
-  useEffect(reloadPresets, [effectPresetPort]);
 
   if (!types || !effectPresetPort) return null;
 
@@ -94,7 +91,7 @@ export function EffectsPanel({ effectPresetPort, ttsPort }: EffectsPanelProps) {
   const selected = presets.find((p) => p.id === selectedPresetId);
 
   return (
-    <div className="space-y-3 border-t pt-3">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-semibold text-secondary">Hiệu ứng âm thanh</div>
         {effectsChain.length > 0 && (
@@ -108,16 +105,7 @@ export function EffectsPanel({ effectPresetPort, ttsPort }: EffectsPanelProps) {
         )}
       </div>
 
-      <select
-        value={selectedPresetId ?? ''}
-        onChange={(e) => applyPreset(e.target.value)}
-        className="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs"
-      >
-        <option value="">Không dùng hiệu ứng</option>
-        {presets.map((p) => (
-          <option key={p.id} value={p.id}>{p.name}</option>
-        ))}
-      </select>
+      <EffectsSelect presets={presets} value={selectedPresetId ?? ''} onChange={applyPreset} />
 
       {/* Chỉ hiện tham số của hiệu ứng mà server CÓ khai — preset lưu từ bản cũ có thể
           chứa loại hiệu ứng đã bị gỡ; bỏ qua lặng lẽ thay vì crash cả panel. */}

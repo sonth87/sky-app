@@ -1,26 +1,18 @@
-import { useEffect, useState } from 'react';
-import type { TtsPort } from '@sky-app/service-contracts';
+import type { TtsEnginePort } from '@sky-app/service-contracts';
 import { useTtsStudioStore } from '../store';
+import { useTtsEngines } from '../lib/useTtsEngines';
+import { LanguageSelect } from './LanguageSelect';
 
 export interface EngineParamsPanelProps {
-  ttsPort?: TtsPort;
+  enginePort?: TtsEnginePort;
 }
 
-export function EngineParamsPanel({ ttsPort }: EngineParamsPanelProps) {
-  const [capabilities, setCapabilities] = useState<Record<string, any> | null>(null);
-  const [loading, setLoading] = useState(false);
+export function EngineParamsPanel({ enginePort }: EngineParamsPanelProps) {
+  const [ttsEngines] = useTtsEngines(enginePort);
   const engineOverrides = useTtsStudioStore((s) => s.engineOverrides);
   const updateEngineOverride = useTtsStudioStore((s) => s.updateEngineOverride);
 
-  useEffect(() => {
-    if (!ttsPort?.getEngineCapabilities) return;
-    setLoading(true);
-    ttsPort.getEngineCapabilities()
-      .then(setCapabilities)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [ttsPort]);
-
+  const capabilities = ttsEngines?.current_capabilities;
   if (!capabilities) return null;
 
   const samplingParams = capabilities.supports_sampling ? capabilities.sampling_params || {} : {};
@@ -32,27 +24,22 @@ export function EngineParamsPanel({ ttsPort }: EngineParamsPanelProps) {
   const languages: string[] = capabilities.multilingual ? capabilities.supported_languages || [] : [];
   const engineId = capabilities.id || 'unknown';
   const currentOverrides = engineOverrides[engineId] || {};
-
-  if (Object.keys(samplingParams).length === 0 && languages.length === 0) return null;
+  const isVieneu = engineId === 'vieneu';
 
   return (
     <div className="space-y-3 border-t pt-3">
       <div className="text-xs font-semibold text-secondary">Engine Parameters</div>
 
-      {languages.length > 0 && (
-        <div className="flex items-center justify-between gap-2">
-          <label htmlFor="engine-language" className="text-xs">Ngôn ngữ</label>
-          <select
-            id="engine-language"
-            value={currentOverrides.language ?? ''}
-            onChange={(e) => updateEngineOverride(engineId, 'language', e.target.value || undefined)}
-            className="rounded-lg border border-border bg-card px-1.5 py-1 text-xs"
-          >
-            <option value="">Tự đoán từ văn bản</option>
-            {languages.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
-          </select>
-        </div>
-      )}
+      <div className="flex items-center justify-between gap-2">
+        <label className="text-xs">Ngôn ngữ</label>
+        <LanguageSelect
+          languages={languages}
+          value={currentOverrides.language ?? ''}
+          onChange={(lang) => updateEngineOverride(engineId, 'language', lang || undefined)}
+          disabled={isVieneu}
+          disabledReason="VieNeu tự gắn ngôn ngữ theo giọng đã chọn (2 bộ preset vi-VN/en-US riêng), không cần chọn ở đây."
+        />
+      </div>
 
       {Object.keys(samplingParams).length > 0 && (
         <div className="space-y-2">

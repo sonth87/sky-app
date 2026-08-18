@@ -1,7 +1,7 @@
-import { Loader2, Pause, Play, Sparkles } from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
 import { ButtonPrimitive } from '@sky-app/ui';
 import { useTtsStudioStore } from '../store';
-import { useAudioPlayingId } from '../lib/audioPlayer';
+import { GenerateButton } from './GenerateButton';
 
 export const QUICK_PLAY_ID = 'quickplay';
 
@@ -9,13 +9,20 @@ export interface GenerateBarProps {
   onGenerate?: () => void;
   onQuickPlay?: () => void;
   canQuickPlay?: boolean;
+  /** AudioPlayerBar đang mở hay không — quyết định nhãn/icon nút "Phát nhanh" (play/pause THẬT
+   *  giờ nằm trong chính player đó, nút này chỉ đóng/mở). */
+  showQuickPlayer?: boolean;
 }
 
-export function GenerateBar({ onGenerate, onQuickPlay, canQuickPlay }: GenerateBarProps) {
+/**
+ * Chỉ 2 nút hành động — KHÔNG có hàng chọn giọng/ngôn ngữ/hiệu ứng (thử thêm 1 lần rồi bỏ,
+ * 2026-08-18: thừa, sidebar đã có `VoicePicker`/`EffectsPanel`/`EngineParamsPanel` lo đúng việc
+ * đó rồi, lặp lại ở đây chỉ gây rối chứ không thêm giá trị).
+ */
+export function GenerateBar({ onGenerate, onQuickPlay, canQuickPlay, showQuickPlayer }: GenerateBarProps) {
   const text = useTtsStudioStore((s) => s.text);
   const isGenerating = useTtsStudioStore((s) => s.isGenerating);
   const selectedVoiceId = useTtsStudioStore((s) => s.selectedVoiceId);
-  const isQuickPlaying = useAudioPlayingId() === QUICK_PLAY_ID;
 
   const disabled = isGenerating || !text.trim() || !selectedVoiceId;
 
@@ -28,12 +35,9 @@ export function GenerateBar({ onGenerate, onQuickPlay, canQuickPlay }: GenerateB
         disabled={!canQuickPlay || isGenerating}
         onClick={onQuickPlay}
       >
-        {isQuickPlaying ? <Pause size={14} /> : <Play size={14} />} {isQuickPlaying ? 'Dừng' : 'Phát nhanh'}
+        {showQuickPlayer ? <Pause size={14} /> : <Play size={14} />} {showQuickPlayer ? 'Ẩn' : 'Phát nhanh'}
       </ButtonPrimitive>
-      <ButtonPrimitive type="button" size="sm" disabled={disabled} onClick={onGenerate}>
-        {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-        Tạo giọng nói
-      </ButtonPrimitive>
+      <GenerateButton generating={isGenerating} disabled={disabled} onClick={() => onGenerate?.()} />
     </div>
   );
 }

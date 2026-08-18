@@ -188,6 +188,10 @@ export function TimelineItem({
       }
       style={{ left, width, top: top + (TRACK_HEIGHT - 56) / 2 }}
       onPointerDown={beginDrag('move')}
+      // `click` KHÔNG bị chặn bởi stopPropagation() trên pointerdown (2 loại event tách biệt)
+      // — không chặn riêng thì bấm chọn item cũng nổi bọt lên container, kích hoạt luôn
+      // handleTimelineClick (tua + BỎ chọn ngay sau khi vừa chọn).
+      onClick={(e) => e.stopPropagation()}
     >
       <div className="pointer-events-none absolute inset-0 top-5">
         {audioUrl && (

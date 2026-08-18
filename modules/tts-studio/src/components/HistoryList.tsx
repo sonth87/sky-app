@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { TtsPort } from '@sky-app/service-contracts';
 import { ButtonPrimitive } from '@sky-app/ui';
 import { useTtsStudioStore } from '../store';
-import { getPlayingId, playUrlAudio, stopAudio, useAudioPlayingId } from '../lib/audioPlayer';
+import { AudioPlayerBar } from './AudioPlayerBar';
 
 function historyPlayId(id: string): string {
   return `history:${id}`;
@@ -27,24 +27,23 @@ export function HistoryList({ ttsPort }: HistoryListProps) {
   const removeHistory = useTtsStudioStore((s) => s.removeHistory);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
-  const playingId = useAudioPlayingId();
+  const [openEntry, setOpenEntry] = useState<{ id: string; url: string; label: string } | null>(null);
 
   const filteredHistory = history.filter((entry) =>
     entry.text.toLowerCase().includes(searchText.toLowerCase()) ||
     entry.voiceLabel.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const handlePlay = async (id: string) => {
+  const handlePlay = async (id: string, label: string) => {
     if (!ttsPort?.getHistoryAudioUrl) return;
-    const playId = historyPlayId(id);
-    if (getPlayingId() === playId) {
-      stopAudio();
+    if (openEntry?.id === id) {
+      setOpenEntry(null); // đang mở đúng dòng này — bấm lại = đóng player (AudioPlayerBar tự dừng phát)
       return;
     }
     setBusyId(id);
     try {
       const url = await ttsPort.getHistoryAudioUrl(id);
-      await playUrlAudio(playId, url);
+      setOpenEntry({ id, url, label });
     } finally {
       setBusyId(null);
     }
@@ -124,7 +123,10 @@ export function HistoryList({ ttsPort }: HistoryListProps) {
 
       <div className="flex flex-col gap-1.5">
         {filteredHistory.map((entry) => {
-          const isPlaying = playingId === historyPlayId(entry.id);
+          // "Đang mở player cho dòng này" — khác `playingId` (có thể đang mở nhưng TẠM DỪNG,
+          // AudioPlayerBar's nút play/pause riêng lo phần đó). Icon Pause ở đây nghĩa là "đang
+          // hiện player, bấm lại để đóng", không nhất thiết đang phát.
+          const isOpen = openEntry?.id === entry.id;
           return (
             <div
               key={entry.id}
@@ -145,12 +147,12 @@ export function HistoryList({ ttsPort }: HistoryListProps) {
                       variant="ghost"
                       size="icon-xs"
                       disabled={busyId === entry.id}
-                      onClick={() => handlePlay(entry.id)}
-                      title={isPlaying ? 'Dừng' : 'Nghe lại'}
+                      onClick={() => handlePlay(entry.id, `${entry.voiceLabel} · ${entry.text}`)}
+                      title={isOpen ? 'Đóng' : 'Nghe lại'}
                     >
                       {busyId === entry.id ? (
                         <Loader2 size={12} className="animate-spin" />
-                      ) : isPlaying ? (
+                      ) : isOpen ? (
                         <Pause size={12} />
                       ) : (
                         <Play size={12} />
@@ -181,6 +183,15 @@ export function HistoryList({ ttsPort }: HistoryListProps) {
           );
         })}
       </div>
+
+      {openEntry && (
+        <AudioPlayerBar
+          id={historyPlayId(openEntry.id)}
+          source={{ kind: 'url', url: openEntry.url }}
+          label={openEntry.label}
+          onClose={() => setOpenEntry(null)}
+        />
+      )}
     </div>
   );
 }

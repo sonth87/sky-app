@@ -104,6 +104,15 @@ export interface TtsEngineInfo {
     supports_clone: boolean;
     supports_preset: boolean;
     supports_emotion: boolean;
+    /** Engine hỗ trợ chỉnh sampling params (temperature/top_k/...) hay không — vắng mặt ở
+     *  server cũ, coi như `false`. Khai kèm `sampling_params` (xem `engine.py`'s
+     *  `capabilities()` — nguồn thật của dict này, KHÔNG suy đoán). */
+    supports_sampling?: boolean;
+    sampling_params?: Record<string, { default: number; min: number; max: number; step: number }>;
+    /** `true` = 1 giọng clone nói được nhiều ngôn ngữ (vd Qwen — 10 ngôn ngữ, KHÔNG có tiếng
+     *  Việt), khác VieNeu (ngôn ngữ gắn theo bộ preset giọng, không cần chọn tách rời). */
+    multilingual?: boolean;
+    supported_languages?: string[];
   } | null;
 }
 

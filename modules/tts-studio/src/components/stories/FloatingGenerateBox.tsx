@@ -1,15 +1,26 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
-import type { EffectConfig, EffectPresetPort, EffectPreset, StoryPort, TtsPort } from '@sky-app/service-contracts';
+import type { EffectConfig, EffectPresetPort, StoryPort, TtsEnginePort, TtsPort } from '@sky-app/service-contracts';
 import { useTtsStudioStore } from '../../store';
+import { useTtsEngines } from '../../lib/useTtsEngines';
+import { useEffectPresets } from '../../lib/useEffectPresets';
+import { getPlayingId, playUrlAudio, stopAudio } from '../../lib/audioPlayer';
+import { VoicePicker, previewPlayId } from '../VoicePicker';
+import { LanguageSelect } from '../LanguageSelect';
+import { EffectsSelect } from '../EffectsSelect';
+import { ModelSelect } from '../ModelSelect';
+import { GenerateButton } from '../GenerateButton';
 
 export interface FloatingGenerateBoxProps {
   storyId: string;
   storyPort: StoryPort;
   ttsPort: TtsPort;
+  enginePort?: TtsEnginePort;
   /** Vắng mặt ở môi trường không có kho preset — dropdown hiệu ứng tự ẩn, đúng cách
    *  `EffectsPanel` (tab "Sinh giọng") đang xử lý optional port này. */
   effectPresetPort?: EffectPresetPort;
+  /** platform.assetUrl — resolve path tương đối (vd voice-covers/cover-01.webp) thành URL
+   *  đúng môi trường, cần cho `VoicePicker`'s ảnh bìa giọng. */
+  assetUrl: (path: string) => string;
   /** Track cuối cùng đang trống — đoạn mới sinh luôn có chỗ riêng, không đè lên item có sẵn
    *  (đúng quy ước `AddFromHistoryPicker`/"Thêm đoạn" đang dùng). */
   track: number;
@@ -20,69 +31,96 @@ export interface FloatingGenerateBoxProps {
 }
 
 /**
- * Ô "sinh giọng nói mới" nổi ngay trong tab Story — port RÚT GỌN từ voicebox's
- * `FloatingGenerateBox.tsx` (~640 dòng). Sky-app đã có sẵn toàn bộ pipeline sinh giọng
- * (`useTtsStudioStore` + `TtsPort.synthesizeBuffer`) dùng chung với tab "Sinh giọng" — component
- * này CHỈ là 1 form gọn gọi lại đúng path đó rồi tự thêm kết quả thẳng vào Story đang mở, không
- * dựng lại pipeline từ đầu như bản voicebox phải làm (họ không có sẵn 1 tab "Sinh giọng" độc
- * lập để tái dùng).
+ * Ô "sinh giọng nói mới" nổi ngay trong tab Story — bố cục giống voicebox (textarea nhiều
+ * dòng phía trên, hàng chọn phía dưới).
  *
- * **Ngôn ngữ — CHỈ hiện khi engine multilingual (Qwen), không phải mọi lúc như voicebox**:
- * VieNeu gắn ngôn ngữ vào CHÍNH giọng (2 bộ preset riêng `voice-ref/vi-VN`/`voice-ref/en-US`,
- * xem voice_catalog.py), không cần chọn tách rời. Qwen thì khác — 1 giọng clone nói được cả 10
- * ngôn ngữ (`engine_qwen.py`'s `SUPPORTED_LANGUAGES`), và auto-guess theo Unicode script
- * (`_guess_language`) LUÔN SAI cho de/fr/pt/es/it (mọi chữ Latin đều rơi về "English" nếu
- * không chỉ định tay) — chọn tay ở đây ảnh hưởng THẬT tới chất lượng, không phải chỉ tiện lợi.
+ * **Giọng đọc dùng THẲNG `VoicePicker`** (search/filter/nghe thử đã có sẵn, wrapper của
+ * `VoicePickerCombobox` từ `@sky-app/voice-catalog-ui`) — KHÔNG tự vẽ `<select>` nghèo nàn
+ * hơn (bản đầu làm vậy, đã bỏ 2026-08-18). Hệ quả: chọn giọng ở đây giờ DÙNG CHUNG
+ * `selectedVoiceId` với tab "Sinh giọng" (khác thiết kế cục bộ ban đầu) — đơn giản hơn, đúng ý
+ * "dùng lại cái đã làm" thay vì tự chế 1 bản khác đi.
  *
- * **"Engine" chỉ hiện nhãn, KHÔNG đổi được tại đây**: đổi engine ở sky-app là thao tác NẶNG,
- * TOÀN CỤC cho cả tiến trình Python (tải lại model, ảnh hưởng cả phần đang chạy thật cho buổi
- * lễ nếu có) — khác voicebox trình bày như 1 dropdown nhẹ theo từng lần sinh. Đổi engine vẫn
- * phải qua màn "Quản lý engine" riêng, không lồng vào ô sinh nhanh này.
- *
- * State (text/voice/preset/language) CỐ Ý cục bộ, KHÔNG dùng chung state của
- * `useTtsStudioStore` (`text`/`selectedVoiceId`/`selectedPresetId`/`engineOverrides`) — gõ/chọn
- * ở đây không nên làm đổi nội dung đang soạn dở ở tab "Sinh giọng". Chỉ đọc `voices` (danh
- * sách, đã tải sẵn lúc mount `TtsStudioApp`) — không tải lại.
+ * **Ngôn ngữ LUÔN hiện, disable khi engine hiện tại là VieNeu** (không ẩn hẳn như bản đầu) —
+ * cùng logic `EngineParamsPanel.tsx`. **Model/engine**: `ModelSelect` mới — CHỌN xong CHƯA đổi
+ * engine thật ngay (đổi engine là thao tác nặng/toàn cục, restart cả tiến trình Python), chỉ
+ * thật sự gọi `enginePort.switchEngine()` lúc bấm Sinh nếu model chọn khác model đang chạy.
  */
 export function FloatingGenerateBox({
-  storyId, storyPort, ttsPort, effectPresetPort, track, onAdded, bottomOffset,
+  storyId, storyPort, ttsPort, enginePort, effectPresetPort, assetUrl, track, onAdded, bottomOffset,
 }: FloatingGenerateBoxProps) {
-  const voices = useTtsStudioStore((s) => s.voices);
+  const selectedVoiceId = useTtsStudioStore((s) => s.selectedVoiceId);
   const [text, setText] = useState('');
-  const [voiceId, setVoiceId] = useState('');
   const [presetId, setPresetId] = useState('');
-  const [presets, setPresets] = useState<EffectPreset[]>([]);
   const [language, setLanguage] = useState('');
-  const [capabilities, setCapabilities] = useState<Record<string, any> | null>(null);
+  const [pendingEngineId, setPendingEngineId] = useState('');
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [switchingEngine, setSwitchingEngine] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    effectPresetPort?.list().then(setPresets).catch(() => {});
-  }, [effectPresetPort]);
+  const [ttsEngines, refetchEngines] = useTtsEngines(enginePort);
+  const [presets] = useEffectPresets(effectPresetPort);
 
-  useEffect(() => {
-    ttsPort.getEngineCapabilities?.().then(setCapabilities).catch(() => {});
-  }, [ttsPort]);
-
-  const engineId: string | undefined = capabilities?.id;
-  const engineLabel: string | undefined = capabilities?.label ?? engineId;
+  const capabilities = ttsEngines?.current_capabilities;
+  const currentEngineId = ttsEngines?.current;
+  const isVieneu = currentEngineId === 'vieneu';
   const languages: string[] = capabilities?.multilingual ? capabilities.supported_languages || [] : [];
 
-  const effectiveVoiceId = voiceId || voices.find((v) => v.default)?.id || voices[0]?.id || '';
-  const disabled = generating || !text.trim() || !effectiveVoiceId;
+  // Chọn model mặc định = engine đang chạy, CHỈ lúc lần đầu có dữ liệu — sau đó độc lập với
+  // `ttsEngines.current` (không tự đồng bộ lại nếu người dùng đã chọn khác).
+  useEffect(() => {
+    if (!pendingEngineId && currentEngineId) setPendingEngineId(currentEngineId);
+  }, [pendingEngineId, currentEngineId]);
+
+  const handlePreview = async (voiceId: string) => {
+    if (!ttsPort.getPreviewUrl) return;
+    const playId = previewPlayId(voiceId);
+    if (getPlayingId() === playId) { stopAudio(); return; }
+    setPreviewingId(voiceId);
+    try {
+      const url = await ttsPort.getPreviewUrl(voiceId);
+      setPreviewingId(null);
+      await playUrlAudio(playId, url);
+    } catch {
+      setPreviewingId(null);
+    }
+  };
+
+  const disabled = generating || switchingEngine || !text.trim() || !selectedVoiceId;
 
   const handleGenerate = async () => {
     if (disabled) return;
-    setGenerating(true);
     setError(null);
+
+    if (pendingEngineId && currentEngineId && pendingEngineId !== currentEngineId) {
+      if (!enginePort?.switchEngine) {
+        setError('Môi trường này không hỗ trợ đổi model.');
+        return;
+      }
+      setSwitchingEngine(true);
+      try {
+        const res = await enginePort.switchEngine(pendingEngineId);
+        if (!res.ok) {
+          setError(res.error ?? 'Không đổi được model.');
+          return;
+        }
+        refetchEngines();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        return;
+      } finally {
+        setSwitchingEngine(false);
+      }
+    }
+
+    setGenerating(true);
     try {
       const effectsChain: EffectConfig[] | undefined = presetId
         ? presets.find((p) => p.id === presetId)?.effectsChain
         : undefined;
-      const engineOverrides = language && engineId ? { [engineId]: { language } } : undefined;
+      const engineOverrides = language && pendingEngineId ? { [pendingEngineId]: { language } } : undefined;
       const result = await ttsPort.synthesizeBuffer(text.trim(), {
-        voiceId: effectiveVoiceId, effectsChain, engine_overrides: engineOverrides,
+        voiceId: selectedVoiceId!, effectsChain, engine_overrides: engineOverrides,
       });
       if (!result.historyId) {
         setError('Môi trường này chưa hỗ trợ tự thêm vào Story — dùng tab "Sinh giọng" rồi bấm "Thêm đoạn" từ lịch sử.');
@@ -100,67 +138,54 @@ export function FloatingGenerateBox({
 
   return (
     <div
-      className="absolute inset-x-2 z-10 flex items-center gap-1.5 rounded-xl border border-border bg-popover/95 p-1.5 shadow-lg backdrop-blur"
+      className="absolute inset-x-2 z-10 flex flex-col gap-2.5 rounded-2xl border border-border bg-popover/95 p-4 shadow-lg backdrop-blur"
       style={{ bottom: bottomOffset + 8 }}
     >
-      <select
-        value={effectiveVoiceId}
-        onChange={(e) => setVoiceId(e.target.value)}
-        className="w-24 shrink-0 rounded-lg border border-border bg-card px-1.5 py-1.5 text-2xs"
-      >
-        {voices.length === 0 && <option value="">Chưa có giọng</option>}
-        {voices.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-      </select>
-      {engineLabel && (
-        <span
-          title="Engine đang dùng — đổi qua &quot;Quản lý engine&quot;, không đổi được tại đây"
-          className="hidden shrink-0 rounded-lg border border-border bg-card px-1.5 py-1.5 text-2xs text-muted-foreground sm:block"
-        >
-          {engineLabel}
-        </span>
-      )}
-      {languages.length > 0 && (
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          title="Engine đa ngôn ngữ — chọn tay tránh đoán nhầm (đặc biệt sai với de/fr/pt/es/it)"
-          className="hidden w-20 shrink-0 rounded-lg border border-border bg-card px-1.5 py-1.5 text-2xs lg:block"
-        >
-          <option value="">Tự đoán</option>
-          {languages.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
-        </select>
-      )}
-      {effectPresetPort && presets.length > 0 && (
-        <select
-          value={presetId}
-          onChange={(e) => setPresetId(e.target.value)}
-          className="hidden w-24 shrink-0 rounded-lg border border-border bg-card px-1.5 py-1.5 text-2xs md:block"
-        >
-          <option value="">Không hiệu ứng</option>
-          {presets.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      )}
-      <input
-        type="text"
+      <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && !disabled) void handleGenerate(); }}
-        placeholder="Gõ văn bản, sinh xong tự thêm vào Story..."
-        className="min-w-0 flex-1 rounded-lg border border-border bg-card px-2 py-1.5 text-2xs outline-none focus:border-primary"
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !disabled) void handleGenerate(); }}
+        placeholder="Nhập văn bản cho Story — sinh xong tự thêm vào track cuối. (⌘/Ctrl+Enter để sinh nhanh)"
+        rows={3}
+        className="w-full resize-none rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:border-primary"
       />
-      <button
-        type="button"
-        onClick={() => void handleGenerate()}
-        disabled={disabled}
-        title={error ?? undefined}
-        className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-2xs text-primary-foreground hover:opacity-90 disabled:opacity-40"
-      >
-        {generating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-        Sinh & Thêm
-      </button>
-      {error && (
-        <p className="absolute -top-6 left-0 right-0 truncate text-2xs text-destructive">{error}</p>
-      )}
+
+      {error && <p className="text-2xs text-destructive">{error}</p>}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <VoicePicker onPreview={handlePreview} previewingId={previewingId} assetUrl={assetUrl} />
+        <LanguageSelect
+          languages={languages}
+          value={language}
+          onChange={setLanguage}
+          disabled={isVieneu}
+          disabledReason="VieNeu tự gắn ngôn ngữ theo giọng đã chọn, không cần chọn ở đây."
+          className="rounded-lg border border-border bg-card px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+        />
+        {ttsEngines && ttsEngines.engines.length > 0 && (
+          <ModelSelect
+            engines={ttsEngines.engines}
+            value={pendingEngineId}
+            onChange={setPendingEngineId}
+            className="rounded-lg border border-border bg-card px-2 py-1.5 text-xs"
+          />
+        )}
+        {presets.length > 0 && (
+          <EffectsSelect
+            presets={presets}
+            value={presetId}
+            onChange={setPresetId}
+            className="w-32 rounded-lg border border-border bg-card px-2 py-1.5 text-xs"
+          />
+        )}
+        <GenerateButton
+          generating={generating || switchingEngine}
+          disabled={disabled}
+          onClick={() => void handleGenerate()}
+          label={switchingEngine ? 'Đang đổi model...' : 'Sinh & Thêm'}
+          className="ml-auto"
+        />
+      </div>
     </div>
   );
 }

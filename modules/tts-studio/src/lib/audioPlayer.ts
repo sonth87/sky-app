@@ -14,7 +14,13 @@ import { useSyncExternalStore } from 'react';
  * đang phát = dừng (toggle), khớp hành vi nút Play/Stop người dùng mong đợi.
  */
 
-type Source = AudioBufferSourceNode | HTMLAudioElement;
+/** `{ stop }` — handle chung chung cho nguồn phát KHÔNG phải Web Audio/`<audio>` thô (vd
+ *  `AudioPlayerBar`'s WaveSurfer instance) — xem `playExternal()`. */
+interface StoppableHandle {
+  stop: () => void;
+}
+
+type Source = AudioBufferSourceNode | HTMLAudioElement | StoppableHandle;
 
 let audioCtx: AudioContext | null = null;
 let currentSource: Source | null = null;
@@ -34,23 +40,56 @@ function isHtmlAudio(s: Source): s is HTMLAudioElement {
   return typeof HTMLAudioElement !== 'undefined' && s instanceof HTMLAudioElement;
 }
 
-/** Dừng audio đang phát, bất kể phát bằng cơ chế nào (PCM tổng hợp hay URL nghe thử). */
+function isAudioBufferSource(s: Source): s is AudioBufferSourceNode {
+  return typeof AudioBufferSourceNode !== 'undefined' && s instanceof AudioBufferSourceNode;
+}
+
+/** Dừng audio đang phát, bất kể phát bằng cơ chế nào (PCM tổng hợp, URL nghe thử, hay nguồn
+ *  ngoài đăng ký qua `playExternal` — vd `AudioPlayerBar`'s WaveSurfer). */
 export function stopAudio(): void {
   if (currentSource) {
     if (isHtmlAudio(currentSource)) {
       currentSource.pause();
       currentSource.currentTime = 0;
-    } else {
+    } else if (isAudioBufferSource(currentSource)) {
       try {
         currentSource.stop();
       } catch {
         /* đã dừng sẵn */
       }
+    } else {
+      currentSource.stop();
     }
   }
   currentSource = null;
   currentId = null;
   notify();
+}
+
+/**
+ * Đăng ký 1 nguồn phát KHÔNG dùng `AudioBufferSourceNode`/`HTMLAudioElement` trực tiếp (vd
+ * `AudioPlayerBar`'s WaveSurfer, tự quản việc phát/tua/volume bên trong nó) làm nguồn "đang
+ * phát" hiện tại — giữ đúng bất biến "chỉ 1 nguồn phát tại 1 thời điểm" của module này: gọi
+ * hàm này tự dừng bất kỳ audio nào khác đang phát qua `playPcmAudio`/`playUrlAudio`/
+ * `playExternal` trước đó, và ngược lại các hàm đó cũng tự dừng nguồn đăng ký ở đây.
+ * `stopFn` được gọi khi có nguồn khác giành quyền phát, hoặc khi `stopAudio()` được gọi thẳng.
+ */
+export function playExternal(id: string, stopFn: () => void): void {
+  if (currentId === id) return; // đã là nguồn đang phát — không tự dừng chính mình
+  stopAudio();
+  currentSource = { stop: stopFn };
+  currentId = id;
+  notify();
+}
+
+/** `AudioPlayerBar` gọi khi nguồn NGOÀI tự kết thúc (phát hết, không loop) — dọn state mà
+ *  KHÔNG gọi lại `stop()` của chính nó (đã tự dừng rồi, gọi lại thừa/vô hại nhưng không cần). */
+export function clearExternalIfCurrent(id: string): void {
+  if (currentId === id) {
+    currentSource = null;
+    currentId = null;
+    notify();
+  }
 }
 
 export function getPlayingId(): string | null {

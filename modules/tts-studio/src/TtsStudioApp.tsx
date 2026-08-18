@@ -6,6 +6,7 @@ import { PortalContainerContext } from './PortalContainerContext';
 import { TextareaRefContext } from './TextareaRefContext';
 import { VoicePicker, previewPlayId } from './components/VoicePicker';
 import { AlertDialog } from './components/AlertDialog';
+import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { SpeedSlider } from './components/SpeedSlider';
 import { EmotionInsert } from './components/EmotionInsert';
 import { EngineParamsPanel } from './components/EngineParamsPanel';
@@ -17,7 +18,7 @@ import { HistoryList } from './components/HistoryList';
 import { VerticalResizeHandle } from './components/VerticalResizeHandle';
 import { StoriesTab } from './components/stories/StoriesTab';
 import { useTtsStudioStore } from './store';
-import { getPlayingId, playPcmAudio, playUrlAudio, stopAudio } from './lib/audioPlayer';
+import { getPlayingId, playUrlAudio, stopAudio } from './lib/audioPlayer';
 import { VoiceCloneModal } from '@sky-app/voice-catalog-ui';
 import { EngineManager, DeviceSettingsModal } from '@sky-app/tts-engine-ui';
 import { useMenuAction } from '@sonth87/device-layout';
@@ -106,6 +107,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
   const [previewingId, setPreviewingId] = useState<string | null>(null);
   const lastResultRef = useRef<{ buffer: ArrayBuffer; sampleRate: number } | null>(null);
   const [canQuickPlay, setCanQuickPlay] = useState(false);
+  const [showQuickPlayer, setShowQuickPlayer] = useState(false);
 
   const refreshVoices = useCallback(async () => {
     if (!tts) return [];
@@ -292,9 +294,9 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
       });
       lastResultRef.current = result;
       setCanQuickPlay(true);
-      // Cùng id với nút "Phát nhanh" (GenerateBar) — auto-play sau khi tạo VÀ nút Phát
-      // nhanh cùng điều khiển 1 audio, nút tự hiện đúng trạng thái Dừng ngay khi vừa tạo.
-      await playPcmAudio(QUICK_PLAY_ID, result.buffer, result.sampleRate);
+      // Hiện AudioPlayerBar ngay — component đó tự autoPlay khi mount, đúng hành vi cũ (tạo
+      // xong nghe luôn), giờ có thêm waveform/tua/loop/volume thay vì chỉ icon Play⇄Pause.
+      setShowQuickPlayer(true);
 
       // Phase 3: server đã ghi dòng lịch sử ngay trong /synthesize và trả id qua
       // X-History-Id (xem history_store.py) — dựng entry NGAY TẠI CLIENT từ dữ liệu đã có
@@ -324,18 +326,11 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
     }
   };
 
-  const handleQuickPlay = async () => {
+  // Nút "Phát nhanh" giờ chỉ đóng/mở AudioPlayerBar (ẩn = tự dừng, xem component's cleanup) —
+  // play/pause THẬT nằm ở nút bên trong chính player đó.
+  const handleQuickPlay = () => {
     if (!lastResultRef.current) return;
-    if (getPlayingId() === QUICK_PLAY_ID) {
-      // Đang phát — bấm lại nút (giờ hiện icon Dừng) = dừng.
-      stopAudio();
-      return;
-    }
-    try {
-      await playPcmAudio(QUICK_PLAY_ID, lastResultRef.current.buffer, lastResultRef.current.sampleRate);
-    } catch {
-      /* im lặng — không phải lỗi nghiêm trọng đủ để hiện banner */
-    }
+    setShowQuickPlayer((v) => !v);
   };
 
   if (!tts) {
@@ -413,10 +408,10 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
                       }
                     }}
                   />
-                  <EmotionInsert />
+                  <EmotionInsert enginePort={enginePort} />
                   <SpeedSlider />
-                  <EngineParamsPanel ttsPort={tts} />
                   <EffectsPanel effectPresetPort={effectPresetPort} ttsPort={tts} />
+                  <EngineParamsPanel enginePort={enginePort} />
                   <UsageGuide />
                   {loadError && (
                     <p className="text-2xs text-destructive">Không tải được danh sách giọng: {loadError}</p>
@@ -435,7 +430,15 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
                       onGenerate={handleGenerate}
                       onQuickPlay={handleQuickPlay}
                       canQuickPlay={canQuickPlay}
+                      showQuickPlayer={showQuickPlayer}
                     />
+                    {showQuickPlayer && lastResultRef.current && (
+                      <AudioPlayerBar
+                        id={QUICK_PLAY_ID}
+                        source={{ kind: 'pcm', buffer: lastResultRef.current.buffer, sampleRate: lastResultRef.current.sampleRate }}
+                        onClose={() => setShowQuickPlayer(false)}
+                      />
+                    )}
                   </div>
                   <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1">
                     <HistoryList ttsPort={tts} />
@@ -445,7 +448,13 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
             )}
 
             {activeTab === 'stories' && storyPort && (
-              <StoriesTab storyPort={storyPort} ttsPort={tts} effectPresetPort={effectPresetPort} />
+              <StoriesTab
+                storyPort={storyPort}
+                ttsPort={tts}
+                enginePort={enginePort}
+                effectPresetPort={effectPresetPort}
+                assetUrl={platform.assetUrl}
+              />
             )}
           </div>
         </div>
