@@ -1812,6 +1812,11 @@ class _MoveItemBody(BaseModel):
     track: int
 
 
+class _ReorderItemsBody(BaseModel):
+    track: int
+    item_ids: list[str]
+
+
 class _TrimItemBody(BaseModel):
     trim_start_ms: int
     trim_end_ms: int
@@ -1823,6 +1828,10 @@ class _VolumeItemBody(BaseModel):
 
 class _SplitItemBody(BaseModel):
     split_time_ms: int
+
+
+class _SetVersionBody(BaseModel):
+    version_id: str
 
 
 def _require_stories():
@@ -1884,6 +1893,19 @@ def delete_story_item(story_id: str, item_id: str):
     return {"ok": True}
 
 
+# Literal path `/items/reorder` khai TRƯỚC mọi route `/items/{item_id}/...` — tránh FastAPI
+# match nhầm "reorder" thành 1 item_id nếu sau này có thêm route PUT/GET thẳng
+# `/items/{item_id}` (hiện chưa có, nhưng đúng cảnh báo voicebox từng gặp, xem kế hoạch Phase 4).
+@app.put("/stories/{story_id}/items/reorder")
+def reorder_story_items(story_id: str, body: _ReorderItemsBody):
+    try:
+        return _require_stories().reorder_items(story_id, body.track, body.item_ids)
+    except StoryNotFound:
+        raise HTTPException(404, f"Story not found: {story_id}")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.put("/stories/{story_id}/items/{item_id}/move")
 def move_story_item(story_id: str, item_id: str, body: _MoveItemBody):
     item = _require_stories().move_item(story_id, item_id, body.start_time_ms, body.track)
@@ -1927,6 +1949,94 @@ def duplicate_story_item(story_id: str, item_id: str):
         return _require_stories().duplicate_item(story_id, item_id)
     except StoryItemNotFound:
         raise HTTPException(404, f"Story item not found: {item_id}")
+
+
+@app.get("/stories/{story_id}/items/{item_id}/audio")
+def get_story_item_audio(story_id: str, item_id: str):
+    """WAV thật (item sở hữu bản audio riêng, đã là file .wav sẵn trên đĩa — không cần đóng gói
+    lại như export-audio). Phục vụ waveform + nghe thử riêng từng đoạn."""
+    path = _require_stories().get_item_audio_path(story_id, item_id)
+    if path is None or not path.exists():
+        raise HTTPException(404, f"Story item not found: {item_id}")
+    return FileResponse(str(path), media_type="audio/wav")
+
+
+@app.get("/stories/{story_id}/items/{item_id}/versions")
+def list_story_item_versions(story_id: str, item_id: str):
+    store = _require_stories()
+    if store.get_item(story_id, item_id) is None:
+        raise HTTPException(404, f"Story item not found: {item_id}")
+    return store.list_item_versions(story_id, item_id)
+
+
+@app.put("/stories/{story_id}/items/{item_id}/version")
+def set_story_item_version(story_id: str, item_id: str, body: _SetVersionBody):
+    try:
+        return _require_stories().set_item_version(story_id, item_id, body.version_id)
+    except StoryItemNotFound:
+        raise HTTPException(404, f"Story item not found: {item_id}")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/stories/{story_id}/items/{item_id}/regenerate")
+async def regenerate_story_item(story_id: str, item_id: str):
+    """Sinh lại audio cho 1 item bằng đúng voice_id/speed/text đã snapshot lúc thêm vào Story,
+    lưu kết quả thành 1 version mới (giữ bản cũ, xem `StoryStore.regenerate_item`'s docstring).
+
+    GIỚI HẠN ĐÃ BIẾT: không áp lại effects_chain gốc (nếu có) — `tts_generation_history` không
+    lưu field này (migration 019), nên item cũng không có gì để snapshot. Không mở rộng phạm vi
+    ở đây để vá lỗ hổng đó, xem migration 022's docstring.
+
+    KHÔNG tự đổi engine đang chạy nếu khác `engine_id` đã snapshot — đổi engine giữa chừng ảnh
+    hưởng tới CẢ tiến trình (kể cả ceremony đang lên sân khấu thật), quá rủi ro cho 1 thao tác
+    tiện lợi. Báo lỗi rõ ràng, để người dùng tự đổi engine trước nếu muốn.
+    """
+    store = _require_stories()
+    item = store.get_item(story_id, item_id)
+    if item is None:
+        raise HTTPException(404, f"Story item not found: {item_id}")
+    if not item.get("voice_id"):
+        raise HTTPException(
+            400,
+            "Item này không có đủ thông tin để sinh lại (thêm vào Story trước khi có tính năng "
+            "Regenerate, hoặc là kết quả của thao tác Tách).",
+        )
+    if _engine is None or _registry is None:
+        raise HTTPException(503, "TTS engine not ready")
+    if item.get("engine_id") and item["engine_id"] != _current_engine_id:
+        raise HTTPException(
+            400,
+            f"Item này được sinh bằng engine '{item['engine_id']}', server đang chạy "
+            f"'{_current_engine_id}' — đổi engine rồi thử lại.",
+        )
+
+    async with _synth_lock:
+        req = TtsRequest(
+            text=item.get("source_text") or "", speaker_id=item["voice_id"],
+            speed=item.get("speed") or 1.0, source="tts_studio",
+        )
+        try:
+            voice = await asyncio.to_thread(_ensure_voice_ready, req.speaker_id)
+            audio = await asyncio.to_thread(_run_synthesis, req, voice)
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(500, str(e))
+
+        audio_np = np.asarray(audio)
+        if (hasattr(audio, "__len__") and len(audio) == 0) or np.isnan(audio_np).any() or np.isinf(audio_np).any():
+            raise HTTPException(500, "Engine trả về audio không hợp lệ")
+
+        from engine import SAMPLE_RATE
+        sample_rate = int(_engine.capabilities().get("sample_rate") or SAMPLE_RATE)
+
+        try:
+            return store.regenerate_item(story_id, item_id, audio_np, sample_rate)
+        except StoryItemNotFound:
+            raise HTTPException(404, f"Story item not found: {item_id}")
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
 
 @app.get("/stories/{story_id}/export-audio")

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Copy, Scissors, Trash2 } from 'lucide-react';
-import type { StoryItem } from '@sky-app/service-contracts';
-import { DRAG_THRESHOLD_PX, MIN_EFFECTIVE_MS, PX_PER_MS, TRACK_HEIGHT } from './timelineConstants';
+import { Check, Copy, RotateCcw, Scissors, Trash2 } from 'lucide-react';
+import type { StoryItem, StoryItemVersion, StoryPort } from '@sky-app/service-contracts';
+import { DRAG_THRESHOLD_PX, MIN_EFFECTIVE_MS, TRACK_HEIGHT } from './timelineConstants';
+import { ClipWaveform } from './ClipWaveform';
+import { DropdownMenu } from '../DropdownMenu';
 
 export interface ItemChange {
   startTimeMs?: number;
@@ -12,6 +14,9 @@ export interface ItemChange {
 
 export interface TimelineItemProps {
   item: StoryItem;
+  storyId: string;
+  storyPort: StoryPort;
+  pxPerMs: number;
   selected: boolean;
   onSelect: (itemId: string) => void;
   /** Gọi lúc THẢ chuột (kéo xong), không phải mỗi pixel di chuyển — Timeline quyết định gọi
@@ -21,6 +26,11 @@ export interface TimelineItemProps {
   onDuplicate: (itemId: string) => void;
   onSplit: (itemId: string, splitTimeMs: number) => void;
   onVolumeChange: (itemId: string, volume: number) => void;
+  onRegenerate: (itemId: string) => void;
+  /** Gọi sau khi đổi version thành công (`VersionPicker`) — Timeline tự `refresh()`, khác
+   *  `onRegenerate` (kích hoạt sinh MỚI, không chỉ đọc lại). */
+  onVersionChanged: () => void;
+  regenerating: boolean;
 }
 
 type DragKind = 'move' | 'trim-left' | 'trim-right';
@@ -30,6 +40,40 @@ interface DragState {
   startY: number;
   moved: boolean;
   orig: { startTimeMs: number; track: number; trimStartMs: number; trimEndMs: number };
+}
+
+/** Dropdown chọn lại 1 bản đã lưu (version) — lazy-load khi mở, đúng cách tránh N+1 query mọi
+ *  item cùng lúc (`can_regenerate` gọn đủ để biết CÓ version hay không, danh sách chỉ cần khi
+ *  người dùng thật sự mở dropdown). */
+function VersionPicker({
+  storyId, itemId, storyPort, onPicked,
+}: { storyId: string; itemId: string; storyPort: StoryPort; onPicked: () => void }) {
+  const [versions, setVersions] = useState<StoryItemVersion[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    storyPort.listItemVersions(storyId, itemId).then((v) => { if (alive) setVersions(v); }).catch(() => { if (alive) setVersions([]); });
+    return () => { alive = false; };
+  }, [storyId, itemId, storyPort]);
+
+  if (versions === null) return <div className="px-2.5 py-1.5 text-2xs text-muted-foreground">Đang tải...</div>;
+  if (versions.length === 0) return <div className="px-2.5 py-1.5 text-2xs text-muted-foreground">Chưa có bản nào khác.</div>;
+
+  return (
+    <>
+      {versions.map((v) => (
+        <button
+          key={v.id}
+          type="button"
+          onClick={() => { void storyPort.setItemVersion(storyId, itemId, v.id).then(onPicked); }}
+          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-2xs text-foreground hover:bg-muted/60"
+        >
+          <Check size={11} className="opacity-0" />
+          {v.label}
+        </button>
+      ))}
+    </>
+  );
 }
 
 /**
@@ -42,12 +86,22 @@ interface DragState {
  * TRÁI cố định (chỉ trimEndMs đổi, startTimeMs không đổi).
  */
 export function TimelineItem({
-  item, selected, onSelect, onCommitChange, onDelete, onDuplicate, onSplit, onVolumeChange,
+  item, storyId, storyPort, pxPerMs, selected, onSelect, onCommitChange, onDelete, onDuplicate,
+  onSplit, onVolumeChange, onRegenerate, onVersionChanged, regenerating,
 }: TimelineItemProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [draft, setDraft] = useState<ItemChange | null>(null);
   const draftRef = useRef<ItemChange | null>(null);
   const movedRef = useRef(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    storyPort.itemAudioUrl(storyId, item.id).then((url) => { if (alive) setAudioUrl(url); }).catch(() => {});
+    return () => { alive = false; };
+    // Chỉ tải lại URL khi audioFile đổi thật (regenerate/set-version) — không phải mỗi lần
+    // trim/move re-render item.
+  }, [storyId, item.id, item.audioFile, storyPort]);
 
   const effective = {
     startTimeMs: draft?.startTimeMs ?? item.startTimeMs,
@@ -56,8 +110,8 @@ export function TimelineItem({
     trimEndMs: draft?.trimEndMs ?? item.trimEndMs,
   };
   const effectiveDurationMs = Math.max(0, item.durationMs - effective.trimStartMs - effective.trimEndMs);
-  const left = effective.startTimeMs * PX_PER_MS;
-  const width = Math.max(6, effectiveDurationMs * PX_PER_MS);
+  const left = effective.startTimeMs * pxPerMs;
+  const width = Math.max(6, effectiveDurationMs * pxPerMs);
   const top = effective.track * TRACK_HEIGHT;
 
   function beginDrag(kind: DragKind) {
@@ -81,7 +135,7 @@ export function TimelineItem({
       const dx = e.clientX - drag.startX;
       const dy = e.clientY - drag.startY;
       if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) movedRef.current = true;
-      const dMs = dx / PX_PER_MS;
+      const dMs = dx / pxPerMs;
 
       let next: ItemChange;
       if (drag.kind === 'move') {
@@ -123,35 +177,47 @@ export function TimelineItem({
       window.removeEventListener('pointerup', onUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `drag`/`item` chỉ đọc lúc bắt đầu kéo, đổi giữa chừng không cần re-attach
-  }, [drag]);
+  }, [drag, pxPerMs]);
 
   return (
     <div
       className={
         selected
-          ? 'group absolute flex h-14 flex-col justify-center rounded-lg border-2 border-primary bg-primary/15 px-2 shadow-sm'
-          : 'group absolute flex h-14 flex-col justify-center rounded-lg border border-border bg-card px-2 shadow-sm hover:border-primary/50'
+          ? 'group absolute flex h-14 flex-col justify-center overflow-hidden rounded-lg border-2 border-primary bg-primary/15 px-2 shadow-sm'
+          : 'group absolute flex h-14 flex-col justify-center overflow-hidden rounded-lg border border-border bg-card px-2 shadow-sm hover:border-primary/50'
       }
       style={{ left, width, top: top + (TRACK_HEIGHT - 56) / 2 }}
       onPointerDown={beginDrag('move')}
     >
-      <div className="pointer-events-none truncate text-2xs font-medium text-foreground">
+      <div className="pointer-events-none absolute inset-0 top-5">
+        {audioUrl && (
+          <ClipWaveform
+            audioUrl={audioUrl}
+            width={width}
+            trimStartMs={effective.trimStartMs}
+            trimEndMs={effective.trimEndMs}
+            durationMs={item.durationMs}
+          />
+        )}
+      </div>
+
+      <div className="pointer-events-none relative truncate text-2xs font-medium text-foreground">
         {item.sourceText || '(không có văn bản)'}
       </div>
       {item.voiceLabel && (
-        <div className="pointer-events-none truncate text-2xs text-muted-foreground">{item.voiceLabel}</div>
+        <div className="pointer-events-none relative truncate text-2xs text-muted-foreground">{item.voiceLabel}</div>
       )}
 
       {/* Handle trim 2 mép — dải mỏng, stopPropagation để không kích hoạt kéo-di-chuyển của
           box cha (xem kế hoạch's rủi ro "Resize handle đè lên vùng kéo-di-chuyển"). */}
       <div
-        className="absolute inset-y-0 left-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100"
+        className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100"
         onPointerDown={beginDrag('trim-left')}
       >
         <div className="mx-auto h-full w-0.5 bg-primary" />
       </div>
       <div
-        className="absolute inset-y-0 right-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100"
+        className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100"
         onPointerDown={beginDrag('trim-right')}
       >
         <div className="mx-auto h-full w-0.5 bg-primary" />
@@ -188,6 +254,31 @@ export function TimelineItem({
           >
             <Copy size={13} />
           </button>
+          {item.canRegenerate && (
+            <button
+              type="button"
+              title="Sinh lại"
+              disabled={regenerating}
+              onClick={() => onRegenerate(item.id)}
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+            >
+              <RotateCcw size={13} className={regenerating ? 'animate-spin' : undefined} />
+            </button>
+          )}
+          {item.activeVersionId && (
+            <DropdownMenu
+              triggerLabel="Chọn lại bản đã sinh"
+              triggerClassName="rounded px-1.5 py-1 text-2xs text-muted-foreground hover:bg-muted hover:text-foreground"
+              trigger={<span>Bản khác</span>}
+            >
+              <VersionPicker
+                storyId={storyId}
+                itemId={item.id}
+                storyPort={storyPort}
+                onPicked={onVersionChanged}
+              />
+            </DropdownMenu>
+          )}
           <button
             type="button"
             title="Xoá"

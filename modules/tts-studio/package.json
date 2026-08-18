@@ -18,6 +18,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@sky-app/kernel": "workspace:*",
     "@sky-app/service-contracts": "workspace:*",
     "@sky-app/tts-engine-ui": "workspace:*",
@@ -27,6 +30,7 @@
     "i18next": "^26.3.6",
     "lucide-react": "catalog:",
     "react-i18next": "^17.0.9",
+    "wavesurfer.js": "^7.12.11",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

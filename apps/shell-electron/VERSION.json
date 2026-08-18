@@ -2,6 +2,15 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.18.0",
+      "date": "2026-08-18",
+      "bump": "minor",
+      "summary": "Nâng tính năng \"Câu chuyện\" trong TTS Studio: mỗi đoạn giờ hiện dạng sóng âm thanh, có thanh zoom, phát thử ngay trên canvas với vạch phát chạy đồng bộ nhiều track (tua được bằng cách bấm vào thước thời gian). Danh sách đoạn có thêm dạng kéo-thả sắp xếp nhanh theo chiều dọc. Thêm tính năng \"Sinh lại\" — sinh lại 1 đoạn ngay trong Story, giữ các bản cũ để chọn lại bất cứ lúc nào. Danh sách Story bên trái có ô tìm kiếm và sửa được tên/mô tả. Thêm ô sinh giọng nói mới nổi ngay trong tab Story, sinh xong tự thêm vào Story đang mở.",
+      "breaking": true,
+      "minAppVersion": "0.18.0",
+      "detailsRef": "history/2026-08-18-stories-voicebox-parity.md"
+    },
+    {
       "version": "0.17.0",
       "date": "2026-08-17",
       "bump": "minor",

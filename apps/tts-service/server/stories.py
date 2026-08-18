@@ -61,7 +61,12 @@ def _row_to_story(row: sqlite3.Row) -> dict:
 
 
 def _row_to_item(row: sqlite3.Row) -> dict:
-    return dict(row)
+    d = dict(row)
+    # `voice_id` vắng mặt (item cũ thêm trước migration 022, hoặc kết quả của Tách — xem
+    # split_item's docstring) → không đủ tham số gọi lại /synthesize, ẩn hẳn nút Regenerate ở
+    # UI thay vì hiện disabled-mà-không-rõ-vì-sao.
+    d["can_regenerate"] = bool(d.get("voice_id"))
+    return d
 
 
 class StoryNotFound(Exception):
@@ -159,6 +164,14 @@ class StoryStore:
             ).fetchone()
             return _row_to_item(row) if row else None
 
+    def get_item_audio_path(self, story_id: str, item_id: str) -> Path | None:
+        """Đúng khuôn `HistoryStore.get_audio_path()` — main.py không tự ráp đường dẫn từ
+        `_story_dir()` (private), luôn đi qua đây."""
+        item = self.get_item(story_id, item_id)
+        if item is None:
+            return None
+        return self._story_dir(story_id) / item["audio_file"]
+
     def _next_start_time_ms(self, story_id: str, track: int) -> int:
         """Vị trí mặc định cho item MỚI thêm: cuối item cuối cùng của track đó + khoảng cách
         mặc định — chỉ dùng lúc thêm mới, không dùng khi kéo-thả (đã có vị trí tường minh)."""
@@ -202,11 +215,13 @@ class StoryStore:
             self._conn.execute(
                 """INSERT INTO tts_story_item
                    (id, story_id, audio_file, source_text, voice_label, duration_ms,
-                    start_time_ms, track, trim_start_ms, trim_end_ms, volume, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1.0, ?)""",
+                    start_time_ms, track, trim_start_ms, trim_end_ms, volume, created_at,
+                    voice_id, speed, engine_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1.0, ?, ?, ?, ?)""",
                 (
                     item_id, story_id, audio_file, entry.get("text"), entry.get("voice_label"),
                     entry.get("duration_ms") or 0, start_time_ms, track, _now_iso(),
+                    entry.get("voice_id"), entry.get("speed"), entry.get("engine_id"),
                 ),
             )
             self._conn.commit()
@@ -226,6 +241,31 @@ class StoryStore:
             self._conn.commit()
             self._touch_story(story_id)
             return self.get_item(story_id, item_id)
+
+    def reorder_items(self, story_id: str, track: int, ordered_item_ids: list[str]) -> list[dict]:
+        """Sắp lại thứ tự các item TRONG CÙNG 1 track (list dọc sortable, kéo-thả bằng
+        `@dnd-kit/sortable`) — tính lại `start_time_ms` tuần tự, cách nhau `DEFAULT_GAP_MS`.
+        KHÔNG đổi track — kéo-thả xuyên track vẫn qua `move_item` (canvas), tránh 2 API cùng
+        làm 1 việc theo 2 cách khác nhau."""
+        with self._lock:
+            if self.get_story(story_id) is None:
+                raise StoryNotFound(story_id)
+            items = {i["id"]: i for i in self.list_items(story_id) if i["track"] == track}
+            if set(ordered_item_ids) != set(items.keys()):
+                raise ValueError("Danh sách sắp lại không khớp đúng các item hiện có trên track này.")
+
+            cursor_ms = 0
+            for item_id in ordered_item_ids:
+                item = items[item_id]
+                self._conn.execute(
+                    "UPDATE tts_story_item SET start_time_ms = ? WHERE story_id = ? AND id = ?",
+                    (cursor_ms, story_id, item_id),
+                )
+                effective_ms = item["duration_ms"] - item["trim_start_ms"] - item["trim_end_ms"]
+                cursor_ms += effective_ms + DEFAULT_GAP_MS
+            self._conn.commit()
+            self._touch_story(story_id)
+            return self.list_items(story_id)
 
     def trim_item(self, story_id: str, item_id: str, trim_start_ms: int, trim_end_ms: int) -> dict:
         with self._lock:
@@ -274,12 +314,14 @@ class StoryStore:
             self._conn.execute(
                 """INSERT INTO tts_story_item
                    (id, story_id, audio_file, source_text, voice_label, duration_ms,
-                    start_time_ms, track, trim_start_ms, trim_end_ms, volume, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    start_time_ms, track, trim_start_ms, trim_end_ms, volume, created_at,
+                    voice_id, speed, engine_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     new_id, story_id, new_audio_file, item["source_text"], item["voice_label"],
                     item["duration_ms"], new_start, item["track"],
                     item["trim_start_ms"], item["trim_end_ms"], item["volume"], _now_iso(),
+                    item["voice_id"], item["speed"], item["engine_id"],
                 ),
             )
             self._conn.commit()
@@ -315,6 +357,16 @@ class StoryStore:
 
             # Nửa phải: item MỚI, file MỚI (copy độc lập) — bắt đầu ngay sau nửa trái trên
             # cùng track, trim_start tính từ điểm tách.
+            # KHÔNG mang voice_id/speed/engine_id sang 2 nửa — cả 2 vẫn trỏ nguyên văn bản
+            # `source_text` ĐẦY ĐỦ (chỉ audio bị cắt), regenerate 1 nửa sẽ sinh lại NGUYÊN câu
+            # gốc chứ không phải riêng nửa đó, hỏng đúng ý người dùng vừa tách. Vô hiệu hoá
+            # Regenerate cho cả 2 nửa (giữ nguyên trim của mảnh trái) an toàn hơn là để sai.
+            self._conn.execute(
+                "UPDATE tts_story_item SET voice_id = NULL, speed = NULL, engine_id = NULL, "
+                "active_version_id = NULL WHERE story_id = ? AND id = ?",
+                (story_id, item_id),
+            )
+
             right_id = _new_id("item")
             right_audio_file = f"{right_id}.wav"
             shutil.copyfile(story_dir / item["audio_file"], story_dir / right_audio_file)
@@ -333,6 +385,99 @@ class StoryStore:
             self._conn.commit()
             self._touch_story(story_id)
             return self.get_item(story_id, item_id), self.get_item(story_id, right_id)  # type: ignore[return-value]
+
+    # ── Regenerate / Versions (Phase 4.5) ───────────────────────────────────────
+    #
+    # `StoryStore` không biết gì về TTS engine — main.py tự lo việc gọi lại `/synthesize`
+    # (dùng `voice_id`/`speed`/`engine_id`/`source_text` snapshot trên item) rồi truyền audio
+    # THÀNH PHẨM vào `regenerate_item()`. Tách vậy để store này không phụ thuộc ngược vào
+    # `_engine`/`_registry` của main.py — đúng ranh giới module hiện có (store chỉ lo DB+file).
+
+    def list_item_versions(self, story_id: str, item_id: str) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM tts_story_item_version WHERE story_item_id = ? ORDER BY created_at",
+                (item_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def regenerate_item(self, story_id: str, item_id: str, new_audio: np.ndarray, sample_rate: int) -> dict:
+        """Lưu audio MỚI (main.py đã tự sinh xong, truyền vào đây) thành 1 version, đặt làm
+        bản đang dùng của item. Lần regenerate ĐẦU TIÊN của 1 item tự lưu audio HIỆN TẠI thành
+        version "Bản gốc" TRƯỚC khi ghi đè — từ đó `active_version_id` luôn trỏ đúng bản đang
+        dùng, không mất bản nào kể cả bản gốc.
+
+        Reset trim về 0/0 — duration bản mới thường khác bản cũ, trim cũ áp lên đó vô nghĩa
+        (đúng hành vi voicebox: đổi version reset luôn trim).
+        """
+        with self._lock:
+            item = self.get_item(story_id, item_id)
+            if item is None:
+                raise StoryItemNotFound(item_id)
+            if not item["voice_id"]:
+                raise ValueError(
+                    "Item này không có đủ thông tin để sinh lại (thêm vào Story trước khi có "
+                    "tính năng Regenerate, hoặc là kết quả của thao tác Tách)."
+                )
+
+            story_dir = self._story_dir(story_id)
+            version_count = self._conn.execute(
+                "SELECT COUNT(*) AS n FROM tts_story_item_version WHERE story_item_id = ?", (item_id,)
+            ).fetchone()["n"]
+
+            if item["active_version_id"] is None:
+                origin_id = _new_id("ver")
+                self._conn.execute(
+                    """INSERT INTO tts_story_item_version
+                       (id, story_item_id, audio_file, duration_ms, label, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (origin_id, item_id, item["audio_file"], item["duration_ms"], "Bản gốc", _now_iso()),
+                )
+                version_count += 1
+
+            new_version_id = _new_id("ver")
+            new_audio_file = f"{new_version_id}.wav"
+            sf.write(str(story_dir / new_audio_file), new_audio, sample_rate)
+            new_duration_ms = int(len(new_audio) / sample_rate * 1000)
+            self._conn.execute(
+                """INSERT INTO tts_story_item_version
+                   (id, story_item_id, audio_file, duration_ms, label, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (new_version_id, item_id, new_audio_file, new_duration_ms, f"Bản {version_count + 1}", _now_iso()),
+            )
+            self._conn.execute(
+                """UPDATE tts_story_item
+                   SET audio_file = ?, duration_ms = ?, trim_start_ms = 0, trim_end_ms = 0,
+                       active_version_id = ?
+                   WHERE story_id = ? AND id = ?""",
+                (new_audio_file, new_duration_ms, new_version_id, story_id, item_id),
+            )
+            self._conn.commit()
+            self._touch_story(story_id)
+            return self.get_item(story_id, item_id)  # type: ignore[return-value]
+
+    def set_item_version(self, story_id: str, item_id: str, version_id: str) -> dict:
+        """Chuyển item về dùng 1 version đã lưu — chỉ TRỎ LẠI file đã có sẵn trong thư mục
+        Story (version's audio_file độc lập từ lúc tạo, không cần copy byte gì thêm)."""
+        with self._lock:
+            if self.get_item(story_id, item_id) is None:
+                raise StoryItemNotFound(item_id)
+            version = self._conn.execute(
+                "SELECT * FROM tts_story_item_version WHERE id = ? AND story_item_id = ?",
+                (version_id, item_id),
+            ).fetchone()
+            if version is None:
+                raise ValueError(f"Không tìm thấy version: {version_id}")
+            self._conn.execute(
+                """UPDATE tts_story_item
+                   SET audio_file = ?, duration_ms = ?, trim_start_ms = 0, trim_end_ms = 0,
+                       active_version_id = ?
+                   WHERE story_id = ? AND id = ?""",
+                (version["audio_file"], version["duration_ms"], version_id, story_id, item_id),
+            )
+            self._conn.commit()
+            self._touch_story(story_id)
+            return self.get_item(story_id, item_id)  # type: ignore[return-value]
 
     def delete_item(self, story_id: str, item_id: str) -> bool:
         with self._lock:

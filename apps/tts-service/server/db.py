@@ -47,7 +47,11 @@ from pathlib import Path
 #
 # 2026-08-17: bump 20 → 21 (bảng `tts_story`/`tts_story_item`, migration 021 — Phase 4, xem
 # packages/app-db/src/migrations/021_tts_story.ts).
-REQUIRED_SCHEMA_VERSION = 21
+#
+# 2026-08-18: bump 21 → 22 (cột `voice_id`/`speed`/`engine_id` trên `tts_story_item` + bảng
+# `tts_story_item_version`, migration 022 — Phase 4.5 "Regenerate", xem
+# packages/app-db/src/migrations/022_tts_story_item_version.ts).
+REQUIRED_SCHEMA_VERSION = 22
 
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None

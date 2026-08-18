@@ -1,4 +1,4 @@
-import type { StoryPort, Story, StoryItem, StoryWithItems } from '@sky-app/service-contracts';
+import type { StoryPort, Story, StoryItem, StoryItemVersion, StoryWithItems } from '@sky-app/service-contracts';
 
 interface RawStory {
   id: string; name: string; description: string | null;
@@ -10,6 +10,12 @@ interface RawStoryItem {
   source_text: string | null; voice_label: string | null; duration_ms: number;
   start_time_ms: number; track: number;
   trim_start_ms: number; trim_end_ms: number; volume: number; created_at: string;
+  voice_id: string | null; engine_id: string | null; can_regenerate: boolean;
+  active_version_id: string | null;
+}
+
+interface RawStoryItemVersion {
+  id: string; story_item_id: string; duration_ms: number; label: string; created_at: string;
 }
 
 interface RawStoryWithItems extends RawStory {
@@ -30,6 +36,15 @@ function toStoryItem(i: RawStoryItem): StoryItem {
     startTimeMs: i.start_time_ms, track: i.track,
     trimStartMs: i.trim_start_ms, trimEndMs: i.trim_end_ms,
     volume: i.volume, createdAt: i.created_at,
+    voiceId: i.voice_id, engineId: i.engine_id, canRegenerate: i.can_regenerate,
+    activeVersionId: i.active_version_id,
+  };
+}
+
+function toStoryItemVersion(v: RawStoryItemVersion): StoryItemVersion {
+  return {
+    id: v.id, storyItemId: v.story_item_id, durationMs: v.duration_ms,
+    label: v.label, createdAt: v.created_at,
   };
 }
 
@@ -149,8 +164,41 @@ export function createWebStoryPort(baseUrl = 'http://localhost:8093'): StoryPort
       if (!res.ok) throw await failText(res, 'Không nhân bản được item');
       return toStoryItem(await res.json());
     },
+    async reorderItems(storyId, track, orderedItemIds) {
+      const res = await fetch(`${base}/${encodeURIComponent(storyId)}/items/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ track, item_ids: orderedItemIds }),
+      });
+      if (!res.ok) throw await failText(res, 'Không sắp lại được thứ tự');
+      return ((await res.json()) as RawStoryItem[]).map(toStoryItem);
+    },
     async exportAudioUrl(storyId) {
       return `${base}/${encodeURIComponent(storyId)}/export-audio`;
+    },
+    async itemAudioUrl(storyId, itemId) {
+      return `${base}/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/audio`;
+    },
+    async regenerateItem(storyId, itemId) {
+      const res = await fetch(`${base}/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/regenerate`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw await failText(res, 'Không sinh lại được item');
+      return toStoryItem(await res.json());
+    },
+    async listItemVersions(storyId, itemId) {
+      const res = await fetch(`${base}/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/versions`);
+      if (!res.ok) throw await failText(res, 'Không tải được danh sách bản đã lưu');
+      return ((await res.json()) as RawStoryItemVersion[]).map(toStoryItemVersion);
+    },
+    async setItemVersion(storyId, itemId, versionId) {
+      const res = await fetch(`${base}/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/version`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version_id: versionId }),
+      });
+      if (!res.ok) throw await failText(res, 'Không đổi được bản đang dùng');
+      return toStoryItem(await res.json());
     },
   };
 }

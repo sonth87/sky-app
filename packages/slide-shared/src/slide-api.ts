@@ -297,10 +297,23 @@ export interface TtsStoryItem {
   trim_end_ms: number;
   volume: number;
   created_at: string;
+  voice_id: string | null;
+  engine_id: string | null;
+  can_regenerate: boolean;
+  active_version_id: string | null;
 }
 
 export interface TtsStoryWithItems extends TtsStory {
   items: TtsStoryItem[];
+}
+
+/** 1 bản audio đã lưu của 1 item (xem stories.py's regenerate_item). */
+export interface TtsStoryItemVersion {
+  id: string;
+  story_item_id: string;
+  duration_ms: number;
+  label: string;
+  created_at: string;
 }
 
 /** Envelope thống nhất cho mọi kênh `story:*` (xem ipc.ts's `storyFetch` helper) —
@@ -494,8 +507,14 @@ export interface SlideApi {
   storySetItemVolume(storyId: string, itemId: string, volume: number): Promise<StoryIpcResult<TtsStoryItem>>;
   storySplitItem(storyId: string, itemId: string, splitTimeMs: number): Promise<StoryIpcResult<{ left: TtsStoryItem; right: TtsStoryItem }>>;
   storyDuplicateItem(storyId: string, itemId: string): Promise<StoryIpcResult<TtsStoryItem>>;
+  storyReorderItems(storyId: string, track: number, itemIds: string[]): Promise<StoryIpcResult<TtsStoryItem[]>>;
   /** URL http://127.0.0.1:<port>/stories/<id>/export-audio — đúng pattern getTtsHistoryAudioUrl. */
   storyExportAudioUrl(storyId: string): Promise<string>;
+  /** URL http://127.0.0.1:<port>/stories/<id>/items/<item_id>/audio — audio RIÊNG 1 item. */
+  storyItemAudioUrl(storyId: string, itemId: string): Promise<string>;
+  storyRegenerateItem(storyId: string, itemId: string): Promise<StoryIpcResult<TtsStoryItem>>;
+  storyListItemVersions(storyId: string, itemId: string): Promise<StoryIpcResult<TtsStoryItemVersion[]>>;
+  storySetItemVersion(storyId: string, itemId: string, versionId: string): Promise<StoryIpcResult<TtsStoryItem>>;
 
   // ── STT (Phase 1 — nhận dạng giọng nói, xem
   //    docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md) ────────────────────────

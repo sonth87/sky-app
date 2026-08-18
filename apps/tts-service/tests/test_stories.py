@@ -1,8 +1,9 @@
 """Test StoryStore + create_story_store() (Phase 4 — timeline nhiều track, xem
-docs/dev/history/2026-08-17-stories-timeline.md).
+docs/dev/history/2026-08-17-stories-timeline.md; Phase 4.5 — regenerate/versions).
 
-Dựng bảng `tts_story`/`tts_story_item` bằng tay trong SQLite in-memory — schema PHẢI khớp
-`packages/app-db/src/migrations/021_tts_story.ts`. Cùng cách `test_history_store.py` đã làm.
+Dựng bảng `tts_story`/`tts_story_item`/`tts_story_item_version` bằng tay trong SQLite
+in-memory — schema PHẢI khớp `packages/app-db/src/migrations/021_tts_story.ts` +
+`022_tts_story_item_version.ts`. Cùng cách `test_history_store.py` đã làm.
 """
 import shutil
 import sqlite3
@@ -30,6 +31,18 @@ CREATE TABLE tts_story_item (
   trim_start_ms INTEGER NOT NULL DEFAULT 0,
   trim_end_ms INTEGER NOT NULL DEFAULT 0,
   volume REAL NOT NULL DEFAULT 1.0,
+  created_at TEXT NOT NULL,
+  voice_id TEXT,
+  speed REAL,
+  engine_id TEXT,
+  active_version_id TEXT REFERENCES tts_story_item_version(id) ON DELETE SET NULL
+);
+CREATE TABLE tts_story_item_version (
+  id TEXT PRIMARY KEY,
+  story_item_id TEXT NOT NULL REFERENCES tts_story_item(id) ON DELETE CASCADE,
+  audio_file TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  label TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
 """
@@ -61,7 +74,8 @@ class FakeHistoryStore:
         self._entries: dict[str, dict] = {}
 
     def add_fake_entry(self, entry_id: str, *, text="Xin chào", voice_label="Giang",
-                       duration_ms=1000, with_audio=True, seconds=1.0, amplitude=0.3):
+                       duration_ms=1000, with_audio=True, seconds=1.0, amplitude=0.3,
+                       voice_id="voice-1", speed=1.0, engine_id="vieneu"):
         audio_file = None
         if with_audio:
             audio_file = self._tmp_path / f"{entry_id}.wav"
@@ -70,6 +84,7 @@ class FakeHistoryStore:
         self._entries[entry_id] = {
             "id": entry_id, "text": text, "voice_label": voice_label,
             "duration_ms": duration_ms, "audio_file": audio_file,
+            "voice_id": voice_id, "speed": speed, "engine_id": engine_id,
         }
 
     def get_entry(self, entry_id: str) -> dict | None:
@@ -409,3 +424,197 @@ def test_export_audio_bo_qua_item_file_bi_mat(store, history):
 
     audio, sr = store.export_audio(s["id"])
     assert audio.size > 0  # item2 vẫn trộn được
+
+
+# ── Regenerate / Versions (Phase 4.5) ────────────────────────────────────────
+
+def _fake_regen_audio(seconds=0.5, amplitude=0.7):
+    return (amplitude * np.ones(int(SR * seconds))).astype(np.float32)
+
+
+def test_them_item_snapshot_voice_id_speed_engine(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1", voice_id="voice-xyz", speed=1.2, engine_id="qwen3")
+    item = store.add_item_from_history(s["id"], history, "h1")
+    assert item["voice_id"] == "voice-xyz"
+    assert item["speed"] == 1.2
+    assert item["engine_id"] == "qwen3"
+    assert item["can_regenerate"] is True
+
+
+def test_them_item_khong_co_voice_id_can_regenerate_false(store, history):
+    history.add_fake_entry("h1", voice_id=None)
+    s = store.create_story("S")
+    item = store.add_item_from_history(s["id"], history, "h1")
+    assert item["can_regenerate"] is False
+
+
+def test_regenerate_tao_version_moi_giu_ca_ban_goc(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1", duration_ms=1000)
+    item = store.add_item_from_history(s["id"], history, "h1")
+    original_audio_file = item["audio_file"]
+
+    updated = store.regenerate_item(s["id"], item["id"], _fake_regen_audio(seconds=0.5), SR)
+
+    # Item giờ trỏ audio MỚI, KHÔNG còn là file gốc lúc thêm.
+    assert updated["audio_file"] != original_audio_file
+    assert updated["active_version_id"] is not None
+    # Trim reset về 0 — bản mới thường khác duration bản cũ.
+    assert updated["trim_start_ms"] == 0 and updated["trim_end_ms"] == 0
+
+    versions = store.list_item_versions(s["id"], item["id"])
+    assert len(versions) == 2
+    assert versions[0]["label"] == "Bản gốc"
+    assert versions[0]["audio_file"] == original_audio_file
+    assert versions[1]["label"] == "Bản 2"
+    assert versions[1]["audio_file"] == updated["audio_file"]
+
+    story_dir = store._story_dir(s["id"])
+    # Bản gốc vẫn còn nguyên trên đĩa — regenerate không xoá gì cả.
+    assert (story_dir / original_audio_file).exists()
+    assert (story_dir / updated["audio_file"]).exists()
+
+
+def test_regenerate_lan_2_khong_tao_lai_ban_goc(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1", duration_ms=1000)
+    item = store.add_item_from_history(s["id"], history, "h1")
+
+    store.regenerate_item(s["id"], item["id"], _fake_regen_audio(), SR)
+    store.regenerate_item(s["id"], item["id"], _fake_regen_audio(), SR)
+
+    versions = store.list_item_versions(s["id"], item["id"])
+    labels = [v["label"] for v in versions]
+    assert labels == ["Bản gốc", "Bản 2", "Bản 3"]  # đúng 1 "Bản gốc" duy nhất
+
+
+def test_regenerate_item_khong_ton_tai(store):
+    with pytest.raises(st.StoryItemNotFound):
+        store.regenerate_item("story-x", "item-x", _fake_regen_audio(), SR)
+
+
+def test_regenerate_item_thieu_voice_id_bao_loi(store, history):
+    history.add_fake_entry("h1", voice_id=None)
+    s = store.create_story("S")
+    item = store.add_item_from_history(s["id"], history, "h1")
+    with pytest.raises(ValueError):
+        store.regenerate_item(s["id"], item["id"], _fake_regen_audio(), SR)
+
+
+def test_set_item_version_tro_lai_ban_cu(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1", duration_ms=1000)
+    item = store.add_item_from_history(s["id"], history, "h1")
+    original_audio_file = item["audio_file"]
+    original_duration_ms = item["duration_ms"]
+
+    store.regenerate_item(s["id"], item["id"], _fake_regen_audio(), SR)
+    versions = store.list_item_versions(s["id"], item["id"])
+    origin_version = next(v for v in versions if v["label"] == "Bản gốc")
+
+    restored = store.set_item_version(s["id"], item["id"], origin_version["id"])
+    assert restored["audio_file"] == original_audio_file
+    assert restored["duration_ms"] == original_duration_ms
+    assert restored["active_version_id"] == origin_version["id"]
+    assert restored["trim_start_ms"] == 0 and restored["trim_end_ms"] == 0
+
+
+def test_set_item_version_khong_ton_tai_bao_loi(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1")
+    item = store.add_item_from_history(s["id"], history, "h1")
+    with pytest.raises(ValueError):
+        store.set_item_version(s["id"], item["id"], "ver-khong-co")
+
+
+def test_split_item_xoa_kha_nang_regenerate(store, history):
+    """Sau khi Tách, cả 2 nửa đều chỉ còn trỏ đúng NGUYÊN VĂN source_text — regenerate 1 nửa sẽ
+    sinh lại CẢ câu gốc chứ không phải riêng nửa đó, nên phải vô hiệu hoá."""
+    s = store.create_story("S")
+    history.add_fake_entry("h1", duration_ms=1000, voice_id="voice-1")
+    item = store.add_item_from_history(s["id"], history, "h1")
+    assert item["can_regenerate"] is True
+
+    left, right = store.split_item(s["id"], item["id"], split_time_ms=400)
+    assert left["can_regenerate"] is False
+    assert right["can_regenerate"] is False
+
+
+def test_duplicate_item_giu_kha_nang_regenerate(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1", voice_id="voice-1", speed=0.9, engine_id="vieneu")
+    item = store.add_item_from_history(s["id"], history, "h1")
+
+    dup = store.duplicate_item(s["id"], item["id"])
+    assert dup["can_regenerate"] is True
+    assert dup["voice_id"] == "voice-1"
+    assert dup["speed"] == 0.9
+    assert dup["engine_id"] == "vieneu"
+
+
+def test_list_item_versions_rong_khi_chua_regenerate(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1")
+    item = store.add_item_from_history(s["id"], history, "h1")
+    assert store.list_item_versions(s["id"], item["id"]) == []
+
+
+def test_get_item_audio_path(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1")
+    item = store.add_item_from_history(s["id"], history, "h1")
+    path = store.get_item_audio_path(s["id"], item["id"])
+    assert path is not None and path.exists()
+    assert path.name == item["audio_file"]
+
+
+def test_get_item_audio_path_item_khong_ton_tai_tra_none(store):
+    assert store.get_item_audio_path("story-x", "item-x") is None
+
+
+# ── Reorder (Phase 4.5 — list dọc sortable) ──────────────────────────────────
+
+def test_reorder_items_tinh_lai_start_time_ms_tuan_tu(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1", duration_ms=1000)
+    history.add_fake_entry("h2", duration_ms=500)
+    history.add_fake_entry("h3", duration_ms=800)
+    i1 = store.add_item_from_history(s["id"], history, "h1", track=0)
+    i2 = store.add_item_from_history(s["id"], history, "h2", track=0)
+    i3 = store.add_item_from_history(s["id"], history, "h3", track=0)
+
+    # Đảo ngược thứ tự: h3, h1, h2.
+    result = store.reorder_items(s["id"], 0, [i3["id"], i1["id"], i2["id"]])
+    by_id = {r["id"]: r for r in result}
+    assert by_id[i3["id"]]["start_time_ms"] == 0
+    assert by_id[i1["id"]]["start_time_ms"] == 800 + st.DEFAULT_GAP_MS
+    assert by_id[i2["id"]]["start_time_ms"] == 800 + st.DEFAULT_GAP_MS + 1000 + st.DEFAULT_GAP_MS
+
+
+def test_reorder_items_khong_dung_track_khac_khong_bi_dong(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1", duration_ms=1000)
+    history.add_fake_entry("h2", duration_ms=1000)
+    i1 = store.add_item_from_history(s["id"], history, "h1", track=0)
+    i2 = store.add_item_from_history(s["id"], history, "h2", track=1)
+    original_i2_start = i2["start_time_ms"]
+
+    store.reorder_items(s["id"], 0, [i1["id"]])
+    unchanged = store.get_item(s["id"], i2["id"])
+    assert unchanged["start_time_ms"] == original_i2_start  # track khác không bị đụng
+
+
+def test_reorder_items_danh_sach_khong_khop_bao_loi(store, history):
+    s = store.create_story("S")
+    history.add_fake_entry("h1")
+    item = store.add_item_from_history(s["id"], history, "h1", track=0)
+    with pytest.raises(ValueError):
+        store.reorder_items(s["id"], 0, [item["id"], "item-khong-co"])
+    with pytest.raises(ValueError):
+        store.reorder_items(s["id"], 0, [])  # thiếu item thật đang có trên track
+
+
+def test_reorder_items_story_khong_ton_tai(store):
+    with pytest.raises(st.StoryNotFound):
+        store.reorder_items("story-x", 0, [])

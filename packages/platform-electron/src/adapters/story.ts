@@ -1,5 +1,5 @@
-import type { StoryPort, Story, StoryItem, StoryWithItems } from '@sky-app/service-contracts';
-import type { TtsStory, TtsStoryItem, TtsStoryWithItems, StoryIpcResult } from '@sky-app/slide-shared';
+import type { StoryPort, Story, StoryItem, StoryItemVersion, StoryWithItems } from '@sky-app/service-contracts';
+import type { TtsStory, TtsStoryItem, TtsStoryItemVersion, TtsStoryWithItems, StoryIpcResult } from '@sky-app/slide-shared';
 import '../bridge-types.js';
 
 function toStory(s: TtsStory): Story {
@@ -16,6 +16,15 @@ function toStoryItem(i: TtsStoryItem): StoryItem {
     startTimeMs: i.start_time_ms, track: i.track,
     trimStartMs: i.trim_start_ms, trimEndMs: i.trim_end_ms,
     volume: i.volume, createdAt: i.created_at,
+    voiceId: i.voice_id, engineId: i.engine_id, canRegenerate: i.can_regenerate,
+    activeVersionId: i.active_version_id,
+  };
+}
+
+function toStoryItemVersion(v: TtsStoryItemVersion): StoryItemVersion {
+  return {
+    id: v.id, storyItemId: v.story_item_id, durationMs: v.duration_ms,
+    label: v.label, createdAt: v.created_at,
   };
 }
 
@@ -94,8 +103,23 @@ export function createElectronStoryPort(): StoryPort {
     async duplicateItem(storyId, itemId) {
       return toStoryItem(unwrap(await window.slide.storyDuplicateItem(storyId, itemId)));
     },
+    async reorderItems(storyId, track, orderedItemIds) {
+      return unwrap(await window.slide.storyReorderItems(storyId, track, orderedItemIds)).map(toStoryItem);
+    },
     async exportAudioUrl(storyId) {
       return window.slide.storyExportAudioUrl(storyId);
+    },
+    async itemAudioUrl(storyId, itemId) {
+      return window.slide.storyItemAudioUrl(storyId, itemId);
+    },
+    async regenerateItem(storyId, itemId) {
+      return toStoryItem(unwrap(await window.slide.storyRegenerateItem(storyId, itemId)));
+    },
+    async listItemVersions(storyId, itemId) {
+      return unwrap(await window.slide.storyListItemVersions(storyId, itemId)).map(toStoryItemVersion);
+    },
+    async setItemVersion(storyId, itemId, versionId) {
+      return toStoryItem(unwrap(await window.slide.storySetItemVersion(storyId, itemId, versionId)));
     },
   };
 }

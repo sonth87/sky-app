@@ -19,6 +19,7 @@ import type {
   TtsStory,
   TtsStoryItem,
   TtsStoryWithItems,
+  TtsStoryItemVersion,
   StoryIpcResult,
 } from '@sky-app/slide-shared';
 
@@ -46,6 +47,7 @@ export type {
   TtsStory,
   TtsStoryItem,
   TtsStoryWithItems,
+  TtsStoryItemVersion,
   StoryIpcResult,
 } from '@sky-app/slide-shared';
 
@@ -293,6 +295,16 @@ const api: SlideApi = {
     ipcRenderer.invoke('story:duplicate-item', { storyId, itemId }),
   storyExportAudioUrl: (storyId: string): Promise<string> =>
     ipcRenderer.invoke('story:export-audio-url', { storyId }),
+  storyItemAudioUrl: (storyId: string, itemId: string): Promise<string> =>
+    ipcRenderer.invoke('story:item-audio-url', { storyId, itemId }),
+  storyRegenerateItem: (storyId: string, itemId: string): Promise<StoryIpcResult<TtsStoryItem>> =>
+    ipcRenderer.invoke('story:item-regenerate', { storyId, itemId }),
+  storyListItemVersions: (storyId: string, itemId: string): Promise<StoryIpcResult<TtsStoryItemVersion[]>> =>
+    ipcRenderer.invoke('story:item-list-versions', { storyId, itemId }),
+  storySetItemVersion: (storyId: string, itemId: string, versionId: string): Promise<StoryIpcResult<TtsStoryItem>> =>
+    ipcRenderer.invoke('story:item-set-version', { storyId, itemId, versionId }),
+  storyReorderItems: (storyId: string, track: number, itemIds: string[]): Promise<StoryIpcResult<TtsStoryItem[]>> =>
+    ipcRenderer.invoke('story:reorder-items', { storyId, track, itemIds }),
   // ---- STT (Phase 1 — nhận dạng giọng nói, xem
   //      docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md). Cài đặt/tải model:
   //      tái dùng nguyên các binding tts:engine-* ở trên (cùng registry, phân biệt qua

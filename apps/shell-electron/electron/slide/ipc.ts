@@ -1367,6 +1367,9 @@ export function registerIpcHandlers() {
     method: string,
     path: string,
     body?: unknown,
+    // Regenerate gọi lại /synthesize thật (có thể chậm như lần sinh đầu) — cần timeout rộng
+    // hơn hẳn các thao tác CRUD/kéo-thả thuần DB còn lại (mặc định 15s quá ngắn cho việc này).
+    timeoutMs = 15000,
   ): Promise<{ ok: true; data: unknown } | { ok: false; error: string; status?: number }> {
     const port = getPythonPort();
     if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
@@ -1374,7 +1377,7 @@ export function registerIpcHandlers() {
       const res = await fetch(`http://127.0.0.1:${port}${path}`, {
         method,
         ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (!res.ok) {
         // `status` cho phép adapter phân biệt 404 (tài nguyên đã bị xoá ở nơi khác — trả
@@ -1425,11 +1428,28 @@ export function registerIpcHandlers() {
   ipcMain.handle('story:duplicate-item', (_e, { storyId, itemId }: { storyId: string; itemId: string }) =>
     storyFetch('POST', `/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/duplicate`));
 
+  ipcMain.handle('story:reorder-items', (_e, { storyId, track, itemIds }: { storyId: string; track: number; itemIds: string[] }) =>
+    storyFetch('PUT', `/stories/${encodeURIComponent(storyId)}/items/reorder`, { track, item_ids: itemIds }));
+
   // URL trỏ thẳng Python server, đúng pattern 'tts:history-audio-url' — renderer's <audio src>
   // hoặc fetch tự tải, không round-trip buffer qua IPC.
   ipcMain.handle('story:export-audio-url', (_e, { storyId }: { storyId: string }) => {
     return `http://127.0.0.1:${getPythonPort()}/stories/${encodeURIComponent(storyId)}/export-audio`;
   });
+
+  ipcMain.handle('story:item-audio-url', (_e, { storyId, itemId }: { storyId: string; itemId: string }) => {
+    return `http://127.0.0.1:${getPythonPort()}/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/audio`;
+  });
+
+  // Regenerate (Phase 4.5) — timeout rộng như lần sinh đầu, xem storyFetch's docstring.
+  ipcMain.handle('story:item-regenerate', (_e, { storyId, itemId }: { storyId: string; itemId: string }) =>
+    storyFetch('POST', `/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/regenerate`, undefined, 120_000));
+
+  ipcMain.handle('story:item-list-versions', (_e, { storyId, itemId }: { storyId: string; itemId: string }) =>
+    storyFetch('GET', `/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/versions`));
+
+  ipcMain.handle('story:item-set-version', (_e, { storyId, itemId, versionId }: { storyId: string; itemId: string; versionId: string }) =>
+    storyFetch('PUT', `/stories/${encodeURIComponent(storyId)}/items/${encodeURIComponent(itemId)}/version`, { version_id: versionId }));
 
   // ── STT (Phase 1 — nhận dạng giọng nói, xem
   //    docs/dev/history/2026-08-14-stt-nen-tang-giai-doan-1.md) ──────────────────────

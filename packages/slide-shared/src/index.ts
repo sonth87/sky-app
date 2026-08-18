@@ -52,5 +52,6 @@ export type {
   TtsStory,
   TtsStoryItem,
   TtsStoryWithItems,
+  TtsStoryItemVersion,
   StoryIpcResult,
 } from './slide-api.js';

@@ -26,6 +26,6 @@ export type { LayoutComponentPort, LayoutComponentMeta } from './layoutComponent
 export type {
   EffectPresetPort, EffectPreset, EffectConfig, EffectParamDef, EffectTypeInfo,
 } from './effect-preset.js';
-export type { StoryPort, Story, StoryItem, StoryWithItems } from './story.js';
+export type { StoryPort, Story, StoryItem, StoryItemVersion, StoryWithItems } from './story.js';
 export type { EventPort } from './event.js';
 export type { DataSourcePort } from './data-source.js';

@@ -1,8 +1,11 @@
-/** Hằng số layout canvas timeline — dùng chung giữa Timeline/TimelineTrack/TimelineItem. */
+/** Hằng số layout canvas timeline — dùng chung giữa Timeline/TimelineItem. */
 
-/** Tỉ lệ pixel/giây cố định — không có zoom ở v1 (xem kế hoạch Phase 4's "cắt phạm vi"). */
-export const PX_PER_SEC = 60;
-export const PX_PER_MS = PX_PER_SEC / 1000;
+/** Tỉ lệ pixel/giây MẶC ĐỊNH lúc mở Story — Phase 4.5 thêm zoom (`Timeline.tsx`'s state
+ *  `pxPerMs`), các hằng số PX_PER_* cũ (cố định, không zoom được) đã bỏ. */
+export const DEFAULT_PX_PER_SEC = 60;
+export const DEFAULT_PX_PER_MS = DEFAULT_PX_PER_SEC / 1000;
+export const MIN_PX_PER_MS = 0.01; // ~10s hiện đủ trong 100px — zoom out tối đa
+export const MAX_PX_PER_MS = 0.5;  // 1 giây = 500px — zoom in tối đa
 
 /** Chiều cao 1 hàng track, px. */
 export const TRACK_HEIGHT = 72;
