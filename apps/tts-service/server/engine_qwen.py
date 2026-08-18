@@ -166,6 +166,12 @@ class QwenEngine:
             "supports_emotion": False,
             "supports_sampling": False,
             "multilingual": True,       # 10 ngôn ngữ, KHÔNG có tiếng Việt
+            # UI dùng danh sách này để hiện dropdown chọn ngôn ngữ (truyền qua
+            # `engine_overrides[engine_id].language`) — KHÔNG hardcode lại bên TS, tránh lệch
+            # nếu SUPPORTED_LANGUAGES đổi. Cần chọn tay vì `_resolve_language()`'s auto-guess
+            # chỉ phân biệt được script CJK/Cyrillic; MỌI chữ Latin (de/fr/pt/es/it) đều rơi
+            # nhầm về "English" nếu không chỉ định — xem `_guess_language`'s docstring.
+            "supported_languages": SUPPORTED_LANGUAGES,
             "requires_ref_text": True,  # xem _run() — thiếu transcript là audio hỏng
             "providers": self.providers,
             "device": self.device,

@@ -4,7 +4,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Download, Loader2, Pause, Play, Plus } from 'lucide-react';
-import type { StoryItem, StoryPort, StoryWithItems, TtsPort } from '@sky-app/service-contracts';
+import type { EffectPresetPort, StoryItem, StoryPort, StoryWithItems, TtsPort } from '@sky-app/service-contracts';
 import { AlertDialog } from '../AlertDialog';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { AddFromHistoryPicker } from './AddFromHistoryPicker';
@@ -18,6 +18,7 @@ export interface StoryContentProps {
   storyId: string;
   storyPort: StoryPort;
   ttsPort: TtsPort;
+  effectPresetPort?: EffectPresetPort;
 }
 
 const FLOATING_BOX_HEIGHT = 56; // ô sinh giọng nổi — chừa chỗ dưới đáy list, tránh đè lên item cuối
@@ -35,7 +36,7 @@ function isCurrentlyPlayingItem(item: StoryItem, isPlaying: boolean, currentTime
  * `useStoryPlayback` gọi Ở ĐÂY (1 lần) rồi truyền `playback` xuống cả `Timeline` lẫn từng
  * `StoryItemCard` ("Phát từ đây") — tránh 2 AudioContext cùng tồn tại nếu mỗi nơi tự gọi hook.
  */
-export function StoryContent({ storyId, storyPort, ttsPort }: StoryContentProps) {
+export function StoryContent({ storyId, storyPort, ttsPort, effectPresetPort }: StoryContentProps) {
   const [story, setStory] = useState<StoryWithItems | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -237,6 +238,7 @@ export function StoryContent({ storyId, storyPort, ttsPort }: StoryContentProps)
         storyId={storyId}
         storyPort={storyPort}
         ttsPort={ttsPort}
+        effectPresetPort={effectPresetPort}
         track={trackCount - 1}
         onAdded={() => void refresh()}
         bottomOffset={items.length > 0 ? trackEditorHeight : 0}

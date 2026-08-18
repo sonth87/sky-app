@@ -277,6 +277,22 @@ def test_export_audio_tra_ve_wav_that_co_header(client, history):
     assert len(audio) > 0
 
 
+def test_export_audio_co_content_disposition_attachment(client, history):
+    """Bug thật 2026-08-18: thiếu header này khiến renderer (chạy trong Electron, gọi server
+    Python qua origin khác) coi click <a download> là ĐIỀU HƯỚNG THẬT thay vì tải file — cả
+    cửa sổ app bị trình phát audio gốc của Chromium thế chỗ, không cách nào quay lại ngoài
+    khởi động lại app. Xem `_download_headers`'s docstring trong main.py."""
+    story = client.post("/stories", json={"name": "Lễ tốt nghiệp"}).json()
+    history.add_fake_entry("h1", duration_ms=1000)
+    client.post(f"/stories/{story['id']}/items", json={"history_entry_id": "h1"})
+
+    res = client.get(f"/stories/{story['id']}/export-audio")
+    assert res.status_code == 200
+    disposition = res.headers["content-disposition"]
+    assert disposition.startswith("attachment;")
+    assert "filename*=UTF-8''" in disposition  # tên Story có dấu tiếng Việt, cần percent-encode
+
+
 def test_export_audio_story_rong_tra_400(client):
     story = client.post("/stories", json={"name": "S"}).json()
     res = client.get(f"/stories/{story['id']}/export-audio")

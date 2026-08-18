@@ -1750,6 +1750,26 @@ async def synthesize(req: TtsRequest):
         )
 
 
+def _download_headers(filename: str) -> dict[str, str]:
+    """`Content-Disposition: attachment` — BẮT BUỘC cho mọi route client tải bằng
+    `<a download>` + `.click()` (khác route chỉ phát qua `<audio src>`/`fetch()`, không cần).
+
+    Bug thật 2026-08-18: renderer chạy trong Electron gọi server Python qua origin KHÁC
+    (`http://127.0.0.1:<port>`, không phải origin load app) — trình duyệt/Chromium chỉ tôn
+    trọng thuộc tính `download` của `<a>` cho tài nguyên CÙNG origin hoặc có
+    `Content-Disposition: attachment` rõ ràng từ server; thiếu header này, click vào link bị
+    coi là ĐIỀU HƯỚNG THẬT thay vì tải file — cả cửa sổ Electron bị thế chỗ bởi trình phát
+    audio gốc của Chromium, không cách nào quay lại ngoài khởi động lại app. Route chỉ dùng
+    cho `<audio src>`/`fetch()` (không phải `<a download>`) không bị ảnh hưởng bởi header này
+    — media element/fetch lấy byte thẳng, không điều hướng.
+    """
+    from urllib.parse import quote
+    ascii_fallback = filename.encode('ascii', errors='ignore').decode('ascii') or 'audio.wav'
+    return {
+        'Content-Disposition': f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quote(filename)}"
+    }
+
+
 # ── History (Phase 3 — nhật ký sinh audio, xem history_store.py) ──────────────
 # Mọi endpoint dưới đây rơi về danh sách rỗng/404/no-op êm khi `_history is None` (DB chưa
 # sẵn sàng) — không bao giờ 503 cả app vì tính năng lịch sử không sẵn sàng.
@@ -1766,7 +1786,10 @@ def get_history_audio(entry_id: str):
     path = _history.get_audio_path(entry_id) if _history is not None else None
     if path is None:
         raise HTTPException(404, f"Audio not found for history entry: {entry_id}")
-    return FileResponse(str(path), media_type="audio/wav")
+    return FileResponse(
+        str(path), media_type="audio/wav",
+        headers=_download_headers(f"tts-studio-{entry_id}.wav"),
+    )
 
 
 @app.delete("/history/{entry_id}")
@@ -2050,7 +2073,8 @@ def export_story_audio(story_id: str):
     được gì — không có header để trình duyệt biết đây là audio.
     """
     store = _require_stories()
-    if store.get_story(story_id) is None:
+    story = store.get_story(story_id)
+    if story is None:
         raise HTTPException(404, f"Story not found: {story_id}")
     audio, sample_rate = store.export_audio(story_id)
     if audio.size == 0:
@@ -2066,7 +2090,10 @@ def export_story_audio(story_id: str):
         f.setframerate(sample_rate)
         f.writeframes(int16_audio.tobytes())
 
-    return Response(content=buf.getvalue(), media_type="audio/wav")
+    return Response(
+        content=buf.getvalue(), media_type="audio/wav",
+        headers=_download_headers(f"{story['name']}.wav"),
+    )
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

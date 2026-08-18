@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import type { Story, StoryPort, TtsPort } from '@sky-app/service-contracts';
+import type { EffectPresetPort, Story, StoryPort, TtsPort } from '@sky-app/service-contracts';
 import { StoryContent } from './StoryContent';
 import { StoryList } from './StoryList';
 
 export interface StoriesTabProps {
   storyPort: StoryPort;
   ttsPort: TtsPort;
+  effectPresetPort?: EffectPresetPort;
 }
 
 /**
@@ -14,7 +15,7 @@ export interface StoriesTabProps {
  * + `StoryContent` (phải — list dọc sortable + panel editor waveform/zoom docked ở đáy) —
  * mirror voicebox's tách StoryList/StoryContent/StoryTrackEditor.
  */
-export function StoriesTab({ storyPort, ttsPort }: StoriesTabProps) {
+export function StoriesTab({ storyPort, ttsPort, effectPresetPort }: StoriesTabProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hasStories, setHasStories] = useState<boolean | null>(null); // null = chưa biết (đang tải lần đầu)
 
@@ -37,7 +38,7 @@ export function StoriesTab({ storyPort, ttsPort }: StoriesTabProps) {
 
       <main className="min-w-0 overflow-hidden">
         {selectedId ? (
-          <StoryContent key={selectedId} storyId={selectedId} storyPort={storyPort} ttsPort={ttsPort} />
+          <StoryContent key={selectedId} storyId={selectedId} storyPort={storyPort} ttsPort={ttsPort} effectPresetPort={effectPresetPort} />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             {hasStories === null ? '' : 'Chọn hoặc tạo 1 Story để bắt đầu.'}

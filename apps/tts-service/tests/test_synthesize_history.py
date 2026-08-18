@@ -180,6 +180,10 @@ def test_get_history_audio_tra_wav_that(client):
     audio_res = client.get(f"/history/{history_id}/audio")
     assert audio_res.status_code == 200
     assert audio_res.headers["content-type"] == "audio/wav"
+    # Bug thật 2026-08-18: thiếu Content-Disposition khiến nút "Tải" (HistoryList.tsx's
+    # handleDownload, <a download> + .click()) bị Electron coi là điều hướng thật thay vì tải
+    # file — xem `_download_headers`'s docstring trong main.py.
+    assert audio_res.headers["content-disposition"].startswith("attachment;")
 
 
 def test_get_history_audio_khong_ton_tai_tra_404(client):

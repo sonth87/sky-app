@@ -445,7 +445,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
             )}
 
             {activeTab === 'stories' && storyPort && (
-              <StoriesTab storyPort={storyPort} ttsPort={tts} />
+              <StoriesTab storyPort={storyPort} ttsPort={tts} effectPresetPort={effectPresetPort} />
             )}
           </div>
         </div>
