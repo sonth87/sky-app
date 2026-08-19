@@ -17,6 +17,11 @@ export interface TimelineItemProps {
   storyId: string;
   storyPort: StoryPort;
   pxPerMs: number;
+  /** Danh sách SỐ track đang hiện trên canvas, đã sắp XẾP TĂNG DẦN — vị trí hiển thị (hàng
+   *  thứ mấy) của 1 item là `tracks.indexOf(item.track)`, KHÔNG phải `item.track` trực tiếp
+   *  (khác trước — cho phép track âm/thưa sau khi thêm nút +/- track thủ công ở Timeline.tsx,
+   *  xem file đó's `handleAddTrackAbove/Below`). */
+  tracks: number[];
   selected: boolean;
   onSelect: (itemId: string) => void;
   /** Gọi lúc THẢ chuột (kéo xong), không phải mỗi pixel di chuyển — Timeline quyết định gọi
@@ -86,7 +91,7 @@ function VersionPicker({
  * TRÁI cố định (chỉ trimEndMs đổi, startTimeMs không đổi).
  */
 export function TimelineItem({
-  item, storyId, storyPort, pxPerMs, selected, onSelect, onCommitChange, onDelete, onDuplicate,
+  item, storyId, storyPort, pxPerMs, tracks, selected, onSelect, onCommitChange, onDelete, onDuplicate,
   onSplit, onVolumeChange, onRegenerate, onVersionChanged, regenerating,
 }: TimelineItemProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -112,7 +117,8 @@ export function TimelineItem({
   const effectiveDurationMs = Math.max(0, item.durationMs - effective.trimStartMs - effective.trimEndMs);
   const left = effective.startTimeMs * pxPerMs;
   const width = Math.max(6, effectiveDurationMs * pxPerMs);
-  const top = effective.track * TRACK_HEIGHT;
+  const trackIndex = Math.max(0, tracks.indexOf(effective.track));
+  const top = trackIndex * TRACK_HEIGHT;
 
   function beginDrag(kind: DragKind) {
     return (e: React.PointerEvent) => {
@@ -139,10 +145,15 @@ export function TimelineItem({
 
       let next: ItemChange;
       if (drag.kind === 'move') {
-        const dTrack = Math.round(dy / TRACK_HEIGHT);
+        // Kéo theo INDEX hàng hiển thị rồi map ngược ra SỐ track thật qua `tracks` — track có
+        // thể âm/thưa (sau khi thêm bằng nút +/- ở Timeline.tsx), không còn phép cộng số
+        // nguyên trực tiếp như trước (`orig.track + dTrack`) được nữa.
+        const origIndex = Math.max(0, tracks.indexOf(drag.orig.track));
+        const dIndex = Math.round(dy / TRACK_HEIGHT);
+        const newIndex = Math.max(0, Math.min(tracks.length - 1, origIndex + dIndex));
         next = {
           startTimeMs: Math.max(0, Math.round(drag.orig.startTimeMs + dMs)),
-          track: Math.max(0, drag.orig.track + dTrack),
+          track: tracks[newIndex] ?? drag.orig.track,
         };
       } else if (drag.kind === 'trim-left') {
         const maxTrimStart = item.durationMs - drag.orig.trimEndMs - MIN_EFFECTIVE_MS;
@@ -177,7 +188,7 @@ export function TimelineItem({
       window.removeEventListener('pointerup', onUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `drag`/`item` chỉ đọc lúc bắt đầu kéo, đổi giữa chừng không cần re-attach
-  }, [drag, pxPerMs]);
+  }, [drag, pxPerMs, tracks]);
 
   return (
     <div

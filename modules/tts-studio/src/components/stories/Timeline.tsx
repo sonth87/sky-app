@@ -20,6 +20,8 @@ const MIN_EDITOR_HEIGHT = 140;
 const MAX_EDITOR_HEIGHT = 480;
 const MIN_CANVAS_MS = 10_000; // tối thiểu 10s bề rộng canvas kể cả Story rỗng
 const CANVAS_PADDING_MS = 4_000; // chừa chỗ trống bên phải item cuối để còn kéo-thả vào
+const LABEL_COL_WIDTH = 28; // cột số track bên trái, kèm nút +/- thêm track ở đầu/cuối cột
+const DEFAULT_TRACKS = [0]; // Story rỗng vẫn có ít nhất 1 track để kéo item đầu tiên vào
 
 function formatTime(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -55,7 +57,34 @@ export function Timeline({ storyId, story, storyPort, onRefresh, onError, playba
   const currentTimeMs = useStoryPlaybackStore((s) => s.currentTimeMs);
 
   const items = story.items;
-  const trackCount = Math.max(1, ...items.map((i) => i.track + 1)) + 1; // +1 hàng trống để kéo item vào
+  const [extraTracks, setExtraTracks] = useState<number[]>([]);
+
+  // Danh sách SỐ track đang hiện (không phải "có bao nhiêu hàng") — cho phép âm/thưa sau khi
+  // thêm bằng nút +/- (`handleAddTrackAbove/Below`), sắp TĂNG DẦN nên số âm tự nằm ở TRÊN cùng,
+  // số dương ở DƯỚI — giữ đúng vị trí track 0 hiện có (không đảo ngược thứ tự voicebox đang
+  // dùng, tránh làm lệch hình dung của Story đã tạo trước đó). Luôn có 1 hàng TRỐNG cao nhất
+  // để kéo item mới vào — đúng hành vi cũ, độc lập với `extraTracks` (track người dùng tự thêm
+  // tay, không tự mất khi rỗng — xem voicebox's `StoryTrackEditor.tsx` cùng ý).
+  const tracks = useMemo(() => {
+    const set = new Set([...DEFAULT_TRACKS, ...items.map((i) => i.track), ...extraTracks]);
+    const maxTrack = Math.max(...set);
+    if (items.some((i) => i.track === maxTrack)) set.add(maxTrack + 1);
+    return Array.from(set).sort((a, b) => a - b);
+  }, [items, extraTracks]);
+
+  const handleAddTrackAbove = () => {
+    setExtraTracks((prev) => {
+      const all = new Set([...DEFAULT_TRACKS, ...items.map((i) => i.track), ...prev]);
+      return [...prev, Math.min(...all) - 1];
+    });
+  };
+  const handleAddTrackBelow = () => {
+    setExtraTracks((prev) => {
+      const all = new Set([...DEFAULT_TRACKS, ...items.map((i) => i.track), ...prev]);
+      return [...prev, Math.max(...all) + 1];
+    });
+  };
+
   const maxEndMs = Math.max(MIN_CANVAS_MS, ...items.map((i) => i.startTimeMs + (i.durationMs - i.trimStartMs - i.trimEndMs)));
   const canvasWidthPx = (maxEndMs + CANVAS_PADDING_MS) * pxPerMs;
 
@@ -170,7 +199,7 @@ export function Timeline({ storyId, story, storyPort, onRefresh, onError, playba
   const handleTimelineClick = (e: React.MouseEvent<HTMLElement>) => {
     if (!tracksRef.current) return;
     const rect = tracksRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left + tracksRef.current.scrollLeft;
+    const x = e.clientX - rect.left + tracksRef.current.scrollLeft - LABEL_COL_WIDTH;
     playback.seek(Math.max(0, x / pxPerMs));
     setSelectedItemId(null);
   };
@@ -251,68 +280,112 @@ export function Timeline({ storyId, story, storyPort, onRefresh, onError, playba
         className="min-h-0 flex-1 overflow-auto"
         onPointerDown={() => setSelectedItemId(null)}
       >
-        {/* Ruler thời gian */}
-        <button
-          type="button"
-          onClick={handleTimelineClick}
-          className="relative block h-5 w-full cursor-pointer border-b border-border bg-muted/20 text-left"
-          style={{ width: canvasWidthPx }}
-          aria-label="Tua theo thời gian"
-        >
-          {timeMarkers.map((ms) => (
-            <div key={ms} className="absolute top-0 h-full" style={{ left: ms * pxPerMs }}>
-              <div className="h-1.5 w-px bg-border" />
-              <span className="ml-1 select-none text-2xs text-muted-foreground">{formatTime(ms)}</span>
-            </div>
-          ))}
-        </button>
-
-        <div
-          className="relative"
-          style={{ width: canvasWidthPx, height: trackCount * TRACK_HEIGHT }}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={handleTimelineClick}
-        >
-          {Array.from({ length: trackCount }).map((_, i) => (
-            <div
-              key={i}
-              className="pointer-events-none absolute inset-x-0 border-b border-border/60"
-              style={{ top: i * TRACK_HEIGHT, height: TRACK_HEIGHT }}
-            />
-          ))}
-
-          {items.map((item) => (
-            <TimelineItem
-              key={item.id}
-              item={item}
-              storyId={storyId}
-              storyPort={storyPort}
-              pxPerMs={pxPerMs}
-              selected={selectedItemId === item.id}
-              onSelect={setSelectedItemId}
-              onCommitChange={handleCommitChange}
-              onDelete={(id) => setPendingDeleteItemId(id)}
-              onDuplicate={handleDuplicate}
-              onSplit={handleSplit}
-              onVolumeChange={handleVolumeChange}
-              onRegenerate={handleRegenerate}
-              onVersionChanged={() => void onRefresh()}
-              regenerating={regeneratingItemId === item.id}
-            />
-          ))}
-
-          {items.length === 0 && (
-            <p className="pointer-events-none absolute left-3 top-3 text-2xs text-muted-foreground">
-              Chưa có đoạn nào — bấm &quot;Thêm đoạn&quot; để chọn từ lịch sử đã sinh.
-            </p>
-          )}
-
-          {/* Playhead */}
+        {/* Hàng ruler: ô góc trống (khớp cột số track) + ruler thời gian */}
+        <div className="flex" style={{ width: canvasWidthPx + LABEL_COL_WIDTH }}>
           <div
-            className="pointer-events-none absolute bottom-0 top-0 z-20 w-px bg-primary"
-            style={{ left: playheadLeft }}
+            className="sticky left-0 z-20 h-5 shrink-0 border-b border-r border-border bg-muted/20"
+            style={{ width: LABEL_COL_WIDTH }}
+          />
+          <button
+            type="button"
+            onClick={handleTimelineClick}
+            className="relative block h-5 cursor-pointer border-b border-border bg-muted/20 text-left"
+            style={{ width: canvasWidthPx }}
+            aria-label="Tua theo thời gian"
           >
-            <div className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-primary" />
+            {timeMarkers.map((ms) => (
+              <div key={ms} className="absolute top-0 h-full" style={{ left: ms * pxPerMs }}>
+                <div className="h-1.5 w-px bg-border" />
+                <span className="ml-1 select-none text-2xs text-muted-foreground">{formatTime(ms)}</span>
+              </div>
+            ))}
+          </button>
+        </div>
+
+        {/* Hàng track: cột SỐ track (sticky trái, kèm nút +/- thêm track ở đầu/cuối cột) + canvas item */}
+        <div className="flex" style={{ width: canvasWidthPx + LABEL_COL_WIDTH }}>
+          <div className="sticky left-0 z-10 shrink-0 bg-background" style={{ width: LABEL_COL_WIDTH }}>
+            {tracks.map((t, i) => (
+              <div
+                key={t}
+                className="relative flex items-center justify-center border-b border-r border-border/60 text-2xs text-muted-foreground"
+                style={{ height: TRACK_HEIGHT }}
+              >
+                {t}
+                {i === 0 && (
+                  <button
+                    type="button"
+                    onClick={handleAddTrackAbove}
+                    title="Thêm track phía trên"
+                    aria-label="Thêm track phía trên"
+                    className="absolute inset-x-0 top-0 flex h-3 items-center justify-center text-muted-foreground/50 hover:bg-muted/40 hover:text-foreground"
+                  >
+                    <Plus size={10} />
+                  </button>
+                )}
+                {i === tracks.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={handleAddTrackBelow}
+                    title="Thêm track phía dưới"
+                    aria-label="Thêm track phía dưới"
+                    className="absolute inset-x-0 bottom-0 flex h-3 items-center justify-center text-muted-foreground/50 hover:bg-muted/40 hover:text-foreground"
+                  >
+                    <Plus size={10} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div
+            className="relative"
+            style={{ width: canvasWidthPx, height: tracks.length * TRACK_HEIGHT }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={handleTimelineClick}
+          >
+            {tracks.map((_, i) => (
+              <div
+                key={i}
+                className="pointer-events-none absolute inset-x-0 border-b border-border/60"
+                style={{ top: i * TRACK_HEIGHT, height: TRACK_HEIGHT }}
+              />
+            ))}
+
+            {items.map((item) => (
+              <TimelineItem
+                key={item.id}
+                item={item}
+                storyId={storyId}
+                storyPort={storyPort}
+                pxPerMs={pxPerMs}
+                tracks={tracks}
+                selected={selectedItemId === item.id}
+                onSelect={setSelectedItemId}
+                onCommitChange={handleCommitChange}
+                onDelete={(id) => setPendingDeleteItemId(id)}
+                onDuplicate={handleDuplicate}
+                onSplit={handleSplit}
+                onVolumeChange={handleVolumeChange}
+                onRegenerate={handleRegenerate}
+                onVersionChanged={() => void onRefresh()}
+                regenerating={regeneratingItemId === item.id}
+              />
+            ))}
+
+            {items.length === 0 && (
+              <p className="pointer-events-none absolute left-3 top-3 text-2xs text-muted-foreground">
+                Chưa có đoạn nào — bấm &quot;Thêm đoạn&quot; để chọn từ lịch sử đã sinh.
+              </p>
+            )}
+
+            {/* Playhead */}
+            <div
+              className="pointer-events-none absolute bottom-0 top-0 z-20 w-px bg-primary"
+              style={{ left: playheadLeft }}
+            >
+              <div className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-primary" />
+            </div>
           </div>
         </div>
       </div>

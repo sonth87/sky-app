@@ -23,9 +23,17 @@ export interface VoicePickerProps {
   /** platform.assetUrl — resolve path tương đối (vd voice-covers/cover-01.webp) thành URL
    * đúng môi trường (Web public/ vs Electron resources), xem PlatformContext.assetUrl. */
   assetUrl: (path: string) => string;
+  /** Ẩn nhãn "Giọng nói" phía trên — dùng khi nhét vào slot `voicePicker` của `GenerateBox`
+   *  (`@sky-app/tts-generation-ui`, xem `StoryContent.tsx`), đứng cạnh các select khác trong 1
+   *  hàng ngang nên nhãn riêng lúc đó chỉ chiếm chỗ chứ không cần thiết. Mặc định `true` (giữ
+   *  nguyên hành vi sidebar hiện có). */
+  showLabel?: boolean;
+  /** Trigger gọn hơn (padding nhỏ hơn) — khớp chiều cao với các `<select>` khác đứng cùng
+   *  hàng. Chuyển thẳng cho `VoicePickerCombobox`'s `compact`. */
+  compact?: boolean;
 }
 
-export function VoicePicker({ onPreview, previewingId, loading, onAddVoice, onDeleteVoice, assetUrl }: VoicePickerProps) {
+export function VoicePicker({ onPreview, previewingId, loading, onAddVoice, onDeleteVoice, assetUrl, showLabel = true, compact }: VoicePickerProps) {
   const voices = useTtsStudioStore((s) => s.voices);
   const selectedVoiceId = useTtsStudioStore((s) => s.selectedVoiceId);
   const setSelectedVoiceId = useTtsStudioStore((s) => s.setSelectedVoiceId);
@@ -60,7 +68,7 @@ export function VoicePicker({ onPreview, previewingId, loading, onAddVoice, onDe
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-medium text-foreground">Giọng nói</label>
+      {showLabel && <label className="text-xs font-medium text-foreground">Giọng nói</label>}
       <VoicePickerCombobox
         items={items}
         value={selectedVoiceId}
@@ -76,6 +84,7 @@ export function VoicePicker({ onPreview, previewingId, loading, onAddVoice, onDe
         tabLabels={{ system: 'Hệ thống', custom: 'Cá nhân' }}
         onAddVoice={onAddVoice}
         onDeleteVoice={onDeleteVoice}
+        compact={compact}
       />
     </div>
   );

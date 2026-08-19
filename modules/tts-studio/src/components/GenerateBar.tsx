@@ -1,7 +1,7 @@
 import { Pause, Play } from 'lucide-react';
 import { ButtonPrimitive } from '@sky-app/ui';
+import { GenerateButton } from '@sky-app/tts-generation-ui';
 import { useTtsStudioStore } from '../store';
-import { GenerateButton } from './GenerateButton';
 
 export const QUICK_PLAY_ID = 'quickplay';
 

@@ -5,10 +5,13 @@ import {
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Download, Loader2, Pause, Play, Plus } from 'lucide-react';
 import type { EffectPresetPort, StoryItem, StoryPort, StoryWithItems, TtsEnginePort, TtsPort } from '@sky-app/service-contracts';
+import { GenerateBox } from '@sky-app/tts-generation-ui';
+import { useTtsStudioStore } from '../../store';
+import { getPlayingId, playUrlAudio, stopAudio } from '../../lib/audioPlayer';
+import { VoicePicker, previewPlayId } from '../VoicePicker';
 import { AlertDialog } from '../AlertDialog';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { AddFromHistoryPicker } from './AddFromHistoryPicker';
-import { FloatingGenerateBox } from './FloatingGenerateBox';
 import { SortableStoryItemCard } from './StoryItemCard';
 import { Timeline } from './Timeline';
 import { useStoryPlayback } from './useStoryPlayback';
@@ -46,6 +49,11 @@ export function StoryContent({ storyId, storyPort, ttsPort, enginePort, effectPr
   const [exporting, setExporting] = useState(false);
   const [pendingDeleteItemId, setPendingDeleteItemId] = useState<string | null>(null);
   const [regeneratingItemId, setRegeneratingItemId] = useState<string | null>(null);
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+
+  const voices = useTtsStudioStore((s) => s.voices);
+  const selectedVoiceId = useTtsStudioStore((s) => s.selectedVoiceId);
+  const selectedVoiceLanguage = voices.find((v) => v.id === selectedVoiceId)?.language;
 
   const isPlaying = useStoryPlaybackStore((s) => s.isPlaying);
   const currentTimeMs = useStoryPlaybackStore((s) => s.currentTimeMs);
@@ -107,6 +115,20 @@ export function StoryContent({ storyId, storyPort, ttsPort, enginePort, effectPr
       setErrorMessage(err instanceof Error ? err.message : String(err));
     } finally {
       setRegeneratingItemId(null);
+    }
+  };
+
+  const handlePreviewVoice = async (voiceId: string) => {
+    if (!ttsPort.getPreviewUrl) return;
+    const playId = previewPlayId(voiceId);
+    if (getPlayingId() === playId) { stopAudio(); return; }
+    setPreviewingVoiceId(voiceId);
+    try {
+      const url = await ttsPort.getPreviewUrl(voiceId);
+      setPreviewingVoiceId(null);
+      await playUrlAudio(playId, url);
+    } catch {
+      setPreviewingVoiceId(null);
     }
   };
 
@@ -236,16 +258,31 @@ export function StoryContent({ storyId, storyPort, ttsPort, enginePort, effectPr
         />
       )}
 
-      <FloatingGenerateBox
-        storyId={storyId}
-        storyPort={storyPort}
+      <GenerateBox
         ttsPort={ttsPort}
         enginePort={enginePort}
         effectPresetPort={effectPresetPort}
-        assetUrl={assetUrl}
-        track={trackCount - 1}
-        onAdded={() => void refresh()}
-        bottomOffset={items.length > 0 ? trackEditorHeight : 0}
+        selectedVoiceId={selectedVoiceId}
+        selectedVoiceLanguage={selectedVoiceLanguage}
+        voicePicker={
+          <VoicePicker
+            onPreview={handlePreviewVoice}
+            previewingId={previewingVoiceId}
+            assetUrl={assetUrl}
+            showLabel={false}
+            compact
+          />
+        }
+        placeholder="Nhập văn bản cho Story — sinh xong tự thêm vào track cuối. (⌘/Ctrl+Enter để sinh nhanh)"
+        onGenerated={async (result) => {
+          if (!result.historyId) {
+            throw new Error('Môi trường này chưa hỗ trợ tự thêm vào Story — dùng tab "Sinh giọng" rồi bấm "Thêm đoạn" từ lịch sử.');
+          }
+          await storyPort.addItemFromHistory(storyId, result.historyId, trackCount - 1);
+          await refresh();
+        }}
+        className="absolute inset-x-2 z-10"
+        style={{ bottom: (items.length > 0 ? trackEditorHeight : 0) + 8 }}
       />
 
       {showPicker && (

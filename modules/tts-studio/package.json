@@ -24,6 +24,7 @@
     "@sky-app/kernel": "workspace:*",
     "@sky-app/service-contracts": "workspace:*",
     "@sky-app/tts-engine-ui": "workspace:*",
+    "@sky-app/tts-generation-ui": "workspace:*",
     "@sky-app/ui": "workspace:*",
     "@sky-app/voice-catalog-ui": "workspace:*",
     "@sonth87/device-layout": "catalog:",

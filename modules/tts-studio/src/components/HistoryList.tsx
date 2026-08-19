@@ -3,10 +3,15 @@ import { useState } from 'react';
 import type { TtsPort } from '@sky-app/service-contracts';
 import { ButtonPrimitive } from '@sky-app/ui';
 import { useTtsStudioStore } from '../store';
-import { AudioPlayerBar } from './AudioPlayerBar';
 
-function historyPlayId(id: string): string {
+export function historyPlayId(id: string): string {
   return `history:${id}`;
+}
+
+export interface HistoryPlayEntry {
+  id: string;
+  url: string;
+  label: string;
 }
 
 function formatTime(ts: number): string {
@@ -20,14 +25,20 @@ function formatTime(ts: number): string {
 
 export interface HistoryListProps {
   ttsPort?: TtsPort;
+  /** `id` của bản ghi đang mở player (hoặc `null`) — nâng lên `TtsStudioApp` để dùng CHUNG 1
+   *  `AudioPlayerBar` với "Phát nhanh", đặt NGOÀI vùng cuộn của chính danh sách này (bug thật:
+   *  trước đây `HistoryList` tự vẽ `AudioPlayerBar` riêng bên trong div `overflow-y-auto` của
+   *  nó, nên player cuộn theo luôn danh sách thay vì đứng yên — phản hồi 2026-08-19). */
+  openEntryId: string | null;
+  /** `null` = đóng player. */
+  onPlayEntry: (entry: HistoryPlayEntry | null) => void;
 }
 
-export function HistoryList({ ttsPort }: HistoryListProps) {
+export function HistoryList({ ttsPort, openEntryId, onPlayEntry }: HistoryListProps) {
   const history = useTtsStudioStore((s) => s.history);
   const removeHistory = useTtsStudioStore((s) => s.removeHistory);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
-  const [openEntry, setOpenEntry] = useState<{ id: string; url: string; label: string } | null>(null);
 
   const filteredHistory = history.filter((entry) =>
     entry.text.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -36,14 +47,14 @@ export function HistoryList({ ttsPort }: HistoryListProps) {
 
   const handlePlay = async (id: string, label: string) => {
     if (!ttsPort?.getHistoryAudioUrl) return;
-    if (openEntry?.id === id) {
-      setOpenEntry(null); // đang mở đúng dòng này — bấm lại = đóng player (AudioPlayerBar tự dừng phát)
+    if (openEntryId === id) {
+      onPlayEntry(null); // đang mở đúng dòng này — bấm lại = đóng player (AudioPlayerBar tự dừng phát)
       return;
     }
     setBusyId(id);
     try {
       const url = await ttsPort.getHistoryAudioUrl(id);
-      setOpenEntry({ id, url, label });
+      onPlayEntry({ id, url, label });
     } finally {
       setBusyId(null);
     }
@@ -126,7 +137,7 @@ export function HistoryList({ ttsPort }: HistoryListProps) {
           // "Đang mở player cho dòng này" — khác `playingId` (có thể đang mở nhưng TẠM DỪNG,
           // AudioPlayerBar's nút play/pause riêng lo phần đó). Icon Pause ở đây nghĩa là "đang
           // hiện player, bấm lại để đóng", không nhất thiết đang phát.
-          const isOpen = openEntry?.id === entry.id;
+          const isOpen = openEntryId === entry.id;
           return (
             <div
               key={entry.id}
@@ -183,15 +194,6 @@ export function HistoryList({ ttsPort }: HistoryListProps) {
           );
         })}
       </div>
-
-      {openEntry && (
-        <AudioPlayerBar
-          id={historyPlayId(openEntry.id)}
-          source={{ kind: 'url', url: openEntry.url }}
-          label={openEntry.label}
-          onClose={() => setOpenEntry(null)}
-        />
-      )}
     </div>
   );
 }

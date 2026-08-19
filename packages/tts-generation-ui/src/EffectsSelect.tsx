@@ -7,11 +7,8 @@ export interface EffectsSelectProps {
   className?: string;
 }
 
-/**
- * Dropdown chọn preset hiệu ứng — tách khỏi `EffectsPanel.tsx` (tab "Sinh giọng", vẫn giữ
- * nguyên phần chỉnh slider/lưu/xoá preset xung quanh) để `FloatingGenerateBox.tsx` (Story)
- * dùng lại đúng 1 implementation, không tự vẽ `<select>` riêng lệch nhau.
- */
+/** Dropdown chọn preset hiệu ứng — dùng chung cho mọi nơi cần áp hiệu ứng lúc sinh giọng, tránh
+ *  mỗi nơi tự vẽ `<select>` riêng lệch nhau. */
 export function EffectsSelect({ presets, value, onChange, className }: EffectsSelectProps) {
   return (
     <select

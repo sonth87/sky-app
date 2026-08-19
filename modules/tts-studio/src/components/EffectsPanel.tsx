@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { EffectPresetPort, EffectTypeInfo, TtsPort } from '@sky-app/service-contracts';
+import { EffectsSelect, useEffectPresets } from '@sky-app/tts-generation-ui';
 import { useTtsStudioStore } from '../store';
-import { useEffectPresets } from '../lib/useEffectPresets';
-import { EffectsSelect } from './EffectsSelect';
 import { PromptDialog } from './PromptDialog';
 
 export interface EffectsPanelProps {

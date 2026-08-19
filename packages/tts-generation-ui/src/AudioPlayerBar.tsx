@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { Pause, Play, Repeat, Volume2, VolumeX, X } from 'lucide-react';
-import { clearExternalIfCurrent, playExternal } from '../lib/audioPlayer';
-import { pcmToWavBlob } from '../lib/wav-encode';
+import { pcmToWavBlob } from './wav-encode.js';
 
 export type AudioPlayerSource =
   | { kind: 'pcm'; buffer: ArrayBuffer; sampleRate: number }
@@ -13,9 +12,16 @@ export interface AudioPlayerBarProps {
   id: string;
   label?: string;
   onClose: () => void;
-  /** Mặc định `true` — tự phát ngay khi mount (đúng hành vi cũ của "Phát nhanh"/"Nghe lại":
-   *  bấm nút là nghe luôn, không cần bấm thêm lần 2). */
+  /** Mặc định `true` — tự phát ngay khi mount (bấm nút là nghe luôn, không cần bấm thêm lần 2). */
   autoPlay?: boolean;
+  /** Điều phối "chỉ 1 nguồn phát tại 1 thời điểm" với các audio khác trong app nhúng component
+   *  này (vd nghe thử giọng, phát lại lịch sử) — app tự truyền vào bộ điều phối của mình. Không
+   *  truyền = mỗi `AudioPlayerBar` tự phát độc lập, không phối hợp dừng-lẫn-nhau với audio khác
+   *  trong app (chấp nhận được khi dùng độc lập/lần đầu tích hợp). */
+  registerPlaying?: (id: string, stop: () => void) => void;
+  /** App gọi khi nguồn NGOÀI giành quyền phát (qua `registerPlaying`) — dọn `isPlaying` mà
+   *  KHÔNG gọi lại `stop()` của chính nó (đã tự dừng rồi). */
+  clearIfCurrent?: (id: string) => void;
 }
 
 function formatTime(seconds: number): string {
@@ -25,21 +31,16 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+const noop = () => {};
+
 /**
  * Thanh phát audio "xịn" — waveform tương tác (kéo để tua), play/pause, loop, volume — dùng
- * WaveSurfer.js làm CHÍNH cho cả hiển thị lẫn phát (khác `stories/ClipWaveform.tsx` — cái đó
- * cố ý mute vì Web Audio API của `useStoryPlayback` lo phát riêng; ở đây KHÔNG có nguồn phát
- * nào khác nên để WaveSurfer tự phát thẳng, đơn giản hơn hẳn tự đồng bộ 2 hệ thống).
- *
- * Dùng chung cho "Phát nhanh" (`TtsStudioApp.tsx`, nguồn PCM thô — bọc WAV qua `wav-encode.ts`
- * trước khi đưa cho WaveSurfer, PCM trần không có header để trình duyệt nhận dạng) và "Nghe
- * lại" lịch sử (`HistoryList.tsx`, nguồn URL trực tiếp).
- *
- * Tích hợp `audioPlayer.ts` qua `playExternal()` — bấm Play ở đây tự dừng bất kỳ audio nào
- * khác đang phát bằng cơ chế cũ (`playPcmAudio`/`playUrlAudio`), và ngược lại — giữ đúng bất
- * biến "chỉ 1 nguồn phát tại 1 thời điểm" đã có từ trước, không tạo hệ thống phát audio riêng.
+ * WaveSurfer.js làm CHÍNH cho cả hiển thị lẫn phát. Dùng chung cho mọi nơi cần phát lại 1 đoạn
+ * audio đã sinh (PCM thô hoặc URL) kèm waveform, không phụ thuộc bất kỳ store/module cụ thể nào
+ * — điều phối "chỉ 1 nguồn phát" với audio khác trong app (nếu có) đi qua
+ * `registerPlaying`/`clearIfCurrent`, do app nhúng tự truyền vào.
  */
-export function AudioPlayerBar({ source, id, label, onClose, autoPlay = true }: AudioPlayerBarProps) {
+export function AudioPlayerBar({ source, id, label, onClose, autoPlay = true, registerPlaying, clearIfCurrent }: AudioPlayerBarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -48,6 +49,9 @@ export function AudioPlayerBar({ source, id, label, onClose, autoPlay = true }: 
   const [duration, setDuration] = useState(0);
   const [loop, setLoop] = useState(false);
   const [volume, setVolume] = useState(1);
+
+  const register = registerPlaying ?? noop;
+  const clear = clearIfCurrent ?? noop;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -62,8 +66,8 @@ export function AudioPlayerBar({ source, id, label, onClose, autoPlay = true }: 
       objectUrlRef.current = null;
     }
 
-    // Đọc thẳng biến CSS `--primary` — đã LÀ 1 giá trị oklch(...) hoàn chỉnh (xem styles.css),
-    // không bọc hàm màu nào thêm (cùng cách stories/ClipWaveform.tsx đọc theme).
+    // Đọc thẳng biến CSS `--primary` — đã LÀ 1 giá trị oklch(...) hoàn chỉnh, không bọc hàm màu
+    // nào thêm (app nhúng chịu trách nhiệm khai báo biến này trong theme của mình).
     const primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#888';
     const wavesurfer = WaveSurfer.create({
       container: containerRef.current,
@@ -82,7 +86,7 @@ export function AudioPlayerBar({ source, id, label, onClose, autoPlay = true }: 
     wavesurfer.on('ready', () => {
       setDuration(wavesurfer.getDuration());
       if (autoPlay) {
-        playExternal(id, () => wavesurfer.pause());
+        register(id, () => wavesurfer.pause());
         void wavesurfer.play();
       }
     });
@@ -92,16 +96,16 @@ export function AudioPlayerBar({ source, id, label, onClose, autoPlay = true }: 
     wavesurfer.on('pause', () => setIsPlaying(false));
     wavesurfer.on('finish', () => {
       setIsPlaying(false);
-      clearExternalIfCurrent(id);
+      clear(id);
     });
 
     return () => {
       wavesurfer.destroy();
       wavesurferRef.current = null;
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-      clearExternalIfCurrent(id);
+      clear(id);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ dựng lại player khi `source`/`id` đổi thật, không phải mỗi lần autoPlay/onClose đổi identity
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ dựng lại player khi `source`/`id` đổi thật, không phải mỗi lần autoPlay/onClose/register/clear đổi identity
   }, [source, id]);
 
   useEffect(() => {
@@ -119,14 +123,14 @@ export function AudioPlayerBar({ source, id, label, onClose, autoPlay = true }: 
     if (ws.isPlaying()) {
       ws.pause();
     } else {
-      playExternal(id, () => ws.pause());
+      register(id, () => ws.pause());
       void ws.play();
     }
   };
 
   const handleClose = () => {
     wavesurferRef.current?.pause();
-    clearExternalIfCurrent(id);
+    clear(id);
     onClose();
   };
 

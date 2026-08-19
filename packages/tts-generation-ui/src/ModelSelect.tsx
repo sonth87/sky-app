@@ -10,8 +10,8 @@ export interface ModelSelectProps {
 /**
  * Dropdown chọn MODEL/ENGINE — CHỈ chọn, KHÔNG đổi engine thật ngay (đổi engine là thao tác
  * nặng/toàn cục, restart cả tiến trình Python — xem `TtsEnginePort.switchEngine`'s docstring).
- * Nơi gọi (`FloatingGenerateBox.tsx`) tự quyết định lúc nào thật sự gọi `switchEngine` (lúc
- * bấm Sinh, không phải lúc đổi dropdown).
+ * Nơi gọi tự quyết định lúc nào thật sự gọi `switchEngine` (thường là lúc bấm Sinh, không phải
+ * lúc đổi dropdown) — xem `GenerateBox`.
  *
  * Engine chưa tải (`install_status !== 'installed'`) vẫn hiện trong danh sách nhưng
  * `disabled` — ghi rõ NGAY TRONG label (không chỉ `title`) vì `<option>` không tin cậy hiện

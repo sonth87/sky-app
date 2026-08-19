@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pcmToWavBlob } from '../lib/wav-encode';
+import { pcmToWavBlob } from './wav-encode.js';
 
 describe('pcmToWavBlob', () => {
   it('tạo Blob với header WAV 44 byte + đúng dataSize', async () => {

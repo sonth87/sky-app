@@ -3,7 +3,7 @@ import type { TtsEnginePort } from '@sky-app/service-contracts';
 import { useTtsStudioStore } from '../store';
 import { useTextareaRef } from '../TextareaRefContext';
 import { buildEmotionHighlightedHtml, getCaretCharOffset, setCaretCharOffset } from '../lib/highlightEditor';
-import { useTtsEngines } from '../lib/useTtsEngines';
+import { useTtsEngines } from '@sky-app/tts-generation-ui';
 import { cn } from '@sky-app/ui';
 
 interface EmotionTag {

@@ -510,6 +510,9 @@ importers:
       '@sky-app/tts-engine-ui':
         specifier: workspace:*
         version: link:../../packages/tts-engine-ui
+      '@sky-app/tts-generation-ui':
+        specifier: workspace:*
+        version: link:../../packages/tts-generation-ui
       '@sky-app/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -875,6 +878,40 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/tts-generation-ui:
+    dependencies:
+      '@sky-app/service-contracts':
+        specifier: workspace:*
+        version: link:../service-contracts
+      wavesurfer.js:
+        specifier: ^7.12.11
+        version: 7.12.11
+    devDependencies:
+      '@sky-app/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.25.0(react@19.2.8)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(lightningcss@1.33.0)(terser@5.49.2)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/ui:
     dependencies:

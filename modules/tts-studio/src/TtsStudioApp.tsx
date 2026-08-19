@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ListMusic, Mic } from 'lucide-react';
 import type { AppContentProps } from '@sky-app/kernel';
 import type { TtsPort, TtsEnginePort, EffectPresetPort, SttPort, StoryPort } from '@sky-app/service-contracts';
 import { PortalContainerContext } from './PortalContainerContext';
 import { TextareaRefContext } from './TextareaRefContext';
+import { AudioPlayerBar, type AudioPlayerSource } from '@sky-app/tts-generation-ui';
 import { VoicePicker, previewPlayId } from './components/VoicePicker';
 import { AlertDialog } from './components/AlertDialog';
-import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { SpeedSlider } from './components/SpeedSlider';
 import { EmotionInsert } from './components/EmotionInsert';
 import { EngineParamsPanel } from './components/EngineParamsPanel';
@@ -14,21 +14,35 @@ import { EffectsPanel } from './components/EffectsPanel';
 import { UsageGuide } from './components/UsageGuide';
 import { TextInputPanel } from './components/TextInputPanel';
 import { GenerateBar, QUICK_PLAY_ID } from './components/GenerateBar';
-import { HistoryList } from './components/HistoryList';
+import { HistoryList, historyPlayId, type HistoryPlayEntry } from './components/HistoryList';
 import { VerticalResizeHandle } from './components/VerticalResizeHandle';
 import { StoriesTab } from './components/stories/StoriesTab';
 import { useTtsStudioStore } from './store';
-import { getPlayingId, playUrlAudio, stopAudio } from './lib/audioPlayer';
+import { clearExternalIfCurrent, getPlayingId, playExternal, playUrlAudio, stopAudio } from './lib/audioPlayer';
 import { VoiceCloneModal } from '@sky-app/voice-catalog-ui';
 import { EngineManager, DeviceSettingsModal } from '@sky-app/tts-engine-ui';
 import { useMenuAction } from '@sonth87/device-layout';
 
 type StudioTab = 'generate' | 'stories';
 
+// Player DUY NHẤT cho cả "Phát nhanh" (kết quả vừa sinh, nguồn PCM) lẫn "Nghe lại" 1 bản ghi
+// lịch sử (nguồn URL) — trước đây `HistoryList.tsx` tự vẽ 1 `AudioPlayerBar` RIÊNG bên trong
+// chính div `overflow-y-auto` của nó, nên player đó cuộn theo History thay vì đứng yên (bug thật
+// đã gây hiểu lầm "sóng âm phải cuộn mới thấy" suốt nhiều vòng sửa — phản hồi 2026-08-19, do
+// người dùng tự bắt được qua đọc code, không phải do CSS `position`). Giờ CHỈ 1 chỗ render
+// `AudioPlayerBar`, đặt ngoài vùng cuộn History (xem JSX bên dưới) — dù kích hoạt từ đâu.
+type PlayerEntry =
+  | { kind: 'quick'; buffer: ArrayBuffer; sampleRate: number }
+  | ({ kind: 'history' } & HistoryPlayEntry);
+
 const EDITOR_HEIGHT_KEY = 'tts-studio-editor-height';
 const DEFAULT_EDITOR_HEIGHT = 320;
 const MIN_EDITOR_HEIGHT = 160;
 const MIN_HISTORY_HEIGHT = 140;
+// Chiều cao ước lượng của AudioPlayerBar (kể cả margin quanh nó) — chừa đúng khoảng này ở đáy
+// vùng cuộn History khi sóng âm đang hiện (ghim đè lên), để item cuối cùng của History không bị
+// nó che khuất.
+const WAVE_BAR_HEIGHT = 64;
 
 function readStoredEditorHeight(): number {
   try {
@@ -107,7 +121,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
   const [previewingId, setPreviewingId] = useState<string | null>(null);
   const lastResultRef = useRef<{ buffer: ArrayBuffer; sampleRate: number } | null>(null);
   const [canQuickPlay, setCanQuickPlay] = useState(false);
-  const [showQuickPlayer, setShowQuickPlayer] = useState(false);
+  const [playerEntry, setPlayerEntry] = useState<PlayerEntry | null>(null);
 
   const refreshVoices = useCallback(async () => {
     if (!tts) return [];
@@ -296,7 +310,7 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
       setCanQuickPlay(true);
       // Hiện AudioPlayerBar ngay — component đó tự autoPlay khi mount, đúng hành vi cũ (tạo
       // xong nghe luôn), giờ có thêm waveform/tua/loop/volume thay vì chỉ icon Play⇄Pause.
-      setShowQuickPlayer(true);
+      setPlayerEntry({ kind: 'quick', buffer: result.buffer, sampleRate: result.sampleRate });
 
       // Phase 3: server đã ghi dòng lịch sử ngay trong /synthesize và trả id qua
       // X-History-Id (xem history_store.py) — dựng entry NGAY TẠI CLIENT từ dữ liệu đã có
@@ -327,11 +341,27 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
   };
 
   // Nút "Phát nhanh" giờ chỉ đóng/mở AudioPlayerBar (ẩn = tự dừng, xem component's cleanup) —
-  // play/pause THẬT nằm ở nút bên trong chính player đó.
+  // play/pause THẬT nằm ở nút bên trong chính player đó. Đang mở "Nghe lại" 1 bản ghi lịch sử
+  // (kind 'history') thì bấm "Phát nhanh" chuyển hẳn sang kết quả vừa sinh, không cộng dồn 2
+  // player — đúng bất biến "chỉ 1 player tại 1 thời điểm".
   const handleQuickPlay = () => {
     if (!lastResultRef.current) return;
-    setShowQuickPlayer((v) => !v);
+    setPlayerEntry((cur) =>
+      cur?.kind === 'quick' ? null : { kind: 'quick', buffer: lastResultRef.current!.buffer, sampleRate: lastResultRef.current!.sampleRate }
+    );
   };
+
+  // `source` PHẢI giữ nguyên identity giữa các lần render không liên quan (vd kéo resize vùng
+  // soạn thảo gọi setEditorHeight liên tục) — AudioPlayerBar's effect dựng lại WaveSurfer mỗi
+  // khi `source` đổi reference, tạo object literal thẳng trong JSX thì MỖI LẦN render đều là 1
+  // object mới, khiến audio tự phát lại từ đầu dù nội dung không đổi (bug thật, phản hồi
+  // 2026-08-19). `useMemo` khoá theo `playerEntry` — chỉ đổi thật khi player đổi nội dung.
+  const playerSource = useMemo<AudioPlayerSource | null>(() => {
+    if (!playerEntry) return null;
+    return playerEntry.kind === 'quick'
+      ? { kind: 'pcm', buffer: playerEntry.buffer, sampleRate: playerEntry.sampleRate }
+      : { kind: 'url', url: playerEntry.url };
+  }, [playerEntry]);
 
   if (!tts) {
     return (
@@ -350,7 +380,14 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
     <div ref={rootRef} className="tts-studio-root relative flex h-full flex-col bg-background" data-env={platform.env}>
       <PortalContainerContext.Provider value={rootRef}>
         <TextareaRefContext.Provider value={textareaRef}>
-        <div className="flex h-full overflow-hidden">
+        {/* min-h-0 — BẮT BUỘC: đây là flex-item theo trục dọc của `tts-studio-root` (flex-col).
+            Thiếu prop này thì `min-height: auto` mặc định của flex item khiến nó KHÔNG co được
+            xuống theo `h-full` khi nội dung bên trong (History dài) muốn cao hơn — cứ phình theo
+            nội dung, tràn lên tận `window-body` (`Window.tsx` của device-layout, `overflow-auto`)
+            khiến CẢ CỬA SỔ cuộn làm 1 khối thay vì chỉ History tự cuộn riêng bên trong nó (bug
+            gốc thật gây ra "phải cuộn hết mới thấy sóng âm" — phản hồi 2026-08-18, xác nhận qua
+            đọc thẳng device-layout's Window.tsx, không phải lỗi ở CSS của khối nút/wave). */}
+        <div className="flex h-full min-h-0 overflow-hidden">
           {/* Rail icon-only, chỉ hiện khi có >1 tab (storyPort sẵn sàng) — đúng mẫu
               ConfigWindow.tsx's nav (packages/tts-engine-ui), tham khảo voicebox. 1 tab duy
               nhất thì rail chỉ tốn chỗ mà không phân biệt được gì. */}
@@ -417,7 +454,12 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
                     <p className="text-2xs text-destructive">Không tải được danh sách giọng: {loadError}</p>
                   )}
                 </aside>
-                <main ref={mainRef} className="flex min-h-0 flex-col overflow-hidden p-3">
+                {/* Thứ tự hiển thị đúng ý: Soạn thảo → khối nút Sinh (vị trí gốc, ngay dưới
+                    soạn thảo) → History (cuộn riêng) → sóng âm khi phát (GHIM đáy TOÀN panel
+                    bên phải, đứng SAU History về mặt hiển thị, độc lập hẳn việc cuộn History —
+                    phản hồi thật 2026-08-18, đã sửa sai 2 lần trước vì gộp chung nút+wave làm 1
+                    khối rồi loay hoay đổi CSS position của cả khối thay vì tách wave ra riêng). */}
+                <main ref={mainRef} className="relative flex min-h-0 flex-col overflow-hidden p-3">
                   <div className="flex flex-none flex-col overflow-hidden" style={{ height: editorHeight }}>
                     <TextInputPanel />
                   </div>
@@ -430,19 +472,31 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
                       onGenerate={handleGenerate}
                       onQuickPlay={handleQuickPlay}
                       canQuickPlay={canQuickPlay}
-                      showQuickPlayer={showQuickPlayer}
+                      showQuickPlayer={playerEntry?.kind === 'quick'}
                     />
-                    {showQuickPlayer && lastResultRef.current && (
+                  </div>
+                  <div
+                    className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1"
+                    style={{ paddingBottom: playerEntry ? WAVE_BAR_HEIGHT : 0 }}
+                  >
+                    <HistoryList
+                      ttsPort={tts}
+                      openEntryId={playerEntry?.kind === 'history' ? playerEntry.id : null}
+                      onPlayEntry={(entry) => setPlayerEntry(entry ? { kind: 'history', ...entry } : null)}
+                    />
+                  </div>
+                  {playerEntry && playerSource && (
+                    <div className="absolute inset-x-3 bottom-3">
                       <AudioPlayerBar
-                        id={QUICK_PLAY_ID}
-                        source={{ kind: 'pcm', buffer: lastResultRef.current.buffer, sampleRate: lastResultRef.current.sampleRate }}
-                        onClose={() => setShowQuickPlayer(false)}
+                        id={playerEntry.kind === 'quick' ? QUICK_PLAY_ID : historyPlayId(playerEntry.id)}
+                        source={playerSource}
+                        label={playerEntry.kind === 'history' ? playerEntry.label : undefined}
+                        onClose={() => setPlayerEntry(null)}
+                        registerPlaying={playExternal}
+                        clearIfCurrent={clearExternalIfCurrent}
                       />
-                    )}
-                  </div>
-                  <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1">
-                    <HistoryList ttsPort={tts} />
-                  </div>
+                    </div>
+                  )}
                 </main>
               </div>
             )}
