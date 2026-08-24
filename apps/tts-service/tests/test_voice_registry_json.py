@@ -58,6 +58,67 @@ def test_file_hong_duoc_backup_khong_xoa_im_lang(tmp_path):
     assert backups[0].read_text(encoding="utf-8") == "{ khong phai json hop le"
 
 
+# ── merge_presets — preset built-in đọc ĐỘNG từ engine.list_presets() lúc runtime ──────────
+
+def test_merge_presets_them_entry_moi(registry):
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False, "accent": "southern",
+         "category": ["conversational"], "tags": [], "tagline": "Nam · Tự nhiên",
+         "description": "Giọng nam miền Nam, phong cách tự nhiên."},
+    ])
+    v = registry.get_voice("builtin-adam")
+    assert v is not None
+    assert v["type"] == "preset"
+    assert v["preset_id"] == "Adam"
+    assert v["accent"] == "southern"
+    assert v["category"] == ["conversational"]
+    # hidden=False → phải lộ ra qua list_voices() mặc định, khác 10 preset tĩnh (hidden=True)
+    assert "builtin-adam" in {x["id"] for x in registry.list_voices(include_hidden=False)}
+
+
+def test_merge_presets_giu_nguyen_hidden_nguoi_dung_da_sua(registry):
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False},
+    ])
+    registry.set_hidden("builtin-adam", True)  # người dùng tự ẩn đi
+
+    registry.merge_presets([  # merge lại (vd restart server) — KHÔNG được ghi đè hidden=False
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False},
+    ])
+    assert registry.get_voice("builtin-adam")["hidden"] is True
+
+
+def test_merge_presets_refresh_metadata_entry_da_co(registry):
+    """Bug thật đã sửa: field mới thêm vào code (vd "language") sau khi 1 preset ĐÃ merge lần
+    trước đó phải tự áp dụng lại ở lần merge sau (restart server), không kẹt mãi ở dữ liệu cũ."""
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False,
+         "description": "Mô tả cũ, chưa có language"},
+    ])
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False,
+         "language": "Vietnamese", "description": "Mô tả mới, đã thêm language"},
+    ])
+    v = registry.get_voice("builtin-adam")
+    assert v["language"] == "Vietnamese"
+    assert v["description"] == "Mô tả mới, đã thêm language"
+
+
+def test_merge_presets_preset_builtin_khong_the_xoa(registry):
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False},
+    ])
+    ok, reason = registry.delete_cloned("builtin-adam")
+    assert ok is False
+    assert reason == "is_preset"
+
+
 # ── get_voice / list_voices — hình dạng KHÔNG lộ ref_file/ref_text/samples ──────
 
 def test_get_voice_khong_lo_ref_file_ref_text(registry):

@@ -6,6 +6,8 @@
 
 ## Mục lục (mới nhất trên cùng)
 
+- [2026-08-24 — Đưa 20 giọng built-in của VieNeu 3.3.0 vào voice picker](./2026-08-24-vieneu-builtin-voices-trong-voice-picker.md)
+- [2026-08-24 — Nâng cấp `vieneu` 3.0.9 → 3.3.0 trong `apps/tts-service`](./2026-08-24-nang-cap-vieneu-3-3-0.md)
 - [2026-08-15 — App "Speech to Text" riêng + lịch sử phiên âm (GĐ 3)](./2026-08-15-stt-app-rieng-va-lich-su.md)
 - [2026-08-14 — Nút "Tự động điền transcript" (GĐ 2)](./2026-08-14-stt-nut-tu-dong-dien-transcript.md)
 - [2026-08-14 — STT (Speech-to-Text): nền tảng engine + port (GĐ 1)](./2026-08-14-stt-nen-tang-giai-doan-1.md)

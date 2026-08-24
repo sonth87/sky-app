@@ -92,6 +92,62 @@ def test_khong_de_len_preset_da_sua(registry):
     assert registry.get_voice(some_id)["hidden"] is False
 
 
+# ── merge_presets — preset built-in đọc ĐỘNG từ engine.list_presets() lúc runtime ──────────
+
+def test_merge_presets_them_entry_moi(registry):
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False, "accent": "southern",
+         "category": ["conversational"], "tags": [], "tagline": "Nam · Tự nhiên",
+         "description": "Giọng nam miền Nam, phong cách tự nhiên."},
+    ])
+    v = registry.get_voice("builtin-adam")
+    assert v is not None
+    assert v["type"] == "preset"
+    assert v["preset_id"] == "Adam"
+    assert v["accent"] == "southern"
+    assert v["category"] == ["conversational"]
+    assert "builtin-adam" in {x["id"] for x in registry.list_voices(include_hidden=False)}
+
+
+def test_merge_presets_giu_nguyen_hidden_nguoi_dung_da_sua(registry):
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False},
+    ])
+    registry.set_hidden("builtin-adam", True)
+
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False},
+    ])
+    assert registry.get_voice("builtin-adam")["hidden"] is True
+
+
+def test_merge_presets_refresh_metadata_entry_da_co(registry):
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False,
+         "description": "Mô tả cũ"},
+    ])
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False,
+         "description": "Mô tả mới"},
+    ])
+    assert registry.get_voice("builtin-adam")["description"] == "Mô tả mới"
+
+
+def test_merge_presets_preset_builtin_khong_the_xoa(registry):
+    registry.merge_presets([
+        {"id": "builtin-adam", "type": "preset", "label": "Adam", "gender": "male",
+         "region": "Nam", "preset_id": "Adam", "hidden": False},
+    ])
+    ok, reason = registry.delete_cloned("builtin-adam")
+    assert ok is False
+    assert reason == "is_preset"
+
+
 # ── add_cloned / get_voice / list_voices ──────────────────────────────────────
 
 def test_them_giong_clone_toi_thieu(registry):

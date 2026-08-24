@@ -1,8 +1,8 @@
-vieneu==3.0.9
+vieneu==3.3.0
 fastapi>=0.115,<0.116
 uvicorn[standard]>=0.34,<0.35
-soxr>=0.3,<0.4
-numpy>=1.26,<2
+soxr>=1.0,<2
+numpy>=2,<3
 python-multipart>=0.0.20
 # Hiệu ứng hậu kỳ (reverb/delay/pitch shift...) — xem server/effects.py.
 # Có binary native: `effects.py` import LƯỜI để service vẫn chạy bình thường (chỉ mất

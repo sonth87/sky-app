@@ -138,7 +138,7 @@ export function GenerateBox({
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !disabled) void handleGenerate(); }}
           placeholder={placeholder ?? 'Nhập văn bản cần chuyển thành giọng nói... (⌘/Ctrl+Enter để sinh nhanh)'}
           rows={3}
-          className="w-full flex-1 resize-none rounded-xl border-none bg-card text-sm outline-none focus:border-primary"
+          className="w-full flex-1 resize-none border-none bg-card text-sm outline-none focus:border-primary"
         />
         <GenerateButton
           generating={generating || switchingEngine}

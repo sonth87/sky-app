@@ -29,6 +29,9 @@ export function AddFromHistoryPicker({ ttsPort, onPick, onClose }: AddFromHistor
       .then((list) => {
         if (alive) setEntries(list.filter((e) => e.hasAudio));
       })
+      .catch(() => {
+        if (alive) setEntries([]);
+      })
       .finally(() => {
         if (alive) setLoading(false);
       });

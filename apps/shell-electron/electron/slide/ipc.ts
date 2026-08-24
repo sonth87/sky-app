@@ -1301,22 +1301,23 @@ export function registerIpcHandlers() {
 
   // ── History (Phase 3 — nhật ký sinh audio, xem apps/tts-service/server/history_store.py) ──
 
+  // KHÔNG nuốt lỗi thành `[]` — mảng rỗng phải chỉ có nghĩa "chưa từng generate", không được
+  // lẫn với "server chưa sẵn sàng"/lỗi mạng. TtsStudioApp.tsx's effect load lịch sử retry theo
+  // backoff CHỈ khi promise reject (mảng rỗng hợp lệ không đáng retry), nên nuốt lỗi ở đây từng
+  // khiến lịch sử trống VĨNH VIỄN nếu app mount trước lúc Python server kịp mở cổng — retry
+  // không bao giờ kích hoạt vì request "thành công" với mảng rỗng (bug thật, phản hồi 2026-08-24).
   ipcMain.handle('tts:history-list', async (_e, { limit, source }: { limit?: number; source?: string }) => {
     const port = getPythonPort();
-    if (!port) return [];
-    try {
-      const params = new URLSearchParams();
-      if (limit !== undefined) params.set('limit', String(limit));
-      if (source) params.set('source', source);
-      const qs = params.toString();
-      const res = await fetch(`http://127.0.0.1:${port}/history${qs ? `?${qs}` : ''}`, {
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!res.ok) return [];
-      return await res.json();
-    } catch {
-      return [];
-    }
+    if (!port) throw new Error('TTS server chưa sẵn sàng');
+    const params = new URLSearchParams();
+    if (limit !== undefined) params.set('limit', String(limit));
+    if (source) params.set('source', source);
+    const qs = params.toString();
+    const res = await fetch(`http://127.0.0.1:${port}/history${qs ? `?${qs}` : ''}`, {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   });
 
   // Trả URL thẳng tới Python server (đúng pattern getTtsPreviewUrl) — renderer's <audio src>

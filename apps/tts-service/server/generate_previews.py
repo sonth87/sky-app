@@ -2,6 +2,7 @@
 import json, os, random, wave, numpy as np
 from pathlib import Path
 from vieneu import Vieneu
+from slug import slugify
 
 SAMPLE_RATE = 48_000
 
@@ -66,6 +67,28 @@ for sid, ref_file in SPEAKER_TO_REF.items():
     text = random.choice(SAMPLE_TEXTS)
     print(f"[Preview] Generating {sid} (ref={ref_file}, text={text[:30]!r}...)...", flush=True)
     audio = tts.infer(text, ref_audio=str(ref_path), apply_watermark=False)
+    int16 = np.clip(audio * 32767, -32768, 32767).astype(np.int16)
+    with wave.open(out_path, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(SAMPLE_RATE)
+        wf.writeframes(int16.tobytes())
+    print(f"[Preview]   -> {sid}.wav ({os.path.getsize(out_path)//1024} KB)", flush=True)
+
+# Preview cho preset built-in (VieNeu 3.3.0: 20 giọng, không cần ref audio) — đọc thẳng
+# tts._preset_voices thay vì qua voice-registry.json: script này có thể chạy TRƯỚC lần server
+# khởi động đầu tiên (registry chưa từng merge preset động, xem main.py's merge_presets), nên
+# không phụ thuộc thứ tự đó. id PHẢI khớp CHÍNH XÁC `builtin-{slug}` mà main.py sinh ra
+# (_builtin_registry_entries) — dùng chung slug.py để không lệch.
+for name in getattr(tts, '_preset_voices', {}):
+    sid = f"builtin-{slugify(name)}"
+    out_path = os.path.join(preview_dir, f"{sid}.wav")
+    if os.path.exists(out_path):
+        print(f"[Preview] Skip {sid}.wav (already exists)")
+        continue
+    text = random.choice(SAMPLE_TEXTS)
+    print(f"[Preview] Generating {sid} (builtin preset={name!r}, text={text[:30]!r}...)...", flush=True)
+    audio = tts.infer(text, voice=name, apply_watermark=False)
     int16 = np.clip(audio * 32767, -32768, 32767).astype(np.int16)
     with wave.open(out_path, 'wb') as wf:
         wf.setnchannels(1)

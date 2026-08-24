@@ -142,7 +142,15 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
           id: v.id,
           name: v.name,
           gender: v.gender,
-          language: v.language,
+          // registry KHÔNG có cột "language" (chỉ "source_lang" dạng mã vd "vi-VN", không phải
+          // tên hiển thị) — v.language luôn null cho MỌI voice registry-backed (kể cả giọng đã
+          // import từ catalog từ lâu). VoicePicker mặc định filter language="Vietnamese" nên
+          // thiếu field này = biến mất khỏi list dù vẫn dùng được (bug thật: Hoài My/Nam Minh/
+          // Cẩm Hồng — đã import — mất khỏi tab Hệ thống). Fallback: catalog gốc (nếu import từ
+          // đó) → "Vietnamese" (app hiện chỉ có nội dung Việt là chính, mọi giọng builtin engine
+          // cũng tiếng Việt) — không để trống, thà sai hiếm khi (giọng en-US tự upload tay,
+          // không qua catalog/builtin) còn hơn biến mất hoàn toàn.
+          language: v.language ?? cat?.language ?? 'Vietnamese',
           accent: v.accent,
           category: v.category ?? cat?.category ?? [],
           tags: v.tags ?? cat?.tags ?? [],
@@ -164,7 +172,10 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
           accent: e.accent,
           category: e.category ?? [],
           tags: e.tags ?? [],
-          type: 'preset',
+          // KHÔNG set `type` ở đây (trước là 'preset' cục bộ, chỉ để đánh dấu "chưa import
+          // vào registry", không liên quan gì tới type: 'preset' THẬT của registry — preset
+          // built-in của engine, xem VoicePicker.tsx's `builtin`). Để lẫn 2 nghĩa này sẽ khiến
+          // catalog vendor chưa import bị nhận nhầm thành giọng built-in (sai màu dấu tích).
           tagline: e.tagline,
           description: e.description,
           sourceCatalogId: e.id,
@@ -241,31 +252,45 @@ export function TtsStudioApp({ appId, platform, isActive }: AppContentProps) {
   // IndexedDB riêng của TTS Studio. Lọc `source: 'tts_studio'` để không lẫn dòng metadata
   // pregen số lượng lớn (1 sự kiện có thể 500-1000+ dòng, xem history_store.py). `listHistory`
   // là optional trên TtsPort (Web chưa hỗ trợ) — degrade về mảng rỗng khi thiếu.
+  // Retry với backoff giống refreshVoices ở trên — cùng race cold-start với server, nhưng chỉ
+  // retry khi request thật sự lỗi: mảng rỗng vẫn là kết quả hợp lệ (chưa từng generate) nên
+  // không dùng làm tín hiệu "chưa sẵn sàng" như bên voices.
   useEffect(() => {
     if (!tts?.listHistory) return;
     let cancelled = false;
-    tts.listHistory({ source: 'tts_studio' })
-      .then((entries) => {
-        if (cancelled) return;
-        setHistory(
-          entries.map((e) => ({
-            id: e.id,
-            text: e.text,
-            voiceId: e.voiceId ?? '',
-            voiceLabel: e.voiceLabel ?? e.voiceId ?? '',
-            speed: e.speed ?? 1.0,
-            createdAt: new Date(e.createdAt).getTime(),
-            durationMs: e.durationMs ?? 0,
-            hasAudio: e.hasAudio,
-            qualityScore: e.qualityScore,
-            qualityFlags: e.qualityFlags,
-            error: e.error,
-          })),
-        );
-      })
-      .catch(() => {
-        /* Server/DB chưa sẵn sàng — lịch sử trống, không chặn app */
-      });
+    let attempt = 0;
+    const MAX_ATTEMPTS = 20;
+
+    const tryLoad = () => {
+      tts.listHistory!({ source: 'tts_studio' })
+        .then((entries) => {
+          if (cancelled) return;
+          setHistory(
+            entries.map((e) => ({
+              id: e.id,
+              text: e.text,
+              voiceId: e.voiceId ?? '',
+              voiceLabel: e.voiceLabel ?? e.voiceId ?? '',
+              speed: e.speed ?? 1.0,
+              createdAt: new Date(e.createdAt).getTime(),
+              durationMs: e.durationMs ?? 0,
+              hasAudio: e.hasAudio,
+              qualityScore: e.qualityScore,
+              qualityFlags: e.qualityFlags,
+              error: e.error,
+            })),
+          );
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (attempt < MAX_ATTEMPTS) {
+            attempt += 1;
+            setTimeout(tryLoad, attempt <= 4 ? 500 : attempt <= 10 ? 1000 : 2000);
+          }
+        });
+    };
+    tryLoad();
+
     return () => {
       cancelled = true;
     };

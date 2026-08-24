@@ -28,6 +28,10 @@ export interface VoiceListItem {
   description?: string;
   /** Chỉ có khi source === 'catalog' — ngôn ngữ chứa entry này (dùng cho getCatalogAudioUrl). */
   catalogLang?: string;
+  /** true = giọng built-in của chính engine (vd 20 giọng VieNeu 3.3.0, không cần ref audio) —
+   * khác giọng catalog vendor (sky-app tự thu/curate WAV mẫu). Cả 2 đều origin === 'system'
+   * (cùng tab "Hệ thống"), field này chỉ để phân biệt MÀU dấu tích trên cover (xem VoiceRow). */
+  builtin?: boolean;
 }
 
 export function voiceToListItem(v: Voice, origin: VoiceListOrigin = 'system'): VoiceListItem {

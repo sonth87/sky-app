@@ -104,7 +104,7 @@ export function EffectsPanel({ effectPresetPort, ttsPort }: EffectsPanelProps) {
         )}
       </div>
 
-      <EffectsSelect presets={presets} value={selectedPresetId ?? ''} onChange={applyPreset} />
+      <EffectsSelect presets={presets} value={selectedPresetId ?? ''} onChange={applyPreset} showLabel={true} />
 
       {/* Chỉ hiện tham số của hiệu ứng mà server CÓ khai — preset lưu từ bản cũ có thể
           chứa loại hiệu ứng đã bị gỡ; bỏ qua lặng lẽ thay vì crash cả panel. */}

@@ -52,6 +52,10 @@ export function VoicePicker({ onPreview, previewingId, loading, onAddVoice, onDe
         tags: v.tags ?? [],
         tagline: v.tagline,
         description: v.description,
+        // type === 'preset' CHỈ true cho preset built-in THẬT của registry (backend) — khác
+        // placeholder cục bộ `type: 'preset'` mà TtsStudioApp.tsx gán cho catalog vendor CHƯA
+        // import (đã bỏ, xem refreshVoices) nên không bị đụng false-positive ở đây.
+        builtin: v.type === 'preset',
       })),
     [voices],
   );

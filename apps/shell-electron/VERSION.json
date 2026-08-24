@@ -2,6 +2,14 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.18.1",
+      "date": "2026-08-24",
+      "bump": "patch",
+      "summary": "Fix lỗi \"Các bản ghi gần đây\" trong TTS Studio không hiện dữ liệu nếu mở app trước khi dịch vụ TTS khởi động xong, kể cả sau khi dịch vụ đã sẵn sàng.",
+      "breaking": true,
+      "minAppVersion": "0.18.1"
+    },
+    {
       "version": "0.18.0",
       "date": "2026-08-18",
       "bump": "minor",

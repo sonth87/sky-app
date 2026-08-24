@@ -21,7 +21,7 @@ export interface VoiceRowProps {
  * hiện overlay bất kể còn hover hay không, tới khi phát xong mới ẩn lại theo hover — khớp yêu
  * cầu "giữ hình play đến khi nào phát xong trừ khi vẫn hover".
  */
-function CoverThumbnail({ coverUrl, isSystem, state, onClick }: { coverUrl: string; isSystem: boolean; state: PreviewState; onClick: (e: React.MouseEvent) => void }) {
+function CoverThumbnail({ coverUrl, isSystem, isBuiltin, state, onClick }: { coverUrl: string; isSystem: boolean; isBuiltin: boolean; state: PreviewState; onClick: (e: React.MouseEvent) => void }) {
   const isLoading = state === 'loading';
   const isPlaying = state === 'playing';
   const isError = state === 'error';
@@ -55,7 +55,17 @@ function CoverThumbnail({ coverUrl, isSystem, state, onClick }: { coverUrl: stri
         </span>
       </button>
       {isSystem && (
-        <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 border border-background shadow-sm" title="Giọng hệ thống">
+        // Cam = catalog vendor (sky-app tự curate WAV mẫu), xanh = built-in của chính engine
+        // (vd 20 giọng VieNeu 3.3.0, không cần ref audio) — 2 nguồn khác hẳn nhau dù cùng tab
+        // "Hệ thống", cần phân biệt được bằng mắt ngay trên list.
+        <span
+          className={
+            isBuiltin
+              ? "absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 border border-background shadow-sm"
+              : "absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 border border-background shadow-sm"
+          }
+          title={isBuiltin ? "Giọng built-in của engine" : "Giọng hệ thống"}
+        >
           <Check size={9} className="text-white stroke-[3.5px]" />
         </span>
       )}
@@ -92,7 +102,7 @@ export function VoiceRow({ item, isSelected, previewState, coverUrl, onSelect, o
       </div>
 
       <div onClick={(e) => e.stopPropagation()}>
-        <CoverThumbnail coverUrl={coverUrl} isSystem={item.origin === 'system'} state={previewState} onClick={onPreview} />
+        <CoverThumbnail coverUrl={coverUrl} isSystem={item.origin === 'system'} isBuiltin={!!item.builtin} state={previewState} onClick={onPreview} />
       </div>
 
       <div className="min-w-0 flex-1">

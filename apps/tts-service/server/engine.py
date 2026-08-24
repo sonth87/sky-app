@@ -174,7 +174,7 @@ class TTSEngine(Protocol):
 
 class VieneuEngine:
     """
-    Concrete implementation dùng VieNeu==3.0.9 (ONNX/CPU mode).
+    Concrete implementation dùng VieNeu==3.3.0 (ONNX/CPU mode).
 
     Tuning decisions (không thay đổi nếu chưa test kỹ):
     - temperature=0.1, top_k=5: đủ thấp tránh random bad sample, nhưng > 0
@@ -247,7 +247,34 @@ class VieneuEngine:
         }
 
     def encode_reference(self, wav_path: str) -> object:
-        return self._model.encode_reference(wav_path)
+        speaker_emb, ref_codes = self._model.encode_reference(wav_path)
+        return {"speaker_emb": speaker_emb, "codes": ref_codes}
+
+    def list_presets(self) -> list[dict]:
+        """Liệt kê preset voice built-in của model (không cần ref audio, không qua clone).
+
+        Đọc thẳng `self._model._preset_voices` — thuộc tính NỘI BỘ của lib (không có API
+        công khai đủ chi tiết: `list_preset_voices()` công khai chỉ trả `(label, id)` đã gộp
+        mất field gender/region/style riêng, không đủ để filter). Vỡ nếu lib đổi tên attribute
+        ở bản sau — cùng loại rủi ro đã chấp nhận với `encode_reference`/`infer` khi nâng
+        3.0.9 → 3.3.0, chấp nhận vì không có lựa chọn khác.
+        """
+        presets = getattr(self._model, "_preset_voices", {}) or {}
+        return [
+            {
+                "preset_id": name,
+                "gender": v.get("gender"),
+                # LƯU Ý: lib KHÔNG giữ field "region" khi load runtime (dù voices_v3_turbo.json
+                # gốc có) — _load_v3_voices() chỉ copy description/gender/style/speaker_emb/
+                # codes vào self._preset_voices, region bị rớt. main.py tự parse lại từ
+                # description (định dạng ổn định "{Giới} · {Vùng} · {Phong cách}") thay vì
+                # phụ thuộc field này — vẫn trả về đây phòng khi lib sửa lại ở bản sau.
+                "region": v.get("region"),
+                "style": v.get("style"),
+                "description": v.get("description", ""),
+            }
+            for name, v in presets.items()
+        ]
 
     def _merge_kwargs(self, text: str, overrides: dict | None) -> dict:
         kw = dict(self._INFER_KWARGS)
@@ -264,7 +291,7 @@ class VieneuEngine:
         self, text: str, ref_embedding: object, speed: float = 1.0, overrides: dict | None = None
     ) -> np.ndarray:
         kw = self._merge_kwargs(text, overrides)
-        audio: np.ndarray = self._model.infer(text, ref_codes=ref_embedding, **kw)
+        audio: np.ndarray = self._model.infer(text, voice=ref_embedding, **kw)
         return self._post_process(audio, speed)
 
     def synthesize_preset(

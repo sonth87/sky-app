@@ -378,6 +378,67 @@ def _activate_stt_engine_sync(engine_id: str):
     return create_engine(engine_id)
 
 
+# ── Preset built-in của engine (VieNeu 3.3.0: 20 giọng, không cần ref audio) ──────────────
+#
+# Khác catalog vendor (voice_catalog.py, đọc file tĩnh resources/voice-ref/) — danh sách này
+# do CHÍNH engine đang chạy khai báo lúc runtime (engine.list_presets(), chỉ VieNeu hiện có),
+# nên map field tiếng Việt (region/style) của lib sang đúng vocabulary tiếng Anh mà UI filter
+# đã dùng cho catalog vendor (accent/category) — xem voice_catalog.py's docstring.
+_REGION_TO_ACCENT = {"Bắc": "northern", "Trung": "central", "Nam": "southern"}
+_STYLE_TO_CATEGORY = {
+    "tin_tuc": "news", "doc_truyen": "narrator", "tu_nhien": "conversational", "ke_chuyen": "storyteller",
+}
+_STYLE_LABEL_VI = {"tin_tuc": "Tin tức", "doc_truyen": "Đọc truyện", "tu_nhien": "Tự nhiên", "ke_chuyen": "Kể chuyện"}
+
+
+def _builtin_registry_entries(presets: list[dict]) -> list[dict]:
+    """Map `engine.list_presets()` (preset_id/gender/region/style thô) → shape entry của
+    voice_registry (`type: "preset"`, đủ field accent/category/tagline/description để UI
+    filter/hiển thị giống hệt catalog vendor). id ổn định qua các lần restart
+    (`builtin-{slug}`) — KHỚP CHÍNH XÁC tên file mà generate_previews.py sinh ra cho preview,
+    xem slug.py."""
+    from slug import slugify
+
+    out = []
+    for p in presets:
+        name = p["preset_id"]
+        # region: engine.list_presets() thường trả rỗng (lib không giữ field này khi load
+        # runtime — xem engine.py's list_presets() docstring) → tự parse lại từ description,
+        # định dạng ổn định "{Giới} · {Vùng} · {Phong cách}" (đã verify cả 20 giọng 3.3.0).
+        region = p.get("region") or ""
+        if not region:
+            parts = [x.strip() for x in (p.get("description") or "").split("·")]
+            region = parts[1] if len(parts) > 1 else ""
+        style = p.get("style") or ""
+        style_label = _STYLE_LABEL_VI.get(style, style)
+        gender_vi = "nam" if p.get("gender") == "male" else "nữ"
+        out.append({
+            "id": f"builtin-{slugify(name)}",
+            "type": "preset",
+            "label": name,
+            "gender": p.get("gender"),
+            "region": region,
+            "preset_id": name,
+            "hidden": False,
+            # LƯU Ý: `tts_voice` (SQLite) không có cột "language" — VoiceRegistrySqlite.
+            # merge_presets() không đọc key này (INSERT liệt kê cột tường minh), nên field này
+            # chỉ thật sự lưu được ở kho JSON. Vẫn khai ở đây cho đúng/rõ nghĩa tại nguồn; kho
+            # SQL đã có lưới đỡ riêng ở frontend (TtsStudioApp.tsx's registryItems fallback
+            # `?? 'Vietnamese'`) nên không mất field lúc hiển thị dù bị rớt lúc lưu SQL.
+            "language": "Vietnamese",
+            "accent": _REGION_TO_ACCENT.get(region),
+            "category": [_STYLE_TO_CATEGORY.get(style, style)] if style else [],
+            "tags": [],
+            "tagline": " · ".join(x for x in (region, style_label) if x),
+            # style_label đã ở dạng viết hoa đầu câu (tagline) — hạ về thường khi chèn giữa
+            # câu để không lỗi chính tả ("phong cách Tin tức" → "phong cách tin tức"). Không
+            # thêm chữ "đọc" cố định trước style_label — "Đọc truyện" tự nó đã có "đọc", thêm
+            # nữa thành "phong cách đọc đọc truyện" (lặp từ).
+            "description": f"Giọng {gender_vi} miền {region}, phong cách {style_label.lower()}.".strip(),
+        })
+    return out
+
+
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
@@ -441,6 +502,23 @@ async def lifespan(app: FastAPI):
     from voice_registry import create_voice_registry
     _registry = create_voice_registry(registry_path, _ref_dir)
     _safe_console(f"[TTS] Voice registry loaded from {registry_path}")
+
+    # Merge preset built-in của engine hiện hành (VieNeu 3.3.0: 20 giọng) — chỉ engine nào
+    # khai list_presets() mới có (không phải mọi engine hỗ trợ preset không-cần-ref-audio).
+    # Chạy 1 lần ở đây theo engine ACTIVE lúc startup — đổi engine giữa chừng (không restart
+    # process) không re-merge, giữ đúng phạm vi yêu cầu tính năng này (không quá kỹ, engine
+    # đã merge trước đó thì vẫn còn nguyên trong registry, chỉ /synthesize sẽ lỗi rõ ràng nếu
+    # gọi preset builtin trong lúc engine active không phải VieNeu — cùng loại giới hạn sẵn có
+    # của mọi voice clone khác, không dùng chéo được giữa các engine).
+    list_presets_fn = getattr(_engine, "list_presets", None)
+    if list_presets_fn is not None:
+        try:
+            presets = list_presets_fn()
+            _registry.merge_presets(_builtin_registry_entries(presets))
+            _safe_console(f"[TTS] Merged {len(presets)} builtin preset voice(s) từ engine '{engine_id}'")
+        except Exception as e:
+            _safe_console(f"[TTS] WARN: merge builtin presets thất bại: {e}")
+            _write_log(f"[TTS] WARN: merge builtin presets thất bại: {e}")
 
     # Init history store (Phase 3) — None êm nếu DB chưa sẵn sàng, xem history_store.py.
     history_dir_env = os.environ.get("VIENEU_HISTORY_DIR", "")
@@ -1453,13 +1531,38 @@ def delete_voice(voice_id: str):
 
 # ── Preview ───────────────────────────────────────────────────────────────────
 
+def _synth_preview_wav_bytes(preset_id: str) -> bytes:
+    """Tổng hợp 1 câu mẫu NGẪU NHIÊN cho preset voice, đóng gói WAV (16-bit PCM mono) —
+    dùng khi chưa có file preview tĩnh (generate_previews.py build-time chưa chạy, vd đang
+    dev local hoặc voice built-in mới thêm sau bản build gần nhất). CHẶN — gọi qua to_thread.
+    """
+    import io
+    import json
+    import random
+    import wave
+
+    from engine import SAMPLE_RATE
+
+    sample_texts = json.loads((Path(__file__).parent / "sample_texts.json").read_text(encoding="utf-8"))
+    text = random.choice(sample_texts)["text"]
+    audio: np.ndarray = _engine.synthesize_preset(text, preset_id, speed=1.0)
+    int16 = np.clip(audio * 32767, -32768, 32767).astype(np.int16)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(SAMPLE_RATE)
+        wf.writeframes(int16.tobytes())
+    return buf.getvalue()
+
+
 @app.get("/preview/{voice_id}")
-def get_preview(voice_id: str):
+async def get_preview(voice_id: str):
     """Trả về WAV preview. Nếu không có file preview tĩnh trong _preview_dir, kiểm tra
     xem voice có source_catalog_id hoặc thuộc catalog vendor không để phát audio gốc."""
     if _registry is None:
         raise HTTPException(503, "Registry not ready")
-    
+
     # 1. Thử lấy file preview tĩnh (NF.wav, SF.wav, v.v.)
     if _preview_dir is not None:
         wav_path = _preview_dir / f"{voice_id}.wav"
@@ -1479,6 +1582,28 @@ def get_preview(voice_id: str):
             if audio_path.exists():
                 media_type = "audio/mpeg" if audio_path.suffix.lower() == ".mp3" else "audio/wav"
                 return FileResponse(str(audio_path), media_type=media_type)
+
+    # 3. Preset built-in KHÔNG có bản ghi gốc để fallback (khác catalog vendor, có ref audio
+    # gốc để phát trực tiếp) — bản chất chỉ tồn tại qua tổng hợp TTS. File tĩnh (bước 1) do
+    # generate_previews.py sinh lúc build là đường NHANH bình thường; khi chưa chạy build đó
+    # (dev local, hoặc voice mới hơn bản build gần nhất) thì tổng hợp NGAY tại đây — preset
+    # không cần chuẩn bị ref audio nên đủ nhanh cho 1 request đồng bộ (~1s thực đo). Cache lại
+    # ra đĩa để lần sau đi thẳng bước 1, không tổng hợp lại mỗi lần bấm nghe thử.
+    preset_id = _registry.get_preset_id(voice_id)
+    if preset_id and _engine is not None:
+        try:
+            async with _synth_lock:
+                wav_bytes = await asyncio.to_thread(_synth_preview_wav_bytes, preset_id)
+        except Exception as e:
+            _write_log(f"[TTS] preview live-synth lỗi cho {voice_id}: {e}")
+            raise HTTPException(500, f"Không tổng hợp được preview: {e}")
+        if _preview_dir is not None:
+            try:
+                _preview_dir.mkdir(parents=True, exist_ok=True)
+                (_preview_dir / f"{voice_id}.wav").write_bytes(wav_bytes)
+            except Exception as e:
+                _write_log(f"[TTS] preview cache-to-disk lỗi cho {voice_id}: {e}")
+        return Response(content=wav_bytes, media_type="audio/wav")
 
     raise HTTPException(404, f"Preview not found for voice: {voice_id}")
 

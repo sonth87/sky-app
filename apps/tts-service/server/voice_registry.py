@@ -32,6 +32,9 @@ Rules:
 - hidden=true: ẩn khỏi GET /voices nhưng vẫn hoạt động qua /synthesize (backward compat)
 - Preset voices không thể DELETE, chỉ hide
 - Khi load: luôn merge PRESET_VOICES từ code → tự nhận preset mới khi VieNeu update
+- Preset built-in KHÁC (lấy từ `engine.list_presets()`, vd 20 giọng VieNeu 3.3.0) merge ĐỘNG
+  lúc runtime qua `merge_presets()` (main.py's lifespan, sau khi engine+registry sẵn sàng) —
+  không thể biết trước lúc module import như PRESET_VOICES tĩnh, vì cần engine đã load xong.
 
 - ref_text (optional, chỉ cloned): BẢN CHÉP LỜI của ref_file — audio mẫu đang nói câu gì.
   Engine clone kiểu in-context (Qwen: BẮT BUỘC; VoxCPM: tuỳ chọn, có thì clone chính xác
@@ -50,7 +53,7 @@ Cloned voice import từ catalog (voice_catalog.py, resources/voice-ref/{lang}/c
 
 Module này giờ có HAI cách lưu, cùng API công khai (`list_voices`/`get_voice`/`set_hidden`/
 `set_ref_text`/`add_cloned`/`find_by_source_catalog_id`/`delete_cloned`/`get_ref_path`/
-`get_preset_id`):
+`get_preset_id`/`merge_presets`):
 
   - `VoiceRegistryJson` — class GỐC, không đổi 1 dòng logic nào, chỉ đổi tên từ
     `VoiceRegistry`. Dùng khi chạy độc lập ngoài Electron, `verify_engine.py`, hoặc Electron
@@ -408,6 +411,33 @@ class VoiceRegistryJson:
             return None
         return v.get("preset_id")
 
+    def merge_presets(self, entries: list[dict]) -> None:
+        """Merge preset voice ĐỘNG — đọc từ `engine.list_presets()` lúc runtime (khác
+        `PRESET_VOICES` tĩnh ở module-level, biết được TRƯỚC khi engine load) — vào registry.
+
+        UPSERT theo id: entry mới thì thêm; entry đã có thì GHI ĐÈ lại metadata (label/region/
+        accent/category/tags/tagline/description/language/preset_id) — cho phép sửa code (vd
+        thêm field mới, sửa mô tả) tự áp dụng lại ở lần restart tiếp theo mà không cần xoá tay
+        registry. CHỈ giữ nguyên `hidden` của entry đã có — đó là lựa chọn CỦA NGƯỜI DÙNG, không
+        phải dữ liệu nguồn nên không được ghi đè (bug thật gặp lúc thêm field "language": entry
+        đã merge trước đó im lặng không bao giờ nhận field mới cho tới khi sửa lại logic này).
+        Mỗi dict trong `entries` phải có `id`.
+        """
+        with self._lock:
+            voices = self._data.setdefault("voices", {})
+            changed = False
+            for e in entries:
+                vid = e["id"]
+                new_entry = {k: v for k, v in e.items() if k != "id"}
+                existing = voices.get(vid)
+                if existing is not None:
+                    new_entry["hidden"] = existing.get("hidden", new_entry.get("hidden", False))
+                if voices.get(vid) != new_entry:
+                    voices[vid] = new_entry
+                    changed = True
+            if changed:
+                self._save()
+
 
 # ── Kho SQL (bảng tts_voice của DB dùng chung) ──────────────────────────────────────────
 
@@ -687,6 +717,40 @@ class VoiceRegistrySqlite:
         if v is None or v.get("type") != "preset":
             return None
         return v.get("preset_id")
+
+    def merge_presets(self, entries: list[dict]) -> None:
+        """Merge preset voice ĐỘNG (xem VoiceRegistryJson.merge_presets — cùng ngữ nghĩa UPSERT,
+        ghi đè metadata nhưng GIỮ NGUYÊN `hidden` đã có, không viết đè lựa chọn người dùng).
+        Dùng luôn cột accent/category_json/tags_json/tagline/description — migration 017 ghi
+        chú các cột này "chỉ 'cloned'" nhưng KHÔNG CHECK constraint ở tầng DB; preset built-in
+        cần chúng để filter được giống catalog vendor (yêu cầu tính năng này). Không có cột
+        "language" trong bảng — field đó (nếu entries có) bị bỏ qua ở đây, xử lý bằng fallback
+        phía frontend (xem TtsStudioApp.tsx's registryItems)."""
+        with self._lock:
+            now = _now_iso()
+            for e in entries:
+                category = e.get("category")
+                tags = e.get("tags")
+                self._conn.execute(
+                    """INSERT INTO tts_voice
+                       (id, type, label, gender, region, preset_id, hidden, created_at,
+                        accent, category_json, tags_json, tagline, description)
+                       VALUES (?, 'preset', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(id) DO UPDATE SET
+                         label = excluded.label, gender = excluded.gender, region = excluded.region,
+                         preset_id = excluded.preset_id, accent = excluded.accent,
+                         category_json = excluded.category_json, tags_json = excluded.tags_json,
+                         tagline = excluded.tagline, description = excluded.description""",
+                    (
+                        e["id"], e["label"], e.get("gender"), e.get("region"), e["preset_id"],
+                        1 if e.get("hidden") else 0, now,
+                        e.get("accent"),
+                        json.dumps(category, ensure_ascii=False) if category is not None else None,
+                        json.dumps(tags, ensure_ascii=False) if tags is not None else None,
+                        e.get("tagline"), e.get("description"),
+                    ),
+                )
+            self._conn.commit()
 
 
 def _import_json_once(conn: sqlite3.Connection, registry_path: Path) -> None:
