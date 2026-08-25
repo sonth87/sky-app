@@ -152,8 +152,9 @@ export function createElectronTtsPort(): TtsPort {
       return window.slide.listEffectTypes();
     },
     async listHistory(opts) {
-      const entries = await window.slide.listTtsHistory(opts);
-      return entries.map(toHistoryEntry);
+      const result = await window.slide.listTtsHistory(opts);
+      if (!result.ok) throw new Error(result.error);
+      return result.entries.map(toHistoryEntry);
     },
     async getHistoryAudioUrl(id) {
       return window.slide.getTtsHistoryAudioUrl(id);

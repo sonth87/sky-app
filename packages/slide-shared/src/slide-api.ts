@@ -495,8 +495,12 @@ export interface SlideApi {
   updateVoice(voiceId: string, hidden?: boolean, refText?: string): Promise<{ ok: boolean; error?: string }>;
   deleteVoice(voiceId: string): Promise<{ ok: boolean; error?: string }>;
   /** Nhật ký sinh audio (Phase 3) — mọi nguồn (ceremony/tts_studio/warmup/pregen), lọc theo
-   *  `source` nếu truyền. Trả mảng rỗng nếu history store chưa sẵn sàng (DB chưa migrate đủ). */
-  listTtsHistory(opts?: { limit?: number; source?: string }): Promise<TtsHistoryEntry[]>;
+   *  `source` nếu truyền. `ok:false` khi TTS server chưa sẵn sàng/lỗi mạng — PHẢI phân biệt
+   *  với mảng rỗng hợp lệ (chưa từng generate) để adapter renderer quyết định có retry hay
+   *  không (xem `platform-electron`'s `listHistory`, `TtsStudioApp.tsx`'s effect load lịch sử). */
+  listTtsHistory(opts?: { limit?: number; source?: string }): Promise<
+    { ok: true; entries: TtsHistoryEntry[] } | { ok: false; error: string }
+  >;
   /** URL http://127.0.0.1:<port>/history/<id>/audio — renderer's <audio src> tự fetch, đúng
    *  pattern getTtsPreviewUrl. 404 nếu entry không có audio (lỗi, hoặc nguồn 'pregen'). */
   getTtsHistoryAudioUrl(id: string): Promise<string>;

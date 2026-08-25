@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Copy, RotateCcw, Scissors, Trash2 } from 'lucide-react';
-import type { StoryItem, StoryItemVersion, StoryPort } from '@sky-app/service-contracts';
+import type { StoryItem, StoryPort } from '@sky-app/service-contracts';
 import { DRAG_THRESHOLD_PX, MIN_EFFECTIVE_MS, TRACK_HEIGHT } from './timelineConstants';
 import { ClipWaveform } from './ClipWaveform';
-import { DropdownMenu } from '../DropdownMenu';
 
 export interface ItemChange {
   startTimeMs?: number;
@@ -27,15 +25,6 @@ export interface TimelineItemProps {
   /** Gọi lúc THẢ chuột (kéo xong), không phải mỗi pixel di chuyển — Timeline quyết định gọi
    *  `moveItem`/`trimItem` (có thể cả 2) tuỳ field nào đổi. */
   onCommitChange: (itemId: string, changes: ItemChange) => void;
-  onDelete: (itemId: string) => void;
-  onDuplicate: (itemId: string) => void;
-  onSplit: (itemId: string, splitTimeMs: number) => void;
-  onVolumeChange: (itemId: string, volume: number) => void;
-  onRegenerate: (itemId: string) => void;
-  /** Gọi sau khi đổi version thành công (`VersionPicker`) — Timeline tự `refresh()`, khác
-   *  `onRegenerate` (kích hoạt sinh MỚI, không chỉ đọc lại). */
-  onVersionChanged: () => void;
-  regenerating: boolean;
 }
 
 type DragKind = 'move' | 'trim-left' | 'trim-right';
@@ -45,40 +34,6 @@ interface DragState {
   startY: number;
   moved: boolean;
   orig: { startTimeMs: number; track: number; trimStartMs: number; trimEndMs: number };
-}
-
-/** Dropdown chọn lại 1 bản đã lưu (version) — lazy-load khi mở, đúng cách tránh N+1 query mọi
- *  item cùng lúc (`can_regenerate` gọn đủ để biết CÓ version hay không, danh sách chỉ cần khi
- *  người dùng thật sự mở dropdown). */
-function VersionPicker({
-  storyId, itemId, storyPort, onPicked,
-}: { storyId: string; itemId: string; storyPort: StoryPort; onPicked: () => void }) {
-  const [versions, setVersions] = useState<StoryItemVersion[] | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    storyPort.listItemVersions(storyId, itemId).then((v) => { if (alive) setVersions(v); }).catch(() => { if (alive) setVersions([]); });
-    return () => { alive = false; };
-  }, [storyId, itemId, storyPort]);
-
-  if (versions === null) return <div className="px-2.5 py-1.5 text-2xs text-muted-foreground">Đang tải...</div>;
-  if (versions.length === 0) return <div className="px-2.5 py-1.5 text-2xs text-muted-foreground">Chưa có bản nào khác.</div>;
-
-  return (
-    <>
-      {versions.map((v) => (
-        <button
-          key={v.id}
-          type="button"
-          onClick={() => { void storyPort.setItemVersion(storyId, itemId, v.id).then(onPicked); }}
-          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-2xs text-foreground hover:bg-muted/60"
-        >
-          <Check size={11} className="opacity-0" />
-          {v.label}
-        </button>
-      ))}
-    </>
-  );
 }
 
 /**
@@ -91,8 +46,7 @@ function VersionPicker({
  * TRÁI cố định (chỉ trimEndMs đổi, startTimeMs không đổi).
  */
 export function TimelineItem({
-  item, storyId, storyPort, pxPerMs, tracks, selected, onSelect, onCommitChange, onDelete, onDuplicate,
-  onSplit, onVolumeChange, onRegenerate, onVersionChanged, regenerating,
+  item, storyId, storyPort, pxPerMs, tracks, selected, onSelect, onCommitChange,
 }: TimelineItemProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [draft, setDraft] = useState<ItemChange | null>(null);
@@ -237,73 +191,6 @@ export function TimelineItem({
       >
         <div className="mx-auto h-full w-0.5 bg-primary" />
       </div>
-
-      {selected && (
-        <div
-          className="absolute -top-9 left-0 flex items-center gap-1 rounded-lg border border-border bg-popover px-1.5 py-1 shadow-md"
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <input
-            type="range"
-            min={0}
-            max={2}
-            step={0.05}
-            value={item.volume}
-            onChange={(e) => onVolumeChange(item.id, Number(e.target.value))}
-            className="w-16"
-            title={`Âm lượng: ${item.volume.toFixed(2)}x`}
-          />
-          <button
-            type="button"
-            title="Tách tại giữa"
-            onClick={() => onSplit(item.id, Math.floor(effectiveDurationMs / 2))}
-            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <Scissors size={13} />
-          </button>
-          <button
-            type="button"
-            title="Nhân bản"
-            onClick={() => onDuplicate(item.id)}
-            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <Copy size={13} />
-          </button>
-          {item.canRegenerate && (
-            <button
-              type="button"
-              title="Sinh lại"
-              disabled={regenerating}
-              onClick={() => onRegenerate(item.id)}
-              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
-            >
-              <RotateCcw size={13} className={regenerating ? 'animate-spin' : undefined} />
-            </button>
-          )}
-          {item.activeVersionId && (
-            <DropdownMenu
-              triggerLabel="Chọn lại bản đã sinh"
-              triggerClassName="rounded px-1.5 py-1 text-2xs text-muted-foreground hover:bg-muted hover:text-foreground"
-              trigger={<span>Bản khác</span>}
-            >
-              <VersionPicker
-                storyId={storyId}
-                itemId={item.id}
-                storyPort={storyPort}
-                onPicked={onVersionChanged}
-              />
-            </DropdownMenu>
-          )}
-          <button
-            type="button"
-            title="Xoá"
-            onClick={() => onDelete(item.id)}
-            className="rounded p-1 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-          >
-            <Trash2 size={13} />
-          </button>
-        </div>
-      )}
     </div>
   );
 }

@@ -1306,18 +1306,28 @@ export function registerIpcHandlers() {
   // backoff CHỈ khi promise reject (mảng rỗng hợp lệ không đáng retry), nên nuốt lỗi ở đây từng
   // khiến lịch sử trống VĨNH VIỄN nếu app mount trước lúc Python server kịp mở cổng — retry
   // không bao giờ kích hoạt vì request "thành công" với mảng rỗng (bug thật, phản hồi 2026-08-24).
+  //
+  // Trả envelope `{ok:false,error}` thay vì THROW trực tiếp (khác lần sửa đầu — throw khiến
+  // Electron tự log "Error occurred in handler..." ra console main process mỗi lần retry lúc
+  // cold-start, phản hồi 2026-08-25) — đúng quy ước sẵn có của file này (`storyFetch`,
+  // `tts:delete-voice`...): main process LUÔN resolve, adapter renderer (`platform-electron`'s
+  // `listHistory`) mới là nơi throw Error thật để kích hoạt retry của TtsStudioApp.tsx.
   ipcMain.handle('tts:history-list', async (_e, { limit, source }: { limit?: number; source?: string }) => {
     const port = getPythonPort();
-    if (!port) throw new Error('TTS server chưa sẵn sàng');
-    const params = new URLSearchParams();
-    if (limit !== undefined) params.set('limit', String(limit));
-    if (source) params.set('source', source);
-    const qs = params.toString();
-    const res = await fetch(`http://127.0.0.1:${port}/history${qs ? `?${qs}` : ''}`, {
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    if (!port) return { ok: false, error: 'TTS server chưa sẵn sàng' };
+    try {
+      const params = new URLSearchParams();
+      if (limit !== undefined) params.set('limit', String(limit));
+      if (source) params.set('source', source);
+      const qs = params.toString();
+      const res = await fetch(`http://127.0.0.1:${port}/history${qs ? `?${qs}` : ''}`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+      return { ok: true, entries: await res.json() };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   // Trả URL thẳng tới Python server (đúng pattern getTtsPreviewUrl) — renderer's <audio src>

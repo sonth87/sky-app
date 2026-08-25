@@ -261,8 +261,9 @@ const api: SlideApi = {
     ipcRenderer.invoke('tts:update-voice', { voiceId, hidden, refText }),
   deleteVoice: (voiceId: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('tts:delete-voice', { voiceId }),
-  listTtsHistory: (opts?: { limit?: number; source?: string }): Promise<TtsHistoryEntry[]> =>
-    ipcRenderer.invoke('tts:history-list', opts ?? {}),
+  listTtsHistory: (opts?: { limit?: number; source?: string }): Promise<
+    { ok: true; entries: TtsHistoryEntry[] } | { ok: false; error: string }
+  > => ipcRenderer.invoke('tts:history-list', opts ?? {}),
   getTtsHistoryAudioUrl: (id: string): Promise<string> =>
     ipcRenderer.invoke('tts:history-audio-url', { id }),
   deleteTtsHistoryEntry: (id: string): Promise<{ ok: boolean; error?: string }> =>

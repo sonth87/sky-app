@@ -1,6 +1,6 @@
 {
   "name": "@sky-app/shell-electron",
-  "version": "0.18.1",
+  "version": "0.18.3",
   "private": true,
   "main": "./dist-electron/main/main.js",
   "scripts": {

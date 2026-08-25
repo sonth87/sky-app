@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { GripHorizontal, Minus, Pause, Play, Plus, Square } from 'lucide-react';
-import type { StoryPort, StoryWithItems } from '@sky-app/service-contracts';
+import { Check, Copy, GripHorizontal, Minus, Pause, Play, Plus, RotateCcw, Scissors, Square, Trash2 } from 'lucide-react';
+import type { StoryItemVersion, StoryPort, StoryWithItems } from '@sky-app/service-contracts';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { DropdownMenu } from '../DropdownMenu';
 import { TimelineItem, type ItemChange } from './TimelineItem';
 import { DEFAULT_PX_PER_MS, MAX_PX_PER_MS, MIN_PX_PER_MS, TRACK_HEIGHT } from './timelineConstants';
 import { useStoryPlaybackStore } from './storyPlaybackStore';
@@ -28,6 +29,40 @@ function formatTime(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+/** Dropdown chọn lại 1 bản đã lưu (version) — lazy-load khi mở, đúng cách tránh N+1 query mọi
+ *  item cùng lúc (`can_regenerate` gọn đủ để biết CÓ version hay không, danh sách chỉ cần khi
+ *  người dùng thật sự mở dropdown). */
+function VersionPicker({
+  storyId, itemId, storyPort, onPicked,
+}: { storyId: string; itemId: string; storyPort: StoryPort; onPicked: () => void }) {
+  const [versions, setVersions] = useState<StoryItemVersion[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    storyPort.listItemVersions(storyId, itemId).then((v) => { if (alive) setVersions(v); }).catch(() => { if (alive) setVersions([]); });
+    return () => { alive = false; };
+  }, [storyId, itemId, storyPort]);
+
+  if (versions === null) return <div className="px-2.5 py-1.5 text-2xs text-muted-foreground">Đang tải...</div>;
+  if (versions.length === 0) return <div className="px-2.5 py-1.5 text-2xs text-muted-foreground">Chưa có bản nào khác.</div>;
+
+  return (
+    <>
+      {versions.map((v) => (
+        <button
+          key={v.id}
+          type="button"
+          onClick={() => { void storyPort.setItemVersion(storyId, itemId, v.id).then(onPicked); }}
+          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-2xs text-foreground hover:bg-muted/60"
+        >
+          <Check size={11} className="opacity-0" />
+          {v.label}
+        </button>
+      ))}
+    </>
+  );
 }
 
 /**
@@ -57,6 +92,7 @@ export function Timeline({ storyId, story, storyPort, onRefresh, onError, playba
   const currentTimeMs = useStoryPlaybackStore((s) => s.currentTimeMs);
 
   const items = story.items;
+  const selectedItem = items.find((i) => i.id === selectedItemId) ?? null;
   const [extraTracks, setExtraTracks] = useState<number[]>([]);
 
   // Danh sách SỐ track đang hiện (không phải "có bao nhiêu hàng") — cho phép âm/thưa sau khi
@@ -268,6 +304,79 @@ export function Timeline({ storyId, story, storyPort, onRefresh, onError, playba
             {formatTime(currentTimeMs)} / {formatTime(playback.totalDurationMs)}
           </span>
         </div>
+
+        {/* Công cụ cho đoạn đang chọn — đặt ngay trong thanh toolbar CỐ ĐỊNH này (không phải
+            popup nổi bám theo vị trí đoạn trên canvas như bản trước) — đúng cách voicebox làm
+            (StoryTrackEditor.tsx's "Clip editing controls"), tránh việc đoạn ở track trên cùng
+            đẩy popup lên toạ độ ÂM trong `tracksRef` (`overflow-auto` phía dưới), bị cắt mất
+            hoàn toàn không cách nào cuộn thấy — bug thật, phản hồi 2026-08-24. */}
+        {selectedItem && (
+          <div className="flex items-center gap-1">
+            <input
+              type="range"
+              min={0}
+              max={2}
+              step={0.05}
+              value={selectedItem.volume}
+              onChange={(e) => handleVolumeChange(selectedItem.id, Number(e.target.value))}
+              className="w-16"
+              title={`Âm lượng: ${selectedItem.volume.toFixed(2)}x`}
+            />
+            <button
+              type="button"
+              title="Tách tại giữa"
+              onClick={() => {
+                const durationMs = selectedItem.durationMs - selectedItem.trimStartMs - selectedItem.trimEndMs;
+                handleSplit(selectedItem.id, Math.floor(durationMs / 2));
+              }}
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Scissors size={14} />
+            </button>
+            <button
+              type="button"
+              title="Nhân bản"
+              onClick={() => handleDuplicate(selectedItem.id)}
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Copy size={14} />
+            </button>
+            {selectedItem.canRegenerate && (
+              <button
+                type="button"
+                title="Sinh lại"
+                disabled={regeneratingItemId === selectedItem.id}
+                onClick={() => handleRegenerate(selectedItem.id)}
+                className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+              >
+                <RotateCcw size={14} className={regeneratingItemId === selectedItem.id ? 'animate-spin' : undefined} />
+              </button>
+            )}
+            {selectedItem.activeVersionId && (
+              <DropdownMenu
+                triggerLabel="Chọn lại bản đã sinh"
+                triggerClassName="rounded px-1.5 py-1 text-2xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                trigger={<span>Bản khác</span>}
+              >
+                <VersionPicker
+                  storyId={storyId}
+                  itemId={selectedItem.id}
+                  storyPort={storyPort}
+                  onPicked={() => void onRefresh()}
+                />
+              </DropdownMenu>
+            )}
+            <button
+              type="button"
+              title="Xoá"
+              onClick={() => setPendingDeleteItemId(selectedItem.id)}
+              className="rounded p-1 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center gap-1">
           <span className="text-2xs text-muted-foreground">Zoom</span>
           <button type="button" onClick={handleZoomOut} className="rounded p-1 text-muted-foreground hover:bg-muted"><Minus size={12} /></button>
@@ -363,13 +472,6 @@ export function Timeline({ storyId, story, storyPort, onRefresh, onError, playba
                 selected={selectedItemId === item.id}
                 onSelect={setSelectedItemId}
                 onCommitChange={handleCommitChange}
-                onDelete={(id) => setPendingDeleteItemId(id)}
-                onDuplicate={handleDuplicate}
-                onSplit={handleSplit}
-                onVolumeChange={handleVolumeChange}
-                onRegenerate={handleRegenerate}
-                onVersionChanged={() => void onRefresh()}
-                regenerating={regeneratingItemId === item.id}
               />
             ))}
 

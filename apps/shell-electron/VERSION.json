@@ -2,6 +2,21 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "version": "0.18.3",
+      "date": "2026-08-25",
+      "bump": "patch",
+      "summary": "Sửa lỗi log ồn \"Error occurred in handler for 'tts:history-list'\" hiện trong terminal lúc mở app khi dịch vụ TTS chưa khởi động xong (không ảnh hưởng hành vi người dùng cuối — cùng fix bản ghi gần đây ở bản 0.18.1, chỉ đổi cách IPC báo lỗi cho gọn console dev).",
+      "breaking": true,
+      "minAppVersion": "0.18.3"
+    },
+    {
+      "version": "0.18.2",
+      "date": "2026-08-24",
+      "bump": "patch",
+      "summary": "Fix lỗi thanh công cụ (tách/nhân bản/âm lượng/xoá/sinh lại/chọn bản khác) của đoạn đang chọn trong Story bị ẩn mất khi đoạn nằm ở track trên cùng.",
+      "breaking": false
+    },
+    {
       "version": "0.18.1",
       "date": "2026-08-24",
       "bump": "patch",
